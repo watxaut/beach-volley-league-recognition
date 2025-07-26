@@ -24,7 +24,7 @@ class BallDetector(BaseDetector):
     def __init__(
         self,
         model_path: Optional[str] = None,
-        confidence_threshold: float = 0.3,
+        confidence_threshold: float = 0.1,  # Much lower threshold for debugging
         device: str = "cpu"
     ):
         """Initialize the ball detector.
@@ -36,7 +36,8 @@ class BallDetector(BaseDetector):
         """
         super().__init__(confidence_threshold, device)
         self.model_path = model_path or "yolov8n.pt"  # Use nano model as default
-        self._ball_class_ids = {32}  # COCO class ID for sports ball
+        # Expand ball class IDs to include more potential ball objects
+        self._ball_class_ids = {32, 37}  # COCO: 32=sports ball, 37=frisbee (similar round objects)
         self.load_model()
 
     def load_model(self) -> None:

@@ -20,13 +20,13 @@ class Config:
         "device": "cpu",  # or "cuda" if GPU available
 
         # Detection settings
-        "ball_confidence": 0.3,
+        "ball_confidence": 0.1,  # Much lower for better ball detection
         "player_confidence": 0.5,
         "max_players": 4,
 
         # Tracking settings
-        "ball_max_missing": 10,
-        "trajectory_smoothing": 5,
+        "ball_max_missing": 30,  # Increased from 10 for better continuity
+        "trajectory_smoothing": 8,  # Increased smoothing
         "player_max_disappeared": 30,
         "tracking_max_distance": 100.0,
 

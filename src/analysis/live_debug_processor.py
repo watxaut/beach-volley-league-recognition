@@ -48,7 +48,12 @@ class LiveDebugProcessor:
         self.colors = {
             'player': (0, 255, 0),      # Green for players
             'ball': (0, 0, 255),        # Red for ball
+            'ball_filtered': (100, 100, 255),  # Light red for filtered balls
+            'ball_predicted': (128, 128, 128), # Gray for predicted balls
             'trajectory': (255, 0, 255), # Magenta for ball trajectory
+            'trajectory_predicted': (200, 100, 200), # Light magenta for predicted trajectory
+            'ball_detection_raw': (0, 150, 255), # Orange for raw detections
+            'velocity_vector': (255, 255, 0), # Cyan for velocity vectors
             'action_dig': (255, 255, 0), # Cyan for digs
             'action_set': (0, 255, 255), # Yellow for sets
             'action_spike': (255, 0, 0), # Blue for spikes
@@ -57,8 +62,14 @@ class LiveDebugProcessor:
             'action_serve': (255, 20, 147) # Deep pink for serves
         }
 
-        # Ball trajectory history
+        # Ball trajectory history with enhanced tracking
         self.ball_trajectory = deque(maxlen=50)  # Store last 50 positions
+        self.ball_raw_detections = deque(maxlen=20)  # Store raw detections for visualization
+        self.ball_detection_stats = {
+            'total_detections': 0,
+            'filtered_detections': 0,
+            'tracked_detections': 0
+        }
 
         # Performance tracking
         self.frame_times = deque(maxlen=30)
@@ -207,18 +218,31 @@ class LiveDebugProcessor:
             ball_detections = self.ball_detector.detect(frame)
             player_detections = self.player_detector.detect(frame)
 
+            # Update ball detection statistics
+            self.ball_detection_stats['total_detections'] += len(ball_detections)
+            self.ball_raw_detections.extend(ball_detections)
+
             # 2. Filter detections by court area
             filtered_player_detections = self.court_detector.filter_detections_by_court(player_detections)
             filtered_ball_detections = self.court_detector.filter_detections_by_court(ball_detections)
+
+            # Update filtered ball statistics
+            filtered_out_balls = len(ball_detections) - len(filtered_ball_detections)
+            self.ball_detection_stats['filtered_detections'] += filtered_out_balls
 
             # Log filtering results
             if len(player_detections) != len(filtered_player_detections):
                 filtered_count = len(player_detections) - len(filtered_player_detections)
                 self.logger.debug(f"Frame {frame_index}: Filtered {filtered_count} out-of-court players")
 
-            # 3. Object Tracking (use filtered detections)
+            if filtered_out_balls > 0:
+                self.logger.debug(f"Frame {frame_index}: Filtered {filtered_out_balls} out-of-court balls")
+
+            # 3. Object Tracking
+            # For players: use filtered detections (only in-court players)
             tracked_players = self.player_tracker.update(filtered_player_detections)
-            tracked_ball = self.ball_tracker.update(filtered_ball_detections)
+            # For ball: use ALL detections (ball can be outside court bounds)
+            tracked_ball = self.ball_tracker.update(ball_detections)
 
             # 4. Action Recognition
             actions = []
@@ -284,57 +308,219 @@ class LiveDebugProcessor:
         return frame
 
     def _draw_ball_and_trajectory(self, frame: np.ndarray, tracked_ball: Optional[Dict[str, Any]]) -> np.ndarray:
-        """Draw ball detection and trajectory.
+        """Draw enhanced ball detection and trajectory with comprehensive visual feedback.
 
         Args:
             frame: Input frame
             tracked_ball: Ball tracking data
 
         Returns:
-            Frame with ball overlays
+            Frame with enhanced ball overlays
         """
+        # First, draw all raw ball detections (before filtering)
+        frame = self._draw_raw_ball_detections(frame)
+
+        # Then draw the main tracked ball
         if tracked_ball:
             center = tracked_ball.get("center", [0, 0])
             confidence = tracked_ball.get("confidence", 0.0)
             velocity = tracked_ball.get("velocity", [0, 0])
             ball_state = tracked_ball.get("ball_state", "unknown")
+            is_predicted = tracked_ball.get("is_predicted", False)
 
             if center[0] is not None and center[1] is not None:
                 x, y = map(int, center)
 
-                # Add to trajectory
-                self.ball_trajectory.append((x, y))
+                # Add to trajectory with metadata
+                self.ball_trajectory.append((x, y, confidence, is_predicted))
+                self.ball_detection_stats['tracked_detections'] += 1
 
-                # Draw ball circle
-                radius = 8 if not tracked_ball.get("is_predicted", False) else 5
-                color = self.colors['ball'] if not tracked_ball.get("is_predicted", False) else (128, 128, 128)
-                cv2.circle(frame, (x, y), radius, color, -1)
+                # Enhanced ball circle with multiple visual indicators
+                if is_predicted:
+                    # Predicted ball - dashed circle
+                    self._draw_dashed_circle(frame, (x, y), 8, self.colors['ball_predicted'], 2)
+                    color = self.colors['ball_predicted']
+                    radius = 6
+                else:
+                    # Actual detection - solid circle with confidence-based sizing
+                    radius = max(6, int(8 + confidence * 4))  # Size based on confidence
+                    color = self.colors['ball']
+                    cv2.circle(frame, (x, y), radius, color, -1)
 
-                # Draw ball info
-                ball_info = f"Ball {confidence:.2f} | {ball_state}"
+                    # Add confidence ring
+                    ring_radius = radius + 3
+                    ring_color = tuple(int(c * confidence) for c in color)
+                    cv2.circle(frame, (x, y), ring_radius, ring_color, 2)
+
+                # Enhanced ball information panel
+                self._draw_ball_info_panel(frame, x, y, confidence, velocity, ball_state, is_predicted)
+
+                # Draw velocity vector with enhanced styling
                 if velocity and velocity != [0, 0]:
                     speed = np.sqrt(velocity[0]**2 + velocity[1]**2)
-                    ball_info += f" | Speed: {speed:.1f}"
+                    if speed > 1:  # Only draw if significant movement
+                        vector_length = min(50, speed * 2)  # Scale vector length
+                        end_x = int(x + (velocity[0] / speed) * vector_length)
+                        end_y = int(y + (velocity[1] / speed) * vector_length)
 
-                cv2.putText(frame, ball_info, (x + 15, y - 10),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                        # Draw velocity vector with gradient effect
+                        cv2.arrowedLine(frame, (x, y), (end_x, end_y),
+                                      self.colors['velocity_vector'], 3, tipLength=0.3)
 
-                # Draw velocity vector
-                if velocity and velocity != [0, 0]:
-                    end_x = int(x + velocity[0] * 3)
-                    end_y = int(y + velocity[1] * 3)
-                    cv2.arrowedLine(frame, (x, y), (end_x, end_y), color, 2)
+                        # Add speed indicator
+                        cv2.putText(frame, f"{speed:.1f}px/f", (end_x + 5, end_y),
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.4, self.colors['velocity_vector'], 1)
 
-        # Draw trajectory trail
-        if len(self.ball_trajectory) > 1:
-            points = list(self.ball_trajectory)
-            for i in range(1, len(points)):
-                # Fade older points
-                alpha = i / len(points)
-                thickness = max(1, int(alpha * 3))
-                cv2.line(frame, points[i-1], points[i], self.colors['trajectory'], thickness)
+        # Draw enhanced trajectory trail
+        self._draw_enhanced_trajectory(frame)
+
+        # Draw ball detection statistics
+        self._draw_ball_statistics(frame)
 
         return frame
+
+    def _draw_raw_ball_detections(self, frame: np.ndarray) -> np.ndarray:
+        """Draw all raw ball detections before filtering."""
+        # Show recent raw detections that were filtered out
+        for detection in list(self.ball_raw_detections)[-5:]:  # Show last 5 raw detections
+            bbox = detection.get("bbox", [])
+            confidence = detection.get("confidence", 0.0)
+
+            if len(bbox) == 4:
+                x1, y1, x2, y2 = map(int, bbox)
+                center_x = (x1 + x2) // 2
+                center_y = (y1 + y2) // 2
+
+                # Draw small orange circle for raw detections
+                cv2.circle(frame, (center_x, center_y), 3, self.colors['ball_detection_raw'], 1)
+
+                # Add small confidence label
+                cv2.putText(frame, f"{confidence:.2f}", (center_x + 5, center_y - 5),
+                          cv2.FONT_HERSHEY_SIMPLEX, 0.3, self.colors['ball_detection_raw'], 1)
+
+        return frame
+
+    def _draw_dashed_circle(self, frame: np.ndarray, center: Tuple[int, int],
+                           radius: int, color: Tuple[int, int, int], thickness: int) -> None:
+        """Draw a dashed circle for predicted ball positions."""
+        x, y = center
+        for angle in range(0, 360, 10):  # Draw dashes every 10 degrees
+            start_angle = np.radians(angle)
+            end_angle = np.radians(angle + 5)  # 5-degree dashes
+
+            start_x = int(x + radius * np.cos(start_angle))
+            start_y = int(y + radius * np.sin(start_angle))
+            end_x = int(x + radius * np.cos(end_angle))
+            end_y = int(y + radius * np.sin(end_angle))
+
+            cv2.line(frame, (start_x, start_y), (end_x, end_y), color, thickness)
+
+    def _draw_ball_info_panel(self, frame: np.ndarray, x: int, y: int, confidence: float,
+                             velocity: List[float], ball_state: str, is_predicted: bool) -> None:
+        """Draw detailed ball information panel."""
+        # Create info panel background
+        panel_x = x + 20
+        panel_y = y - 40
+        panel_width = 200
+        panel_height = 80
+
+        # Semi-transparent background
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (panel_x, panel_y),
+                     (panel_x + panel_width, panel_y + panel_height), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
+
+        # Ball info text
+        status = "PREDICTED" if is_predicted else "DETECTED"
+        lines = [
+            f"Ball {status}",
+            f"Confidence: {confidence:.3f}",
+            f"State: {ball_state}",
+        ]
+
+        if velocity and velocity != [0, 0]:
+            speed = np.sqrt(velocity[0]**2 + velocity[1]**2)
+            angle = np.degrees(np.arctan2(velocity[1], velocity[0]))
+            lines.append(f"Speed: {speed:.1f} px/f")
+            lines.append(f"Angle: {angle:.1f}°")
+
+        # Draw text lines
+        for i, line in enumerate(lines):
+            text_y = panel_y + 15 + (i * 12)
+            color = self.colors['ball_predicted'] if is_predicted else self.colors['ball']
+            cv2.putText(frame, line, (panel_x + 5, text_y),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+
+    def _draw_enhanced_trajectory(self, frame: np.ndarray) -> None:
+        """Draw enhanced ball trajectory with fade effect and prediction indicators."""
+        if len(self.ball_trajectory) > 1:
+            points = list(self.ball_trajectory)
+
+            for i in range(1, len(points)):
+                if len(points[i]) >= 4:  # Has metadata
+                    _, _, confidence, is_predicted = points[i]
+                    prev_point = points[i-1][:2]
+                    curr_point = points[i][:2]
+
+                    # Calculate alpha based on position in trajectory and confidence
+                    alpha = (i / len(points)) * confidence
+                    thickness = max(1, int(alpha * 4))
+
+                    # Choose color based on prediction status
+                    if is_predicted:
+                        color = self.colors['trajectory_predicted']
+                    else:
+                        color = self.colors['trajectory']
+
+                    # Fade color
+                    faded_color = tuple(int(c * alpha) for c in color)
+                    cv2.line(frame, prev_point, curr_point, faded_color, thickness)
+                else:
+                    # Fallback for old format
+                    prev_point = points[i-1][:2]
+                    curr_point = points[i][:2]
+                    alpha = i / len(points)
+                    thickness = max(1, int(alpha * 3))
+                    cv2.line(frame, prev_point, curr_point, self.colors['trajectory'], thickness)
+
+    def _draw_ball_statistics(self, frame: np.ndarray) -> None:
+        """Draw ball detection statistics panel."""
+        h, w = frame.shape[:2]
+
+        # Statistics panel
+        stats_x = w - 250
+        stats_y = 60
+
+        stats_text = [
+            f"Ball Detections:",
+            f"  Total: {self.ball_detection_stats['total_detections']}",
+            f"  Filtered: {self.ball_detection_stats['filtered_detections']}",
+            f"  Tracked: {self.ball_detection_stats['tracked_detections']}",
+            f"  Trajectory: {len(self.ball_trajectory)} pts"
+        ]
+
+        # Background for stats
+        for i, text in enumerate(stats_text):
+            text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
+            cv2.rectangle(frame, (stats_x - 5, stats_y + i * 18 - 12),
+                         (stats_x + text_size[0] + 5, stats_y + i * 18 + 5), (0, 0, 0), -1)
+
+            color = (255, 255, 255) if i == 0 else (200, 200, 200)
+            cv2.putText(frame, text, (stats_x, stats_y + i * 18),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        # Legend for ball visualization
+        legend_y = stats_y + len(stats_text) * 18 + 20
+        legend_items = [
+            ("● Detected", self.colors['ball']),
+            ("○ Predicted", self.colors['ball_predicted']),
+            ("● Raw Detection", self.colors['ball_detection_raw']),
+            ("→ Velocity", self.colors['velocity_vector'])
+        ]
+
+        for i, (text, color) in enumerate(legend_items):
+            cv2.putText(frame, text, (stats_x, legend_y + i * 15),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
 
     def _draw_actions(self, frame: np.ndarray, actions: List[Dict[str, Any]]) -> np.ndarray:
         """Draw recognized actions.

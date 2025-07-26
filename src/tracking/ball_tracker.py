@@ -21,9 +21,9 @@ class BallTracker:
 
     def __init__(
         self,
-        max_missing_frames: int = 10,
-        trajectory_smoothing: int = 5,
-        velocity_threshold: float = 50.0
+        max_missing_frames: int = 30,  # Increased from 10 - volleyball can be fast
+        trajectory_smoothing: int = 8,  # Increased smoothing window
+        velocity_threshold: float = 200.0  # Much higher threshold for volleyball
     ):
         """Initialize the ball tracker.
 
@@ -36,12 +36,15 @@ class BallTracker:
         self.trajectory_smoothing = trajectory_smoothing
         self.velocity_threshold = velocity_threshold
 
-        # Tracking state
-        self.trajectory = deque(maxlen=100)  # Store recent positions
-        self.velocities = deque(maxlen=10)   # Store recent velocities
+        # Enhanced tracking state for volleyball
+        self.trajectory = deque(maxlen=200)  # Increased to store longer trajectory
+        self.velocities = deque(maxlen=20)   # Store more velocity history
+        self.accelerations = deque(maxlen=10)  # Track acceleration for better prediction
         self.missing_count = 0
         self.last_position = None
         self.last_velocity = None
+        self.last_acceleration = None
+        self.confidence_history = deque(maxlen=10)  # Track detection confidence
 
         self.logger = logging.getLogger(__name__)
 
@@ -144,6 +147,21 @@ class BallTracker:
             else:
                 self.logger.debug(f"Invalid velocity detected: {velocity}")
 
+        # Calculate acceleration if we have previous velocity
+        acceleration = None
+        if self.last_velocity and velocity:
+            acceleration = [
+                velocity[0] - self.last_velocity[0],
+                velocity[1] - self.last_velocity[1]
+            ]
+
+            # Validate acceleration (check for sudden spikes)
+            if self._is_valid_acceleration(acceleration):
+                self.accelerations.append(acceleration)
+                self.last_acceleration = acceleration
+            else:
+                self.logger.debug(f"Invalid acceleration detected: {acceleration}")
+
         # Add to trajectory
         self.trajectory.append(center)
         self.last_position = center
@@ -153,6 +171,7 @@ class BallTracker:
         enhanced_detection = detection.copy()
         enhanced_detection.update({
             "velocity": velocity,
+            "acceleration": acceleration,
             "trajectory_length": len(self.trajectory),
             "smoothed_position": self._get_smoothed_position(),
             "ball_state": self._classify_ball_state()
@@ -219,6 +238,39 @@ class BallTracker:
 
             # Sudden velocity changes might indicate detection errors
             if velocity_change > self.velocity_threshold * 0.5:
+                return False
+
+        return True
+
+    def _is_valid_acceleration(self, acceleration: List[float]) -> bool:
+        """Check if acceleration is reasonable.
+
+        Args:
+            acceleration: [ax, ay] acceleration vector
+
+        Returns:
+            True if acceleration is valid
+        """
+        if not acceleration:
+            return False
+
+        # Check acceleration magnitude
+        magnitude = np.sqrt(acceleration[0]**2 + acceleration[1]**2)
+
+        # Too high acceleration is likely a detection error
+        if magnitude > self.velocity_threshold * 2:  # Higher threshold for acceleration
+            return False
+
+        # If we have acceleration history, check for sudden changes
+        if len(self.accelerations) > 0:
+            avg_acceleration = np.mean(self.accelerations, axis=0)
+            acceleration_change = np.sqrt(
+                (acceleration[0] - avg_acceleration[0])**2 +
+                (acceleration[1] - avg_acceleration[1])**2
+            )
+
+            # Sudden acceleration changes might indicate detection errors
+            if acceleration_change > self.velocity_threshold:
                 return False
 
         return True
@@ -290,9 +342,11 @@ class BallTracker:
         """Reset tracker state."""
         self.trajectory.clear()
         self.velocities.clear()
+        self.accelerations.clear()
         self.missing_count = 0
         self.last_position = None
         self.last_velocity = None
+        self.last_acceleration = None
         self.logger.debug("Ball tracker reset")
 
     def get_trajectory(self) -> List[List[float]]:
