@@ -9,7 +9,6 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
 
 from src.analysis.video_processor import VideoProcessor
 from src.output_gen.csv_exporter import CSVExporter
@@ -54,6 +53,17 @@ def parse_arguments() -> argparse.Namespace:
         "--skip-visualization",
         action="store_true",
         help="Skip generating visualization graphs"
+    )
+    parser.add_argument(
+        "--debug-live",
+        action="store_true",
+        help="Enable live debug mode with real-time visualization"
+    )
+    parser.add_argument(
+        "--debug-speed",
+        type=float,
+        default=1.0,
+        help="Debug playback speed multiplier (default: 1.0)"
     )
 
     return parser.parse_args()
@@ -114,6 +124,14 @@ def main() -> int:
 
         # Initialize video processor
         processor = VideoProcessor(config)
+
+        # Check if debug live mode is enabled
+        if args.debug_live:
+            logger.info("Starting live debug mode...")
+            from src.analysis.live_debug_processor import LiveDebugProcessor
+            debug_processor = LiveDebugProcessor(config, debug_speed=args.debug_speed)
+            debug_processor.process_video_live(str(video_file))
+            return 0
 
         # Process the video
         logger.info("Starting video processing...")
