@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Optional
 
 from src.analysis.video_processor import VideoProcessor
-from src.output.csv_exporter import CSVExporter
-from src.output.visualization import VisualizationGenerator
+from src.output_gen.csv_exporter import CSVExporter
+from src.output_gen.visualization import VisualizationGenerator
 from src.utils.config import Config
 from src.utils.logger import setup_logging
 
