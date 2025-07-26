@@ -14,6 +14,7 @@ from collections import deque
 
 from ..detection.ball_detector import BallDetector
 from ..detection.player_detector import PlayerDetector
+from ..detection.court_detector import CourtDetector
 from ..tracking.ball_tracker import BallTracker
 from ..tracking.player_tracker import PlayerTracker
 from ..recognition.pose_estimator import PoseEstimator
@@ -99,6 +100,12 @@ class LiveDebugProcessor:
                 pose_estimator=self.pose_estimator,
                 temporal_window=self.config.get("temporal_window", 10),
                 confidence_threshold=self.config.get("action_confidence", 0.6)
+            )
+
+            # Court detection component
+            self.court_detector = CourtDetector(
+                config=self.config,
+                debug_mode=True
             )
 
             self.logger.info("Live debug components initialized successfully")
@@ -189,26 +196,40 @@ class LiveDebugProcessor:
         debug_frame = frame.copy()
 
         try:
+            # 0. Court Detection (detect once, then use for filtering)
+            if frame_index == 0 or frame_index % 30 == 0:  # Re-detect every 30 frames
+                self.court_detector.detect_court(frame)
+
             # 1. Object Detection
             ball_detections = self.ball_detector.detect(frame)
             player_detections = self.player_detector.detect(frame)
 
-            # 2. Object Tracking
-            tracked_players = self.player_tracker.update(player_detections)
-            tracked_ball = self.ball_tracker.update(ball_detections)
+            # 2. Filter detections by court area
+            filtered_player_detections = self.court_detector.filter_detections_by_court(player_detections)
+            filtered_ball_detections = self.court_detector.filter_detections_by_court(ball_detections)
 
-            # 3. Action Recognition
+            # Log filtering results
+            if len(player_detections) != len(filtered_player_detections):
+                filtered_count = len(player_detections) - len(filtered_player_detections)
+                self.logger.debug(f"Frame {frame_index}: Filtered {filtered_count} out-of-court players")
+
+            # 3. Object Tracking (use filtered detections)
+            tracked_players = self.player_tracker.update(filtered_player_detections)
+            tracked_ball = self.ball_tracker.update(filtered_ball_detections)
+
+            # 4. Action Recognition
             actions = []
             if tracked_players:
                 actions = self.action_classifier.classify_actions(
                     frame, tracked_players, tracked_ball
                 )
 
-            # 4. Draw visualizations
+            # 5. Draw visualizations
+            debug_frame = self._draw_court_overlay(debug_frame)  # Draw court first
             debug_frame = self._draw_players(debug_frame, tracked_players)
             debug_frame = self._draw_ball_and_trajectory(debug_frame, tracked_ball)
             debug_frame = self._draw_actions(debug_frame, actions)
-            debug_frame = self._draw_frame_info(debug_frame, frame_index, len(tracked_players))
+            debug_frame = self._draw_frame_info(debug_frame, frame_index, len(tracked_players), len(filtered_player_detections), len(player_detections))
 
         except Exception as e:
             self.logger.error(f"Error processing debug frame {frame_index}: {e}")
@@ -355,28 +376,36 @@ class LiveDebugProcessor:
 
         return frame
 
-    def _draw_frame_info(self, frame: np.ndarray, frame_index: int, player_count: int) -> np.ndarray:
+    def _draw_frame_info(self, frame: np.ndarray, frame_index: int, tracked_count: int, filtered_count: int, total_detections: int) -> np.ndarray:
         """Draw frame information overlay.
 
         Args:
             frame: Input frame
             frame_index: Current frame index
-            player_count: Number of detected players
+            tracked_count: Number of tracked players
+            filtered_count: Number of players after court filtering
+            total_detections: Total player detections before filtering
 
         Returns:
             Frame with info overlay
         """
         h, w = frame.shape[:2]
 
-        # Frame info
-        info_text = f"Frame: {frame_index} | Players: {player_count}"
-        cv2.putText(frame, info_text, (10, h - 60),
+        # Frame info with filtering statistics
+        info_text = f"Frame: {frame_index} | Tracked: {tracked_count} | In-Court: {filtered_count}/{total_detections}"
+        cv2.putText(frame, info_text, (10, h - 80),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
         # Ball trajectory info
         ball_info = f"Ball trajectory points: {len(self.ball_trajectory)}"
-        cv2.putText(frame, ball_info, (10, h - 40),
+        cv2.putText(frame, ball_info, (10, h - 60),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+        # Court detection status
+        court_stats = self.court_detector.get_court_statistics()
+        court_status = "Court Detected" if court_stats.get("court_detected", False) else "No Court"
+        cv2.putText(frame, f"Court: {court_status}", (10, h - 40),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0) if court_stats.get("court_detected", False) else (0, 0, 255), 2)
 
         # Controls info
         controls = "Controls: 'q'=quit, SPACE=pause, 'r'=restart"
@@ -384,6 +413,17 @@ class LiveDebugProcessor:
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
 
         return frame
+
+    def _draw_court_overlay(self, frame: np.ndarray) -> np.ndarray:
+        """Draw court boundary overlay for debugging.
+
+        Args:
+            frame: Input frame
+
+        Returns:
+            Frame with court boundary overlay
+        """
+        return self.court_detector.draw_court_overlay(frame)
 
     def _add_performance_overlay(self, frame: np.ndarray, frame_count: int, total_frames: int) -> np.ndarray:
         """Add performance metrics overlay.
