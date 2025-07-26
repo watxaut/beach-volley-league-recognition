@@ -14,7 +14,6 @@ from collections import deque
 
 from ..detection.ball_detector import BallDetector
 from ..detection.player_detector import PlayerDetector
-from ..detection.court_detector import CourtDetector
 from ..tracking.ball_tracker import BallTracker
 from ..tracking.player_tracker import PlayerTracker
 from ..recognition.pose_estimator import PoseEstimator
@@ -68,6 +67,13 @@ class LiveDebugProcessor:
         """Initialize all computer vision components."""
         try:
             # Detection components
+            from ..detection.court_detector import CourtDetector
+
+            self.court_detector = CourtDetector(
+                config=self.config,
+                debug_mode=self.config.get("debug_mode", True)
+            )
+
             self.ball_detector = BallDetector(
                 confidence_threshold=self.config.get("ball_confidence", 0.3),
                 device=self.config.get("device", "cpu")
@@ -78,6 +84,9 @@ class LiveDebugProcessor:
                 device=self.config.get("device", "cpu"),
                 max_players=self.config.get("max_players", 4)
             )
+
+            # Connect court detector to player detector for court-based filtering
+            self.player_detector.set_court_detector(self.court_detector)
 
             # Tracking components
             self.ball_tracker = BallTracker(
@@ -100,12 +109,6 @@ class LiveDebugProcessor:
                 pose_estimator=self.pose_estimator,
                 temporal_window=self.config.get("temporal_window", 10),
                 confidence_threshold=self.config.get("action_confidence", 0.6)
-            )
-
-            # Court detection component
-            self.court_detector = CourtDetector(
-                config=self.config,
-                debug_mode=True
             )
 
             self.logger.info("Live debug components initialized successfully")

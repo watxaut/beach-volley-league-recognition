@@ -48,6 +48,13 @@ class VideoProcessor:
         """Initialize all computer vision components."""
         try:
             # Detection components
+            from ..detection.court_detector import CourtDetector
+
+            self.court_detector = CourtDetector(
+                config=self.config,
+                debug_mode=self.config.get("debug_mode", False)
+            )
+
             self.ball_detector = BallDetector(
                 confidence_threshold=self.config.get("ball_confidence", 0.3),
                 device=self.config.get("device", "cpu")
@@ -58,6 +65,9 @@ class VideoProcessor:
                 device=self.config.get("device", "cpu"),
                 max_players=self.config.get("max_players", 4)
             )
+
+            # Connect court detector to player detector for court-based filtering
+            self.player_detector.set_court_detector(self.court_detector)
 
             # Tracking components
             self.ball_tracker = BallTracker(

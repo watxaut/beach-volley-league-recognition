@@ -2,7 +2,8 @@
 Player tracker for volleyball video analysis.
 
 This module implements multi-object tracking for volleyball players,
-maintaining consistent player identities across video frames.
+maintaining consistent player identities across video frames with
+improved position consistency checks.
 """
 
 from typing import List, Dict, Any, Optional, Tuple
@@ -17,14 +18,16 @@ class PlayerTracker:
     """Multi-object tracker for volleyball players.
 
     Maintains consistent player identities across frames using a combination
-    of spatial proximity and appearance features.
+    of spatial proximity, appearance features, and position consistency checks.
     """
 
     def __init__(
         self,
         max_disappeared: int = 30,
         max_distance: float = 100.0,
-        iou_threshold: float = 0.3
+        iou_threshold: float = 0.3,
+        max_velocity: float = 50.0,
+        velocity_weight: float = 0.3
     ):
         """Initialize the player tracker.
 
@@ -32,15 +35,20 @@ class PlayerTracker:
             max_disappeared: Maximum frames a player can disappear before being removed
             max_distance: Maximum distance for associating detections with tracks
             iou_threshold: Minimum IoU for track association
+            max_velocity: Maximum allowed velocity in pixels per frame
+            velocity_weight: Weight for velocity consistency in assignment cost
         """
         self.max_disappeared = max_disappeared
         self.max_distance = max_distance
         self.iou_threshold = iou_threshold
+        self.max_velocity = max_velocity
+        self.velocity_weight = velocity_weight
 
         # Tracking state
         self.next_id = 0
         self.tracks = {}  # track_id -> track_info
         self.disappeared = defaultdict(int)
+        self.frame_count = 0
 
         self.logger = logging.getLogger(__name__)
 
@@ -85,7 +93,8 @@ class PlayerTracker:
                 "center": detection["center"],
                 "confidence": detection["confidence"],
                 "last_seen": 0,
-                "history": [detection["center"]]
+                "history": [detection["center"]],
+                "velocity": [0, 0]  # Initialize velocity
             }
             self.tracks[track_id] = track_info
 
@@ -152,7 +161,7 @@ class PlayerTracker:
         track_ids: List[int],
         detections: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """Perform greedy assignment of detections to tracks.
+        """Perform greedy assignment of detections to tracks with velocity consistency.
 
         Args:
             cost_matrix: Distance matrix between tracks and detections
@@ -171,29 +180,124 @@ class PlayerTracker:
         if cost_matrix.size == 0:
             return assignments
 
-        # Greedy assignment: for each track, find closest detection
+        # Enhanced assignment with velocity consistency check
         for track_idx, track_id in enumerate(track_ids):
-            min_distance = float('inf')
+            min_cost = float('inf')
             best_detection_idx = -1
 
             for det_idx in assignments["unmatched_detections"]:
+                # Base distance cost
                 distance = cost_matrix[track_idx, det_idx]
-                if distance < min_distance and distance < self.max_distance:
-                    min_distance = distance
-                    best_detection_idx = det_idx
+
+                if distance < self.max_distance:
+                    # Calculate velocity consistency cost
+                    velocity_cost = self._calculate_velocity_cost(track_id, detections[det_idx])
+
+                    # Combined cost
+                    total_cost = distance + (self.velocity_weight * velocity_cost)
+
+                    if total_cost < min_cost:
+                        min_cost = total_cost
+                        best_detection_idx = det_idx
 
             # If valid assignment found
             if best_detection_idx != -1:
-                # Additional IoU check
+                # Additional IoU and velocity validation
                 track_bbox = self.tracks[track_id]["bbox"]
                 det_bbox = detections[best_detection_idx]["bbox"]
 
-                if self._calculate_iou(track_bbox, det_bbox) > self.iou_threshold:
+                iou_valid = self._calculate_iou(track_bbox, det_bbox) > self.iou_threshold
+                velocity_valid = self._is_velocity_valid(track_id, detections[best_detection_idx])
+
+                if iou_valid and velocity_valid:
                     assignments["matched"].append((track_id, best_detection_idx))
                     assignments["unmatched_tracks"].discard(track_id)
                     assignments["unmatched_detections"].discard(best_detection_idx)
 
         return assignments
+
+    def _calculate_velocity_cost(self, track_id: int, detection: Dict[str, Any]) -> float:
+        """Calculate velocity consistency cost for track-detection assignment.
+
+        Args:
+            track_id: Track ID
+            detection: Detection to evaluate
+
+        Returns:
+            Velocity cost (lower is better)
+        """
+        track = self.tracks[track_id]
+
+        # If track has insufficient history, return low cost
+        if len(track["history"]) < 2:
+            return 0.0
+
+        # Calculate expected position based on current velocity
+        current_pos = track["center"]
+        current_velocity = track.get("velocity", [0, 0])
+        expected_pos = [
+            current_pos[0] + current_velocity[0],
+            current_pos[1] + current_velocity[1]
+        ]
+
+        # Calculate cost as distance from expected position
+        det_pos = detection["center"]
+        velocity_cost = np.sqrt(
+            (det_pos[0] - expected_pos[0])**2 +
+            (det_pos[1] - expected_pos[1])**2
+        )
+
+        return velocity_cost
+
+    def _is_velocity_valid(self, track_id: int, detection: Dict[str, Any]) -> bool:
+        """Check if the implied velocity is realistic for a player.
+
+        Args:
+            track_id: Track ID
+            detection: Detection to validate
+
+        Returns:
+            True if velocity is within acceptable bounds
+        """
+        track = self.tracks[track_id]
+        current_pos = track["center"]
+        new_pos = detection["center"]
+
+        # Calculate implied velocity
+        velocity = [
+            new_pos[0] - current_pos[0],
+            new_pos[1] - current_pos[1]
+        ]
+
+        # Check if velocity magnitude is within bounds
+        velocity_magnitude = np.sqrt(velocity[0]**2 + velocity[1]**2)
+        return velocity_magnitude <= self.max_velocity
+
+    def _update_velocity(self, track_id: int, new_center: List[float]) -> None:
+        """Update velocity for a track based on position change.
+
+        Args:
+            track_id: Track ID to update
+            new_center: New center position
+        """
+        track = self.tracks[track_id]
+        old_center = track["center"]
+
+        # Calculate new velocity
+        velocity = [
+            new_center[0] - old_center[0],
+            new_center[1] - old_center[1]
+        ]
+
+        # Apply smoothing to velocity (exponential moving average)
+        if "velocity" in track:
+            alpha = 0.3  # Smoothing factor
+            track["velocity"] = [
+                alpha * velocity[0] + (1 - alpha) * track["velocity"][0],
+                alpha * velocity[1] + (1 - alpha) * track["velocity"][1]
+            ]
+        else:
+            track["velocity"] = velocity
 
     def _update_tracks_with_assignments(
         self,
@@ -226,6 +330,9 @@ class PlayerTracker:
 
             # Reset disappeared counter
             self.disappeared[track_id] = 0
+
+            # Update velocity
+            self._update_velocity(track_id, detection["center"])
 
             # Add to output
             tracked_detection = detection.copy()
@@ -269,7 +376,8 @@ class PlayerTracker:
             "center": detection["center"],
             "confidence": detection["confidence"],
             "last_seen": 0,
-            "history": [detection["center"]]
+            "history": [detection["center"]],
+            "velocity": [0, 0]  # Initialize velocity
         }
         self.tracks[track_id] = track_info
         self.disappeared[track_id] = 0

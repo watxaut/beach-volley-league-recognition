@@ -40,6 +40,7 @@ class PlayerDetector(BaseDetector):
         self.model_path = model_path or "yolov8n.pt"
         self.max_players = max_players
         self._person_class_ids = {0}  # COCO class ID for person
+        self.court_detector = None  # Will be set later via set_court_detector
         self.load_model()
 
     def load_model(self) -> None:
@@ -83,7 +84,7 @@ class PlayerDetector(BaseDetector):
             detections = self.postprocess_detections(results)
 
             # Filter and rank detections
-            filtered_detections = self.filter_player_detections(detections)
+            filtered_detections = self.filter_player_detections(detections, frame)
 
             self.logger.debug(f"Detected {len(filtered_detections)} players in frame")
             return filtered_detections
@@ -129,11 +130,12 @@ class PlayerDetector(BaseDetector):
 
         return detections
 
-    def filter_player_detections(self, detections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def filter_player_detections(self, detections: List[Dict[str, Any]], frame: Optional[np.ndarray] = None) -> List[Dict[str, Any]]:
         """Apply player-specific filtering to detections.
 
         Args:
             detections: Raw player detections
+            frame: Input frame for court filtering
 
         Returns:
             Filtered and ranked player detections
@@ -156,6 +158,21 @@ class PlayerDetector(BaseDetector):
                     self.logger.debug(f"Filtered player with invalid area: {area}")
             else:
                 self.logger.debug(f"Filtered player with invalid aspect ratio: {aspect_ratio}")
+
+        # Court filtering: keep only players inside or intersecting with the court
+        if self.court_detector and frame is not None:
+            court_filtered = []
+            court_mask = self.court_detector.detect_court(frame)
+
+            if court_mask is not None:
+                for detection in player_filtered:
+                    if self._is_player_in_court(detection, court_mask):
+                        court_filtered.append(detection)
+                    else:
+                        self.logger.debug(f"Filtered player outside court bounds")
+                player_filtered = court_filtered
+            else:
+                self.logger.warning("Court detection failed, keeping all players")
 
         # Sort by confidence and limit to max_players
         player_filtered.sort(key=lambda x: x["confidence"], reverse=True)
@@ -244,3 +261,38 @@ class PlayerDetector(BaseDetector):
             max_area = min(max_area, frame_area * max_ratio)
 
         return min_area <= area <= max_area
+
+    def _is_player_in_court(self, detection: Dict[str, Any], court_mask: np.ndarray) -> bool:
+        """Check if a player detection intersects with the court area.
+
+        Args:
+            detection: Player detection dictionary with bbox
+            court_mask: Binary mask of court area (255 = court, 0 = outside)
+
+        Returns:
+            True if player intersects with court area
+        """
+        bbox = detection["bbox"]
+        x1, y1, x2, y2 = map(int, bbox)
+
+        # Ensure bbox is within frame bounds
+        h, w = court_mask.shape
+        x1 = max(0, min(x1, w-1))
+        y1 = max(0, min(y1, h-1))
+        x2 = max(0, min(x2, w-1))
+        y2 = max(0, min(y2, h-1))
+
+        if x2 <= x1 or y2 <= y1:
+            return False
+
+        # Check if any part of the player's bbox overlaps with court area
+        player_region = court_mask[y1:y2, x1:x2]
+        return np.any(player_region == 255)
+
+    def set_court_detector(self, court_detector) -> None:
+        """Set the court detector for filtering players by court boundaries.
+
+        Args:
+            court_detector: CourtDetector instance
+        """
+        self.court_detector = court_detector
