@@ -233,3 +233,5 @@ docs/build/
 
 # Ruff cache
 .ruff_cache/
+
+.claude

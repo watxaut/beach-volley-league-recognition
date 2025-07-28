@@ -65,6 +65,13 @@ def parse_arguments() -> argparse.Namespace:
         default=1.0,
         help="Debug playback speed multiplier (default: 1.0)"
     )
+    parser.add_argument(
+        "--detection-method",
+        type=str,
+        choices=["yolo", "template", "features", "hybrid", "fusion"],
+        default="hybrid",
+        help="Ball detection method to use (default: hybrid)"
+    )
 
     return parser.parse_args()
 
@@ -117,6 +124,9 @@ def main() -> int:
 
         # Load configuration
         config = Config.load(args.config) if args.config else Config.default()
+        
+        # Override config with command line detection method
+        config["detection_method"] = args.detection_method
 
         # Create output directory
         output_dir = Path(args.output_dir)

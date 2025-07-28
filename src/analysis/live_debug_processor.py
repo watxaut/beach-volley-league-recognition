@@ -14,7 +14,7 @@ from collections import deque
 
 from ..detection.ball_detector import BallDetector
 from ..detection.player_detector import PlayerDetector
-from ..tracking.ball_tracker import BallTracker
+from ..tracking.enhanced_ball_tracker import EnhancedBallTracker  # Import enhanced tracker
 from ..tracking.player_tracker import PlayerTracker
 from ..recognition.pose_estimator import PoseEstimator
 from ..recognition.action_classifier import ActionClassifier
@@ -68,8 +68,12 @@ class LiveDebugProcessor:
         self.ball_detection_stats = {
             'total_detections': 0,
             'filtered_detections': 0,
-            'tracked_detections': 0
+            'tracked_detections': 0,
+            'method_counts': {}  # Track which methods are detecting balls
         }
+        
+        # Detection method tracking
+        self.recent_detection_methods = deque(maxlen=10)  # Store recent detection methods used
 
         # Performance tracking
         self.frame_times = deque(maxlen=30)
@@ -87,7 +91,10 @@ class LiveDebugProcessor:
 
             self.ball_detector = BallDetector(
                 confidence_threshold=self.config.get("ball_confidence", 0.3),
-                device=self.config.get("device", "cpu")
+                device=self.config.get("device", "cpu"),
+                detection_method=self.config.get("detection_method", "hybrid"),
+                enable_multiple_methods=self.config.get("enable_multiple_methods", True),
+                wilson_ball_dir=self.config.get("wilson_ball_dir", "resources/wilson_ball")
             )
 
             self.player_detector = PlayerDetector(
@@ -99,10 +106,13 @@ class LiveDebugProcessor:
             # Connect court detector to player detector for court-based filtering
             self.player_detector.set_court_detector(self.court_detector)
 
-            # Tracking components
-            self.ball_tracker = BallTracker(
-                max_missing_frames=self.config.get("ball_max_missing", 10),
-                trajectory_smoothing=self.config.get("trajectory_smoothing", 5)
+            # Tracking components - Use Enhanced Ball Tracker for better continuity
+            self.ball_tracker = EnhancedBallTracker(
+                max_missing_frames=self.config.get("ball_max_missing", 45),
+                template_update_interval=5,
+                optical_flow_quality=0.01,
+                kalman_process_noise=0.1,
+                kalman_measurement_noise=1.0
             )
 
             self.player_tracker = PlayerTracker(
@@ -218,9 +228,16 @@ class LiveDebugProcessor:
             ball_detections = self.ball_detector.detect(frame)
             player_detections = self.player_detector.detect(frame)
 
-            # Update ball detection statistics
+            # Update ball detection statistics and track methods used
             self.ball_detection_stats['total_detections'] += len(ball_detections)
             self.ball_raw_detections.extend(ball_detections)
+            
+            # Track detection methods used
+            for detection in ball_detections:
+                method = detection.get('method', 'unknown')
+                self.ball_detection_stats['method_counts'][method] = \
+                    self.ball_detection_stats['method_counts'].get(method, 0) + 1
+                self.recent_detection_methods.append(method)
 
             # 2. Filter detections by court area
             filtered_player_detections = self.court_detector.filter_detections_by_court(player_detections)
@@ -241,8 +258,8 @@ class LiveDebugProcessor:
             # 3. Object Tracking
             # For players: use filtered detections (only in-court players)
             tracked_players = self.player_tracker.update(filtered_player_detections)
-            # For ball: use ALL detections (ball can be outside court bounds)
-            tracked_ball = self.ball_tracker.update(ball_detections)
+            # For ball: use ALL detections (ball can be outside court bounds) + frame for enhanced tracking
+            tracked_ball = self.ball_tracker.update(ball_detections, frame)
 
             # 4. Action Recognition
             actions = []
@@ -254,7 +271,7 @@ class LiveDebugProcessor:
             # 5. Draw visualizations
             debug_frame = self._draw_court_overlay(debug_frame)  # Draw court first
             debug_frame = self._draw_players(debug_frame, tracked_players)
-            debug_frame = self._draw_ball_and_trajectory(debug_frame, tracked_ball)
+            debug_frame = self._draw_ball_and_trajectory(debug_frame, tracked_ball, ball_detections)
             debug_frame = self._draw_actions(debug_frame, actions)
             debug_frame = self._draw_frame_info(debug_frame, frame_index, len(tracked_players), len(filtered_player_detections), len(player_detections))
 
@@ -307,18 +324,19 @@ class LiveDebugProcessor:
 
         return frame
 
-    def _draw_ball_and_trajectory(self, frame: np.ndarray, tracked_ball: Optional[Dict[str, Any]]) -> np.ndarray:
+    def _draw_ball_and_trajectory(self, frame: np.ndarray, tracked_ball: Optional[Dict[str, Any]], current_detections: List[Dict[str, Any]] = None) -> np.ndarray:
         """Draw enhanced ball detection and trajectory with comprehensive visual feedback.
 
         Args:
             frame: Input frame
             tracked_ball: Ball tracking data
+            current_detections: Current frame ball detections with method info
 
         Returns:
             Frame with enhanced ball overlays
         """
-        # First, draw all raw ball detections (before filtering)
-        frame = self._draw_raw_ball_detections(frame)
+        # First, draw all raw ball detections with method information
+        frame = self._draw_raw_ball_detections(frame, current_detections)
 
         # Then draw the main tracked ball
         if tracked_ball:
@@ -352,8 +370,9 @@ class LiveDebugProcessor:
                     ring_color = tuple(int(c * confidence) for c in color)
                     cv2.circle(frame, (x, y), ring_radius, ring_color, 2)
 
-                # Enhanced ball information panel
-                self._draw_ball_info_panel(frame, x, y, confidence, velocity, ball_state, is_predicted)
+                # Enhanced ball information panel with method info
+                current_method = tracked_ball.get('method', 'unknown')
+                self._draw_ball_info_panel(frame, x, y, confidence, velocity, ball_state, is_predicted, current_method)
 
                 # Draw velocity vector with enhanced styling
                 if velocity and velocity != [0, 0]:
@@ -379,24 +398,65 @@ class LiveDebugProcessor:
 
         return frame
 
-    def _draw_raw_ball_detections(self, frame: np.ndarray) -> np.ndarray:
-        """Draw all raw ball detections before filtering."""
-        # Show recent raw detections that were filtered out
-        for detection in list(self.ball_raw_detections)[-5:]:  # Show last 5 raw detections
+    def _draw_raw_ball_detections(self, frame: np.ndarray, current_detections: List[Dict[str, Any]] = None) -> np.ndarray:
+        """Draw all raw ball detections with method information."""
+        # Define colors for different detection methods
+        method_colors = {
+            'template': (255, 165, 0),      # Orange for template matching
+            'features': (0, 255, 255),      # Cyan for feature-based
+            'hybrid': (255, 0, 255),        # Magenta for hybrid CNN
+            'fusion': (128, 255, 128),      # Light green for fusion
+            'yolo': (255, 255, 0),          # Yellow for YOLO
+            'wilson_tracker': (255, 192, 203), # Pink for Wilson tracker
+            'unknown': (128, 128, 128)      # Gray for unknown
+        }
+        
+        # Draw current frame detections with method labels
+        if current_detections:
+            for i, detection in enumerate(current_detections):
+                bbox = detection.get("bbox", [])
+                confidence = detection.get("confidence", 0.0)
+                method = detection.get("method", "unknown")
+                
+                if len(bbox) == 4:
+                    x1, y1, x2, y2 = map(int, bbox)
+                    center_x = (x1 + x2) // 2
+                    center_y = (y1 + y2) // 2
+                    
+                    # Get method color
+                    method_color = method_colors.get(method, method_colors['unknown'])
+                    
+                    # Draw detection circle with method-specific color
+                    cv2.circle(frame, (center_x, center_y), 5, method_color, 2)
+                    
+                    # Draw method label
+                    method_label = f"{method[:8]}" # Truncate long method names
+                    cv2.putText(frame, method_label, (center_x + 8, center_y - 8),
+                              cv2.FONT_HERSHEY_SIMPLEX, 0.4, method_color, 1)
+                    
+                    # Draw confidence
+                    cv2.putText(frame, f"{confidence:.2f}", (center_x + 8, center_y + 8),
+                              cv2.FONT_HERSHEY_SIMPLEX, 0.3, method_color, 1)
+                    
+                    # Draw detection number
+                    cv2.putText(frame, str(i+1), (center_x - 10, center_y - 10),
+                              cv2.FONT_HERSHEY_SIMPLEX, 0.4, method_color, 1)
+        
+        # Also show recent historical detections (smaller)
+        for detection in list(self.ball_raw_detections)[-3:]:  # Show last 3 historical detections
             bbox = detection.get("bbox", [])
             confidence = detection.get("confidence", 0.0)
+            method = detection.get("method", "unknown")
 
             if len(bbox) == 4:
                 x1, y1, x2, y2 = map(int, bbox)
                 center_x = (x1 + x2) // 2
                 center_y = (y1 + y2) // 2
-
-                # Draw small orange circle for raw detections
-                cv2.circle(frame, (center_x, center_y), 3, self.colors['ball_detection_raw'], 1)
-
-                # Add small confidence label
-                cv2.putText(frame, f"{confidence:.2f}", (center_x + 5, center_y - 5),
-                          cv2.FONT_HERSHEY_SIMPLEX, 0.3, self.colors['ball_detection_raw'], 1)
+                
+                method_color = method_colors.get(method, method_colors['unknown'])
+                
+                # Draw smaller circle for historical detections
+                cv2.circle(frame, (center_x, center_y), 2, method_color, 1)
 
         return frame
 
@@ -416,7 +476,7 @@ class LiveDebugProcessor:
             cv2.line(frame, (start_x, start_y), (end_x, end_y), color, thickness)
 
     def _draw_ball_info_panel(self, frame: np.ndarray, x: int, y: int, confidence: float,
-                             velocity: List[float], ball_state: str, is_predicted: bool) -> None:
+                             velocity: List[float], ball_state: str, is_predicted: bool, method: str = "unknown") -> None:
         """Draw detailed ball information panel."""
         # Create info panel background
         panel_x = x + 20
@@ -430,10 +490,11 @@ class LiveDebugProcessor:
                      (panel_x + panel_width, panel_y + panel_height), (0, 0, 0), -1)
         cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
 
-        # Ball info text
+        # Ball info text with method information
         status = "PREDICTED" if is_predicted else "DETECTED"
         lines = [
             f"Ball {status}",
+            f"Method: {method}",
             f"Confidence: {confidence:.3f}",
             f"State: {ball_state}",
         ]
@@ -484,43 +545,71 @@ class LiveDebugProcessor:
                     cv2.line(frame, prev_point, curr_point, self.colors['trajectory'], thickness)
 
     def _draw_ball_statistics(self, frame: np.ndarray) -> None:
-        """Draw ball detection statistics panel."""
+        """Draw ball detection statistics panel with method breakdown."""
         h, w = frame.shape[:2]
 
         # Statistics panel
-        stats_x = w - 250
+        stats_x = w - 300
         stats_y = 60
 
+        # Main statistics
         stats_text = [
             f"Ball Detections:",
             f"  Total: {self.ball_detection_stats['total_detections']}",
             f"  Filtered: {self.ball_detection_stats['filtered_detections']}",
             f"  Tracked: {self.ball_detection_stats['tracked_detections']}",
-            f"  Trajectory: {len(self.ball_trajectory)} pts"
+            f"  Trajectory: {len(self.ball_trajectory)} pts",
+            "",
+            f"Detection Methods Used:"
         ]
+
+        # Add method counts
+        for method, count in self.ball_detection_stats['method_counts'].items():
+            stats_text.append(f"  {method}: {count}")
+
+        # Add recent methods used
+        if len(self.recent_detection_methods) > 0:
+            recent_methods = list(self.recent_detection_methods)[-3:]  # Last 3 methods
+            recent_str = " → ".join(recent_methods)
+            stats_text.append("")
+            stats_text.append(f"Recent: {recent_str}")
+
+        # Current detection method from ball detector
+        current_method = getattr(self.ball_detector, 'detection_method', 'unknown')
+        stats_text.append(f"Config: {current_method}")
 
         # Background for stats
         for i, text in enumerate(stats_text):
-            text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
-            cv2.rectangle(frame, (stats_x - 5, stats_y + i * 18 - 12),
-                         (stats_x + text_size[0] + 5, stats_y + i * 18 + 5), (0, 0, 0), -1)
+            if text.strip():  # Skip empty lines
+                text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)[0]
+                cv2.rectangle(frame, (stats_x - 5, stats_y + i * 15 - 10),
+                             (stats_x + text_size[0] + 5, stats_y + i * 15 + 3), (0, 0, 0), -1)
 
-            color = (255, 255, 255) if i == 0 else (200, 200, 200)
-            cv2.putText(frame, text, (stats_x, stats_y + i * 18),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+                # Color coding for headers vs data
+                if text.endswith(":") and not text.startswith("  "):
+                    color = (255, 255, 255)  # White for headers
+                elif text.startswith("  "):
+                    color = (200, 200, 200)  # Light gray for indented items
+                else:
+                    color = (150, 255, 150)  # Light green for recent/config info
 
-        # Legend for ball visualization
-        legend_y = stats_y + len(stats_text) * 18 + 20
+                cv2.putText(frame, text, (stats_x, stats_y + i * 15),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+
+        # Method color legend
+        legend_y = stats_y + len(stats_text) * 15 + 20
         legend_items = [
-            ("● Detected", self.colors['ball']),
-            ("○ Predicted", self.colors['ball_predicted']),
-            ("● Raw Detection", self.colors['ball_detection_raw']),
-            ("→ Velocity", self.colors['velocity_vector'])
+            ("● Template", (255, 165, 0)),     # Orange
+            ("● Features", (0, 255, 255)),     # Cyan  
+            ("● Hybrid", (255, 0, 255)),       # Magenta
+            ("● Fusion", (128, 255, 128)),     # Light green
+            ("● YOLO", (255, 255, 0)),         # Yellow
+            ("● Wilson", (255, 192, 203)),     # Pink
         ]
 
         for i, (text, color) in enumerate(legend_items):
-            cv2.putText(frame, text, (stats_x, legend_y + i * 15),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+            cv2.putText(frame, text, (stats_x, legend_y + i * 12),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.35, color, 1)
 
     def _draw_actions(self, frame: np.ndarray, actions: List[Dict[str, Any]]) -> np.ndarray:
         """Draw recognized actions.
