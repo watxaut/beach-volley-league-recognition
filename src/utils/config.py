@@ -21,9 +21,10 @@ class Config:
 
         # Detection settings
         "detection_method": "template",  # Default to Wilson ball template matching
-        "ball_confidence": 0.05,  # Much lower for better ball detection
+        "ball_confidence": 0.5,  # Much lower for better ball detection
         "player_confidence": 0.5,
         "max_players": 4,
+        "ball_horizontal_margin_percent": 0.25,  # Horizontal margin to exclude from ball detection (15% on each side)
 
         # Tracking settings
         "ball_max_missing": 30,  # Increased from 10 for better continuity
@@ -253,6 +254,10 @@ class Config:
 
         if not 0 <= self.get("court_margin", 0.05) <= 1:
             logging.error("court_margin must be between 0 and 1")
+            valid = False
+
+        if not 0 <= self.get("ball_horizontal_margin_percent", 0.15) < 0.5:
+            logging.error("ball_horizontal_margin_percent must be between 0 and 0.5 (exclusive)")
             valid = False
 
         return valid

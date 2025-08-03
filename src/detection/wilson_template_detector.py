@@ -12,6 +12,8 @@ from typing import List, Dict, Any, Tuple, Optional
 from pathlib import Path
 import math
 
+from .motion_ball_tracker import MotionBallTracker
+
 
 class WilsonTemplateDetector:
     """
@@ -26,7 +28,10 @@ class WilsonTemplateDetector:
         template_dir: str = "resources/wilson_ball",
         confidence_threshold: float = 0.7,
         scales: List[float] = None,
-        match_methods: List[int] = None
+        match_methods: List[int] = None,
+        enable_motion_filtering: bool = True,
+        fps: float = 30.0,
+        horizontal_margin_percent: float = 0.15
     ):
         """
         Initialize Wilson template detector.
@@ -36,13 +41,34 @@ class WilsonTemplateDetector:
             confidence_threshold: Minimum confidence for detection
             scales: Scales to test for template matching
             match_methods: OpenCV template matching methods to use
+            enable_motion_filtering: Enable motion-based false positive filtering
+            fps: Video frame rate for motion analysis
+            horizontal_margin_percent: Horizontal margin to exclude from detection (0.0-0.5)
         """
         self.template_dir = Path(template_dir)
         self.confidence_threshold = confidence_threshold
         self.scales = scales or [0.08, 0.1, 0.12, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]
         self.match_methods = match_methods or [cv2.TM_CCOEFF_NORMED, cv2.TM_CCORR_NORMED]
+        self.enable_motion_filtering = enable_motion_filtering
+        self.fps = fps
+        self.horizontal_margin_percent = horizontal_margin_percent
         
         self.logger = logging.getLogger(__name__)
+        
+        # Initialize motion-based tracker for false positive filtering
+        if self.enable_motion_filtering:
+            self.motion_tracker = MotionBallTracker(
+                trajectory_window=4,  # Shorter window for faster validation
+                min_velocity=1.0,     # Lower threshold for slower ball movements
+                max_velocity=40.0,
+                gravity_tolerance=0.6,  # More tolerant for various trajectories
+                motion_weight=0.4,    # Lower weight, trust template matching more
+                min_movement=5.0,     # Lower threshold for slow movements
+                fps=self.fps
+            )
+            self.logger.info("Motion-based filtering enabled")
+        else:
+            self.motion_tracker = None
         
         # Load and preprocess templates
         self.templates = []
@@ -135,7 +161,15 @@ class WilsonTemplateDetector:
                 detections.append(best_match)
         
         # Non-maximum suppression to remove overlapping detections
-        final_detections = self._non_max_suppression(detections)
+        nms_detections = self._non_max_suppression(detections)
+        
+        # Apply motion-based filtering if enabled
+        if self.enable_motion_filtering and self.motion_tracker is not None:
+            final_detections = self.motion_tracker.filter_detections(nms_detections, frame)
+            self.logger.debug(f"Motion filtering: {len(nms_detections)} -> {len(final_detections)} detections")
+
+        else:
+            final_detections = nms_detections
         
         return final_detections
 
@@ -158,12 +192,23 @@ class WilsonTemplateDetector:
         return color_mask
 
     def _filter_ball_regions(self, contours: List, frame_shape: Tuple) -> List[Tuple[int, int, int, int]]:
-        """Filter contours to find potential ball regions."""
+        """Filter contours to find potential ball regions in middle 70% of screen."""
         ball_regions = []
+        
+        # Calculate horizontal region of interest using configurable margin
+        frame_width = frame_shape[1]
+        margin = int(frame_width * self.horizontal_margin_percent)
+        roi_x_start = margin
+        roi_x_end = frame_width - margin
         
         for contour in contours:
             # Calculate bounding rectangle
             x, y, w, h = cv2.boundingRect(contour)
+            
+            # Filter by horizontal position - only keep regions in middle 70%
+            center_x = x + w // 2
+            if center_x < roi_x_start or center_x > roi_x_end:
+                continue
             
             # Filter by size (reasonable ball sizes)
             area = w * h
@@ -353,3 +398,10 @@ class WilsonTemplateDetector:
 
         union_area = box1_area + box2_area - inter_area
         return inter_area / union_area if union_area > 0 else 0.0
+
+    def get_motion_statistics(self) -> Dict[str, Any]:
+        """Get motion tracking statistics for debugging."""
+        if self.motion_tracker is not None:
+            return self.motion_tracker.get_track_statistics()
+        else:
+            return {"motion_filtering": "disabled"}

@@ -58,7 +58,8 @@ class VideoProcessor:
             self.ball_detector = BallDetector(
                 confidence_threshold=self.config.get("ball_confidence", 0.3),
                 device=self.config.get("device", "cpu"),
-                detection_method=self.config.get("detection_method", "template")
+                detection_method=self.config.get("detection_method", "template"),
+                horizontal_margin_percent=self.config.get("ball_horizontal_margin_percent", 0.15)
             )
 
             self.player_detector = PlayerDetector(
@@ -125,6 +126,15 @@ class VideoProcessor:
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
         self.logger.info(f"Video properties: {self.total_frames} frames, {fps} FPS, {width}x{height}")
+        
+        # Update ball detector with actual video FPS for accurate motion analysis
+        if hasattr(self.ball_detector, 'wilson_detectors') and 'template' in self.ball_detector.wilson_detectors:
+            template_detector = self.ball_detector.wilson_detectors['template']
+            if template_detector.motion_tracker is not None:
+                template_detector.motion_tracker.fps = fps
+                # Recalculate gravity with correct FPS
+                template_detector.motion_tracker.gravity_px_per_frame2 = template_detector.motion_tracker._calculate_gravity_pixels()
+                self.logger.info(f"Updated motion tracker FPS to {fps:.2f}, gravity: {template_detector.motion_tracker.gravity_px_per_frame2:.4f} px/frame²")
 
         # Initialize results storage
         results = {

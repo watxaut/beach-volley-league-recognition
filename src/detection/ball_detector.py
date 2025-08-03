@@ -26,6 +26,9 @@ class BallDetector(BaseDetector):
         device: str = "cpu",
         wilson_ball_dir: Optional[str] = None,
         detection_method: str = "template",
+        enable_motion_filtering: bool = True,
+        fps: float = 30.0,
+        horizontal_margin_percent: float = 0.15
     ):
         """Initialize the ball detector.
 
@@ -35,12 +38,18 @@ class BallDetector(BaseDetector):
             device: Device to run inference on ("cpu" or "cuda")
             wilson_ball_dir: Path to Wilson ball reference images directory
             detection_method: Detection method (only "template" supported)
+            enable_motion_filtering: Enable motion-based false positive filtering
+            fps: Video frame rate for motion analysis
+            horizontal_margin_percent: Horizontal margin to exclude from detection (0.0-0.5)
         """
         super().__init__(confidence_threshold, device)
         
         # Template detection configuration
         self.detection_method = detection_method
         self.wilson_dir = wilson_ball_dir or "resources/wilson_ball"
+        self.enable_motion_filtering = enable_motion_filtering
+        self.fps = fps
+        self.horizontal_margin_percent = horizontal_margin_percent
         
         # Initialize Wilson template detector
         self.wilson_detectors = {}
@@ -57,7 +66,10 @@ class BallDetector(BaseDetector):
         try:
             self.wilson_detectors['template'] = WilsonTemplateDetector(
                 template_dir=self.wilson_dir,
-                confidence_threshold=self.confidence_threshold
+                confidence_threshold=self.confidence_threshold,
+                enable_motion_filtering=self.enable_motion_filtering,
+                fps=self.fps,
+                horizontal_margin_percent=self.horizontal_margin_percent
             )
             self.logger.info("Wilson template detector initialized")
         except Exception as e:
