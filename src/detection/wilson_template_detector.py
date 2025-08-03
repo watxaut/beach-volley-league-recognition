@@ -58,15 +58,15 @@ class WilsonTemplateDetector:
         # Initialize motion-based tracker for false positive filtering
         if self.enable_motion_filtering:
             self.motion_tracker = MotionBallTracker(
-                trajectory_window=4,  # Shorter window for faster validation
-                min_velocity=1.0,     # Lower threshold for slower ball movements
-                max_velocity=40.0,
-                gravity_tolerance=0.6,  # More tolerant for various trajectories
-                motion_weight=0.4,    # Lower weight, trust template matching more
-                min_movement=5.0,     # Lower threshold for slow movements
+                trajectory_window=3,    # Even shorter window for faster validation
+                min_velocity=0.5,       # Very low threshold for slow ball movements
+                max_velocity=50.0,      # Higher threshold for fast serves/spikes
+                gravity_tolerance=1.5,  # Much more tolerant for various trajectories
+                motion_weight=0.2,      # Much lower weight, trust template matching more
+                min_movement=2.0,       # Much lower threshold for slow movements
                 fps=self.fps
             )
-            self.logger.info("Motion-based filtering enabled")
+            self.logger.info("Motion-based filtering enabled with lenient parameters")
         else:
             self.motion_tracker = None
         
@@ -165,8 +165,17 @@ class WilsonTemplateDetector:
         
         # Apply motion-based filtering if enabled
         if self.enable_motion_filtering and self.motion_tracker is not None:
+            self.logger.info(f"Before motion filtering: {len(nms_detections)} detections")
+            if nms_detections:
+                for i, det in enumerate(nms_detections):
+                    self.logger.info(f"  Detection {i}: center={det['center']}, conf={det['confidence']:.3f}")
+            
             final_detections = self.motion_tracker.filter_detections(nms_detections, frame)
-            self.logger.debug(f"Motion filtering: {len(nms_detections)} -> {len(final_detections)} detections")
+            
+            self.logger.info(f"After motion filtering: {len(final_detections)} detections")
+            if final_detections:
+                for i, det in enumerate(final_detections):
+                    self.logger.info(f"  Final {i}: center={det['center']}, conf={det.get('final_confidence', det['confidence']):.3f}, motion={det.get('motion_score', 0):.3f}")
 
         else:
             final_detections = nms_detections

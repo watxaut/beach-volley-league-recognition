@@ -171,7 +171,7 @@ class MotionBallTracker:
                     detection, track_data, center, template_name, template_conf
                 )
                 
-                if score > 0.3:  # Minimum matching threshold
+                if score > 0.15:  # Minimum matching threshold (reduced from 0.3)
                     detection_track_scores.append((det_idx, track_id, score))
         
         # Sort by score and assign best matches
@@ -236,12 +236,12 @@ class MotionBallTracker:
             distance = min(distance, predicted_distance)  # Use best of actual or predicted
         
         # Distance scoring: closer = better, but penalize very large jumps
-        if distance > 150:  # Reject very large jumps
+        if distance > 300:  # Reject very large jumps (increased from 150)
             return 0.0
-        elif distance < 20:  # Very close
+        elif distance < 50:  # Very close (increased tolerance)
             distance_score = 1.0
         else:
-            distance_score = max(0.0, 1.0 - (distance - 20) / 130)  # Linear decay
+            distance_score = max(0.0, 1.0 - (distance - 50) / 250)  # Linear decay
         scores.append(('distance', distance_score, 0.5))
         
         # 2. Template consistency score
@@ -351,14 +351,14 @@ class MotionBallTracker:
             should_include = False
             
             if track_length < 3:
-                # New tracks: lenient threshold
-                should_include = final_score > 0.3
+                # New tracks: very lenient threshold
+                should_include = final_score > 0.15
             elif track_length < 6:
-                # Growing tracks: moderate threshold  
-                should_include = final_score > 0.4 or motion_score > 0.2
+                # Growing tracks: lenient threshold  
+                should_include = final_score > 0.2 or motion_score > 0.1
             else:
-                # Mature tracks: require good motion or very high template confidence
-                should_include = motion_score > 0.25 or template_confidence > 0.9
+                # Mature tracks: moderate threshold
+                should_include = motion_score > 0.15 or template_confidence > 0.7
             
             if should_include:
                 validated_detections.append(latest_detection)
