@@ -130,7 +130,8 @@ class LiveDebugProcessor:
             self.action_classifier = ActionClassifier(
                 pose_estimator=self.pose_estimator,
                 temporal_window=self.config.get("temporal_window", 10),
-                confidence_threshold=self.config.get("action_confidence", 0.6)
+                confidence_threshold=self.config.get("action_confidence", 0.6),
+                enhanced_validation_config=self.config.get("enhanced_validation", {})
             )
 
             self.logger.info("Live debug components initialized successfully")
@@ -275,9 +276,24 @@ class LiveDebugProcessor:
             # 4. Action Recognition
             actions = []
             if tracked_players:
+                # Get court info for enhanced validation
+                court_info = None
+                if hasattr(self.court_detector, 'get_court_statistics'):
+                    court_stats = self.court_detector.get_court_statistics()
+                    if court_stats.get("court_detected", False):
+                        court_info = {"boundaries": court_stats.get("boundaries", {})}
+                
                 actions = self.action_classifier.classify_actions(
-                    frame, tracked_players, tracked_ball
+                    frame, tracked_players, tracked_ball,
+                    frame_number=frame_index,
+                    court_info=court_info
                 )
+                
+                # Filter out UNKNOWN actions - only keep actions with ball contact
+                actions = [
+                    action for action in actions 
+                    if action.get("action", "unknown") != "unknown" and action.get("confidence", 0.0) > 0.1
+                ]
 
             # 5. Draw visualizations
             debug_frame = self._draw_court_overlay(debug_frame)  # Draw court first

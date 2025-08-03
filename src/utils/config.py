@@ -57,11 +57,13 @@ class Config:
         "log_file": None,
 
         # Court detection settings
-        "court_detection_method": "geometric",  # "geometric" or "vision"
-        "court_height_ratio": 0.23,  # Court takes 60% of frame height
-        "court_width_ratio": 0.7,   # Court takes 80% of frame width
-        "court_vertical_offset": 0.5,  # Court starts at 20% from top
-        "court_horizontal_center": 0.52,  # Court centered horizontally
+        "court_detection_method": "geometric",  # "yolo", "geometric", or "vision"
+        "court_model_path": "weights/court/court_best.pt",  # Path to YOLO court model
+        "court_confidence": 0.5,  # Confidence threshold for YOLO court detection
+        "court_height_ratio": 0.23,  # Court takes 60% of frame height (fallback for geometric)
+        "court_width_ratio": 0.7,   # Court takes 80% of frame width (fallback for geometric)
+        "court_vertical_offset": 0.5,  # Court starts at 20% from top (fallback for geometric)
+        "court_horizontal_center": 0.52,  # Court centered horizontally (fallback for geometric)
 
         # Perspective correction settings
         "court_perspective_enabled": True,  # Enable perspective-aware court detection
@@ -73,6 +75,77 @@ class Config:
         # Advanced court detection settings
         "court_margin": 0.01,  # 5% margin around detected court
         "use_adaptive_court": False,  # Adapt court based on player positions
+        
+        # Enhanced Ball-Player Proximity Validation Settings
+        "enhanced_validation": {
+            "enabled": True,
+            "strict_mode": True,  # Enforce strict ball contact requirement
+            
+            # Ball contact validation settings
+            "ball_contact": {
+                "min_contact_confidence": 0.3,  # Stricter requirement for ball contact
+                "contact_zones": {
+                    "dig": {
+                        "height_range": [0.6, 1.0],  # Relative to player height
+                        "width_expansion": 1.0,      # Tighter arm reach
+                        "base_threshold": 60         # Stricter proximity requirement
+                    },
+                    "set": {
+                        "height_range": [0.0, 0.4],  # Above shoulders
+                        "width_expansion": 0.8,      # Tighter reach
+                        "base_threshold": 70         # Stricter proximity requirement
+                    },
+                    "spike": {
+                        "height_range": [-0.2, 0.3], # Extended above head
+                        "width_expansion": 1.2,      # Reduced reach
+                        "base_threshold": 80         # Stricter proximity requirement
+                    },
+                    "block": {
+                        "height_range": [0.0, 0.3],
+                        "width_expansion": 1.0,      # Tighter reach
+                        "base_threshold": 70         # Stricter proximity requirement
+                    },
+                    "serve": {
+                        "height_range": [0.2, 0.8],
+                        "width_expansion": 1.5,      # Reduced reach
+                        "base_threshold": 100        # Stricter proximity requirement
+                    }
+                }
+            },
+            
+            # Temporal validation settings
+            "temporal": {
+                "window_size": 5,
+                "min_frames_in_contact": 2,     # Require fewer frames for contact
+                "confidence_decay_rate": 0.2,   # Faster decay
+                "contact_stability_threshold": 0.4  # Lower threshold for stability
+            },
+            
+            # Ball trajectory analysis settings
+            "trajectory": {
+                "trajectory_window": 10,
+                "min_velocity_change": 50.0,      # pixels/frame
+                "min_direction_change": 30.0,     # degrees
+                "velocity_spike_threshold": 2.0,   # multiplier
+                "smoothing_window": 3,
+                "gravity_acceleration": 9.8,      # pixels/frame^2
+                "air_resistance_factor": 0.98,
+                "bounce_energy_loss": 0.7
+            },
+            
+            # Court position validation settings
+            "court": {
+                "enabled": True,
+                "serve_boundary_margin": 50,      # pixels behind baseline
+                "court_geometry": "from_config",   # Use existing court detection
+                "court_geometry_config": {
+                    "court_width_ratio": 0.7,
+                    "court_height_ratio": 0.6,
+                    "court_horizontal_center": 0.5,
+                    "court_vertical_offset": 0.3
+                }
+            }
+        }
     }
 
     def __init__(self, config_dict: Optional[Dict[str, Any]] = None):

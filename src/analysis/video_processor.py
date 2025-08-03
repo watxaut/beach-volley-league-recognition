@@ -59,7 +59,8 @@ class VideoProcessor:
                 confidence_threshold=self.config.get("ball_confidence", 0.3),
                 device=self.config.get("device", "cpu"),
                 detection_method=self.config.get("detection_method", "template"),
-                horizontal_margin_percent=self.config.get("ball_horizontal_margin_percent", 0.15)
+                horizontal_margin_percent=self.config.get("ball_horizontal_margin_percent", 0.15),
+                enable_motion_filtering=False  # disable for now as it is not working properly
             )
 
             self.player_detector = PlayerDetector(
@@ -91,7 +92,8 @@ class VideoProcessor:
             self.action_classifier = ActionClassifier(
                 pose_estimator=self.pose_estimator,
                 temporal_window=self.config.get("temporal_window", 10),
-                confidence_threshold=self.config.get("action_confidence", 0.6)
+                confidence_threshold=self.config.get("action_confidence", 0.6),
+                enhanced_validation_config=self.config.get("enhanced_validation", {})
             )
 
             # Analysis component
@@ -223,10 +225,28 @@ class VideoProcessor:
 
         # 3. Action Recognition
         if tracked_players:
+            # Get court information for validation
+            court_info = None
+            if hasattr(self, 'court_detector') and self.court_detector:
+                try:
+                    court_detection = self.court_detector.detect_court(frame)
+                    if court_detection and court_detection.get("detected", False):
+                        court_info = {"boundaries": court_detection}
+                except Exception as e:
+                    self.logger.debug(f"Court detection failed: {e}")
+            
             actions = self.action_classifier.classify_actions(
-                frame, tracked_players, tracked_ball
+                frame, tracked_players, tracked_ball,
+                frame_number=frame_result.get("frame_number", 0),
+                court_info=court_info
             )
-            frame_result["actions"] = actions
+            
+            # Filter out UNKNOWN actions - only keep actions with ball contact
+            valid_actions = [
+                action for action in actions 
+                if action.get("action", "unknown") != "unknown" and action.get("confidence", 0.0) > 0.1
+            ]
+            frame_result["actions"] = valid_actions
 
         # Record processing time
         frame_result["processing_time"] = time.time() - start_time

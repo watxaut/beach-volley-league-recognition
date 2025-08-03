@@ -10,6 +10,7 @@ import cv2
 import numpy as np
 import logging
 from scipy import ndimage
+from .yolo_court_detector import YoloCourtDetector
 
 
 class CourtDetector:
@@ -31,13 +32,18 @@ class CourtDetector:
         self.logger = logging.getLogger(__name__)
 
         # Court detection parameters from config
-        self.detection_method = config.get("court_detection_method", "geometric")
+        self.detection_method = config.get("court_detection_method", "yolo")  # Default to YOLO
         self.court_height_ratio = config.get("court_height_ratio", 0.6)
         self.court_width_ratio = config.get("court_width_ratio", 0.8)
         self.court_vertical_offset = config.get("court_vertical_offset", 0.2)
         self.court_horizontal_center = config.get("court_horizontal_center", 0.5)
         self.court_margin = config.get("court_margin", 0.05)
         self.use_adaptive_court = config.get("use_adaptive_court", True)
+
+        # YOLO court detection parameters
+        self.yolo_model_path = config.get("court_model_path", "weights/court/court_best.pt")
+        self.yolo_confidence = config.get("court_confidence", 0.5)
+        self.yolo_device = config.get("device", "auto")
 
         # Perspective correction parameters
         self.perspective_enabled = config.get("court_perspective_enabled", True)
@@ -55,6 +61,24 @@ class CourtDetector:
         # Player position history for adaptive court
         self.player_positions_history = []
 
+        # Initialize YOLO court detector
+        self.yolo_detector = None
+        if self.detection_method == "yolo":
+            try:
+                self.yolo_detector = YoloCourtDetector(
+                    model_path=self.yolo_model_path,
+                    confidence_threshold=self.yolo_confidence,
+                    device=self.yolo_device
+                )
+                if self.yolo_detector.is_model_loaded():
+                    self.logger.info(f"YOLO court detector loaded successfully: {self.yolo_model_path}")
+                else:
+                    self.logger.warning("YOLO model not available, falling back to geometric detection")
+                    self.detection_method = "geometric"
+            except Exception as e:
+                self.logger.error(f"Failed to initialize YOLO court detector: {e}")
+                self.detection_method = "geometric"
+
         self.logger.info(f"Court detector initialized: method={self.detection_method}, "
                         f"height_ratio={self.court_height_ratio}, width_ratio={self.court_width_ratio}")
 
@@ -69,11 +93,56 @@ class CourtDetector:
         """
         self.frame_dimensions = frame.shape[:2]  # (height, width)
 
-        if self.detection_method == "geometric":
+        if self.detection_method == "yolo" and self.yolo_detector is not None:
+            return self._detect_court_yolo(frame)
+        elif self.detection_method == "geometric":
             return self._detect_court_geometric(frame)
         else:
             # Fallback to original vision-based method
             return self._detect_court_vision_based(frame)
+
+    def _detect_court_yolo(self, frame: np.ndarray) -> Optional[np.ndarray]:
+        """Detect court using YOLO11 model.
+
+        Args:
+            frame: Input video frame
+
+        Returns:
+            Binary mask of the court area or None if detection failed
+        """
+        try:
+            detection = self.yolo_detector.detect_court(frame)
+            
+            if detection is None:
+                self.logger.debug("YOLO court detection failed, falling back to geometric")
+                return self._detect_court_geometric(frame)
+            
+            # Extract court mask
+            court_mask = detection.get('mask')
+            if court_mask is None:
+                self.logger.debug("No mask from YOLO detection, falling back to geometric")
+                return self._detect_court_geometric(frame)
+            
+            # Store detection results for other methods to use
+            self.court_bounds = detection.get('bbox')
+            self.court_mask = court_mask
+            
+            # Apply margin if specified
+            if self.court_margin > 0:
+                h, w = frame.shape[:2]
+                margin_pixels = int(min(h, w) * self.court_margin)
+                kernel = np.ones((margin_pixels * 2, margin_pixels * 2), np.uint8)
+                court_mask = cv2.dilate(court_mask, kernel, iterations=1)
+                self.court_mask = court_mask
+            
+            confidence = detection.get('confidence', 0.0)
+            self.logger.debug(f"YOLO court detected with confidence: {confidence:.3f}")
+            
+            return court_mask
+            
+        except Exception as e:
+            self.logger.error(f"YOLO court detection error: {e}")
+            return self._detect_court_geometric(frame)
 
     def _detect_court_geometric(self, frame: np.ndarray) -> np.ndarray:
         """Detect court using geometric assumptions with perspective correction.
@@ -350,6 +419,16 @@ class CourtDetector:
         Returns:
             True if point is in court
         """
+        # If we have YOLO detection, use the court mask for precise point checking
+        if (self.detection_method == "yolo" and self.yolo_detector is not None 
+            and self.court_mask is not None):
+            x, y = point
+            h, w = self.court_mask.shape
+            if 0 <= x < w and 0 <= y < h:
+                return self.court_mask[y, x] > 0
+            return False
+        
+        # Fallback to geometric and adaptive court checking
         return (self._is_point_in_geometric_court(point) or
                 self._is_point_in_adaptive_court(point))
 
@@ -368,7 +447,12 @@ class CourtDetector:
         # Draw court mask as semi-transparent overlay
         if self.court_mask is not None:
             court_colored = np.zeros_like(frame)
-            court_colored[:, :, 1] = self.court_mask  # Green channel
+            
+            # Use different colors based on detection method
+            if self.detection_method == "yolo":
+                court_colored[:, :, 0] = self.court_mask  # Blue channel for YOLO
+            else:
+                court_colored[:, :, 1] = self.court_mask  # Green channel for geometric
 
             # Blend with original frame
             alpha = 0.2
@@ -407,6 +491,20 @@ class CourtDetector:
             cv2.putText(overlay, adaptive_info, (left, bottom + 20),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
 
+        # Add YOLO detection info if applicable
+        if self.detection_method == "yolo" and self.yolo_detector is not None:
+            yolo_info = f"YOLO Court Detection"
+            if self.yolo_detector.is_model_loaded():
+                confidence = self.yolo_detector.get_detection_confidence()
+                yolo_info += f" | Confidence: {confidence:.2f}"
+                color = (255, 0, 0)  # Blue for YOLO
+            else:
+                yolo_info += " | Model Not Loaded"
+                color = (0, 0, 255)  # Red for error
+            
+            cv2.putText(overlay, yolo_info, (10, 100),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+
         # Add configuration info
         config_text = f"Method: {self.detection_method} | Perspective: {'ON' if self.perspective_enabled else 'OFF'} | Margin: {self.court_margin:.1%}"
         cv2.putText(overlay, config_text, (10, 120),
@@ -428,6 +526,17 @@ class CourtDetector:
             "use_adaptive": self.use_adaptive_court,
             "player_history_count": len(self.player_positions_history) if self.player_positions_history else 0
         }
+
+        # Add YOLO-specific statistics
+        if self.detection_method == "yolo" and self.yolo_detector is not None:
+            yolo_stats = self.yolo_detector.get_model_info()
+            stats.update({
+                "yolo_model_loaded": self.yolo_detector.is_model_loaded(),
+                "yolo_model_path": yolo_stats.get("model_path"),
+                "yolo_confidence_threshold": yolo_stats.get("confidence_threshold"),
+                "yolo_device": yolo_stats.get("device"),
+                "yolo_detection_confidence": self.yolo_detector.get_detection_confidence()
+            })
 
         if self.court_bounds and self.frame_dimensions:
             left, top, right, bottom = self.court_bounds

@@ -12,17 +12,11 @@ from enum import Enum
 import logging
 
 from .pose_estimator import PoseEstimator
-
-
-class VolleyballAction(Enum):
-    """Enumeration of volleyball actions to recognize."""
-    DIG = "dig"
-    SET = "set"
-    SPIKE = "spike"
-    BLOCK = "block"
-    ACE = "ace"
-    SERVE = "serve"
-    UNKNOWN = "unknown"
+from .volleyball_actions import VolleyballAction
+from .enhanced_ball_contact import EnhancedBallContactValidator
+from .temporal_contact_validator import TemporalContactValidator
+from .ball_trajectory_analyzer import BallTrajectoryAnalyzer
+from .court_position_validator import CourtPositionValidator
 
 
 class ActionClassifier:
@@ -36,7 +30,8 @@ class ActionClassifier:
         self,
         pose_estimator: PoseEstimator,
         temporal_window: int = 10,
-        confidence_threshold: float = 0.6
+        confidence_threshold: float = 0.6,
+        enhanced_validation_config: Optional[Dict[str, Any]] = None
     ):
         """Initialize the action classifier.
 
@@ -56,12 +51,41 @@ class ActionClassifier:
 
         # Action classification rules
         self._initialize_action_rules()
+        
+        # Enhanced validation modules
+        self.enhanced_validation_config = enhanced_validation_config or {}
+        self.enhanced_validation_enabled = self.enhanced_validation_config.get("enabled", True)
+        
+        if self.enhanced_validation_enabled:
+            # Initialize enhanced validation modules
+            self.ball_contact_validator = EnhancedBallContactValidator(
+                self.enhanced_validation_config.get("ball_contact", {})
+            )
+            
+            self.temporal_validator = TemporalContactValidator(
+                self.enhanced_validation_config.get("temporal", {})
+            )
+            
+            self.trajectory_analyzer = BallTrajectoryAnalyzer(
+                self.enhanced_validation_config.get("trajectory", {})
+            )
+            
+            self.court_validator = CourtPositionValidator(
+                self.enhanced_validation_config.get("court", {})
+            )
+        else:
+            self.ball_contact_validator = None
+            self.temporal_validator = None
+            self.trajectory_analyzer = None
+            self.court_validator = None
 
     def classify_actions(
         self,
         frame: np.ndarray,
         player_detections: List[Dict[str, Any]],
-        ball_info: Optional[Dict[str, Any]] = None
+        ball_info: Optional[Dict[str, Any]] = None,
+        frame_number: Optional[int] = None,
+        court_info: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """Classify actions for all players in the current frame.
 
@@ -87,10 +111,24 @@ class ActionClassifier:
             # Update player history
             self._update_player_history(track_id, detection, pose_data, ball_info)
 
-            # Classify action for this player
-            action_result = self._classify_player_action(track_id, frame_index=None)
+            # Classify action for this player with enhanced validation
+            action_result = self._classify_player_action_enhanced(
+                track_id=track_id,
+                detection=detection,
+                pose_data=pose_data,
+                ball_info=ball_info,
+                frame_number=frame_number,
+                court_info=court_info
+            )
 
             if action_result:
+                # Additional safety check: no ball detected means no actions possible
+                if ball_info is None or not ball_info.get("center"):
+                    # No ball detected - force action to UNKNOWN
+                    action_result["action"] = VolleyballAction.UNKNOWN.value
+                    action_result["confidence"] = 0.0
+                    action_result["no_ball_detected"] = True
+                
                 action_result.update({
                     "track_id": track_id,
                     "bbox": detection["bbox"],
@@ -204,6 +242,155 @@ class ActionClassifier:
             "features": features,
             "action_scores": {a.value: s for a, s in action_scores.items()}
         }
+
+    def _classify_player_action_enhanced(
+        self,
+        track_id: int,
+        detection: Dict[str, Any],
+        pose_data: Dict[str, Any],
+        ball_info: Optional[Dict[str, Any]] = None,
+        frame_number: Optional[int] = None,
+        court_info: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Enhanced action classification with ball contact and position validation.
+        
+        Args:
+            track_id: Player tracking ID
+            detection: Player detection data
+            pose_data: Pose estimation data
+            ball_info: Ball tracking information
+            frame_number: Current frame number
+            court_info: Court detection information
+            
+        Returns:
+            Enhanced action classification result
+        """
+        # Start with basic classification
+        basic_result = self._classify_player_action(track_id)
+        
+        if not basic_result:
+            return None
+            
+        if not self.enhanced_validation_enabled:
+            return basic_result
+        
+        # Get the predicted action
+        predicted_action = VolleyballAction(basic_result["action"])
+        player_bbox = detection.get("bbox", [])
+        
+        # Enhanced validation results
+        validation_results = {}
+        
+        try:
+            # 1. Enhanced ball contact validation
+            if self.ball_contact_validator and ball_info:
+                ball_contact_validation = self.ball_contact_validator.validate_ball_contact(
+                    ball_info, pose_data, predicted_action, player_bbox
+                )
+                validation_results["ball_contact"] = ball_contact_validation
+        except Exception as e:
+            self.logger.debug(f"Ball contact validation failed: {e}")
+            validation_results["ball_contact"] = {"valid": False, "confidence": 0.0, "error": str(e)}
+        
+        try:
+            # 2. Temporal contact validation
+            if self.temporal_validator and ball_info:
+                # Update trajectory analyzer first
+                if self.trajectory_analyzer and frame_number is not None:
+                    trajectory_analysis = self.trajectory_analyzer.analyze_trajectory(
+                        ball_info, frame_number
+                    )
+                    validation_results["trajectory_analysis"] = trajectory_analysis
+                    
+                    # Validate trajectory for action type
+                    trajectory_validation = self.trajectory_analyzer.validate_action_trajectory(
+                        predicted_action, trajectory_analysis
+                    )
+                    validation_results["trajectory_validation"] = trajectory_validation
+                
+                # Get instantaneous validation for temporal analysis
+                instantaneous_validation = validation_results.get("ball_contact", {"valid": False, "confidence": 0.0})
+                
+                temporal_validation = self.temporal_validator.validate_temporal_contact(
+                    track_id, ball_info, instantaneous_validation, predicted_action, frame_number
+                )
+                validation_results["temporal_contact"] = temporal_validation
+        except Exception as e:
+            self.logger.debug(f"Temporal validation failed: {e}")
+            validation_results["temporal_contact"] = {"valid": False, "confidence": 0.0, "error": str(e)}
+        
+        try:
+            # 3. Court position validation
+            if self.court_validator and court_info:
+                # Set court boundaries if available
+                if "boundaries" in court_info:
+                    self.court_validator.set_court_boundaries(court_info["boundaries"])
+                
+                # Calculate player center position
+                if player_bbox and len(player_bbox) >= 4:
+                    player_center = (
+                        (player_bbox[0] + player_bbox[2]) / 2,
+                        (player_bbox[1] + player_bbox[3]) / 2
+                    )
+                    
+                    court_validation = self.court_validator.validate_position_for_action(
+                        player_center, predicted_action, player_bbox
+                    )
+                    validation_results["court_position"] = court_validation
+                    
+                    # Special serve validation
+                    if predicted_action == VolleyballAction.SERVE:
+                        ball_position = None
+                        if ball_info and "center" in ball_info:
+                            ball_position = tuple(ball_info["center"])
+                        
+                        serve_validation = self.court_validator.validate_serve_position(
+                            player_center, ball_position, "contact"
+                        )
+                        validation_results["serve_position"] = serve_validation
+        except Exception as e:
+            self.logger.debug(f"Court validation failed: {e}")
+            validation_results["court_position"] = {"valid": True, "confidence": 1.0, "error": str(e)}
+        
+        try:
+            # Calculate enhanced confidence score
+            enhanced_confidence = self._calculate_enhanced_confidence(
+                basic_result["confidence"], validation_results, predicted_action
+            )
+            
+            # Determine if action should be filtered out
+            action_valid = self._determine_action_validity(validation_results, predicted_action)
+            
+            # Update result with enhanced validation
+            enhanced_result = basic_result.copy()
+            enhanced_result.update({
+                "enhanced_confidence": enhanced_confidence,
+                "action_valid": action_valid,
+                "validation_results": validation_results,
+                "enhanced_validation_enabled": True
+            })
+            
+            # Override confidence with enhanced score
+            enhanced_result["confidence"] = enhanced_confidence
+            
+            # Filter out invalid actions in strict mode
+            strict_mode = self.enhanced_validation_config.get("strict_mode", True)
+            if strict_mode and not action_valid:
+                enhanced_result["action"] = VolleyballAction.UNKNOWN.value
+                enhanced_result["confidence"] = 0.1
+            
+            return enhanced_result
+            
+        except Exception as e:
+            self.logger.debug(f"Enhanced validation processing failed: {e}")
+            # Fallback to basic result with validation info
+            fallback_result = basic_result.copy()
+            fallback_result.update({
+                "enhanced_validation_enabled": True,
+                "validation_error": str(e),
+                "validation_results": validation_results
+            })
+            return fallback_result
 
     def _extract_action_features(
         self,
@@ -516,3 +703,262 @@ class ActionClassifier:
             score += 0.2
 
         return min(score, 1.0)
+
+    def _calculate_enhanced_confidence(
+        self,
+        base_confidence: float,
+        validation_results: Dict[str, Any],
+        action_type: VolleyballAction
+    ) -> float:
+        """Calculate enhanced confidence score incorporating all validation results.
+        
+        Args:
+            base_confidence: Base confidence from traditional classification
+            validation_results: Results from all validation modules
+            action_type: Predicted action type
+            
+        Returns:
+            Enhanced confidence score (0.0 to 1.0)
+        """
+        # Start with base confidence (weighted 30%)
+        enhanced_confidence = base_confidence * 0.3
+        
+        # Ball contact validation (weighted 40%)
+        ball_contact = validation_results.get("ball_contact", {})
+        if ball_contact:
+            ball_confidence = ball_contact.get("confidence", 0.0)
+            enhanced_confidence += ball_confidence * 0.4
+        else:
+            # No ball contact validation - use reduced weight for pose-only actions
+            enhanced_confidence += base_confidence * 0.4
+        
+        # Temporal validation (weighted 20%)
+        temporal_contact = validation_results.get("temporal_contact", {})
+        if temporal_contact:
+            temporal_confidence = temporal_contact.get("confidence", 0.0)
+            enhanced_confidence += temporal_confidence * 0.2
+        else:
+            enhanced_confidence += base_confidence * 0.2
+        
+        # Court position validation (weighted 10%)
+        court_position = validation_results.get("court_position", {})
+        if court_position:
+            court_confidence = court_position.get("confidence", 1.0)
+            enhanced_confidence += court_confidence * 0.1
+        else:
+            enhanced_confidence += 0.1  # Default court confidence
+        
+        # Trajectory validation bonus/penalty
+        trajectory_validation = validation_results.get("trajectory_validation", {})
+        if trajectory_validation:
+            traj_confidence = trajectory_validation.get("confidence", 0.5)
+            if traj_confidence > 0.7:
+                enhanced_confidence *= 1.1  # Bonus for good trajectory match
+            elif traj_confidence < 0.3:
+                enhanced_confidence *= 0.8  # Penalty for poor trajectory match
+        
+        # Special serve position validation
+        if action_type == VolleyballAction.SERVE:
+            serve_position = validation_results.get("serve_position", {})
+            if serve_position:
+                if not serve_position.get("valid", True):
+                    enhanced_confidence *= 0.3  # Heavy penalty for invalid serve position
+        
+        # Action-specific validation requirements
+        enhanced_confidence = self._apply_action_specific_validation_rules(
+            enhanced_confidence, validation_results, action_type
+        )
+        
+        return max(0.0, min(1.0, enhanced_confidence))
+    
+    def _determine_action_validity(
+        self,
+        validation_results: Dict[str, Any],
+        action_type: VolleyballAction
+    ) -> bool:
+        """Determine if action should be considered valid based on validation results.
+        
+        Args:
+            validation_results: Results from all validation modules
+            action_type: Predicted action type
+            
+        Returns:
+            True if action is valid
+        """
+        # Get validation results
+        ball_contact = validation_results.get("ball_contact", {})
+        temporal_contact = validation_results.get("temporal_contact", {})
+        court_position = validation_results.get("court_position", {})
+        serve_position = validation_results.get("serve_position", {})
+        
+        # ALL actions except UNKNOWN require ball contact/proximity
+        if action_type != VolleyballAction.UNKNOWN:
+            # Must have valid ball contact for ANY action
+            if not ball_contact.get("valid", False):
+                return False
+            
+            # Must have reasonable ball contact confidence
+            ball_confidence = ball_contact.get("confidence", 0.0)
+            min_contact_confidence = self.enhanced_validation_config.get("ball_contact", {}).get("min_contact_confidence", 0.3)
+            if ball_confidence < min_contact_confidence:
+                return False
+            
+            # Must have reasonable temporal validation in strict mode
+            strict_mode = self.enhanced_validation_config.get("strict_mode", True)
+            if strict_mode and temporal_contact:
+                if not temporal_contact.get("valid", False):
+                    return False
+                if temporal_contact.get("confidence", 0.0) < 0.2:
+                    return False
+        
+        # Special serve validation
+        if action_type == VolleyballAction.SERVE:
+            if serve_position and not serve_position.get("valid", True):
+                return False
+        
+        # Court position validation
+        if court_position and not court_position.get("valid", True):
+            # Allow some flexibility unless confidence is very low
+            if court_position.get("confidence", 1.0) < 0.2:
+                return False
+        
+        # Block-specific validation (must be near net and have ball contact)
+        if action_type == VolleyballAction.BLOCK:
+            if court_position:
+                region = court_position.get("details", {}).get("current_region", "")
+                if region not in ["front_court", "unknown"]:
+                    return False
+        
+        return True
+    
+    def _apply_action_specific_validation_rules(
+        self,
+        confidence: float,
+        validation_results: Dict[str, Any],
+        action_type: VolleyballAction
+    ) -> float:
+        """Apply action-specific validation rules to adjust confidence.
+        
+        Args:
+            confidence: Current confidence score
+            validation_results: Validation results
+            action_type: Action type
+            
+        Returns:
+            Adjusted confidence score
+        """
+        # Get relevant validation results
+        ball_contact = validation_results.get("ball_contact", {})
+        trajectory_validation = validation_results.get("trajectory_validation", {})
+        court_position = validation_results.get("court_position", {})
+        
+        if action_type == VolleyballAction.DIG:
+            # Digs require good ball contact and upward trajectory
+            if ball_contact.get("valid", False):
+                dig_details = ball_contact.get("details", {}).get("action_specific", {}).get("details", {})
+                if dig_details.get("ball_height_appropriate", False):
+                    confidence *= 1.1
+            
+            if trajectory_validation.get("upward_motion", False):
+                confidence *= 1.1
+        
+        elif action_type == VolleyballAction.SET:
+            # Sets require controlled ball contact and moderate trajectory
+            if ball_contact.get("valid", False):
+                set_details = ball_contact.get("details", {}).get("action_specific", {}).get("details", {})
+                if set_details.get("ball_height_appropriate", False) and set_details.get("arms_raised", False):
+                    confidence *= 1.2
+            
+            if trajectory_validation.get("controlled_velocity", False):
+                confidence *= 1.1
+        
+        elif action_type == VolleyballAction.SPIKE:
+            # Spikes require high ball contact and fast downward trajectory
+            if ball_contact.get("valid", False):
+                spike_details = ball_contact.get("details", {}).get("action_specific", {}).get("details", {})
+                if spike_details.get("ball_height_appropriate", False) and spike_details.get("arm_extended_high", False):
+                    confidence *= 1.2
+            
+            if trajectory_validation.get("high_velocity", False) and trajectory_validation.get("downward_motion", False):
+                confidence *= 1.3
+        
+        elif action_type == VolleyballAction.BLOCK:
+            # Blocks require front court position and both arms raised
+            if court_position.get("valid", False):
+                region = court_position.get("details", {}).get("current_region", "")
+                if region == "front_court":
+                    confidence *= 1.2
+            
+            if ball_contact.get("valid", False):
+                block_details = ball_contact.get("details", {}).get("action_specific", {}).get("details", {})
+                if block_details.get("both_arms_raised", False):
+                    confidence *= 1.1
+        
+        elif action_type == VolleyballAction.SERVE:
+            # Serves require back court position and ball acceleration
+            serve_position = validation_results.get("serve_position", {})
+            if serve_position.get("valid", False):
+                confidence *= 1.3
+            
+            if trajectory_validation.get("acceleration_detected", False):
+                confidence *= 1.2
+        
+        return confidence
+    
+    def set_court_boundaries(self, court_boundaries: Dict[str, Any]) -> None:
+        """Set court boundaries for position validation.
+        
+        Args:
+            court_boundaries: Court boundary information
+        """
+        if self.court_validator:
+            self.court_validator.set_court_boundaries(court_boundaries)
+    
+    def reset_enhanced_validation(self) -> None:
+        """Reset all enhanced validation modules."""
+        if self.temporal_validator:
+            self.temporal_validator.reset_all_histories()
+        
+        if self.trajectory_analyzer:
+            self.trajectory_analyzer.clear_history()
+        
+        if self.court_validator:
+            self.court_validator.reset_court_boundaries()
+    
+    def get_validation_statistics(self) -> Dict[str, Any]:
+        """Get statistics from validation modules.
+        
+        Returns:
+            Validation statistics
+        """
+        stats = {
+            "enhanced_validation_enabled": self.enhanced_validation_enabled
+        }
+        
+        if self.temporal_validator:
+            # Get player contact histories
+            player_histories = {}
+            for player_id in self.temporal_validator.player_histories:
+                history = self.temporal_validator.get_player_contact_history(player_id)
+                state = self.temporal_validator.get_player_state(player_id)
+                player_histories[player_id] = {
+                    "history_length": len(history) if history else 0,
+                    "current_state": state.value if state else "unknown"
+                }
+            stats["temporal_validation"] = player_histories
+        
+        if self.trajectory_analyzer:
+            trajectory_stats = {
+                "trajectory_points": len(self.trajectory_analyzer.get_trajectory_history()),
+                "detected_events": len(self.trajectory_analyzer.get_detected_events())
+            }
+            stats["trajectory_analysis"] = trajectory_stats
+        
+        if self.court_validator:
+            court_stats = {
+                "court_available": self.court_validator.is_court_available(),
+                "regions_defined": len(self.court_validator.get_court_regions())
+            }
+            stats["court_validation"] = court_stats
+        
+        return stats
