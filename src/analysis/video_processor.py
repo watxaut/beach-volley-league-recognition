@@ -57,7 +57,8 @@ class VideoProcessor:
 
             self.ball_detector = BallDetector(
                 confidence_threshold=self.config.get("ball_confidence", 0.3),
-                device=self.config.get("device", "cpu")
+                device=self.config.get("device", "cpu"),
+                detection_method=self.config.get("detection_method", "template")
             )
 
             self.player_detector = PlayerDetector(

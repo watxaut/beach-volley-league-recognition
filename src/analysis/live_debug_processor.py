@@ -92,8 +92,7 @@ class LiveDebugProcessor:
             self.ball_detector = BallDetector(
                 confidence_threshold=self.config.get("ball_confidence", 0.3),
                 device=self.config.get("device", "cpu"),
-                detection_method=self.config.get("detection_method", "hybrid"),
-                enable_multiple_methods=self.config.get("enable_multiple_methods", True),
+                detection_method=self.config.get("detection_method", "template"),
                 wilson_ball_dir=self.config.get("wilson_ball_dir", "resources/wilson_ball")
             )
 
@@ -371,8 +370,7 @@ class LiveDebugProcessor:
                     cv2.circle(frame, (x, y), ring_radius, ring_color, 2)
 
                 # Enhanced ball information panel with method info
-                current_method = tracked_ball.get('method', 'unknown')
-                self._draw_ball_info_panel(frame, x, y, confidence, velocity, ball_state, is_predicted, current_method)
+                self._draw_ball_info_panel(frame, x, y, confidence, velocity, ball_state, is_predicted, tracked_ball)
 
                 # Draw velocity vector with enhanced styling
                 if velocity and velocity != [0, 0]:
@@ -429,8 +427,14 @@ class LiveDebugProcessor:
                     # Draw detection circle with method-specific color
                     cv2.circle(frame, (center_x, center_y), 5, method_color, 2)
                     
-                    # Draw method label
-                    method_label = f"{method[:8]}" # Truncate long method names
+                    # Draw method label with template info for template detections
+                    if method.startswith('template') and 'template_name' in detection:
+                        template_name = detection.get('template_name', 'unknown')
+                        scale_used = detection.get('scale_used', 0)
+                        method_label = f"{template_name[:6]}@{scale_used:.1f}"
+                    else:
+                        method_label = f"{method[:8]}" # Truncate long method names
+                    
                     cv2.putText(frame, method_label, (center_x + 8, center_y - 8),
                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, method_color, 1)
                     
@@ -476,7 +480,7 @@ class LiveDebugProcessor:
             cv2.line(frame, (start_x, start_y), (end_x, end_y), color, thickness)
 
     def _draw_ball_info_panel(self, frame: np.ndarray, x: int, y: int, confidence: float,
-                             velocity: List[float], ball_state: str, is_predicted: bool, method: str = "unknown") -> None:
+                             velocity: List[float], ball_state: str, is_predicted: bool, ball_data: Dict[str, Any]) -> None:
         """Draw detailed ball information panel."""
         # Create info panel background
         panel_x = x + 20
@@ -490,14 +494,25 @@ class LiveDebugProcessor:
                      (panel_x + panel_width, panel_y + panel_height), (0, 0, 0), -1)
         cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
 
-        # Ball info text with method information
+        # Ball info text with enhanced template information
         status = "PREDICTED" if is_predicted else "DETECTED"
+        method = ball_data.get('method', 'unknown')
+        
         lines = [
             f"Ball {status}",
             f"Method: {method}",
             f"Confidence: {confidence:.3f}",
             f"State: {ball_state}",
         ]
+        
+        # Add template-specific information if available
+        if 'template_name' in ball_data:
+            template_name = ball_data.get('template_name', 'unknown')
+            scale_used = ball_data.get('scale_used', 0)
+            template_idx = ball_data.get('template_index', 0)
+            lines.append(f"Template: {template_name}")
+            lines.append(f"Scale: {scale_used:.2f}")
+            lines.append(f"Index: {template_idx}")
 
         if velocity and velocity != [0, 0]:
             speed = np.sqrt(velocity[0]**2 + velocity[1]**2)
@@ -563,9 +578,25 @@ class LiveDebugProcessor:
             f"Detection Methods Used:"
         ]
 
-        # Add method counts
+        # Add method counts with template breakdown
         for method, count in self.ball_detection_stats['method_counts'].items():
-            stats_text.append(f"  {method}: {count}")
+            if method.startswith('template_'):
+                # Extract template index and show template name if available
+                try:
+                    template_idx = int(method.split('_')[1])
+                    if hasattr(self.ball_detector, 'wilson_detectors') and 'template' in self.ball_detector.wilson_detectors:
+                        template_detector = self.ball_detector.wilson_detectors['template']
+                        if template_idx < len(template_detector.template_names):
+                            template_name = template_detector.template_names[template_idx]
+                            stats_text.append(f"  {template_name}: {count}")
+                        else:
+                            stats_text.append(f"  {method}: {count}")
+                    else:
+                        stats_text.append(f"  {method}: {count}")
+                except (ValueError, IndexError):
+                    stats_text.append(f"  {method}: {count}")
+            else:
+                stats_text.append(f"  {method}: {count}")
 
         # Add recent methods used
         if len(self.recent_detection_methods) > 0:

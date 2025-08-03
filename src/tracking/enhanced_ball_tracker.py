@@ -154,14 +154,14 @@ class EnhancedBallTracker:
 
                 # Ball should have aspect ratio close to 1.0 (circular)
                 if 0.5 <= aspect_ratio <= 2.0:  # Allow some tolerance
-                    self.detection_methods['yolo'] = {
-                        'center': best_detection['center'],
+                    # Preserve original detection data and enhance it
+                    enhanced_detection = best_detection.copy()
+                    enhanced_detection.update({
                         'confidence': best_detection['confidence'] * 1.3,  # Boost validated detections
-                        'method': 'yolo',
-                        'bbox': best_detection['bbox'],
                         'area': area,
                         'aspect_ratio': aspect_ratio
-                    }
+                    })
+                    self.detection_methods['yolo'] = enhanced_detection
                 else:
                     self.detection_methods['yolo'] = None
             else:
@@ -399,18 +399,21 @@ class EnhancedBallTracker:
             curr_pos = detection['center']
             velocity = [curr_pos[0] - prev_pos[0], curr_pos[1] - prev_pos[1]]
 
-        return {
-            'center': detection['center'],
-            'confidence': detection['confidence'],
-            'bbox': detection['bbox'],
-            'class_name': 'volleyball',
+        # Start with original detection to preserve all metadata
+        enhanced_detection = detection.copy()
+        
+        # Add or update enhanced tracking information
+        enhanced_detection.update({
             'velocity': velocity,
             'trajectory_length': len(self.trajectory),
             'ball_state': self._classify_ball_state(velocity),
             'tracking_method': detection['method'],
             'is_predicted': detection['method'] in ['kalman', 'optical_flow'],
-            'missing_frames': self.missing_count
-        }
+            'missing_frames': self.missing_count,
+            'class_name': 'volleyball'
+        })
+        
+        return enhanced_detection
 
     def _handle_missing_ball(self) -> Optional[Dict[str, Any]]:
         """Handle frame where ball was not detected by any method."""

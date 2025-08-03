@@ -68,9 +68,9 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--detection-method",
         type=str,
-        choices=["yolo", "template", "features", "hybrid", "fusion"],
-        default="hybrid",
-        help="Ball detection method to use (default: hybrid)"
+        choices=["template"],
+        default="template",
+        help="Ball detection method to use (default: template)"
     )
 
     return parser.parse_args()

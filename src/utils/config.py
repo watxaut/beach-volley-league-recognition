@@ -20,7 +20,8 @@ class Config:
         "device": "cpu",  # or "cuda" if GPU available
 
         # Detection settings
-        "ball_confidence": 0.1,  # Much lower for better ball detection
+        "detection_method": "template",  # Default to Wilson ball template matching
+        "ball_confidence": 0.05,  # Much lower for better ball detection
         "player_confidence": 0.5,
         "max_players": 4,
 

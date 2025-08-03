@@ -24,7 +24,7 @@ class WilsonTemplateDetector:
     def __init__(
         self,
         template_dir: str = "resources/wilson_ball",
-        confidence_threshold: float = 0.6,
+        confidence_threshold: float = 0.7,
         scales: List[float] = None,
         match_methods: List[int] = None
     ):
@@ -39,7 +39,7 @@ class WilsonTemplateDetector:
         """
         self.template_dir = Path(template_dir)
         self.confidence_threshold = confidence_threshold
-        self.scales = scales or [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5]
+        self.scales = scales or [0.08, 0.1, 0.12, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]
         self.match_methods = match_methods or [cv2.TM_CCOEFF_NORMED, cv2.TM_CCORR_NORMED]
         
         self.logger = logging.getLogger(__name__)
@@ -48,6 +48,7 @@ class WilsonTemplateDetector:
         self.templates = []
         self.templates_hsv = []
         self.templates_gray = []
+        self.template_names = []  # Track template filenames
         
         self._load_templates()
         
@@ -71,6 +72,7 @@ class WilsonTemplateDetector:
                 template = cv2.imread(str(template_path))
                 if template is not None:
                     self.templates.append(template)
+                    self.template_names.append(template_path.name)  # Store filename
                     
                     # Convert to HSV and grayscale
                     template_hsv = cv2.cvtColor(template, cv2.COLOR_BGR2HSV)
@@ -167,7 +169,7 @@ class WilsonTemplateDetector:
             area = w * h
             frame_area = frame_shape[0] * frame_shape[1]
             
-            if area < 100 or area > frame_area * 0.1:  # Too small or too large
+            if area < 50 or area > frame_area * 0.1:  # Too small or too large
                 continue
             
             # Filter by aspect ratio (balls should be roughly circular)
@@ -241,11 +243,15 @@ class WilsonTemplateDetector:
                             
                             if combined_confidence > best_confidence:
                                 best_confidence = combined_confidence
+                                template_name = self.template_names[template_idx] if template_idx < len(self.template_names) else f"template_{template_idx}"
                                 best_match = {
                                     'center': [center_x, center_y],
                                     'bbox': [abs_x, abs_y, abs_x + new_w, abs_y + new_h],
                                     'confidence': combined_confidence,
                                     'method': f'template_{template_idx}_scale_{scale:.1f}',
+                                    'template_name': template_name,
+                                    'template_index': template_idx,
+                                    'scale_used': scale,
                                     'template_size': (new_w, new_h)
                                 }
                     
