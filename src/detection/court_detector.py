@@ -39,6 +39,7 @@ class CourtDetector:
         self.court_horizontal_center = config.get("court_horizontal_center", 0.5)
         self.court_margin = config.get("court_margin", 0.05)
         self.use_adaptive_court = config.get("use_adaptive_court", True)
+        self.court_yolo_only_start = config.get("court_yolo_only_start", True)
 
         # YOLO court detection parameters
         self.yolo_model_path = config.get("court_model_path", "weights/court/court_best.pt")
@@ -60,6 +61,12 @@ class CourtDetector:
 
         # Player position history for adaptive court
         self.player_positions_history = []
+        
+        # Frame counting for YOLO-only-start mode
+        self.frame_count = 0
+        self.cached_court_mask = None
+        self.cached_court_bounds = None
+        self.yolo_detection_frames = 10  # Number of frames to run YOLO detection
 
         # Initialize YOLO court detector
         self.yolo_detector = None
@@ -92,6 +99,7 @@ class CourtDetector:
             Binary mask of the court area, or None if detection failed
         """
         self.frame_dimensions = frame.shape[:2]  # (height, width)
+        self.frame_count += 1
 
         if self.detection_method == "yolo" and self.yolo_detector is not None:
             return self._detect_court_yolo(frame)
@@ -110,6 +118,16 @@ class CourtDetector:
         Returns:
             Binary mask of the court area or None if detection failed
         """
+        # If court_yolo_only_start is enabled and we have cached results, use them
+        if (self.court_yolo_only_start and 
+            self.frame_count > self.yolo_detection_frames and 
+            self.cached_court_mask is not None):
+            
+            self.logger.debug(f"Using cached YOLO court detection (frame {self.frame_count})")
+            self.court_mask = self.cached_court_mask
+            self.court_bounds = self.cached_court_bounds
+            return self.cached_court_mask
+        
         try:
             detection = self.yolo_detector.detect_court(frame)
             
@@ -134,6 +152,13 @@ class CourtDetector:
                 kernel = np.ones((margin_pixels * 2, margin_pixels * 2), np.uint8)
                 court_mask = cv2.dilate(court_mask, kernel, iterations=1)
                 self.court_mask = court_mask
+            
+            # Cache the results if we're in the initial detection phase
+            if (self.court_yolo_only_start and 
+                self.frame_count <= self.yolo_detection_frames):
+                self.cached_court_mask = court_mask.copy()
+                self.cached_court_bounds = self.court_bounds
+                self.logger.debug(f"Cached YOLO court detection for frame {self.frame_count}")
             
             confidence = detection.get('confidence', 0.0)
             self.logger.debug(f"YOLO court detected with confidence: {confidence:.3f}")
@@ -497,7 +522,18 @@ class CourtDetector:
             if self.yolo_detector.is_model_loaded():
                 confidence = self.yolo_detector.get_detection_confidence()
                 yolo_info += f" | Confidence: {confidence:.2f}"
-                color = (255, 0, 0)  # Blue for YOLO
+                
+                # Add cached detection info
+                if (self.court_yolo_only_start and 
+                    self.frame_count > self.yolo_detection_frames and 
+                    self.cached_court_mask is not None):
+                    yolo_info += f" | CACHED (Frame {self.frame_count})"
+                    color = (0, 255, 255)  # Yellow for cached
+                elif self.court_yolo_only_start and self.frame_count <= self.yolo_detection_frames:
+                    yolo_info += f" | DETECTING ({self.frame_count}/{self.yolo_detection_frames})"
+                    color = (255, 0, 0)  # Blue for detecting
+                else:
+                    color = (255, 0, 0)  # Blue for YOLO
             else:
                 yolo_info += " | Model Not Loaded"
                 color = (0, 0, 255)  # Red for error
@@ -535,7 +571,13 @@ class CourtDetector:
                 "yolo_model_path": yolo_stats.get("model_path"),
                 "yolo_confidence_threshold": yolo_stats.get("confidence_threshold"),
                 "yolo_device": yolo_stats.get("device"),
-                "yolo_detection_confidence": self.yolo_detector.get_detection_confidence()
+                "yolo_detection_confidence": self.yolo_detector.get_detection_confidence(),
+                "court_yolo_only_start": self.court_yolo_only_start,
+                "yolo_detection_frames": self.yolo_detection_frames,
+                "current_frame_count": self.frame_count,
+                "using_cached_detection": (self.court_yolo_only_start and 
+                                         self.frame_count > self.yolo_detection_frames and 
+                                         self.cached_court_mask is not None)
             })
 
         if self.court_bounds and self.frame_dimensions:

@@ -31,6 +31,15 @@ class Config:
         "trajectory_smoothing": 8,  # Increased smoothing
         "player_max_disappeared": 30,
         "tracking_max_distance": 100.0,
+        
+        # Enhanced trajectory-based tracking settings
+        "low_confidence_threshold": 0.15,  # Accept lower confidence with good trajectory
+        "trajectory_confidence_boost": 0.3,  # Boost confidence for trajectory-consistent detections
+        "max_trajectory_gap": 150.0,  # Maximum distance to consider trajectory continuation
+        "velocity_consistency_weight": 0.4,  # Weight for velocity consistency in scoring
+        "acceleration_consistency_weight": 0.2,  # Weight for acceleration consistency
+        "trajectory_prediction_frames": 5,  # Number of frames to predict ahead
+        "fast_ball_velocity_threshold": 50.0,  # Velocity threshold for fast ball mode
 
         # Recognition settings
         "pose_confidence": 0.5,
@@ -57,12 +66,12 @@ class Config:
         "log_file": None,
 
         # Court detection settings
-        "court_detection_method": "geometric",  # "yolo", "geometric", or "vision"
+        "court_detection_method": "yolo",  # "yolo", "geometric", or "vision"
         "court_model_path": "weights/court/court_best.pt",  # Path to YOLO court model
         "court_confidence": 0.5,  # Confidence threshold for YOLO court detection
-        "court_height_ratio": 0.23,  # Court takes 60% of frame height (fallback for geometric)
+        "court_height_ratio": 0.2,  # Court takes 60% of frame height (fallback for geometric)
         "court_width_ratio": 0.7,   # Court takes 80% of frame width (fallback for geometric)
-        "court_vertical_offset": 0.5,  # Court starts at 20% from top (fallback for geometric)
+        "court_vertical_offset": 0.6,  # Court starts at 20% from top (fallback for geometric)
         "court_horizontal_center": 0.52,  # Court centered horizontally (fallback for geometric)
 
         # Perspective correction settings
@@ -75,6 +84,7 @@ class Config:
         # Advanced court detection settings
         "court_margin": 0.01,  # 5% margin around detected court
         "use_adaptive_court": False,  # Adapt court based on player positions
+        "court_yolo_only_start": True,  # Only run YOLO court detection on first 10 frames, then reuse
         
         # Enhanced Ball-Player Proximity Validation Settings
         "enhanced_validation": {

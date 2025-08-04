@@ -23,7 +23,14 @@ class BallTracker:
         self,
         max_missing_frames: int = 30,  # Increased from 10 - volleyball can be fast
         trajectory_smoothing: int = 8,  # Increased smoothing window
-        velocity_threshold: float = 200.0  # Much higher threshold for volleyball
+        velocity_threshold: float = 200.0,  # Much higher threshold for volleyball
+        low_confidence_threshold: float = 0.15,  # Accept lower confidence with good trajectory
+        trajectory_confidence_boost: float = 0.3,  # Boost confidence for consistent detections
+        max_trajectory_gap: float = 150.0,  # Maximum distance for trajectory continuation
+        velocity_consistency_weight: float = 0.4,  # Weight for velocity consistency
+        acceleration_consistency_weight: float = 0.2,  # Weight for acceleration consistency
+        trajectory_prediction_frames: int = 5,  # Frames to predict ahead
+        fast_ball_velocity_threshold: float = 50.0  # Threshold for fast ball mode
     ):
         """Initialize the ball tracker.
 
@@ -31,10 +38,24 @@ class BallTracker:
             max_missing_frames: Maximum frames ball can be missing before reset
             trajectory_smoothing: Number of frames to use for trajectory smoothing
             velocity_threshold: Maximum velocity change for trajectory validation
+            low_confidence_threshold: Accept detections above this confidence if trajectory is good
+            trajectory_confidence_boost: Amount to boost confidence for trajectory-consistent detections
+            max_trajectory_gap: Maximum distance to consider trajectory continuation
+            velocity_consistency_weight: Weight for velocity consistency in trajectory scoring
+            acceleration_consistency_weight: Weight for acceleration consistency in trajectory scoring
+            trajectory_prediction_frames: Number of frames to predict ahead for missing ball
+            fast_ball_velocity_threshold: Velocity threshold to activate fast ball tracking mode
         """
         self.max_missing_frames = max_missing_frames
         self.trajectory_smoothing = trajectory_smoothing
         self.velocity_threshold = velocity_threshold
+        self.low_confidence_threshold = low_confidence_threshold
+        self.trajectory_confidence_boost = trajectory_confidence_boost
+        self.max_trajectory_gap = max_trajectory_gap
+        self.velocity_consistency_weight = velocity_consistency_weight
+        self.acceleration_consistency_weight = acceleration_consistency_weight
+        self.trajectory_prediction_frames = trajectory_prediction_frames
+        self.fast_ball_velocity_threshold = fast_ball_velocity_threshold
 
         # Enhanced tracking state for volleyball
         self.trajectory = deque(maxlen=200)  # Increased to store longer trajectory
@@ -69,42 +90,152 @@ class BallTracker:
         return self._update_trajectory(best_detection)
 
     def _select_best_detection(self, detections: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-        """Select the best ball detection from multiple candidates.
+        """Select the best ball detection from multiple candidates with trajectory-based scoring.
 
         Args:
             detections: List of ball detections
 
         Returns:
-            Best detection or None
+            Best detection or None, with enhanced confidence if trajectory is good
         """
+        if not detections:
+            return None
+            
         if len(detections) == 1:
-            return detections[0]
+            detection = detections[0]
+            # Boost confidence if detection follows good trajectory
+            enhanced_detection = self._enhance_detection_confidence(detection)
+            return enhanced_detection
 
-        # If we have trajectory history, select detection closest to predicted position
-        if len(self.trajectory) >= 2:
-            predicted_position = self._predict_next_position()
-            if predicted_position:
-                best_detection = None
-                min_distance = float('inf')
+        # Score all detections based on confidence + trajectory consistency
+        scored_detections = []
+        
+        for detection in detections:
+            # Start with base confidence
+            base_confidence = detection.get("confidence", 0.0)
+            
+            # Calculate trajectory consistency score
+            trajectory_score = self._calculate_trajectory_consistency(detection)
+            
+            # Combine confidence and trajectory score
+            final_score = base_confidence + trajectory_score
+            
+            # Accept low confidence detections if trajectory is very good
+            if (base_confidence < self.low_confidence_threshold and 
+                trajectory_score > 0.2):  # Strong trajectory evidence
+                final_score += self.trajectory_confidence_boost
+                
+            scored_detections.append((final_score, detection))
 
-                for detection in detections:
-                    center = detection["center"]
-                    distance = np.sqrt(
-                        (center[0] - predicted_position[0])**2 +
-                        (center[1] - predicted_position[1])**2
-                    )
+        # Return the highest scoring detection
+        if scored_detections:
+            best_score, best_detection = max(scored_detections, key=lambda x: x[0])
+            
+            # Enhance the confidence of the selected detection
+            enhanced_detection = self._enhance_detection_confidence(best_detection)
+            return enhanced_detection
 
-                    if distance < min_distance:
-                        min_distance = distance
-                        best_detection = detection
+        return None
 
-                return best_detection
+    def _calculate_trajectory_consistency(self, detection: Dict[str, Any]) -> float:
+        """Calculate how well a detection fits the current trajectory.
 
-        # Otherwise, select detection with highest confidence
-        return max(detections, key=lambda x: x["confidence"])
+        Args:
+            detection: Ball detection to evaluate
+
+        Returns:
+            Trajectory consistency score (0.0 to 1.0)
+        """
+        if len(self.trajectory) < 2:
+            return 0.0
+
+        center = detection["center"]
+        score = 0.0
+        
+        # 1. Distance from predicted position
+        predicted_position = self._predict_next_position()
+        if predicted_position:
+            distance = np.sqrt(
+                (center[0] - predicted_position[0])**2 +
+                (center[1] - predicted_position[1])**2
+            )
+            
+            # Closer to prediction = better score
+            distance_score = max(0, 1.0 - distance / self.max_trajectory_gap)
+            score += distance_score * 0.4
+        
+        # 2. Velocity consistency
+        if self.last_velocity and len(self.trajectory) >= 1:
+            last_pos = self.trajectory[-1]
+            current_velocity = [
+                center[0] - last_pos[0],
+                center[1] - last_pos[1]
+            ]
+            
+            # Compare with expected velocity
+            velocity_diff = np.sqrt(
+                (current_velocity[0] - self.last_velocity[0])**2 +
+                (current_velocity[1] - self.last_velocity[1])**2
+            )
+            
+            velocity_score = max(0, 1.0 - velocity_diff / self.velocity_threshold)
+            score += velocity_score * self.velocity_consistency_weight
+        
+        # 3. Acceleration consistency (if we have enough history)
+        if self.last_acceleration and len(self.trajectory) >= 2:
+            if len(self.velocities) >= 1:
+                prev_velocity = self.velocities[-1]
+                last_pos = self.trajectory[-1]
+                current_velocity = [
+                    center[0] - last_pos[0],
+                    center[1] - last_pos[1]
+                ]
+                current_acceleration = [
+                    current_velocity[0] - prev_velocity[0],
+                    current_velocity[1] - prev_velocity[1]
+                ]
+                
+                accel_diff = np.sqrt(
+                    (current_acceleration[0] - self.last_acceleration[0])**2 +
+                    (current_acceleration[1] - self.last_acceleration[1])**2
+                )
+                
+                accel_score = max(0, 1.0 - accel_diff / (self.velocity_threshold * 2))
+                score += accel_score * self.acceleration_consistency_weight
+        
+        return min(1.0, score)
+
+    def _enhance_detection_confidence(self, detection: Dict[str, Any]) -> Dict[str, Any]:
+        """Enhance detection confidence based on trajectory consistency.
+
+        Args:
+            detection: Original detection
+
+        Returns:
+            Detection with potentially boosted confidence
+        """
+        enhanced_detection = detection.copy()
+        
+        # Calculate trajectory consistency
+        trajectory_score = self._calculate_trajectory_consistency(detection)
+        
+        # Boost confidence for trajectory-consistent detections
+        original_confidence = detection.get("confidence", 0.0)
+        
+        if trajectory_score > 0.3:  # Good trajectory evidence
+            confidence_boost = trajectory_score * self.trajectory_confidence_boost
+            enhanced_confidence = min(1.0, original_confidence + confidence_boost)
+            enhanced_detection["confidence"] = enhanced_confidence
+            enhanced_detection["trajectory_boosted"] = True
+            enhanced_detection["trajectory_score"] = trajectory_score
+            
+            self.logger.debug(f"Boosted confidence from {original_confidence:.3f} to {enhanced_confidence:.3f} "
+                            f"(trajectory_score: {trajectory_score:.3f})")
+        
+        return enhanced_detection
 
     def _predict_next_position(self) -> Optional[List[float]]:
-        """Predict next ball position based on trajectory.
+        """Predict next ball position based on trajectory with enhanced physics.
 
         Returns:
             Predicted [x, y] position or None
@@ -112,11 +243,23 @@ class BallTracker:
         if len(self.trajectory) < 2:
             return None
 
-        # Simple linear prediction based on last velocity
+        # Enhanced prediction using velocity and acceleration
         if self.last_velocity:
             last_pos = self.trajectory[-1]
-            predicted_x = last_pos[0] + self.last_velocity[0]
-            predicted_y = last_pos[1] + self.last_velocity[1]
+            
+            # Use acceleration if available for better prediction
+            if self.last_acceleration and len(self.accelerations) > 0:
+                # Physics-based prediction: pos = pos + velocity*t + 0.5*acceleration*t^2
+                # For t=1 frame: pos = pos + velocity + 0.5*acceleration
+                predicted_x = (last_pos[0] + self.last_velocity[0] + 
+                              0.5 * self.last_acceleration[0])
+                predicted_y = (last_pos[1] + self.last_velocity[1] + 
+                              0.5 * self.last_acceleration[1])
+            else:
+                # Simple linear prediction
+                predicted_x = last_pos[0] + self.last_velocity[0]
+                predicted_y = last_pos[1] + self.last_velocity[1]
+            
             return [predicted_x, predicted_y]
 
         return None
@@ -180,7 +323,7 @@ class BallTracker:
         return enhanced_detection
 
     def _handle_missing_ball(self) -> Optional[Dict[str, Any]]:
-        """Handle frame where ball was not detected.
+        """Handle frame where ball was not detected with enhanced prediction.
 
         Returns:
             Predicted ball info or None
@@ -192,25 +335,85 @@ class BallTracker:
             self._reset_tracker()
             return None
 
-        # Try to predict ball position
-        predicted_position = self._predict_next_position()
+        # Enhanced multi-frame prediction for fast balls
+        predicted_position = self._predict_position_multiple_frames(self.missing_count)
         if predicted_position:
+            # Calculate prediction confidence based on missing frames and trajectory quality
+            prediction_confidence = max(0.1, 0.5 - 0.05 * self.missing_count)
+            
+            # Higher confidence if we have good velocity/acceleration data
+            if (self.last_velocity and self.last_acceleration and 
+                len(self.trajectory) > 5):
+                prediction_confidence += 0.2
+            
             return {
                 "center": predicted_position,
-                "confidence": 0.0,  # Low confidence for predicted position
+                "confidence": prediction_confidence,
                 "bbox": self._estimate_bbox(predicted_position),
                 "class_name": "volleyball",
-                "velocity": self.last_velocity,
+                "velocity": self._predict_velocity_for_frame(self.missing_count),
                 "trajectory_length": len(self.trajectory),
                 "smoothed_position": predicted_position,
                 "ball_state": "predicted",
-                "is_predicted": True
+                "is_predicted": True,
+                "missing_frames": self.missing_count,
+                "prediction_method": "physics" if self.last_acceleration else "linear"
             }
 
         return None
 
+    def _predict_position_multiple_frames(self, frames_ahead: int) -> Optional[List[float]]:
+        """Predict ball position multiple frames ahead using physics.
+
+        Args:
+            frames_ahead: Number of frames to predict ahead
+
+        Returns:
+            Predicted [x, y] position or None
+        """
+        if len(self.trajectory) < 2 or not self.last_velocity:
+            return None
+
+        last_pos = self.trajectory[-1]
+        
+        if self.last_acceleration and len(self.accelerations) > 0:
+            # Physics-based prediction: pos = pos + velocity*t + 0.5*acceleration*t^2
+            t = frames_ahead
+            predicted_x = (last_pos[0] + self.last_velocity[0] * t + 
+                          0.5 * self.last_acceleration[0] * t * t)
+            predicted_y = (last_pos[1] + self.last_velocity[1] * t + 
+                          0.5 * self.last_acceleration[1] * t * t)
+        else:
+            # Linear prediction
+            t = frames_ahead
+            predicted_x = last_pos[0] + self.last_velocity[0] * t
+            predicted_y = last_pos[1] + self.last_velocity[1] * t
+        
+        return [predicted_x, predicted_y]
+
+    def _predict_velocity_for_frame(self, frames_ahead: int) -> Optional[List[float]]:
+        """Predict velocity for a frame ahead.
+
+        Args:
+            frames_ahead: Number of frames ahead
+
+        Returns:
+            Predicted [vx, vy] velocity or None
+        """
+        if not self.last_velocity:
+            return self.last_velocity
+
+        if self.last_acceleration and len(self.accelerations) > 0:
+            # velocity = initial_velocity + acceleration * time
+            t = frames_ahead
+            predicted_vx = self.last_velocity[0] + self.last_acceleration[0] * t
+            predicted_vy = self.last_velocity[1] + self.last_acceleration[1] * t
+            return [predicted_vx, predicted_vy]
+        
+        return self.last_velocity
+
     def _is_valid_velocity(self, velocity: List[float]) -> bool:
-        """Check if velocity is reasonable.
+        """Check if velocity is reasonable with enhanced validation for fast balls.
 
         Args:
             velocity: [vx, vy] velocity vector
@@ -224,20 +427,50 @@ class BallTracker:
         # Check velocity magnitude
         magnitude = np.sqrt(velocity[0]**2 + velocity[1]**2)
 
-        # Too fast movement is likely a detection error
-        if magnitude > self.velocity_threshold:
+        # Adaptive velocity threshold for fast ball tracking
+        adaptive_threshold = self.velocity_threshold
+        
+        # If ball is moving fast, be more lenient with velocity changes
+        if magnitude > self.fast_ball_velocity_threshold:
+            adaptive_threshold *= 1.5  # 50% more lenient for fast balls
+            self.logger.debug(f"Fast ball detected (speed: {magnitude:.1f}), using adaptive threshold: {adaptive_threshold:.1f}")
+
+        # Too fast movement is likely a detection error (but be more lenient)
+        if magnitude > adaptive_threshold:
             return False
 
         # If we have velocity history, check for sudden changes
         if len(self.velocities) > 0:
-            avg_velocity = np.mean(self.velocities, axis=0)
+            # Use recent velocities for better validation
+            recent_velocities = list(self.velocities)[-5:]  # Last 5 velocities
+            avg_velocity = np.mean(recent_velocities, axis=0)
+            
             velocity_change = np.sqrt(
                 (velocity[0] - avg_velocity[0])**2 +
                 (velocity[1] - avg_velocity[1])**2
             )
 
-            # Sudden velocity changes might indicate detection errors
-            if velocity_change > self.velocity_threshold * 0.5:
+            # More lenient threshold for velocity changes
+            change_threshold = adaptive_threshold * 0.7  # Increased from 0.5
+            
+            if velocity_change > change_threshold:
+                # Allow the change if it's consistent with recent trajectory trend
+                if len(self.velocities) >= 3:
+                    # Check if this is part of a consistent acceleration pattern
+                    recent_changes = []
+                    for i in range(min(3, len(self.velocities) - 1)):
+                        v1 = self.velocities[-(i+2)]
+                        v2 = self.velocities[-(i+1)]
+                        change = np.sqrt((v2[0] - v1[0])**2 + (v2[1] - v1[1])**2)
+                        recent_changes.append(change)
+                    
+                    avg_recent_change = np.mean(recent_changes)
+                    
+                    # If current change is similar to recent trend, allow it
+                    if abs(velocity_change - avg_recent_change) < adaptive_threshold * 0.3:
+                        self.logger.debug(f"Velocity change {velocity_change:.1f} allowed due to consistent trend")
+                        return True
+                
                 return False
 
         return True

@@ -75,7 +75,15 @@ class VideoProcessor:
             # Tracking components
             self.ball_tracker = BallTracker(
                 max_missing_frames=self.config.get("ball_max_missing", 10),
-                trajectory_smoothing=self.config.get("trajectory_smoothing", 5)
+                trajectory_smoothing=self.config.get("trajectory_smoothing", 5),
+                velocity_threshold=self.config.get("velocity_threshold", 200.0),
+                low_confidence_threshold=self.config.get("low_confidence_threshold", 0.15),
+                trajectory_confidence_boost=self.config.get("trajectory_confidence_boost", 0.3),
+                max_trajectory_gap=self.config.get("max_trajectory_gap", 150.0),
+                velocity_consistency_weight=self.config.get("velocity_consistency_weight", 0.4),
+                acceleration_consistency_weight=self.config.get("acceleration_consistency_weight", 0.2),
+                trajectory_prediction_frames=self.config.get("trajectory_prediction_frames", 5),
+                fast_ball_velocity_threshold=self.config.get("fast_ball_velocity_threshold", 50.0)
             )
 
             self.player_tracker = PlayerTracker(
