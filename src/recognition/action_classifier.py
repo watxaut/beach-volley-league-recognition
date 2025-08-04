@@ -46,6 +46,9 @@ class ActionClassifier:
 
         # Store temporal data for each tracked player
         self.player_histories = {}  # track_id -> deque of frame data
+        
+        # Store recent actions to prevent consecutive identical actions
+        self.recent_actions = {}  # track_id -> list of (frame_number, action, confidence)
 
         self.logger = logging.getLogger(__name__)
 
@@ -134,6 +137,13 @@ class ActionClassifier:
                     "bbox": detection["bbox"],
                     "frame_pose": pose_data
                 })
+                
+                # Apply temporal filtering to prevent consecutive identical actions
+                if self._should_filter_consecutive_action(track_id, action_result["action"], frame_number):
+                    action_result["action"] = VolleyballAction.UNKNOWN.value
+                    action_result["confidence"] = 0.0
+                    action_result["filtered_consecutive"] = True
+                
                 action_results.append(action_result)
 
         return action_results
@@ -282,10 +292,13 @@ class ActionClassifier:
         validation_results = {}
         
         try:
-            # 1. Enhanced ball contact validation
+            # 1. Enhanced ball contact validation - check all available ball candidates
             if self.ball_contact_validator and ball_info:
+                # Try to find best ball candidate if multiple balls available
+                best_ball_info = self._find_best_ball_candidate(ball_info, pose_data, player_bbox)
+                
                 ball_contact_validation = self.ball_contact_validator.validate_ball_contact(
-                    ball_info, pose_data, predicted_action, player_bbox
+                    best_ball_info, pose_data, predicted_action, player_bbox
                 )
                 validation_results["ball_contact"] = ball_contact_validation
         except Exception as e:
@@ -579,6 +592,9 @@ class ActionClassifier:
         # Ace is a special case of serve that results in a point
         scores[VolleyballAction.ACE] = scores[VolleyballAction.SERVE] * 0.1  # Lower probability
 
+        # Apply cross-action validation to prevent misclassification
+        scores = self._apply_cross_action_validation(scores, features)
+
         return scores
 
     def _score_dig_action(self, features: Dict[str, Any]) -> float:
@@ -613,76 +629,236 @@ class ActionClassifier:
         """Score set action based on features."""
         score = 0.0
 
-        # High arm position
+        # Both arms moderately high (for overhead setting position)
         left_arm_height = features.get("left_arm_height", 500)
         right_arm_height = features.get("right_arm_height", 500)
         avg_arm_height = (left_arm_height + right_arm_height) / 2
+        arm_height_diff = abs(left_arm_height - right_arm_height)
 
-        if avg_arm_height < 200:  # Arms high
-            score += 0.4
+        # Arms should be high but not as extreme as spikes
+        if 150 < avg_arm_height < 250:  # Moderate arm height (not too extreme)
+            score += 0.3
+        elif avg_arm_height < 200:  # Very high arms
+            score += 0.2  # Lower score since might be spike/block
 
-        # Ball overhead
+        # Set characteristic: arms relatively symmetric (both used for setting)
+        if arm_height_diff < 60:  # Arms fairly symmetric
+            score += 0.3
+        elif arm_height_diff > 120:  # Too asymmetric (more like spike)
+            score -= 0.3
+
+        # Ball overhead and controlled contact
         ball_relative_height = features.get("ball_relative_height", 0.5)
-        if ball_relative_height < 0.3:
-            score += 0.3
+        if 0.1 < ball_relative_height < 0.4:  # Ball overhead but accessible
+            score += 0.4
+        elif ball_relative_height < 0.1:  # Ball too high (more like spike)
+            score += 0.1
 
-        # Ball interaction
+        # Ball interaction is essential for sets
         if features.get("ball_in_reach", False):
-            score += 0.3
+            score += 0.2
 
-        return min(score, 1.0)
+        # Sets can happen anywhere but are more common in middle/back for setup
+        court_region = features.get("court_region", "")
+        if court_region in ["middle", "back"]:
+            score += 0.1
+        elif court_region == "front":
+            score += 0.05  # Can happen but less common
+
+        # Low to moderate movement (sets are more controlled)
+        movement_speed = features.get("max_movement_speed", 0)
+        if movement_speed < 8:  # Controlled, precise movement
+            score += 0.2
+        elif movement_speed > 15:  # Too aggressive for set
+            score -= 0.2
+
+        # Penalty for extreme arm positions (more characteristic of spike/block)
+        if avg_arm_height < 120:  # Arms too high (spike-like)
+            score -= 0.2
+        
+        return max(0.0, min(score, 1.0))
 
     def _score_spike_action(self, features: Dict[str, Any]) -> float:
         """Score spike action based on features."""
         score = 0.0
 
-        # One arm very high (spiking arm)
+        # One arm much higher than the other (asymmetric arm position)
         left_arm_height = features.get("left_arm_height", 500)
         right_arm_height = features.get("right_arm_height", 500)
-        max_arm_height = min(left_arm_height, right_arm_height)
+        max_arm_height = min(left_arm_height, right_arm_height)  # Highest arm
+        min_arm_height = max(left_arm_height, right_arm_height)  # Lowest arm
+        arm_height_diff = abs(left_arm_height - right_arm_height)
 
+        # Primary spike indicator: one arm very high
         if max_arm_height < 150:  # Very high arm
+            score += 0.3
+        
+        # Strong spike indicator: significant arm height difference (asymmetric)
+        if arm_height_diff > 100:  # Large difference between arms
             score += 0.4
+        elif arm_height_diff < 50:  # Arms too similar (more like block/set)
+            score -= 0.2
 
-        # High movement speed (jumping)
+        # High movement speed (aggressive jumping for spike)
         movement_speed = features.get("max_movement_speed", 0)
-        if movement_speed > 10:
-            score += 0.2
+        if movement_speed > 15:  # Higher threshold for aggressive spike motion
+            score += 0.3
+        elif movement_speed > 10:
+            score += 0.1
 
-        # Ball interaction high
+        # Ball interaction high above head (spike contact point)
         ball_relative_height = features.get("ball_relative_height", 0.5)
-        if ball_relative_height < 0.2:
-            score += 0.2
+        if ball_relative_height < 0.1:  # Very high ball contact
+            score += 0.3
+        elif ball_relative_height < 0.2:
+            score += 0.1
 
-        # Court position (usually front/middle)
+        # Court position (usually front/middle for spikes)
         court_region = features.get("court_region", "")
         if court_region in ["front", "middle"]:
-            score += 0.2
+            score += 0.1
 
-        return min(score, 1.0)
+        # Penalize if both arms are equally high (more like a block)
+        if abs(left_arm_height - right_arm_height) < 30 and max_arm_height < 200:
+            score -= 0.3
+
+        return max(0.0, min(score, 1.0))
 
     def _score_block_action(self, features: Dict[str, Any]) -> float:
         """Score block action based on features."""
         score = 0.0
 
-        # Both arms high
+        # Both arms high and parallel (key block characteristic)
         left_arm_height = features.get("left_arm_height", 500)
         right_arm_height = features.get("right_arm_height", 500)
+        arm_height_diff = abs(left_arm_height - right_arm_height)
+        avg_arm_height = (left_arm_height + right_arm_height) / 2
 
+        # Both arms must be high
         if left_arm_height < 200 and right_arm_height < 200:
+            score += 0.3
+        
+        # Strong block indicator: arms at similar height (parallel/symmetric)
+        if arm_height_diff < 50:  # Arms are parallel
             score += 0.4
+        elif arm_height_diff > 100:  # Arms too different (more like spike)
+            score -= 0.3
 
-        # High movement (jumping)
+        # Moderate movement (controlled jumping, not aggressive like spike)
         movement_speed = features.get("max_movement_speed", 0)
-        if movement_speed > 8:
+        if 5 < movement_speed < 12:  # Controlled block jump
+            score += 0.2
+        elif movement_speed > 15:  # Too aggressive for block
+            score -= 0.2
+
+        # Ball position (blocks typically occur with ball slightly in front)
+        ball_relative_height = features.get("ball_relative_height", 0.5)
+        if 0.0 < ball_relative_height < 0.3:  # Ball overhead to slightly in front
             score += 0.2
 
-        # Front court position
+        # Front court position (essential for blocks)
         court_region = features.get("court_region", "")
         if court_region == "front":
             score += 0.4
+        elif court_region in ["middle", "back"]:
+            score -= 0.2  # Blocks rarely happen in back court
 
-        return min(score, 1.0)
+        # Bonus for symmetric arm position with both arms high
+        if arm_height_diff < 30 and avg_arm_height < 180:
+            score += 0.2
+
+        return max(0.0, min(score, 1.0))
+
+    def _apply_cross_action_validation(self, scores: Dict[VolleyballAction, float], features: Dict[str, Any]) -> Dict[VolleyballAction, float]:
+        """Apply cross-validation between similar actions to improve classification.
+        
+        Args:
+            scores: Initial action scores
+            features: Extracted features
+            
+        Returns:
+            Adjusted action scores
+        """
+        adjusted_scores = scores.copy()
+        
+        # Get key discriminating features
+        left_arm_height = features.get("left_arm_height", 500)
+        right_arm_height = features.get("right_arm_height", 500)
+        arm_height_diff = abs(left_arm_height - right_arm_height)
+        avg_arm_height = (left_arm_height + right_arm_height) / 2
+        movement_speed = features.get("max_movement_speed", 0)
+        ball_relative_height = features.get("ball_relative_height", 0.5)
+        court_region = features.get("court_region", "")
+        
+        # Spike vs Block vs Set discrimination
+        spike_score = scores.get(VolleyballAction.SPIKE, 0)
+        block_score = scores.get(VolleyballAction.BLOCK, 0)
+        set_score = scores.get(VolleyballAction.SET, 0)
+        
+        # If multiple high scores, apply discriminating logic
+        high_scores = [s for s in [spike_score, block_score, set_score] if s > 0.3]
+        
+        if len(high_scores) >= 2:
+            # Multiple similar actions detected - apply stronger discrimination
+            
+            # Strong asymmetric arms favor spike
+            if arm_height_diff > 120:
+                adjusted_scores[VolleyballAction.SPIKE] *= 1.3
+                adjusted_scores[VolleyballAction.BLOCK] *= 0.5
+                adjusted_scores[VolleyballAction.SET] *= 0.6
+            
+            # Strong symmetric arms favor block or set
+            elif arm_height_diff < 40:
+                # Very high symmetric arms favor block
+                if avg_arm_height < 160 and court_region == "front":
+                    adjusted_scores[VolleyballAction.BLOCK] *= 1.4
+                    adjusted_scores[VolleyballAction.SPIKE] *= 0.4
+                    adjusted_scores[VolleyballAction.SET] *= 0.7
+                # Moderate symmetric arms favor set
+                elif 160 < avg_arm_height < 220:
+                    adjusted_scores[VolleyballAction.SET] *= 1.3
+                    adjusted_scores[VolleyballAction.SPIKE] *= 0.5
+                    adjusted_scores[VolleyballAction.BLOCK] *= 0.8
+            
+            # High movement speed favors spike over set/block
+            if movement_speed > 15:
+                adjusted_scores[VolleyballAction.SPIKE] *= 1.2
+                adjusted_scores[VolleyballAction.SET] *= 0.6
+                adjusted_scores[VolleyballAction.BLOCK] *= 0.8
+            
+            # Low movement speed favors set
+            elif movement_speed < 5:
+                adjusted_scores[VolleyballAction.SET] *= 1.2
+                adjusted_scores[VolleyballAction.SPIKE] *= 0.7
+            
+            # Very high ball contact favors spike
+            if ball_relative_height < 0.05:
+                adjusted_scores[VolleyballAction.SPIKE] *= 1.3
+                adjusted_scores[VolleyballAction.SET] *= 0.7
+                adjusted_scores[VolleyballAction.BLOCK] *= 0.8
+            
+            # Moderate ball height favors set
+            elif 0.1 < ball_relative_height < 0.3:
+                adjusted_scores[VolleyballAction.SET] *= 1.2
+                adjusted_scores[VolleyballAction.SPIKE] *= 0.8
+            
+            # Court position discrimination
+            if court_region == "front":
+                # Front court: spike and block more likely than set
+                adjusted_scores[VolleyballAction.SPIKE] *= 1.1
+                adjusted_scores[VolleyballAction.BLOCK] *= 1.2
+                adjusted_scores[VolleyballAction.SET] *= 0.8
+            elif court_region == "back":
+                # Back court: set more likely, spike less likely, block very unlikely
+                adjusted_scores[VolleyballAction.SET] *= 1.2
+                adjusted_scores[VolleyballAction.SPIKE] *= 0.7
+                adjusted_scores[VolleyballAction.BLOCK] *= 0.3
+        
+        # Ensure scores remain in valid range
+        for action in adjusted_scores:
+            adjusted_scores[action] = max(0.0, min(adjusted_scores[action], 1.0))
+        
+        return adjusted_scores
 
     def _score_serve_action(self, features: Dict[str, Any]) -> float:
         """Score serve action based on features."""
@@ -703,6 +879,98 @@ class ActionClassifier:
             score += 0.2
 
         return min(score, 1.0)
+
+    def _find_best_ball_candidate(
+        self, 
+        ball_info: Dict[str, Any], 
+        pose_data: Dict[str, Any], 
+        player_bbox: List[float]
+    ) -> Dict[str, Any]:
+        """Find the best ball candidate for contact validation.
+        
+        Args:
+            ball_info: Primary ball tracking info (may contain multiple candidates)
+            pose_data: Player pose data
+            player_bbox: Player bounding box [x1, y1, x2, y2]
+            
+        Returns:
+            Best ball candidate for this player
+        """
+        # If ball_info has multiple candidates, choose the closest to player
+        candidates = ball_info.get("candidates", [ball_info])
+        if len(candidates) <= 1:
+            return ball_info
+        
+        # Calculate player center
+        player_center = [
+            (player_bbox[0] + player_bbox[2]) / 2,
+            (player_bbox[1] + player_bbox[3]) / 2
+        ]
+        
+        best_candidate = ball_info
+        best_distance = float('inf')
+        
+        for candidate in candidates:
+            ball_center = candidate.get("center", [0, 0])
+            if not ball_center:
+                continue
+                
+            # Calculate distance to player center
+            distance = np.sqrt(
+                (ball_center[0] - player_center[0]) ** 2 + 
+                (ball_center[1] - player_center[1]) ** 2
+            )
+            
+            # Prefer balls that are closer to player
+            if distance < best_distance:
+                best_distance = distance
+                best_candidate = candidate
+        
+        self.logger.debug(f"Selected best ball candidate at distance {best_distance:.1f} from player")
+        return best_candidate
+
+    def _should_filter_consecutive_action(self, track_id: int, action: str, frame_number: Optional[int] = None) -> bool:
+        """Check if action should be filtered due to consecutive identical actions.
+        
+        Args:
+            track_id: Player tracking ID
+            action: Action type being classified
+            frame_number: Current frame number
+            
+        Returns:
+            True if action should be filtered out
+        """
+        if action == "unknown" or frame_number is None:
+            return False
+            
+        # Initialize recent actions for this player if needed
+        if track_id not in self.recent_actions:
+            self.recent_actions[track_id] = []
+            
+        recent = self.recent_actions[track_id]
+        
+        # Remove old actions (older than 30 frames)
+        cutoff_frame = frame_number - 30
+        recent = [r for r in recent if r[0] > cutoff_frame]
+        self.recent_actions[track_id] = recent
+        
+        # Check for consecutive identical actions
+        if len(recent) > 0:
+            last_frame, last_action, last_confidence = recent[-1]
+            
+            # Filter if same action within last 5 frames (avoid immediate duplicates)
+            if action == last_action and frame_number - last_frame < 5:
+                return True
+                
+            # Filter if more than 1 of the same action in last 15 frames (more aggressive)
+            same_action_count = sum(1 for f, a, _ in recent if a == action and frame_number - f < 15)
+            if same_action_count >= 1:
+                return True
+        
+        # Record this action
+        self.recent_actions[track_id].append((frame_number, action, 0.8))  # Placeholder confidence
+        
+        return False
 
     def _calculate_enhanced_confidence(
         self,
@@ -799,7 +1067,7 @@ class ActionClassifier:
             
             # Must have reasonable ball contact confidence
             ball_confidence = ball_contact.get("confidence", 0.0)
-            min_contact_confidence = self.enhanced_validation_config.get("ball_contact", {}).get("min_contact_confidence", 0.3)
+            min_contact_confidence = self.enhanced_validation_config.get("ball_contact", {}).get("min_contact_confidence", 0.7)
             if ball_confidence < min_contact_confidence:
                 return False
             
@@ -869,30 +1137,68 @@ class ActionClassifier:
                 if set_details.get("ball_height_appropriate", False) and set_details.get("arms_raised", False):
                     confidence *= 1.2
             
+            # Sets should have controlled, moderate velocity changes
             if trajectory_validation.get("controlled_velocity", False):
-                confidence *= 1.1
+                confidence *= 1.2
+            
+            # Penalize sets with high velocity (more like spikes)
+            if trajectory_validation.get("high_velocity", False):
+                confidence *= 0.6
+            
+            # Penalize sets with strong downward motion (more like spikes)
+            if trajectory_validation.get("downward_motion", False):
+                confidence *= 0.7
         
         elif action_type == VolleyballAction.SPIKE:
             # Spikes require high ball contact and fast downward trajectory
             if ball_contact.get("valid", False):
                 spike_details = ball_contact.get("details", {}).get("action_specific", {}).get("details", {})
                 if spike_details.get("ball_height_appropriate", False) and spike_details.get("arm_extended_high", False):
-                    confidence *= 1.2
+                    confidence *= 1.3
             
+            # Strong boost for spikes with high velocity and downward motion
             if trajectory_validation.get("high_velocity", False) and trajectory_validation.get("downward_motion", False):
-                confidence *= 1.3
+                confidence *= 1.4
+            elif trajectory_validation.get("high_velocity", False):
+                confidence *= 1.2
+            elif trajectory_validation.get("downward_motion", False):
+                confidence *= 1.1
+            
+            # Penalize spikes with controlled velocity (more like sets)
+            if trajectory_validation.get("controlled_velocity", False):
+                confidence *= 0.5
+            
+            # Penalize spikes in back court
+            if court_position.get("valid", False):
+                region = court_position.get("details", {}).get("current_region", "")
+                if region == "back_court":
+                    confidence *= 0.6
         
         elif action_type == VolleyballAction.BLOCK:
             # Blocks require front court position and both arms raised
             if court_position.get("valid", False):
                 region = court_position.get("details", {}).get("current_region", "")
                 if region == "front_court":
-                    confidence *= 1.2
+                    confidence *= 1.3
+                elif region in ["middle_court", "back_court"]:
+                    confidence *= 0.4  # Heavy penalty for blocks away from net
             
             if ball_contact.get("valid", False):
                 block_details = ball_contact.get("details", {}).get("action_specific", {}).get("details", {})
                 if block_details.get("both_arms_raised", False):
-                    confidence *= 1.1
+                    confidence *= 1.2
+            
+            # Blocks should show ball deflection or minimal velocity change
+            if trajectory_validation.get("velocity_reduction", False):
+                confidence *= 1.2
+            
+            # Penalize blocks with high velocity changes (more like spikes)
+            if trajectory_validation.get("high_velocity", False):
+                confidence *= 0.7
+            
+            # Blocks typically show sudden velocity changes due to deflection
+            if trajectory_validation.get("sudden_direction_change", False):
+                confidence *= 1.1
         
         elif action_type == VolleyballAction.SERVE:
             # Serves require back court position and ball acceleration

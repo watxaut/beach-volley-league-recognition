@@ -241,10 +241,10 @@ class VideoProcessor:
                 court_info=court_info
             )
             
-            # Filter out UNKNOWN actions - only keep actions with ball contact
+            # Filter out UNKNOWN actions - only keep actions with sufficient confidence
             valid_actions = [
                 action for action in actions 
-                if action.get("action", "unknown") != "unknown" and action.get("confidence", 0.0) > 0.1
+                if action.get("action", "unknown") != "unknown" and action.get("confidence", 0.0) > 0.4
             ]
             frame_result["actions"] = valid_actions
 

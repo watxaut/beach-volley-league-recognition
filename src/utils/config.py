@@ -36,7 +36,7 @@ class Config:
         "pose_confidence": 0.5,
         "pose_complexity": 1,
         "temporal_window": 10,
-        "action_confidence": 0.6,
+        "action_confidence": 0.7,  # Higher threshold for actions
 
         # Processing settings
         "batch_size": 1,
@@ -79,36 +79,36 @@ class Config:
         # Enhanced Ball-Player Proximity Validation Settings
         "enhanced_validation": {
             "enabled": True,
-            "strict_mode": True,  # Enforce strict ball contact requirement
+            "strict_mode": True,  # Enforce stricter validation to reduce over-detection
             
             # Ball contact validation settings
             "ball_contact": {
-                "min_contact_confidence": 0.3,  # Stricter requirement for ball contact
+                "min_contact_confidence": 0.6,  # Higher threshold to reduce over-detection
                 "contact_zones": {
                     "dig": {
                         "height_range": [0.6, 1.0],  # Relative to player height
-                        "width_expansion": 1.0,      # Tighter arm reach
-                        "base_threshold": 60         # Stricter proximity requirement
+                        "width_expansion": 1.5,      # Increased arm reach
+                        "base_threshold": 120        # More lenient proximity
                     },
                     "set": {
                         "height_range": [0.0, 0.4],  # Above shoulders
-                        "width_expansion": 0.8,      # Tighter reach
-                        "base_threshold": 70         # Stricter proximity requirement
+                        "width_expansion": 1.5,      # Increased reach for sets
+                        "base_threshold": 150        # Much more lenient for sets
                     },
                     "spike": {
                         "height_range": [-0.2, 0.3], # Extended above head
-                        "width_expansion": 1.2,      # Reduced reach
-                        "base_threshold": 80         # Stricter proximity requirement
+                        "width_expansion": 1.8,      # Increased spike reach
+                        "base_threshold": 140        # More lenient proximity
                     },
                     "block": {
                         "height_range": [0.0, 0.3],
-                        "width_expansion": 1.0,      # Tighter reach
-                        "base_threshold": 70         # Stricter proximity requirement
+                        "width_expansion": 1.5,      # Increased reach
+                        "base_threshold": 130        # More lenient proximity
                     },
                     "serve": {
                         "height_range": [0.2, 0.8],
-                        "width_expansion": 1.5,      # Reduced reach
-                        "base_threshold": 100        # Stricter proximity requirement
+                        "width_expansion": 2.0,      # Increased serve reach
+                        "base_threshold": 180        # Higher for serves
                     }
                 }
             },

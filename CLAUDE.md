@@ -194,3 +194,13 @@ detector = BallDetector(detection_method="fusion", enable_multiple_methods=True)
 - Live debug processor provides real-time development feedback
 - Test suite covers core components with sample video validation
 - Wilson detection modules are standalone and can be used independently
+
+## Claude Code Workflow Guidance
+
+### Implementation Strategies
+- When told to "implement a new feature":
+  * Write down an implementation plan
+  * Consider 3 different implementation strategies
+  * Select the best strategy
+  * Create the feature in the @features/ folder first
+  * Do not write actual code implementation initially
