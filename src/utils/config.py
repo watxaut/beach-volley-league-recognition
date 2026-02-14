@@ -155,6 +155,53 @@ class Config:
                     "court_vertical_offset": 0.3
                 }
             }
+        },
+        
+        # Game state detection settings
+        "game_state_detection": {
+            "enabled": True,
+            "serve_threshold": 0.4,
+            "point_end_threshold": 0.6,
+            "min_state_duration_frames": 10,
+            "activity_gap_threshold_seconds": 3.0,
+            
+            # Action sequence analysis
+            "action_sequence": {
+                "serve_pattern_window": 30,  # frames
+                "rally_end_inactivity_threshold": 90,  # frames
+                "action_confidence_threshold": 0.6
+            },
+            
+            # Trajectory analysis
+            "trajectory_analysis": {
+                "serve_trajectory_features": {
+                    "min_arc_height": 50,  # pixels
+                    "horizontal_distance_threshold": 200,
+                    "velocity_pattern_weight": 0.7
+                },
+                "point_end_detection": {
+                    "ground_contact_threshold": 20,  # pixels from court bottom
+                    "out_of_bounds_margin": 30,     # pixels beyond court
+                    "velocity_drop_threshold": 0.3   # relative velocity drop
+                }
+            },
+            
+            # Temporal analysis
+            "temporal_analysis": {
+                "activity_smoothing_window": 15,     # frames
+                "pause_classification_thresholds": {
+                    "short_pause": 1.0,   # seconds - between-point pause
+                    "medium_pause": 5.0,  # seconds - timeout/break
+                    "long_pause": 15.0    # seconds - extended break
+                }
+            },
+            
+            # Score tracking
+            "score_tracking": {
+                "max_score_per_set": 25,
+                "service_rotation_enabled": True,
+                "point_detection_methods": ["trajectory", "action_sequence"]
+            }
         }
     }
 

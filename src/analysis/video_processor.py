@@ -12,13 +12,8 @@ import logging
 from pathlib import Path
 from tqdm import tqdm
 
-from ..detection.ball_detector import BallDetector
-from ..detection.player_detector import PlayerDetector
-from ..tracking.ball_tracker import BallTracker
-from ..tracking.player_tracker import PlayerTracker
-from ..recognition.pose_estimator import PoseEstimator
-from ..recognition.action_classifier import ActionClassifier
 from .statistics import StatisticsAnalyzer
+from .frame_processor import FrameProcessor
 
 
 class VideoProcessor:
@@ -37,81 +32,17 @@ class VideoProcessor:
         self.config = config
         self.logger = logging.getLogger(__name__)
 
-        # Initialize components
-        self._initialize_components()
+        # Initialize shared frame processor (batch mode - use standard ball tracker)
+        self.frame_processor = FrameProcessor(config, use_enhanced_ball_tracker=False)
+        
+        # Analysis component
+        self.statistics_analyzer = StatisticsAnalyzer()
 
         # Processing state
         self.frame_count = 0
         self.total_frames = 0
 
-    def _initialize_components(self) -> None:
-        """Initialize all computer vision components."""
-        try:
-            # Detection components
-            from ..detection.court_detector import CourtDetector
-
-            self.court_detector = CourtDetector(
-                config=self.config,
-                debug_mode=self.config.get("debug_mode", False)
-            )
-
-            self.ball_detector = BallDetector(
-                confidence_threshold=self.config.get("ball_confidence", 0.3),
-                device=self.config.get("device", "cpu"),
-                detection_method=self.config.get("detection_method", "template"),
-                horizontal_margin_percent=self.config.get("ball_horizontal_margin_percent", 0.15),
-                enable_motion_filtering=False  # disable for now as it is not working properly
-            )
-
-            self.player_detector = PlayerDetector(
-                confidence_threshold=self.config.get("player_confidence", 0.5),
-                device=self.config.get("device", "cpu"),
-                max_players=self.config.get("max_players", 4)
-            )
-
-            # Connect court detector to player detector for court-based filtering
-            self.player_detector.set_court_detector(self.court_detector)
-
-            # Tracking components
-            self.ball_tracker = BallTracker(
-                max_missing_frames=self.config.get("ball_max_missing", 10),
-                trajectory_smoothing=self.config.get("trajectory_smoothing", 5),
-                velocity_threshold=self.config.get("velocity_threshold", 200.0),
-                low_confidence_threshold=self.config.get("low_confidence_threshold", 0.15),
-                trajectory_confidence_boost=self.config.get("trajectory_confidence_boost", 0.3),
-                max_trajectory_gap=self.config.get("max_trajectory_gap", 150.0),
-                velocity_consistency_weight=self.config.get("velocity_consistency_weight", 0.4),
-                acceleration_consistency_weight=self.config.get("acceleration_consistency_weight", 0.2),
-                trajectory_prediction_frames=self.config.get("trajectory_prediction_frames", 5),
-                fast_ball_velocity_threshold=self.config.get("fast_ball_velocity_threshold", 50.0)
-            )
-
-            self.player_tracker = PlayerTracker(
-                max_disappeared=self.config.get("player_max_disappeared", 30),
-                max_distance=self.config.get("tracking_max_distance", 100.0)
-            )
-
-            # Recognition components
-            self.pose_estimator = PoseEstimator(
-                min_detection_confidence=self.config.get("pose_confidence", 0.5),
-                model_complexity=self.config.get("pose_complexity", 1)
-            )
-
-            self.action_classifier = ActionClassifier(
-                pose_estimator=self.pose_estimator,
-                temporal_window=self.config.get("temporal_window", 10),
-                confidence_threshold=self.config.get("action_confidence", 0.6),
-                enhanced_validation_config=self.config.get("enhanced_validation", {})
-            )
-
-            # Analysis component
-            self.statistics_analyzer = StatisticsAnalyzer()
-
-            self.logger.info("All components initialized successfully")
-
-        except Exception as e:
-            self.logger.error(f"Failed to initialize components: {e}")
-            raise
+    # Removed _initialize_components - now handled by FrameProcessor
 
     def process_video(self, video_path: str) -> Dict[str, Any]:
         """Process a volleyball video and extract analysis results.
@@ -137,14 +68,9 @@ class VideoProcessor:
 
         self.logger.info(f"Video properties: {self.total_frames} frames, {fps} FPS, {width}x{height}")
         
-        # Update ball detector with actual video FPS for accurate motion analysis
-        if hasattr(self.ball_detector, 'wilson_detectors') and 'template' in self.ball_detector.wilson_detectors:
-            template_detector = self.ball_detector.wilson_detectors['template']
-            if template_detector.motion_tracker is not None:
-                template_detector.motion_tracker.fps = fps
-                # Recalculate gravity with correct FPS
-                template_detector.motion_tracker.gravity_px_per_frame2 = template_detector.motion_tracker._calculate_gravity_pixels()
-                self.logger.info(f"Updated motion tracker FPS to {fps:.2f}, gravity: {template_detector.motion_tracker.gravity_px_per_frame2:.4f} px/frame²")
+        # Setup frame processor with video properties
+        self.frame_processor.setup_video_fps(fps)
+        self.frame_processor.setup_video_dimensions(width, height)
 
         # Initialize results storage
         results = {
@@ -171,8 +97,8 @@ class VideoProcessor:
                     break
 
                 try:
-                    # Process single frame
-                    frame_result = self._process_frame(frame)
+                    # Process single frame using shared processor
+                    frame_result = self.frame_processor.process_frame(frame, self.frame_count)
                     results["frame_results"].append(frame_result)
 
                     # Update progress
@@ -195,71 +121,7 @@ class VideoProcessor:
         self.logger.info("Video processing completed")
         return results
 
-    def _process_frame(self, frame: np.ndarray) -> Dict[str, Any]:
-        """Process a single video frame.
-
-        Args:
-            frame: Input frame as numpy array
-
-        Returns:
-            Frame processing results
-        """
-        frame_result = {
-            "frame_index": self.frame_count,
-            "ball_detections": [],
-            "player_detections": [],
-            "tracked_players": [],
-            "tracked_ball": None,
-            "actions": [],
-            "processing_time": 0.0
-        }
-
-        import time
-        start_time = time.time()
-
-        # 1. Object Detection
-        ball_detections = self.ball_detector.detect(frame)
-        player_detections = self.player_detector.detect(frame)
-
-        frame_result["ball_detections"] = ball_detections
-        frame_result["player_detections"] = player_detections
-
-        # 2. Object Tracking
-        tracked_players = self.player_tracker.update(player_detections)
-        tracked_ball = self.ball_tracker.update(ball_detections)
-
-        frame_result["tracked_players"] = tracked_players
-        frame_result["tracked_ball"] = tracked_ball
-
-        # 3. Action Recognition
-        if tracked_players:
-            # Get court information for validation
-            court_info = None
-            if hasattr(self, 'court_detector') and self.court_detector:
-                try:
-                    court_detection = self.court_detector.detect_court(frame)
-                    if court_detection and court_detection.get("detected", False):
-                        court_info = {"boundaries": court_detection}
-                except Exception as e:
-                    self.logger.debug(f"Court detection failed: {e}")
-            
-            actions = self.action_classifier.classify_actions(
-                frame, tracked_players, tracked_ball,
-                frame_number=frame_result.get("frame_number", 0),
-                court_info=court_info
-            )
-            
-            # Filter out UNKNOWN actions - only keep actions with sufficient confidence
-            valid_actions = [
-                action for action in actions 
-                if action.get("action", "unknown") != "unknown" and action.get("confidence", 0.0) > 0.4
-            ]
-            frame_result["actions"] = valid_actions
-
-        # Record processing time
-        frame_result["processing_time"] = time.time() - start_time
-
-        return frame_result
+    # Removed _process_frame - now handled by FrameProcessor
 
     def _post_process_results(self, results: Dict[str, Any]) -> Dict[str, Any]:
         """Post-process complete video results.

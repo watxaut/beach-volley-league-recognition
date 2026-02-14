@@ -88,7 +88,8 @@ class ActionClassifier:
         player_detections: List[Dict[str, Any]],
         ball_info: Optional[Dict[str, Any]] = None,
         frame_number: Optional[int] = None,
-        court_info: Optional[Dict[str, Any]] = None
+        court_info: Optional[Dict[str, Any]] = None,
+        game_state_info: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """Classify actions for all players in the current frame.
 
@@ -96,6 +97,9 @@ class ActionClassifier:
             frame: Current video frame
             player_detections: List of player detections with tracking IDs
             ball_info: Ball detection/tracking information
+            frame_number: Current frame number
+            court_info: Court detection information
+            game_state_info: Game state context information
 
         Returns:
             List of action classifications for each player
@@ -123,6 +127,10 @@ class ActionClassifier:
                 frame_number=frame_number,
                 court_info=court_info
             )
+            
+            # Apply game state context if available
+            if action_result and game_state_info:
+                action_result = self._apply_game_state_context(action_result, game_state_info)
 
             if action_result:
                 # Additional safety check: no ball detected means no actions possible
@@ -1268,3 +1276,62 @@ class ActionClassifier:
             stats["court_validation"] = court_stats
         
         return stats
+    
+    def _apply_game_state_context(self, action_result: Dict[str, Any], 
+                                game_state_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply game state context to refine action classifications.
+        
+        Args:
+            action_result: Base action classification result
+            game_state_info: Game state context information
+            
+        Returns:
+            Enhanced action result with game state context applied
+        """
+        current_state = game_state_info.get("current_state")
+        score_info = game_state_info.get("score_info", {})
+        
+        # Make a copy to avoid modifying the original
+        enhanced_result = action_result.copy()
+        
+        # Context-aware serve vs spike distinction
+        original_action = action_result.get("action", "unknown")
+        
+        if original_action in ["serve", "spike"]:
+            if current_state in ["game_off", "serve_preparation"]:
+                # Game is starting - bias towards serve
+                if original_action == "spike":
+                    enhanced_result["action"] = "serve"
+                    enhanced_result["context_reason"] = "game_state_starting"
+                    enhanced_result["original_action"] = original_action
+                    # Boost confidence for serve in starting context
+                    enhanced_result["confidence"] = min(
+                        enhanced_result.get("confidence", 0.0) * 1.2, 1.0
+                    )
+                    self.logger.debug(f"Context change: {original_action} → serve (game starting)")
+                
+            elif current_state == "game_on":
+                # Game is active - bias towards spike
+                if original_action == "serve":
+                    # Only change to spike if confidence is relatively low
+                    if enhanced_result.get("confidence", 0.0) < 0.8:
+                        enhanced_result["action"] = "spike"
+                        enhanced_result["context_reason"] = "game_state_active"
+                        enhanced_result["original_action"] = original_action
+                        self.logger.debug(f"Context change: {original_action} → spike (game active)")
+        
+        # Add team context if available
+        if score_info.get("serving_team"):
+            enhanced_result["team_context"] = {
+                "serving_team": score_info["serving_team"],
+                "score_context": f"{score_info.get('team_a_score', 0)}-{score_info.get('team_b_score', 0)}",
+                "point_in_progress": score_info.get("point_in_progress", False)
+            }
+        
+        # Add game state context
+        enhanced_result["game_state_context"] = {
+            "current_state": current_state,
+            "state_confidence": game_state_info.get("state_confidence", 0.0)
+        }
+        
+        return enhanced_result

@@ -12,12 +12,7 @@ import logging
 import time
 from collections import deque
 
-from ..detection.ball_detector import BallDetector
-from ..detection.player_detector import PlayerDetector
-from ..tracking.enhanced_ball_tracker import EnhancedBallTracker  # Import enhanced tracker
-from ..tracking.player_tracker import PlayerTracker
-from ..recognition.pose_estimator import PoseEstimator
-from ..recognition.action_classifier import ActionClassifier
+from .frame_processor import FrameProcessor
 
 
 class LiveDebugProcessor:
@@ -41,8 +36,8 @@ class LiveDebugProcessor:
         self.debug_speed = debug_speed
         self.logger = logging.getLogger(__name__)
 
-        # Initialize components
-        self._initialize_components()
+        # Initialize shared frame processor (live mode - use enhanced ball tracker)
+        self.frame_processor = FrameProcessor(config, use_enhanced_ball_tracker=True)
 
         # Visual settings
         self.colors = {
@@ -59,7 +54,12 @@ class LiveDebugProcessor:
             'action_spike': (255, 0, 0), # Blue for spikes
             'action_block': (0, 165, 255), # Orange for blocks
             'action_ace': (128, 0, 128),  # Purple for aces
-            'action_serve': (255, 20, 147) # Deep pink for serves
+            'action_serve': (255, 20, 147), # Deep pink for serves
+            'game_state_off': (128, 128, 128),  # Gray for game off
+            'game_state_on': (0, 255, 0),       # Green for game on
+            'game_state_serve': (255, 165, 0),  # Orange for serve prep
+            'game_state_scored': (255, 0, 255), # Magenta for point scored
+            'game_state_timeout': (255, 255, 0) # Yellow for timeout
         }
 
         # Ball trajectory history with enhanced tracking
@@ -77,68 +77,13 @@ class LiveDebugProcessor:
 
         # Performance tracking
         self.frame_times = deque(maxlen=30)
+        
+        # Quick access to shared components for visualization
+        self.ball_detector = self.frame_processor.get_ball_detector()
+        self.court_detector = self.frame_processor.get_court_detector()
+        self.game_state_manager = self.frame_processor.get_game_state_manager()
 
-    def _initialize_components(self) -> None:
-        """Initialize all computer vision components."""
-        try:
-            # Detection components
-            from ..detection.court_detector import CourtDetector
-
-            self.court_detector = CourtDetector(
-                config=self.config,
-                debug_mode=self.config.get("debug_mode", True)
-            )
-
-            self.ball_detector = BallDetector(
-                confidence_threshold=self.config.get("ball_confidence", 0.3),
-                device=self.config.get("device", "cpu"),
-                detection_method=self.config.get("detection_method", "template"),
-                wilson_ball_dir=self.config.get("wilson_ball_dir", "resources/wilson_ball"),
-                horizontal_margin_percent=self.config.get("ball_horizontal_margin_percent", 0.15),
-                enable_motion_filtering=False
-            )
-
-            self.player_detector = PlayerDetector(
-                confidence_threshold=self.config.get("player_confidence", 0.5),
-                device=self.config.get("device", "cpu"),
-                max_players=self.config.get("max_players", 4)
-            )
-
-            # Connect court detector to player detector for court-based filtering
-            self.player_detector.set_court_detector(self.court_detector)
-
-            # Tracking components - Use Enhanced Ball Tracker for better continuity
-            self.ball_tracker = EnhancedBallTracker(
-                max_missing_frames=self.config.get("ball_max_missing", 45),
-                template_update_interval=5,
-                optical_flow_quality=0.01,
-                kalman_process_noise=0.1,
-                kalman_measurement_noise=1.0
-            )
-
-            self.player_tracker = PlayerTracker(
-                max_disappeared=self.config.get("player_max_disappeared", 30),
-                max_distance=self.config.get("tracking_max_distance", 100.0)
-            )
-
-            # Recognition components
-            self.pose_estimator = PoseEstimator(
-                min_detection_confidence=self.config.get("pose_confidence", 0.5),
-                model_complexity=self.config.get("pose_complexity", 1)
-            )
-
-            self.action_classifier = ActionClassifier(
-                pose_estimator=self.pose_estimator,
-                temporal_window=self.config.get("temporal_window", 10),
-                confidence_threshold=self.config.get("action_confidence", 0.6),
-                enhanced_validation_config=self.config.get("enhanced_validation", {})
-            )
-
-            self.logger.info("Live debug components initialized successfully")
-
-        except Exception as e:
-            self.logger.error(f"Failed to initialize debug components: {e}")
-            raise
+    # Removed _initialize_components - now handled by FrameProcessor
 
     def process_video_live(self, video_path: str) -> None:
         """Process video with real-time debugging visualization.
@@ -162,14 +107,9 @@ class LiveDebugProcessor:
 
         self.logger.info(f"Video: {total_frames} frames, {fps} FPS, {width}x{height}")
         
-        # Update ball detector with actual video FPS for accurate motion analysis
-        if hasattr(self.ball_detector, 'wilson_detectors') and 'template' in self.ball_detector.wilson_detectors:
-            template_detector = self.ball_detector.wilson_detectors['template']
-            if template_detector.motion_tracker is not None:
-                template_detector.motion_tracker.fps = fps
-                # Recalculate gravity with correct FPS
-                template_detector.motion_tracker.gravity_px_per_frame2 = template_detector.motion_tracker._calculate_gravity_pixels()
-                self.logger.info(f"Updated motion tracker FPS to {fps:.2f}, gravity: {template_detector.motion_tracker.gravity_px_per_frame2:.4f} px/frame²")
+        # Setup frame processor with video properties
+        self.frame_processor.setup_video_fps(fps)
+        self.frame_processor.setup_video_dimensions(width, height)
         
         self.logger.info("Press 'q' to quit, SPACE to pause/resume, 'r' to restart")
 
@@ -185,8 +125,11 @@ class LiveDebugProcessor:
 
                 start_time = time.time()
 
-                # Process frame
-                debug_frame = self._process_debug_frame(frame, frame_count)
+                # Process frame using shared processor
+                frame_result = self.frame_processor.process_frame(frame, frame_count, enable_court_redetection=True)
+                
+                # Create debug visualization
+                debug_frame = self._create_debug_visualization(frame, frame_result, frame_count)
 
                 # Add performance info
                 debug_frame = self._add_performance_overlay(debug_frame, frame_count, total_frames)
@@ -212,18 +155,19 @@ class LiveDebugProcessor:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 frame_count = 0
                 self.ball_trajectory.clear()
-                self._reset_trackers()
+                self.frame_processor.reset_trackers()
                 self.logger.info("Video restarted")
 
         cap.release()
         cv2.destroyAllWindows()
         self.logger.info("Live debug session ended")
 
-    def _process_debug_frame(self, frame: np.ndarray, frame_index: int) -> np.ndarray:
-        """Process a single frame for debug visualization.
+    def _create_debug_visualization(self, frame: np.ndarray, frame_result: Dict[str, Any], frame_index: int) -> np.ndarray:
+        """Create debug visualization from frame processing results.
 
         Args:
             frame: Input frame
+            frame_result: Results from frame processor
             frame_index: Frame index
 
         Returns:
@@ -232,14 +176,13 @@ class LiveDebugProcessor:
         debug_frame = frame.copy()
 
         try:
-            # 0. Court Detection (detect once, then use for filtering)
-            if frame_index == 0 or frame_index % 30 == 0:  # Re-detect every 30 frames
-                self.court_detector.detect_court(frame)
-
-            # 1. Object Detection
-            ball_detections = self.ball_detector.detect(frame)
-            player_detections = self.player_detector.detect(frame)
-
+            # Extract results
+            ball_detections = frame_result.get("ball_detections", [])
+            tracked_players = frame_result.get("tracked_players", [])
+            tracked_ball = frame_result.get("tracked_ball")
+            actions = frame_result.get("actions", [])
+            game_state = frame_result.get("game_state", {})
+            
             # Update ball detection statistics and track methods used
             self.ball_detection_stats['total_detections'] += len(ball_detections)
             self.ball_raw_detections.extend(ball_detections)
@@ -251,61 +194,34 @@ class LiveDebugProcessor:
                     self.ball_detection_stats['method_counts'].get(method, 0) + 1
                 self.recent_detection_methods.append(method)
 
-            # 2. Filter detections by court area
-            filtered_player_detections = self.court_detector.filter_detections_by_court(player_detections)
-            filtered_ball_detections = self.court_detector.filter_detections_by_court(ball_detections)
+            # Update filtered ball statistics (estimate from total vs tracked)
+            if tracked_ball:
+                self.ball_detection_stats['tracked_detections'] += 1
 
-            # Update filtered ball statistics
-            filtered_out_balls = len(ball_detections) - len(filtered_ball_detections)
-            self.ball_detection_stats['filtered_detections'] += filtered_out_balls
-
-            # Log filtering results
-            if len(player_detections) != len(filtered_player_detections):
-                filtered_count = len(player_detections) - len(filtered_player_detections)
-                self.logger.debug(f"Frame {frame_index}: Filtered {filtered_count} out-of-court players")
-
-            if filtered_out_balls > 0:
-                self.logger.debug(f"Frame {frame_index}: Filtered {filtered_out_balls} out-of-court balls")
-
-            # 3. Object Tracking
-            # For players: use filtered detections (only in-court players)
-            tracked_players = self.player_tracker.update(filtered_player_detections)
-            # For ball: use ALL detections (ball can be outside court bounds) + frame for enhanced tracking
-            tracked_ball = self.ball_tracker.update(ball_detections, frame)
-
-            # 4. Action Recognition
-            actions = []
-            if tracked_players:
-                # Get court info for enhanced validation
-                court_info = None
-                if hasattr(self.court_detector, 'get_court_statistics'):
-                    court_stats = self.court_detector.get_court_statistics()
-                    if court_stats.get("court_detected", False):
-                        court_info = {"boundaries": court_stats.get("boundaries", {})}
-                
-                actions = self.action_classifier.classify_actions(
-                    frame, tracked_players, tracked_ball,
-                    frame_number=frame_index,
-                    court_info=court_info
-                )
-                
-                # Filter out UNKNOWN actions - only keep actions with ball contact
-                actions = [
-                    action for action in actions 
-                    if action.get("action", "unknown") != "unknown" and action.get("confidence", 0.0) > 0.1
-                ]
-
-            # 5. Draw visualizations
+            # Draw visualizations
             debug_frame = self._draw_court_overlay(debug_frame)  # Draw court first
             debug_frame = self._draw_players(debug_frame, tracked_players)
             debug_frame = self._draw_ball_and_trajectory(debug_frame, tracked_ball, ball_detections)
             debug_frame = self._draw_actions(debug_frame, actions)
-            debug_frame = self._draw_frame_info(debug_frame, frame_index, len(tracked_players), len(filtered_player_detections), len(player_detections))
+            
+            # Convert game state dict to object-like structure for visualization
+            if game_state:
+                # Create a simple namespace object from the dict
+                class GameStateInfo:
+                    def __init__(self, data):
+                        for key, value in data.items():
+                            setattr(self, key, value)
+                
+                game_state_obj = GameStateInfo(game_state)
+                debug_frame = self._draw_game_state(debug_frame, game_state_obj)
+            
+            player_detections = frame_result.get("player_detections", [])
+            debug_frame = self._draw_frame_info(debug_frame, frame_index, len(tracked_players), len(player_detections), len(player_detections))
 
         except Exception as e:
-            self.logger.error(f"Error processing debug frame {frame_index}: {e}")
+            self.logger.error(f"Error creating debug visualization {frame_index}: {e}")
             # Draw error message on frame
-            cv2.putText(debug_frame, f"Processing Error: {str(e)[:50]}",
+            cv2.putText(debug_frame, f"Visualization Error: {str(e)[:50]}",
                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
         return debug_frame
@@ -762,6 +678,118 @@ class LiveDebugProcessor:
         """
         return self.court_detector.draw_court_overlay(frame)
 
+    def _draw_game_state(self, frame: np.ndarray, game_state_info: Dict[str, Any]) -> np.ndarray:
+        """Draw game state information overlay.
+
+        Args:
+            frame: Input frame
+            game_state_info: Game state analysis results
+
+        Returns:
+            Frame with game state overlay
+        """
+        if not game_state_info:
+            return frame
+
+        h, w = frame.shape[:2]
+        
+        # Game state panel position (top right)
+        panel_x = w - 350
+        panel_y = 60
+        panel_width = 340
+        panel_height = 200
+
+        # Semi-transparent background
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (panel_x, panel_y),
+                     (panel_x + panel_width, panel_y + panel_height), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.8, frame, 0.2, 0, frame)
+
+        # Game state header
+        current_state = game_state_info.current_state if hasattr(game_state_info, 'current_state') else 'unknown'
+        state_confidence = game_state_info.state_confidence if hasattr(game_state_info, 'state_confidence') else 0.0
+        state_color = self.colors.get(f'game_state_{current_state.value if hasattr(current_state, "value") else str(current_state)}', (255, 255, 255))
+        
+        cv2.putText(frame, "GAME STATE", (panel_x + 10, panel_y + 20),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        
+        # Current state with confidence
+        state_text = f"State: {current_state.value.upper() if hasattr(current_state, 'value') else str(current_state).upper()}"
+        cv2.putText(frame, state_text, (panel_x + 10, panel_y + 45),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, state_color, 2)
+        
+        confidence_text = f"Confidence: {state_confidence:.3f}"
+        cv2.putText(frame, confidence_text, (panel_x + 10, panel_y + 65),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, state_color, 1)
+
+        # Score information
+        team_a_score = game_state_info.team_a_score if hasattr(game_state_info, 'team_a_score') else 0
+        team_b_score = game_state_info.team_b_score if hasattr(game_state_info, 'team_b_score') else 0
+        serving_team = game_state_info.serving_team if hasattr(game_state_info, 'serving_team') else 'unknown'
+        
+        score_text = f"Score: {team_a_score} - {team_b_score}"
+        cv2.putText(frame, score_text, (panel_x + 10, panel_y + 90),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        
+        serve_text = f"Serving: Team {serving_team}"
+        cv2.putText(frame, serve_text, (panel_x + 10, panel_y + 110),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+
+        # Analysis module confidences
+        analysis_results = game_state_info.analysis_results if hasattr(game_state_info, 'analysis_results') else {}
+        y_offset = 135
+        
+        cv2.putText(frame, "Analysis Modules:", (panel_x + 10, panel_y + y_offset),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+        y_offset += 15
+        
+        # Action sequence analysis
+        action_analysis = analysis_results.get('action_sequence', {})
+        serve_conf = action_analysis.get('serve_confidence', 0.0)
+        rally_conf = action_analysis.get('rally_confidence', 0.0)
+        
+        cv2.putText(frame, f"Action: S:{serve_conf:.2f} R:{rally_conf:.2f}", 
+                   (panel_x + 15, panel_y + y_offset),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 200, 200), 1)
+        y_offset += 12
+        
+        # Trajectory analysis
+        trajectory_analysis = analysis_results.get('trajectory', {})
+        traj_serve_conf = trajectory_analysis.get('serve_confidence', 0.0)
+        traj_attack_conf = trajectory_analysis.get('attack_confidence', 0.0)
+        
+        cv2.putText(frame, f"Trajectory: S:{traj_serve_conf:.2f} A:{traj_attack_conf:.2f}", 
+                   (panel_x + 15, panel_y + y_offset),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 200, 200), 1)
+        y_offset += 12
+        
+        # Temporal analysis
+        temporal_analysis = analysis_results.get('temporal', {})
+        activity_level = temporal_analysis.get('activity_level', 0.0)
+        activity_resuming = temporal_analysis.get('activity_resuming_confidence', 0.0)
+        
+        cv2.putText(frame, f"Temporal: A:{activity_level:.2f} R:{activity_resuming:.2f}", 
+                   (panel_x + 15, panel_y + y_offset),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 200, 200), 1)
+        
+        # State transition indicator
+        transition_info = game_state_info.transition_info if hasattr(game_state_info, 'transition_info') else None
+        if transition_info:
+            y_offset += 20
+            from_state = transition_info.get('from_state', 'unknown') if isinstance(transition_info, dict) else 'unknown'
+            to_state = transition_info.get('to_state', 'unknown') if isinstance(transition_info, dict) else 'unknown'
+            trigger = transition_info.get('trigger', 'unknown') if isinstance(transition_info, dict) else 'unknown'
+            
+            transition_text = f"Transition: {from_state} → {to_state}"
+            cv2.putText(frame, transition_text, (panel_x + 10, panel_y + y_offset),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 0), 1)
+            
+            trigger_text = f"Trigger: {trigger}"
+            cv2.putText(frame, trigger_text, (panel_x + 10, panel_y + y_offset + 15),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 200, 200), 1)
+
+        return frame
+
     def _add_performance_overlay(self, frame: np.ndarray, frame_count: int, total_frames: int) -> np.ndarray:
         """Add performance metrics overlay.
 
@@ -806,17 +834,4 @@ class LiveDebugProcessor:
 
         return frame
 
-    def _reset_trackers(self) -> None:
-        """Reset all tracking state."""
-        # Reset player tracker
-        self.player_tracker.tracks = {}
-        self.player_tracker.disappeared = {}
-        self.player_tracker.next_id = 0
-
-        # Reset ball tracker
-        self.ball_tracker._reset_tracker()
-
-        # Clear trajectory
-        self.ball_trajectory.clear()
-
-        self.logger.debug("Trackers reset")
+    # Removed _reset_trackers - now handled by FrameProcessor

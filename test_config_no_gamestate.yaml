@@ -1,0 +1,109 @@
+acceleration_consistency_weight: 0.2
+action_confidence: 0.7
+ball_confidence: 0.5
+ball_horizontal_margin_percent: 0.25
+ball_max_missing: 30
+ball_model_path: null
+batch_size: 1
+court_confidence: 0.5
+court_detection_method: yolo
+court_height_ratio: 0.2
+court_horizontal_center: 0.52
+court_margin: 0.01
+court_model_path: weights/court/court_best.pt
+court_perspective_bottom_width: 0.8
+court_perspective_depth: 0.2
+court_perspective_enabled: true
+court_perspective_skew: 0.0
+court_perspective_top_width: 0.5
+court_vertical_offset: 0.6
+court_width_ratio: 0.7
+court_yolo_only_start: true
+debug_output_dir: ./debug
+detection_method: template
+device: cpu
+enhanced_validation:
+  ball_contact:
+    contact_zones:
+      block:
+        base_threshold: 130
+        height_range:
+        - 0.0
+        - 0.3
+        width_expansion: 1.5
+      dig:
+        base_threshold: 120
+        height_range:
+        - 0.6
+        - 1.0
+        width_expansion: 1.5
+      serve:
+        base_threshold: 180
+        height_range:
+        - 0.2
+        - 0.8
+        width_expansion: 2.0
+      set:
+        base_threshold: 150
+        height_range:
+        - 0.0
+        - 0.4
+        width_expansion: 1.5
+      spike:
+        base_threshold: 140
+        height_range:
+        - -0.2
+        - 0.3
+        width_expansion: 1.8
+    min_contact_confidence: 0.6
+  court:
+    court_geometry: from_config
+    court_geometry_config:
+      court_height_ratio: 0.6
+      court_horizontal_center: 0.5
+      court_vertical_offset: 0.3
+      court_width_ratio: 0.7
+    enabled: true
+    serve_boundary_margin: 50
+  enabled: true
+  strict_mode: true
+  temporal:
+    confidence_decay_rate: 0.2
+    contact_stability_threshold: 0.4
+    min_frames_in_contact: 2
+    window_size: 5
+  trajectory:
+    air_resistance_factor: 0.98
+    bounce_energy_loss: 0.7
+    gravity_acceleration: 9.8
+    min_direction_change: 30.0
+    min_velocity_change: 50.0
+    smoothing_window: 3
+    trajectory_window: 10
+    velocity_spike_threshold: 2.0
+fast_ball_velocity_threshold: 50.0
+frame_skip: 1
+game_state_detection:
+  enabled: false
+log_file: null
+log_level: INFO
+low_confidence_threshold: 0.15
+max_players: 4
+max_trajectory_gap: 150.0
+output_format:
+- csv
+- png
+player_confidence: 0.5
+player_max_disappeared: 30
+player_model_path: null
+pose_complexity: 1
+pose_confidence: 0.5
+save_debug_frames: false
+temporal_window: 10
+tracking_max_distance: 100.0
+trajectory_confidence_boost: 0.3
+trajectory_prediction_frames: 5
+trajectory_smoothing: 8
+use_adaptive_court: false
+velocity_consistency_weight: 0.4
+visualization_dpi: 300

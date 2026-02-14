@@ -39,6 +39,10 @@ class CSVExporter:
             # Create statistics CSV
             stats_path = output_path.parent / f"{output_path.stem}_statistics.csv"
             self._export_statistics(analysis_results, stats_path)
+            
+            # Create game state timeline CSV
+            game_state_path = output_path.parent / f"{output_path.stem}_game_state.csv"
+            self._export_game_state_timeline(analysis_results, game_state_path)
 
             self.logger.info("CSV export completed successfully")
 
@@ -291,3 +295,97 @@ class CSVExporter:
         # Write to CSV
         df = pd.DataFrame(csv_data)
         df.to_csv(output_path, index=False)
+    
+    def _export_game_state_timeline(self, analysis_results: Dict[str, Any], output_path: Path) -> None:
+        """Export game state timeline with score progression.
+        
+        Args:
+            analysis_results: Analysis results
+            output_path: Output CSV path
+        """
+        csv_data = []
+        
+        # Extract game state information from frame results
+        video_info = analysis_results.get("video_info", {})
+        fps = video_info.get("fps", 30.0)
+        
+        for frame_result in analysis_results.get("frame_results", []):
+            frame_index = frame_result.get("frame_index", 0)
+            game_state = frame_result.get("game_state", {})
+            
+            if game_state:  # Only export frames with game state information
+                score_info = game_state.get("score_info", {})
+                
+                row = {
+                    "Frame_Index": frame_index,
+                    "Timestamp_Seconds": round(frame_index / fps, 2),
+                    "Game_State": game_state.get("current_state", "unknown"),
+                    "State_Confidence": round(game_state.get("state_confidence", 0.0), 3),
+                    "State_Duration_Frames": game_state.get("state_duration_frames", 0),
+                    "Team_A_Score": score_info.get("team_a_score", 0),
+                    "Team_B_Score": score_info.get("team_b_score", 0),
+                    "Serving_Team": score_info.get("serving_team", "unknown"),
+                    "Point_In_Progress": score_info.get("point_in_progress", False),
+                    "Set_Number": score_info.get("set_number", 1)
+                }
+                
+                # Add analysis breakdown if available
+                analysis_breakdown = game_state.get("analysis_breakdown", {})
+                if analysis_breakdown:
+                    # Action sequence confidence scores
+                    action_seq = analysis_breakdown.get("action_sequence", {})
+                    row["Action_Serve_Detected"] = round(action_seq.get("serve_detected", 0.0), 3)
+                    row["Action_Rally_Active"] = round(action_seq.get("rally_active", 0.0), 3)
+                    row["Action_Rally_End"] = round(action_seq.get("rally_end_pattern", 0.0), 3)
+                    row["Action_Inactivity"] = round(action_seq.get("inactivity_detected", 0.0), 3)
+                    
+                    # Trajectory confidence scores
+                    trajectory = analysis_breakdown.get("trajectory", {})
+                    row["Trajectory_Serve"] = round(trajectory.get("serve_trajectory", 0.0), 3)
+                    row["Trajectory_Attack"] = round(trajectory.get("attack_trajectory", 0.0), 3)
+                    row["Trajectory_Point_End"] = round(trajectory.get("point_ending", 0.0), 3)
+                    row["Trajectory_Ball_In_Play"] = round(trajectory.get("ball_in_play", 0.0), 3)
+                    
+                    # Temporal confidence scores
+                    temporal = analysis_breakdown.get("temporal", {})
+                    row["Temporal_Activity_Resuming"] = round(temporal.get("activity_resuming", 0.0), 3)
+                    row["Temporal_Extended_Pause"] = round(temporal.get("extended_pause", 0.0), 3)
+                    row["Temporal_Activity_Level"] = round(temporal.get("activity_level", 0.0), 3)
+                
+                # Add state transitions if any occurred
+                transitions = game_state.get("transitions", [])
+                if transitions:
+                    # Get the most recent transition for this frame
+                    latest_transition = transitions[-1] if transitions else None
+                    if latest_transition:
+                        row["Transition_From"] = latest_transition.get("from_state", "")
+                        row["Transition_To"] = latest_transition.get("to_state", "")
+                        row["Transition_Trigger"] = latest_transition.get("trigger", "")
+                        row["Transition_Confidence"] = round(latest_transition.get("confidence", 0.0), 3)
+                else:
+                    row["Transition_From"] = ""
+                    row["Transition_To"] = ""
+                    row["Transition_Trigger"] = ""
+                    row["Transition_Confidence"] = 0.0
+                
+                csv_data.append(row)
+        
+        # Write to CSV
+        if csv_data:
+            df = pd.DataFrame(csv_data)
+            df.to_csv(output_path, index=False)
+        else:
+            # Create empty CSV with headers if no game state data
+            headers = [
+                "Frame_Index", "Timestamp_Seconds", "Game_State", "State_Confidence", 
+                "State_Duration_Frames", "Team_A_Score", "Team_B_Score", "Serving_Team", 
+                "Point_In_Progress", "Set_Number",
+                "Action_Serve_Detected", "Action_Rally_Active", "Action_Rally_End", "Action_Inactivity",
+                "Trajectory_Serve", "Trajectory_Attack", "Trajectory_Point_End", "Trajectory_Ball_In_Play",
+                "Temporal_Activity_Resuming", "Temporal_Extended_Pause", "Temporal_Activity_Level",
+                "Transition_From", "Transition_To", "Transition_Trigger", "Transition_Confidence"
+            ]
+            
+            with open(output_path, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(headers)
