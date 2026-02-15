@@ -37,9 +37,11 @@ class PoseEstimator:
         self.model_complexity = model_complexity
 
         # Initialize MediaPipe pose
+        # static_image_mode=False enables temporal smoothing across frames,
+        # reducing keypoint jitter that causes false action detections.
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(
-            static_image_mode=True,
+            static_image_mode=False,
             model_complexity=model_complexity,
             enable_segmentation=False,
             min_detection_confidence=min_detection_confidence,
@@ -234,6 +236,10 @@ class PoseEstimator:
     def _calculate_pose_features(self, keypoints_dict: Dict[int, Dict[str, float]]) -> Dict[str, float]:
         """Calculate volleyball-relevant pose features.
 
+        All spatial features are normalized relative to the player's body
+        (shoulder-to-hip distance) so they're independent of the player's
+        distance from the camera.
+
         Args:
             keypoints_dict: Dictionary of keypoint data
 
@@ -243,41 +249,81 @@ class PoseEstimator:
         features = {}
 
         try:
+            # Compute body reference measurements for normalization
+            hip_y = None
+            shoulder_y = None
+            torso_height = None
+
+            if all(kp_id in keypoints_dict for kp_id in [11, 12, 23, 24]):
+                left_shoulder = keypoints_dict[11]
+                right_shoulder = keypoints_dict[12]
+                left_hip = keypoints_dict[23]
+                right_hip = keypoints_dict[24]
+
+                shoulder_y = (left_shoulder["y"] + right_shoulder["y"]) / 2
+                hip_y = (left_hip["y"] + right_hip["y"]) / 2
+                torso_height = abs(hip_y - shoulder_y)
+                if torso_height < 1:
+                    torso_height = 1  # prevent division by zero
+
+                features["shoulder_width"] = abs(left_shoulder["x"] - right_shoulder["x"])
+                features["body_lean"] = self._calculate_body_lean(keypoints_dict)
+
             # Arm angles (important for spiking, setting)
-            if all(kp_id in keypoints_dict for kp_id in [11, 13, 15]):  # Left arm
+            if all(kp_id in keypoints_dict for kp_id in [11, 13, 15]):
                 features["left_arm_angle"] = self._calculate_arm_angle(
                     keypoints_dict[11], keypoints_dict[13], keypoints_dict[15]
                 )
 
-            if all(kp_id in keypoints_dict for kp_id in [12, 14, 16]):  # Right arm
+            if all(kp_id in keypoints_dict for kp_id in [12, 14, 16]):
                 features["right_arm_angle"] = self._calculate_arm_angle(
                     keypoints_dict[12], keypoints_dict[14], keypoints_dict[16]
                 )
 
-            # Body lean (important for digging)
-            if all(kp_id in keypoints_dict for kp_id in [11, 12, 23, 24]):
-                features["body_lean"] = self._calculate_body_lean(keypoints_dict)
+            # Normalized arm heights: wrist position relative to body
+            # Positive = above shoulders, negative = below hips
+            if torso_height and shoulder_y and hip_y:
+                left_wrist_y = keypoints_dict.get(15, {}).get("y")
+                right_wrist_y = keypoints_dict.get(16, {}).get("y")
+
+                if left_wrist_y is not None:
+                    # In image coords, y increases downward
+                    # ratio > 1 means wrist above shoulders, < 0 means below hips
+                    features["left_wrist_height_ratio"] = (hip_y - left_wrist_y) / torso_height
+                if right_wrist_y is not None:
+                    features["right_wrist_height_ratio"] = (hip_y - right_wrist_y) / torso_height
+
+                # Average wrist height for symmetry detection
+                if "left_wrist_height_ratio" in features and "right_wrist_height_ratio" in features:
+                    features["avg_wrist_height_ratio"] = (
+                        features["left_wrist_height_ratio"] + features["right_wrist_height_ratio"]
+                    ) / 2
+                    features["wrist_height_diff"] = abs(
+                        features["left_wrist_height_ratio"] - features["right_wrist_height_ratio"]
+                    )
+
+                # Elbow height (normalized)
+                left_elbow_y = keypoints_dict.get(13, {}).get("y")
+                right_elbow_y = keypoints_dict.get(14, {}).get("y")
+                if left_elbow_y is not None:
+                    features["left_elbow_height_ratio"] = (hip_y - left_elbow_y) / torso_height
+                if right_elbow_y is not None:
+                    features["right_elbow_height_ratio"] = (hip_y - right_elbow_y) / torso_height
+
+            # Legacy: raw arm height (kept for backward compat but should not be used)
+            features["left_arm_height"] = keypoints_dict.get(15, {}).get("y", 0)
+            features["right_arm_height"] = keypoints_dict.get(16, {}).get("y", 0)
 
             # Leg bend (important for jumping, digging)
-            if all(kp_id in keypoints_dict for kp_id in [23, 25, 27]):  # Left leg
+            if all(kp_id in keypoints_dict for kp_id in [23, 25, 27]):
                 features["left_leg_bend"] = self._calculate_leg_bend(
                     keypoints_dict[23], keypoints_dict[25], keypoints_dict[27]
                 )
 
-            if all(kp_id in keypoints_dict for kp_id in [24, 26, 28]):  # Right leg
+            if all(kp_id in keypoints_dict for kp_id in [24, 26, 28]):
                 features["right_leg_bend"] = self._calculate_leg_bend(
                     keypoints_dict[24], keypoints_dict[26], keypoints_dict[28]
                 )
-
-            # Arm height (important for blocking, spiking)
-            features["left_arm_height"] = keypoints_dict.get(15, {}).get("y", 0)
-            features["right_arm_height"] = keypoints_dict.get(16, {}).get("y", 0)
-
-            # Shoulder width (for normalization)
-            if 11 in keypoints_dict and 12 in keypoints_dict:
-                left_shoulder = keypoints_dict[11]
-                right_shoulder = keypoints_dict[12]
-                features["shoulder_width"] = abs(left_shoulder["x"] - right_shoulder["x"])
 
         except Exception as e:
             self.logger.debug(f"Error calculating pose features: {e}")

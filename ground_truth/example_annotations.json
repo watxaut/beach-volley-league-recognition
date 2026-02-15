@@ -1,0 +1,23 @@
+{
+  "video": "resources/avp_front_1.mp4",
+  "fps": 30.0,
+  "resolution": [1920, 1080],
+  "annotated_frames": {
+    "ball": {
+      "description": "Ball center position every 5 frames",
+      "frames": {}
+    },
+    "players": {
+      "description": "Player bounding boxes + IDs every 10 frames",
+      "frames": {}
+    },
+    "actions": {
+      "description": "Action events with frame number, player ID, and type",
+      "events": []
+    }
+  },
+  "court": {
+    "corners": [],
+    "net_posts": []
+  }
+}

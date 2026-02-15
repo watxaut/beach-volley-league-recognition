@@ -66,11 +66,9 @@ def parse_arguments() -> argparse.Namespace:
         help="Debug playback speed multiplier (default: 1.0)"
     )
     parser.add_argument(
-        "--detection-method",
+        "--court",
         type=str,
-        choices=["template"],
-        default="template",
-        help="Ball detection method to use (default: template)"
+        help="Path to court calibration JSON (from scripts/test_court_calibration.py)"
     )
 
     return parser.parse_args()
@@ -125,8 +123,9 @@ def main() -> int:
         # Load configuration
         config = Config.load(args.config) if args.config else Config.default()
         
-        # Override config with command line detection method
-        config["detection_method"] = args.detection_method
+        # Set court calibration path if provided
+        if args.court:
+            config["court_calibration_path"] = args.court
 
         # Create output directory
         output_dir = Path(args.output_dir)
