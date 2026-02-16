@@ -47,9 +47,10 @@ def main():
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    video_name = Path(args.video).stem
     writer = None
     if args.save_video:
-        out_path = str(output_dir / "ball_detection.mp4")
+        out_path = str(output_dir / f"{video_name}_ball_detection.mp4")
         writer = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
 
     detected_frames = 0
@@ -88,7 +89,7 @@ def main():
     cap.release()
     if writer:
         writer.release()
-        print(f"\nAnnotated video saved to {output_dir / 'ball_detection.mp4'}")
+        print(f"\nAnnotated video saved to {output_dir / f'{video_name}_ball_detection.mp4'}")
 
     # Print summary
     rate = detected_frames / total_frames if total_frames > 0 else 0

@@ -41,7 +41,7 @@ PLAYER_COLORS = {
 def main():
     parser = argparse.ArgumentParser(description="Test player tracking")
     parser.add_argument("video", help="Path to video file")
-    parser.add_argument("--court", help="Path to court calibration JSON")
+    parser.add_argument("--court", help="Path to court calibration JSON (auto-detected from calibrations/ if omitted)")
     parser.add_argument("--output", default="output/player_test", help="Output directory")
     parser.add_argument("--max-frames", type=int, default=500, help="Max frames to process")
     parser.add_argument("--save-video", action="store_true", help="Save annotated video")
@@ -57,8 +57,14 @@ def main():
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    # Load court calibration
-    court = CourtCalibration(args.court) if args.court else CourtCalibration()
+    # Load court calibration (auto-detect from calibrations/<video_name>.json)
+    court_path = args.court
+    if not court_path:
+        auto_path = Path(__file__).resolve().parent.parent / "calibrations" / f"{Path(args.video).stem}.json"
+        if auto_path.exists():
+            court_path = str(auto_path)
+            print(f"Auto-loaded court calibration: {court_path}")
+    court = CourtCalibration(court_path) if court_path else CourtCalibration()
 
     detector = PlayerDetector(confidence_threshold=0.5)
     tracker = PlayerTracker(max_players=4, court_calibration=court)
@@ -66,9 +72,10 @@ def main():
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    video_name = Path(args.video).stem
     writer = None
     if args.save_video:
-        out_path = str(output_dir / "player_tracking.mp4")
+        out_path = str(output_dir / f"{video_name}_player_tracking.mp4")
         writer = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
 
     id_seen = set()
@@ -114,7 +121,7 @@ def main():
     cap.release()
     if writer:
         writer.release()
-        print(f"Annotated video saved to {output_dir / 'player_tracking.mp4'}")
+        print(f"Annotated video saved to {output_dir / f'{video_name}_player_tracking.mp4'}")
 
     print(f"\n{'='*50}")
     print(f"  Player Tracking Summary")

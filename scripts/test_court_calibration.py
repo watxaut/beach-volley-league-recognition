@@ -3,12 +3,14 @@
 Test script for court calibration.
 
 Opens the first frame of a video, lets the user click 4 court corners + 2 net posts,
-saves the calibration, and draws the overlay to verify.
+saves the calibration to calibrations/<video_name>.json, and draws the overlay to verify.
+
+If a calibration already exists for that video, it loads it automatically (use --recalibrate to redo).
 
 Usage:
-    python scripts/test_court_calibration.py resources/full_videos/video.mp4
+    python scripts/test_court_calibration.py resources/avp_front_1.mp4
+    python scripts/test_court_calibration.py resources/avp_front_1.mp4 --recalibrate
     python scripts/test_court_calibration.py resources/avp_front_1.mp4 --output output/court_test/
-    python scripts/test_court_calibration.py resources/avp_front_1.mp4 --load court_calibration.json
 """
 
 import argparse
@@ -22,13 +24,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.detection.court_calibration import CourtCalibration
 
+CALIBRATIONS_DIR = Path(__file__).resolve().parent.parent / "calibrations"
+
+
+def get_calibration_path(video_path: str) -> Path:
+    """Derive calibration JSON path from video filename."""
+    video_name = Path(video_path).stem  # e.g. "avp_front_1"
+    return CALIBRATIONS_DIR / f"{video_name}.json"
+
 
 def main():
     parser = argparse.ArgumentParser(description="Test court calibration")
     parser.add_argument("video", help="Path to video file")
-    parser.add_argument("--output", default="output/court_test", help="Output directory")
-    parser.add_argument("--save", default="court_calibration.json", help="Calibration save path")
-    parser.add_argument("--load", help="Load existing calibration instead of clicking")
+    parser.add_argument("--output", default="output/court_test", help="Output directory for overlay image")
+    parser.add_argument("--recalibrate", action="store_true", help="Force recalibration even if saved calibration exists")
     args = parser.parse_args()
 
     # Open video
@@ -45,29 +54,32 @@ def main():
 
     print(f"Video frame: {frame.shape[1]}x{frame.shape[0]}")
 
-    # Calibrate
+    calib_path = get_calibration_path(args.video)
     calib = CourtCalibration()
 
-    if args.load:
-        calib.load(args.load)
-        print(f"Loaded calibration from {args.load}")
+    if calib_path.exists() and not args.recalibrate:
+        calib.load(str(calib_path))
+        print(f"Loaded existing calibration from {calib_path}")
     else:
-        print("Click 4 court corners (clockwise: far-left, far-right, near-right, near-left)")
-        print("Then click 2 net-sideline intersections at ground level (left, right)")
-        print("  - NOT the post tops! Click where the net crosses the sideline on the sand.")
+        CALIBRATIONS_DIR.mkdir(parents=True, exist_ok=True)
+        print("Click 8 points:")
+        print("  1-4: Court corners (clockwise: far-left, far-right, near-right, near-left)")
+        print("  5-6: Midcourt ground line (left, right) - on the SAND where court changes sides")
+        print("  7-8: Net top (left, right) - top edge of the net at each post")
         print("Controls: [R] Reset  [U] Undo last point  [Q] Cancel")
-        success = calib.calibrate_from_frame(frame, save_path=args.save)
+        success = calib.calibrate_from_frame(frame, save_path=str(calib_path))
         if not success:
             print("Calibration cancelled")
             sys.exit(1)
-        print(f"Calibration saved to {args.save}")
+        print(f"Calibration saved to {calib_path}")
 
     # Draw overlay and save
     overlay = calib.draw_court_overlay(frame)
 
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / "court_calibration_overlay.jpg"
+    video_name = Path(args.video).stem
+    output_path = output_dir / f"{video_name}_court_overlay.jpg"
     cv2.imwrite(str(output_path), overlay)
     print(f"Overlay saved to {output_path}")
 

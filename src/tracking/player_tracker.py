@@ -94,8 +94,40 @@ class PlayerTracker:
 
     # --- Initialization ---
 
+    @staticmethod
+    def _deduplicate_detections(detections: List[Dict[str, Any]], iou_threshold: float = 0.4) -> List[Dict[str, Any]]:
+        """Remove overlapping detections, keeping the higher confidence one."""
+        if len(detections) <= 1:
+            return detections
+
+        # Sort by confidence descending
+        dets = sorted(detections, key=lambda d: d.get("confidence", 0), reverse=True)
+        keep = []
+        for det in dets:
+            b1 = det["bbox"]
+            is_dup = False
+            for kept in keep:
+                b2 = kept["bbox"]
+                # Compute IoU
+                x1 = max(b1[0], b2[0])
+                y1 = max(b1[1], b2[1])
+                x2 = min(b1[2], b2[2])
+                y2 = min(b1[3], b2[3])
+                inter = max(0, x2 - x1) * max(0, y2 - y1)
+                a1 = (b1[2] - b1[0]) * (b1[3] - b1[1])
+                a2 = (b2[2] - b2[0]) * (b2[3] - b2[1])
+                union = a1 + a2 - inter
+                iou = inter / union if union > 0 else 0
+                if iou > iou_threshold:
+                    is_dup = True
+                    break
+            if not is_dup:
+                keep.append(det)
+        return keep
+
     def _initialization_phase(self, detections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Collect detections for init_frames, then pick the best 4 tracks."""
+        detections = self._deduplicate_detections(detections)
         self._init_buffer.append(detections)
 
         if self.frame_count < self.init_frames and len(self._init_buffer) < self.init_frames:
@@ -138,7 +170,9 @@ class PlayerTracker:
         cluster_counts = np.bincount(labels.flatten(), minlength=k)
         top_clusters = np.argsort(-cluster_counts)[:self.max_players]
 
-        # For each cluster, pick the detection from the last frame closest to center
+        # For each cluster, pick the detection from the last frame closest to center.
+        # Use cluster center for team assignment (stable across frames) instead of
+        # the last-frame bbox which might be mid-squat.
         last_frame_dets = self._init_buffer[-1] if self._init_buffer else []
         for cluster_idx in top_clusters:
             center = cluster_centers[cluster_idx]
@@ -152,14 +186,13 @@ class PlayerTracker:
                     best_det = det
 
             if best_det is not None:
-                self._create_track(best_det)
+                tid = self._create_track(best_det, team_override_center=center.tolist())
             else:
-                # No detection near this cluster in last frame, create a synthetic one
-                self._create_track({
+                tid = self._create_track({
                     "bbox": [int(center[0]-30), int(center[1]-60), int(center[0]+30), int(center[1]+60)],
                     "center": center.tolist(),
                     "confidence": 0.5,
-                })
+                }, team_override_center=center.tolist())
 
         self.logger.info(f"Initialized {len(self.tracks)} player tracks from {len(self._init_buffer)} frames")
 
@@ -177,6 +210,7 @@ class PlayerTracker:
 
     def _associate_detections(self, detections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Associate detections with existing tracks using Hungarian algorithm."""
+        detections = self._deduplicate_detections(detections)
         track_ids = list(self.tracks.keys())
         n_tracks = len(track_ids)
         n_dets = len(detections)
@@ -212,7 +246,7 @@ class PlayerTracker:
 
             out = det.copy()
             out["track_id"] = tid
-            out["team"] = self._get_team(det["center"])
+            out["team"] = self._get_locked_team(tid)
             tracked_players.append(out)
 
         # Unmatched tracks: increment disappeared
@@ -230,7 +264,7 @@ class PlayerTracker:
                             "center": track["center"],
                             "confidence": max(0.1, track["confidence"] - 0.05),
                             "track_id": tid,
-                            "team": self._get_team(track["center"]),
+                            "team": self._get_locked_team(tid),
                             "predicted": True,
                         }
                         tracked_players.append(out)
@@ -243,7 +277,7 @@ class PlayerTracker:
                 tid = self._create_track(det)
                 out = det.copy()
                 out["track_id"] = tid
-                out["team"] = self._get_team(det["center"])
+                out["team"] = self._get_locked_team(tid)
                 tracked_players.append(out)
 
         return tracked_players
@@ -311,8 +345,16 @@ class PlayerTracker:
 
     # --- Track management ---
 
-    def _create_track(self, detection: Dict[str, Any]) -> int:
-        """Create a new track. Respects max_players limit."""
+    def _create_track(self, detection: Dict[str, Any], team_override_center=None) -> int:
+        """Create a new track. Respects max_players limit.
+
+        Args:
+            detection: Detection dict with bbox, center, confidence.
+            team_override_center: If provided, use this [x, y] point for team
+                assignment instead of the detection bbox. Used during initialization
+                to assign team from the stable K-means cluster center rather than
+                a single frame's bbox (which may be mid-squat).
+        """
         if len(self.tracks) >= self.max_players:
             self.logger.debug("Max players reached, not creating new track")
             return -1
@@ -321,6 +363,13 @@ class PlayerTracker:
         self.next_id += 1
 
         hist = self._compute_histogram(detection["bbox"]) if self._current_frame is not None else None
+        if team_override_center is not None:
+            # Use the cluster center point directly for team assignment
+            team = self.court_calibration.get_team(
+                (int(team_override_center[0]), int(team_override_center[1]))
+            ) if self.court_calibration is not None and hasattr(self.court_calibration, "get_team") else None
+        else:
+            team = self._get_team_from_calibration(detection["bbox"])
 
         self.tracks[tid] = {
             "bbox": detection["bbox"],
@@ -329,6 +378,7 @@ class PlayerTracker:
             "history": [detection["center"]],
             "velocity": [0.0, 0.0],
             "histogram": hist,
+            "team": team,  # locked at creation, never re-evaluated
         }
         self.disappeared[tid] = 0
         self.logger.debug(f"Created track {tid}")
@@ -389,17 +439,24 @@ class PlayerTracker:
                     "center": track["center"],
                     "confidence": max(0.1, track["confidence"] - 0.05),
                     "track_id": tid,
-                    "team": self._get_team(track["center"]),
+                    "team": self._get_locked_team(tid),
                     "predicted": True,
                 })
         return result
 
     # --- Team assignment ---
 
-    def _get_team(self, center: List[float]) -> Optional[str]:
-        """Get team assignment based on court calibration."""
-        if self.court_calibration is not None and hasattr(self.court_calibration, "get_team"):
-            return self.court_calibration.get_team((int(center[0]), int(center[1])))
+    def _get_team_from_calibration(self, bbox: List[float]) -> Optional[str]:
+        """Get team from court calibration based on foot position. Used only at track creation."""
+        if self.court_calibration is not None and hasattr(self.court_calibration, "get_team_for_bbox"):
+            return self.court_calibration.get_team_for_bbox([int(v) for v in bbox])
+        return None
+
+    def _get_locked_team(self, tid: int) -> Optional[str]:
+        """Get the locked team for a track. Team is assigned once and never changes."""
+        track = self.tracks.get(tid)
+        if track:
+            return track.get("team")
         return None
 
     def set_court_calibration(self, calibration) -> None:
@@ -427,6 +484,6 @@ class PlayerTracker:
                 "center": track["center"],
                 "confidence": track["confidence"],
                 "track_id": tid,
-                "team": self._get_team(track["center"]),
+                "team": self._get_locked_team(tid),
             })
         return result
