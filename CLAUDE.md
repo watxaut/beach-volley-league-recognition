@@ -78,7 +78,7 @@ Use videos in the `resources/` directory for testing:
 ## Project Architecture
 
 ### Core Pipeline Architecture
-The system follows a modular computer vision pipeline designed for a **fixed camera perpendicular to the net**:
+The system follows a modular computer vision pipeline designed for a **fixed camera on the long axis of the court, with the net facing the camera** (camera looks down the length of the court). The near half of the court is Team A, the far half is Team B; team assignment is by which side of the midcourt line a player's feet fall on.
 
 1. **Detection Layer** (`src/detection/`): YOLO-based ball and player detection + one-time court calibration
 2. **Tracking Layer** (`src/tracking/`): 4-player locked tracking + conservative ball tracking
@@ -89,9 +89,9 @@ The system follows a modular computer vision pipeline designed for a **fixed cam
 ### Key Components
 
 #### Detection System
-- **BallDetector** (`ball_detector.py`): YOLO sports ball (class 32) + frisbee (class 29) detection. Auto-scales input resolution for high-res video. Low confidence threshold (0.05) with size filtering.
-- **PlayerDetector** (`player_detector.py`): YOLO person detection with court-boundary filtering.
-- **CourtCalibration** (`court_calibration.py`): One-time interactive calibration -- user clicks 4 court corners + 2 net-sideline intersections. Saves to JSON for reuse. Provides court polygon, net line, team zones, spatial queries (is_near_net, is_behind_baseline, get_team).
+- **BallDetector** (`ball_detector.py`): YOLO-based. Loads either COCO `yolov8n.pt` (filters to sports ball class 32 + frisbee class 29) or a custom fine-tuned model via `model_path` (e.g., `models/volleyball_ball_best.pt`, no class filter needed). Auto-scales input resolution for high-res video. Size filtering rejects too-large detections. The `keep_all` flag (default `False`) returns every passing detection instead of the top-1 cull the tracker relies on -- used by `test_ball_detection.py` for validation.
+- **PlayerDetector** (`player_detector.py`): YOLO person detection with court-boundary filtering (foot position inside court polygon). Aspect-ratio floor lowered to 0.6 so diving/crouching and close-to-camera players are not rejected.
+- **CourtCalibration** (`court_calibration.py`): One-time interactive calibration -- user clicks 4 court corners + 2 midcourt ground-line points (where the net tape meets the sand at each sideline) + 2 net-top points (where the net tape meets each post/antenna). Saves to JSON for reuse. Provides court polygon, midcourt/net lines, team zones, and spatial queries (`is_near_net`, `is_behind_baseline`, `get_team`, `is_above_net`).
 
 #### Tracking System
 - **BallTracker** (`ball_tracker.py`): Conservative tracker. Returns None when ball is lost (no hallucinated positions). Court-bounds rejection. Settings: max_missing_frames=10, low_confidence_threshold=0.4, max_trajectory_gap=60px.
@@ -116,8 +116,8 @@ The system follows a modular computer vision pipeline designed for a **fixed cam
 7. Statistical aggregation and result export
 
 ### Configuration
-- Uses YAML configuration files (`volleyball_detection_config.yaml`)
-- Key settings: `ball_confidence` (0.05), `player_confidence` (0.5), `max_players` (4)
+- Defaults live in `src/utils/config.py` (`Config.DEFAULT_CONFIG`). Override by passing `--config <file>` (YAML or JSON) on the CLI.
+- Key settings: `ball_confidence` (0.7), `player_confidence` (0.5), `max_players` (4), `ball_model_path` (optional -- points to a fine-tuned ball model)
 - Supports CPU/CUDA device selection
 
 ### Output
@@ -134,9 +134,5 @@ The system follows a modular computer vision pipeline designed for a **fixed cam
 ## Claude Code Workflow Guidance
 
 ### Implementation Strategies
-- When told to "implement a new feature":
-  * Write down an implementation plan
-  * Consider 3 different implementation strategies
-  * Select the best strategy
-  * Create the feature in the @features/ folder first
-  * Do not write actual code implementation initially
+- When asked to implement a new feature, draft a short plan in the conversation and confirm the approach with the user before writing production code.
+- Prefer extending existing modules under `src/` over creating new top-level files.

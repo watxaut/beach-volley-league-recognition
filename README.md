@@ -64,18 +64,18 @@ The system can be configured using a YAML or JSON file. Default configuration:
 device: "cpu"  # or "cuda" for GPU
 
 # Detection thresholds
-ball_confidence: 0.3
+ball_confidence: 0.7
 player_confidence: 0.5
 max_players: 4
 
 # Tracking parameters
-ball_max_missing: 10
+ball_max_missing: 30
 player_max_disappeared: 30
 tracking_max_distance: 100.0
 
 # Recognition settings
 pose_confidence: 0.5
-action_confidence: 0.6
+action_confidence: 0.7
 temporal_window: 10
 
 # Output settings
@@ -91,6 +91,7 @@ volley_recognition/
 │   ├── detection/                 # Object detection modules
 │   │   ├── ball_detector.py       # Ball detection using YOLO
 │   │   ├── player_detector.py     # Player detection using YOLO
+│   │   ├── court_calibration.py   # One-time interactive court + net calibration
 │   │   └── base_detector.py       # Abstract base class
 │   ├── tracking/                  # Object tracking modules
 │   │   ├── ball_tracker.py        # Ball trajectory tracking
@@ -101,7 +102,7 @@ volley_recognition/
 │   ├── analysis/                  # Video processing and statistics
 │   │   ├── video_processor.py     # Main processing pipeline
 │   │   └─��� statistics.py          # Statistical analysis
-│   ├── output/                    # Export and visualization
+│   ├── output_gen/                # Export and visualization
 │   │   ├── csv_exporter.py        # CSV export functionality
 │   │   └── visualization.py       # Graph generation
 │   └── utils/                     # Utility modules
