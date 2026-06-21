@@ -147,6 +147,7 @@ test_results/
 analysis_results/
 debug/
 debug_frames/
+datasets/
 
 # Model files (large binary files)
 *.pt
