@@ -423,8 +423,10 @@ class CourtCalibration:
             if len(bbox) != 4:
                 continue
             x1, y1, x2, y2 = bbox
-            cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
-            if self.is_point_in_court((int(cx), int(cy))):
+            # Use foot position (bottom-center) — consistent with team assignment
+            foot_x = (x1 + x2) / 2
+            foot_y = y2
+            if self.is_point_in_court((int(foot_x), int(foot_y))):
                 filtered.append(det)
         return filtered
 

@@ -40,6 +40,7 @@ class BallDetector(BaseDetector):
         device: str = "cpu",
         max_ball_size: int = 80,
         imgsz: Optional[int] = None,
+        keep_all: bool = False,
         # Legacy params accepted but ignored for backward compatibility
         **kwargs,
     ):
@@ -52,12 +53,18 @@ class BallDetector(BaseDetector):
             max_ball_size: Max width/height in pixels for a valid ball detection.
             imgsz: YOLO input resolution. If None, auto-computed from frame size
                 to ensure ~20px ball visibility (capped at 1920).
+            keep_all: If True, return every detection passing the confidence and
+                size filters instead of culling to the single highest-confidence
+                one. Intended for validation/diagnostic use -- production callers
+                should leave this False since there is only one ball in play.
         """
         super().__init__(confidence_threshold, device)
         self.model_path = model_path or "yolov8n.pt"
         self.max_ball_size = max_ball_size
         self._imgsz = imgsz  # None = auto
         self._auto_imgsz: Optional[int] = None
+        self._is_custom_model = model_path is not None
+        self.keep_all = keep_all
         self.load_model()
 
     def load_model(self) -> None:
@@ -127,10 +134,13 @@ class BallDetector(BaseDetector):
 
         try:
             imgsz = self._get_imgsz(frame)
+            # Custom model: all classes are balls, no filtering needed.
+            # Pretrained COCO model: filter to sports ball (32) + frisbee (29).
+            classes = None if self._is_custom_model else self.BALL_CLASSES
             results = self._model(
                 frame,
                 verbose=False,
-                classes=self.BALL_CLASSES,
+                classes=classes,
                 conf=self.confidence_threshold,
                 imgsz=imgsz,
             )
@@ -165,8 +175,10 @@ class BallDetector(BaseDetector):
                         "class_name": "sports_ball",
                     })
 
-            # Keep only the highest confidence detection (there's only one ball)
-            if len(detections) > 1:
+            # Keep only the highest confidence detection (there's only one ball).
+            # Skipped when keep_all=True so validation tooling can see every
+            # confident detection, including false positives.
+            if len(detections) > 1 and not self.keep_all:
                 detections.sort(key=lambda d: d["confidence"], reverse=True)
                 detections = detections[:1]
 

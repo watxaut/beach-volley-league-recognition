@@ -27,12 +27,12 @@ class PlayerTracker:
 
     def __init__(
         self,
-        max_disappeared: int = 30,
+        max_disappeared: int = 90,
         max_distance: float = 150.0,
         max_velocity: float = 150.0,
         max_players: int = 4,
         appearance_weight: float = 0.4,
-        init_frames: int = 30,
+        init_frames: int = 60,
         court_calibration=None,
     ):
         """Initialize the player tracker.
@@ -58,7 +58,7 @@ class PlayerTracker:
         # Tracking state
         self.tracks: Dict[int, Dict[str, Any]] = {}
         self.disappeared: Dict[int, int] = {}
-        self.next_id = 1  # IDs start at 1
+        # No next_id — IDs are recycled from range 1..max_players
         self.frame_count = 0
         self._initialized = False
 
@@ -186,13 +186,15 @@ class PlayerTracker:
                     best_det = det
 
             if best_det is not None:
-                tid = self._create_track(best_det, team_override_center=center.tolist())
+                # Use the detection's bbox for team assignment (foot position)
+                # instead of the cluster center which is a bbox-center average
+                tid = self._create_track(best_det)
             else:
                 tid = self._create_track({
                     "bbox": [int(center[0]-30), int(center[1]-60), int(center[0]+30), int(center[1]+60)],
                     "center": center.tolist(),
                     "confidence": 0.5,
-                }, team_override_center=center.tolist())
+                })
 
         self.logger.info(f"Initialized {len(self.tracks)} player tracks from {len(self._init_buffer)} frames")
 
@@ -345,31 +347,26 @@ class PlayerTracker:
 
     # --- Track management ---
 
-    def _create_track(self, detection: Dict[str, Any], team_override_center=None) -> int:
+    def _create_track(self, detection: Dict[str, Any]) -> int:
         """Create a new track. Respects max_players limit.
 
         Args:
             detection: Detection dict with bbox, center, confidence.
-            team_override_center: If provided, use this [x, y] point for team
-                assignment instead of the detection bbox. Used during initialization
-                to assign team from the stable K-means cluster center rather than
-                a single frame's bbox (which may be mid-squat).
         """
         if len(self.tracks) >= self.max_players:
             self.logger.debug("Max players reached, not creating new track")
             return -1
 
-        tid = self.next_id
-        self.next_id += 1
+        # Recycle IDs: pick the lowest unused ID in 1..max_players
+        available = sorted(set(range(1, self.max_players + 1)) - set(self.tracks.keys()))
+        if not available:
+            self.logger.debug("No available IDs in 1..max_players range")
+            return -1
+        tid = available[0]
 
         hist = self._compute_histogram(detection["bbox"]) if self._current_frame is not None else None
-        if team_override_center is not None:
-            # Use the cluster center point directly for team assignment
-            team = self.court_calibration.get_team(
-                (int(team_override_center[0]), int(team_override_center[1]))
-            ) if self.court_calibration is not None and hasattr(self.court_calibration, "get_team") else None
-        else:
-            team = self._get_team_from_calibration(detection["bbox"])
+        # Always use foot position (bottom-center of bbox) for team assignment
+        team = self._get_team_from_calibration(detection["bbox"])
 
         self.tracks[tid] = {
             "bbox": detection["bbox"],

@@ -59,6 +59,7 @@ class FrameProcessor:
 
             # Ball detection (YOLO-based)
             self.ball_detector = BallDetector(
+                model_path=self.config.get("ball_model_path"),
                 confidence_threshold=self.config.get("ball_confidence", 0.05),
                 device=self.config.get("device", "cpu"),
             )

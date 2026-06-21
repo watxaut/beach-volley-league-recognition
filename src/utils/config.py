@@ -21,7 +21,7 @@ class Config:
 
         # Detection settings
         "detection_method": "template",  # Default to Wilson ball template matching
-        "ball_confidence": 0.5,  # Much lower for better ball detection
+        "ball_confidence": 0.7,  # Much lower for better ball detection
         "player_confidence": 0.5,
         "max_players": 4,
         "ball_horizontal_margin_percent": 0.25,  # Horizontal margin to exclude from ball detection (15% on each side)

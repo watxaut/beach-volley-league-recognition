@@ -27,7 +27,8 @@ def main():
     parser.add_argument("video", help="Path to video file")
     parser.add_argument("--output", default="output/ball_test", help="Output directory")
     parser.add_argument("--max-frames", type=int, default=500, help="Max frames to process")
-    parser.add_argument("--confidence", type=float, default=0.05, help="Detection confidence threshold")
+    parser.add_argument("--confidence", type=float, default=0.9, help="Detection confidence threshold")
+    parser.add_argument("--model", type=str, default=None, help="Path to custom YOLO model weights")
     parser.add_argument("--save-video", action="store_true", help="Save annotated video")
     args = parser.parse_args()
 
@@ -42,7 +43,13 @@ def main():
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     print(f"Video: {w}x{h} @ {fps:.1f}fps, {total} frames")
 
-    detector = BallDetector(confidence_threshold=args.confidence)
+    # keep_all=True so every detection above the confidence threshold is drawn,
+    # including false positives -- this is a diagnostic script, not the tracker.
+    detector = BallDetector(
+        model_path=args.model,
+        confidence_threshold=args.confidence,
+        keep_all=True,
+    )
 
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)

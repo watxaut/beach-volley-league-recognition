@@ -21,8 +21,8 @@ classifiers = [
 
 dependencies = [
     "opencv-python>=4.8.0",
-    "ultralytics>=8.0.0",  # YOLO models
-    "mediapipe>=0.10.0",   # Pose estimation
+    "ultralytics>=8.0.0", # YOLO models
+    "mediapipe>=0.10.0", # Pose estimation
     "numpy>=1.24.0",
     "pandas>=2.0.0",
     "matplotlib>=3.7.0",
@@ -32,7 +32,8 @@ dependencies = [
     "scikit-learn>=1.3.0",
     "tqdm>=4.65.0",
     "Pillow>=10.0.0",
-    "albumentations>=1.3.0",  # Image augmentation for Wilson ball tracker
+    "albumentations>=1.3.0", # Image augmentation for Wilson ball tracker
+    "inference-sdk>=0.64.8",
 ]
 
 [project.optional-dependencies]

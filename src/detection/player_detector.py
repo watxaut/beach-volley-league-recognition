@@ -235,7 +235,7 @@ class PlayerDetector(BaseDetector):
             True if aspect ratio is reasonable for a player
         """
         # Players should be taller than wide, but not extremely thin
-        min_ratio = 1.2  # Slightly taller than wide (crouching/jumping)
+        min_ratio = 0.6  # Allow wider bboxes for crouching/diving/close-to-camera players
         max_ratio = 5.0  # Very tall and thin
         return min_ratio <= aspect_ratio <= max_ratio
 
