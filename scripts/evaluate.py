@@ -258,6 +258,7 @@ def evaluate_actions(
     predictions: List[Dict[str, Any]],
     ground_truth: List[Dict[str, Any]],
     frame_tolerance: int = 15,
+    match_player: bool = True,
 ) -> Dict[str, Any]:
     """Evaluate action recognition precision and recall.
 
@@ -272,9 +273,14 @@ def evaluate_actions(
     if not ground_truth:
         return {"error": "No ground truth actions"}
 
+    # Ground truth uses the "final_action" schema key; predictions use "action".
+    # Normalise both so either side can supply either key.
+    def _act(evt):
+        return evt.get("action", evt.get("final_action"))
+
     action_types = set()
     for evt in ground_truth + predictions:
-        action_types.add(evt["action"])
+        action_types.add(_act(evt))
 
     per_action = {}
     total_tp = 0
@@ -282,10 +288,10 @@ def evaluate_actions(
     total_fn = 0
 
     for action in sorted(action_types):
-        gt_events = [e for e in ground_truth if e["action"] == action]
-        pred_events = [e for e in predictions if e["action"] == action]
+        gt_events = [e for e in ground_truth if _act(e) == action]
+        pred_events = [e for e in predictions if _act(e) == action]
 
-        tp, fp, fn = _match_action_events(gt_events, pred_events, frame_tolerance)
+        tp, fp, fn = _match_action_events(gt_events, pred_events, frame_tolerance, match_player)
         total_tp += tp
         total_fp += fp
         total_fn += fn
@@ -324,7 +330,8 @@ def evaluate_actions(
 
 
 def _match_action_events(
-    gt_events: List[Dict], pred_events: List[Dict], frame_tolerance: int
+    gt_events: List[Dict], pred_events: List[Dict], frame_tolerance: int,
+    match_player: bool = True,
 ) -> Tuple[int, int, int]:
     """Match predicted action events to ground truth within frame tolerance."""
     matched_gt = set()
@@ -342,8 +349,14 @@ def _match_action_events(
             if gi in matched_gt:
                 continue
             frame_dist = abs(pred["frame"] - gt["frame"])
-            # Optionally check player_id match
-            player_match = pred.get("player_id") == gt.get("player_id") or pred.get("player_id") is None
+            # Optionally check player_id match (skipped when match_player=False,
+            # since ground-truth player_id is a per-frame left-to-right index
+            # that need not line up with a predictor's own player numbering).
+            player_match = (
+                not match_player
+                or pred.get("player_id") == gt.get("player_id")
+                or pred.get("player_id") is None
+            )
             if frame_dist <= frame_tolerance and player_match and frame_dist < best_dist:
                 best_dist = frame_dist
                 best_gi = gi
@@ -360,7 +373,8 @@ def _match_action_events(
 
 # --- Main ---
 
-def run_evaluation(predictions_path: str, ground_truth_path: str, component: Optional[str] = None):
+def run_evaluation(predictions_path: str, ground_truth_path: str, component: Optional[str] = None,
+                   match_player: bool = True):
     """Run evaluation and print results."""
     gt = load_json(ground_truth_path)
     gt_annotated = gt.get("annotated_frames", gt)
@@ -397,11 +411,15 @@ def run_evaluation(predictions_path: str, ground_truth_path: str, component: Opt
             _print_section("Player Tracking", results["players"])
 
         elif comp == "actions" and "actions" in gt_annotated:
-            pred_actions = predictions.get("actions", predictions.get("action_events", []))
+            # Predictions may be a bare list (action log) or a dict wrapper.
+            if isinstance(predictions, list):
+                pred_actions = predictions
+            else:
+                pred_actions = predictions.get("actions", predictions.get("action_events", []))
             if isinstance(pred_actions, dict) and "events" in pred_actions:
                 pred_actions = pred_actions["events"]
             gt_actions = gt_annotated["actions"].get("events", gt_annotated["actions"])
-            results["actions"] = evaluate_actions(pred_actions, gt_actions)
+            results["actions"] = evaluate_actions(pred_actions, gt_actions, match_player=match_player)
             _print_section("Action Recognition", results["actions"])
 
     return results
@@ -436,9 +454,17 @@ def main():
         help="Evaluate only one component",
     )
     parser.add_argument("--output", help="Save results to JSON file")
+    parser.add_argument(
+        "--ignore-player", action="store_true",
+        help="Match actions on type + frame only, ignoring player_id (GT player_id "
+             "is a per-frame left-to-right index that may not match the predictor's).",
+    )
     args = parser.parse_args()
 
-    results = run_evaluation(args.predictions, args.ground_truth, args.component)
+    results = run_evaluation(
+        args.predictions, args.ground_truth, args.component,
+        match_player=not args.ignore_player,
+    )
 
     if args.output:
         with open(args.output, "w") as f:

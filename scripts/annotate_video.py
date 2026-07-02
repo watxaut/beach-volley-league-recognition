@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.detection.ball_detector import BallDetector
 from src.detection.court_calibration import CourtCalibration
 from src.detection.player_detector import PlayerDetector
+from src.recognition.rally_state import compute_rally_state
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -116,12 +117,20 @@ class AnnotationTool:
 
         # Action mode state
         self.pending_action: Optional[str] = None
+        # Additional raw-visual labels to attach to the next action event
+        # alongside final_action (filled by pressing 'v' then a label key).
+        self.pending_raw_visual_actions: List[str] = []
+        # When True, next S/D/T/K/B keypress adds to pending_raw_visual_actions
+        # instead of replacing pending_action.
+        self.pending_raw_add: bool = False
 
         # Mouse click state
         self.click_pos: Optional[Tuple[int, int]] = None
 
         # Annotations
         self.annotations = self._load_or_create_annotations()
+        self._migrate_action_events()
+        self._recompute_rally_state()
 
         # Undo stack: list of (category, key/index, old_value)
         self.undo_stack: List[Tuple[str, Any, Any]] = []
@@ -153,7 +162,13 @@ class AnnotationTool:
                     "frames": {},
                 },
                 "actions": {
-                    "description": "Action events with frame number, player ID, and type",
+                    "description": (
+                        "Action events with rally-state context. Each event has: "
+                        "frame, player_id, final_action (canonical label), "
+                        "raw_visual_actions (open-vocabulary multi-label), "
+                        "player_team, team_in_possession, touch_number, "
+                        "preceded_by_attack, rally_id, overrides."
+                    ),
                     "events": [],
                 },
             },
@@ -173,7 +188,12 @@ class AnnotationTool:
     # --- Detection helpers ---
 
     def _detect_balls_all(self, frame: np.ndarray) -> List[Dict[str, Any]]:
-        """Run ball detector but return ALL detections (not just top-1)."""
+        """Run ball detector but return ALL detections (not just top-1).
+
+        Drops detections whose center is outside the court polygon when a
+        court calibration is loaded -- avoids labeling balls on adjacent
+        courts or the surrounding beach.
+        """
         if not self.ball_detector.validate_frame(frame):
             return []
         imgsz = self.ball_detector._get_imgsz(frame)
@@ -199,12 +219,19 @@ class AnnotationTool:
                     "center": [float(cx), float(cy)],
                     "confidence": conf,
                 })
+        if self.court and self.court.is_calibrated:
+            detections = [
+                d for d in detections
+                if self.court.is_point_in_court((int(d["center"][0]), int(d["center"][1])))
+            ]
         detections.sort(key=lambda d: d["confidence"], reverse=True)
         return detections
 
     def _detect_players(self, frame: np.ndarray) -> List[Dict[str, Any]]:
-        """Run player detector and return detections sorted by x position."""
+        """Run player detector and return in-court detections sorted by x position."""
         detections = self.player_detector.detect(frame)
+        if self.court and self.court.is_calibrated:
+            detections = self.court.filter_detections_by_court(detections)
         detections.sort(key=lambda d: d["center"][0])
         return detections
 
@@ -307,23 +334,136 @@ class AnnotationTool:
 
         idx = self._find_nearest_detection(self.click_pos, self.player_detections, max_dist=150)
         if idx is not None:
-            # Use detection index + 1 as player_id (or existing annotation if available)
+            det = self.player_detections[idx]
+            bbox = [int(v) for v in det["bbox"]]
+            player_team = "?"
+            if self.court and self.court.is_calibrated:
+                player_team = self.court.get_team_for_bbox(bbox) or "?"
+
             player_id = idx + 1
+
+            raw_labels = list(self.pending_raw_visual_actions)
+            if self.pending_action not in raw_labels:
+                raw_labels.insert(0, self.pending_action)
+
             event = {
                 "frame": self.current_frame_idx,
                 "player_id": player_id,
-                "action": self.pending_action,
+                "final_action": self.pending_action,
+                "raw_visual_actions": raw_labels,
+                "player_team": player_team,
+                # Rally-state fields populated by _recompute_rally_state.
+                "team_in_possession": None,
+                "touch_number": 0,
+                "preceded_by_attack": False,
+                "rally_id": 0,
+                # Per-event overrides survive rally-state recompute.
+                "overrides": {},
             }
             events = self.annotations["annotated_frames"]["actions"]["events"]
             old_len = len(events)
             events.append(event)
             self.undo_stack.append(("action", old_len, None))
+            self._recompute_rally_state()
             logger.info(
-                f"Action '{self.pending_action}' by Player {player_id} at frame {self.current_frame_idx}"
+                f"Action '{self.pending_action}' (raw={raw_labels}) by Player {player_id} "
+                f"(Team {player_team}) at frame {self.current_frame_idx}"
             )
 
         self.pending_action = None
+        self.pending_raw_visual_actions = []
         self.click_pos = None
+
+    def _recompute_rally_state(self) -> None:
+        """Recompute rally state across all action events.
+
+        Thin wrapper around `src.recognition.rally_state.compute_rally_state`
+        so the labeller and the future action classifier share one
+        implementation. See that function for the state-machine spec.
+        """
+        events = self.annotations["annotated_frames"]["actions"]["events"]
+        compute_rally_state(events)
+
+    def _migrate_action_events(self) -> None:
+        """Migrate old {action: ...} events to the new schema in place."""
+        events = (
+            self.annotations.get("annotated_frames", {})
+            .get("actions", {})
+            .get("events", [])
+        )
+        for event in events:
+            if "final_action" not in event and "action" in event:
+                event["final_action"] = event["action"]
+                del event["action"]
+            event.setdefault("final_action", "unknown")
+            event.setdefault("raw_visual_actions", [event["final_action"]])
+            event.setdefault("player_team", "?")
+            event.setdefault("team_in_possession", None)
+            event.setdefault("touch_number", 0)
+            event.setdefault("preceded_by_attack", False)
+            event.setdefault("rally_id", 0)
+            event.setdefault("overrides", {})
+
+    def _current_rally_context(self) -> Dict[str, Any]:
+        """Rally context the next action event would inherit at this frame.
+
+        Reads the most recent event before current_frame_idx and reports
+        what the next labeler-added event would naturally take as its
+        rally_id / team_in_possession / touch_number / preceded_by_attack,
+        assuming it's by the same team as the last event. The actual
+        values get recomputed once the event is added.
+        """
+        events = self.annotations["annotated_frames"]["actions"]["events"]
+        past = [e for e in events if e["frame"] < self.current_frame_idx]
+        if not past:
+            return {
+                "rally_id": 0,
+                "team": None,
+                "next_touch": 1,
+                "prev": None,
+                "prev_team": None,
+            }
+        last = max(past, key=lambda e: e["frame"])
+        return {
+            "rally_id": last.get("rally_id", 0),
+            "team": last.get("team_in_possession"),
+            "next_touch": last.get("touch_number", 0) + 1,
+            "prev": last.get("final_action"),
+            "prev_team": last.get("player_team"),
+        }
+
+    def _last_action_event(self) -> Optional[Dict[str, Any]]:
+        """Return the most recent action event by frame, or None."""
+        events = self.annotations["annotated_frames"]["actions"]["events"]
+        if not events:
+            return None
+        return max(events, key=lambda e: e["frame"])
+
+    def _bump_touch_number(self, delta: int) -> None:
+        """Adjust the last event's touch_number via override; recompute state."""
+        event = self._last_action_event()
+        if not event:
+            logger.info("No action events to override")
+            return
+        overrides = event.setdefault("overrides", {})
+        base = overrides.get("touch_number", event.get("touch_number", 0))
+        new_val = max(1, base + delta)
+        overrides["touch_number"] = new_val
+        self._recompute_rally_state()
+        logger.info(f"Overrode touch_number -> {new_val}")
+
+    def _flip_possession(self) -> None:
+        """Flip the last event's team_in_possession via override; recompute."""
+        event = self._last_action_event()
+        if not event:
+            logger.info("No action events to override")
+            return
+        overrides = event.setdefault("overrides", {})
+        current = overrides.get("team_in_possession", event.get("team_in_possession"))
+        new_val = "B" if current == "A" else "A"
+        overrides["team_in_possession"] = new_val
+        self._recompute_rally_state()
+        logger.info(f"Overrode team_in_possession -> {new_val}")
 
     def _undo(self):
         """Undo the last annotation."""
@@ -351,6 +491,7 @@ class AnnotationTool:
             events = self.annotations["annotated_frames"]["actions"]["events"]
             if key < len(events):
                 events.pop(key)
+            self._recompute_rally_state()
             logger.info("Undid last action annotation")
 
     # --- Frame navigation ---
@@ -403,13 +544,14 @@ class AnnotationTool:
         cv2.putText(overlay, f"Frame: {self.current_frame_idx}/{self.total_frames}",
                     (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLOR_HUD_TEXT, 1)
 
-        # --- Top-right: annotation counts ---
+        # --- Top-right: annotation counts (+ rally state in ACTION mode) ---
         ball_count = len(self.annotations["annotated_frames"]["ball"]["frames"])
         player_count = len(self.annotations["annotated_frames"]["players"]["frames"])
         action_count = len(self.annotations["annotated_frames"]["actions"]["events"])
 
         stats_x = w - 280
-        cv2.rectangle(overlay, (stats_x - 10, 0), (w, 80), COLOR_HUD_BG, -1)
+        panel_h = 140 if self.mode == MODE_ACTION else 80
+        cv2.rectangle(overlay, (stats_x - 10, 0), (w, panel_h), COLOR_HUD_BG, -1)
         cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
         overlay = frame
 
@@ -417,6 +559,17 @@ class AnnotationTool:
                     (stats_x, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.55, COLOR_HUD_TEXT, 1)
         cv2.putText(overlay, f"Actions: {action_count}",
                     (stats_x, 55), cv2.FONT_HERSHEY_SIMPLEX, 0.55, COLOR_HUD_TEXT, 1)
+
+        if self.mode == MODE_ACTION:
+            ctx = self._current_rally_context()
+            rally_team = ctx["team"] or "-"
+            cv2.putText(overlay, f"Rally {ctx['rally_id']} | Poss: {rally_team}",
+                        (stats_x, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.55, COLOR_HUD_TEXT, 1)
+            cv2.putText(
+                overlay,
+                f"Next touch: {ctx['next_touch']} | Prev: {ctx['prev'] or '-'}",
+                (stats_x, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.55, COLOR_HUD_TEXT, 1,
+            )
 
         # --- Bottom: keybindings for current mode ---
         if self.mode == MODE_BALL:
@@ -426,9 +579,12 @@ class AnnotationTool:
             if self.pending_player_id:
                 keys_str = f">> Click player for ID {self.pending_player_id} << | ESC=cancel"
         else:
-            keys_str = "S=serve D=dig T=set K=spike B=block, then click player | SPACE=pause | Q=quit"
+            keys_str = "S/D/T/K/B=action, click | V=raw +/-=touch# P=flip poss | SPACE=pause Q=quit"
             if self.pending_action:
-                keys_str = f">> Click player for '{self.pending_action}' << | ESC=cancel"
+                raw_str = ""
+                if self.pending_raw_visual_actions:
+                    raw_str = f" + raw={self.pending_raw_visual_actions}"
+                keys_str = f">> Click player for '{self.pending_action}'{raw_str} << | V=more raw | ESC=cancel"
 
         bar_y = h - 35
         cv2.rectangle(overlay, (0, bar_y - 5), (w, h), COLOR_HUD_BG, -1)
@@ -523,9 +679,11 @@ class AnnotationTool:
         events = self.annotations["annotated_frames"]["actions"]["events"]
         for ev in events:
             if abs(ev["frame"] - self.current_frame_idx) < 30:
+                raw = ev.get("raw_visual_actions", [])
+                raw_str = f" (raw={','.join(raw)})" if len(raw) > 1 else ""
                 cv2.putText(
                     frame,
-                    f"[F{ev['frame']}] P{ev['player_id']}: {ev['action']}",
+                    f"[F{ev['frame']}] P{ev['player_id']}: {ev['final_action']}{raw_str}",
                     (10, self.height - 60),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLOR_MODE_ACTION, 1,
                 )
@@ -647,6 +805,8 @@ class AnnotationTool:
             elif key == 27:
                 self.pending_player_id = None
                 self.pending_action = None
+                self.pending_raw_visual_actions = []
+                self.pending_raw_add = False
                 self.click_pos = None
 
             # Ball mode: N = not visible
@@ -662,10 +822,35 @@ class AnnotationTool:
 
             # Action mode: action keys
             elif self.mode == MODE_ACTION and key in ACTION_KEYS:
-                self.pending_action = ACTION_KEYS[key]
-                self.paused = True  # Pause to let user click
-                self._refresh_detections()
-                logger.info(f"Selected action: {self.pending_action} - click the player")
+                label = ACTION_KEYS[key]
+                if self.pending_raw_add and self.pending_action:
+                    if label not in self.pending_raw_visual_actions:
+                        self.pending_raw_visual_actions.append(label)
+                        logger.info(
+                            f"Added '{label}' to raw labels: {self.pending_raw_visual_actions}"
+                        )
+                else:
+                    self.pending_action = label
+                    self.paused = True
+                    self._refresh_detections()
+                    logger.info(f"Selected action: {self.pending_action} - click the player")
+
+            # Action mode: override last event's rally state
+            elif self.mode == MODE_ACTION and key in (ord("="), ord("+")):
+                self._bump_touch_number(+1)
+            elif self.mode == MODE_ACTION and key == ord("-"):
+                self._bump_touch_number(-1)
+            elif self.mode == MODE_ACTION and key == ord("p"):
+                self._flip_possession()
+
+            # Action mode: toggle raw-label add mode (after final_action is picked)
+            elif self.mode == MODE_ACTION and key == ord("v"):
+                if not self.pending_action:
+                    logger.info("Pick final_action first (S/D/T/K/B), then V to add raw labels")
+                else:
+                    self.pending_raw_add = not self.pending_raw_add
+                    state = "ON" if self.pending_raw_add else "OFF"
+                    logger.info(f"Raw-label add mode: {state}")
 
             # Non-paused: advance frame
             if not self.paused:

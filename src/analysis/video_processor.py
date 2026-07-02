@@ -115,6 +115,12 @@ class VideoProcessor:
 
         cap.release()
 
+        # Flush the final contact held back by the action classifier's
+        # one-contact look-ahead, attaching it to the last frame's results.
+        flushed = self.frame_processor.flush_actions()
+        if flushed and results["frame_results"]:
+            results["frame_results"][-1].setdefault("actions", []).extend(flushed)
+
         # Post-process results
         results = self._post_process_results(results)
 
@@ -154,8 +160,11 @@ class VideoProcessor:
                     if track_id not in player_actions:
                         player_actions[track_id] = []
                     player_actions[track_id].append({
-                        "frame_index": frame_result["frame_index"],
+                        # Prefer the action's true contact frame (it is finalised
+                        # a little after the frame it was emitted on).
+                        "frame_index": action.get("frame_number", frame_result["frame_index"]),
                         "action": action.get("action"),
+                        "gesture": action.get("gesture"),
                         "confidence": action.get("confidence"),
                         "bbox": action.get("bbox")
                     })

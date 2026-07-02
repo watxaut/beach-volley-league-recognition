@@ -41,6 +41,7 @@ def main():
     parser = argparse.ArgumentParser(description="Test action recognition")
     parser.add_argument("video", help="Path to video file")
     parser.add_argument("--court", help="Path to court calibration JSON (auto-detected from calibrations/ if omitted)")
+    parser.add_argument("--ball-model", help="Path to fine-tuned ball model (auto-detected from models/volleyball_ball_best.pt if omitted)")
     parser.add_argument("--output", default="output/action_test", help="Output directory")
     parser.add_argument("--max-frames", type=int, default=1000, help="Max frames to process")
     parser.add_argument("--save-video", action="store_true", help="Save annotated video")
@@ -65,7 +66,16 @@ def main():
             print(f"Auto-loaded court calibration: {court_path}")
     court = CourtCalibration(court_path) if court_path else CourtCalibration()
 
-    ball_detector = BallDetector(confidence_threshold=0.15)
+    # Fine-tuned ball model (auto-detect from models/ if not given). Needed on
+    # real footage; the COCO fallback rarely finds a volleyball.
+    ball_model = args.ball_model
+    if not ball_model:
+        auto_model = Path(__file__).resolve().parent.parent / "models" / "volleyball_ball_best.pt"
+        if auto_model.exists():
+            ball_model = str(auto_model)
+            print(f"Auto-loaded ball model: {ball_model}")
+
+    ball_detector = BallDetector(model_path=ball_model, confidence_threshold=0.15)
     player_detector = PlayerDetector(confidence_threshold=0.5)
     ball_tracker = BallTracker(max_missing_frames=10, low_confidence_threshold=0.4, max_trajectory_gap=60.0)
     player_tracker = PlayerTracker(max_players=4, court_calibration=court)
@@ -92,6 +102,30 @@ def main():
     action_log = []
     recent_actions = {}  # track_id -> (frame, action, confidence) for display persistence
 
+    def record_action(action, display_frame):
+        act_name = action["action"]
+        tid = action.get("track_id", -1)
+        conf = action.get("confidence", 0)
+        # The classifier confirms a contact a few frames late; report it at its
+        # true contact frame so it lines up with ground truth.
+        contact_frame = action.get("frame_number", display_frame)
+        action_counts[act_name] += 1
+        action_log.append({
+            "frame": contact_frame,
+            "player_id": action.get("player_id"),
+            "track_id": tid,
+            "action": act_name,
+            "gesture": action.get("gesture"),
+            "confidence": conf,
+            "team": action.get("team"),
+            "touch_number": action.get("touch_number"),
+            "rally_id": action.get("rally_id"),
+            "contact_kind": action.get("contact_kind"),
+        })
+        recent_actions[tid] = (display_frame, act_name, conf)
+        print(f"  Frame {contact_frame}: Player {tid} (idx {action.get('player_id')}) "
+              f"[{action.get('gesture')}] -> {act_name} ({conf:.2f})")
+
     for frame_idx in range(min(args.max_frames, total)):
         ret, frame = cap.read()
         if not ret:
@@ -113,18 +147,7 @@ def main():
         )
 
         for action in actions:
-            act_name = action["action"]
-            tid = action.get("track_id", -1)
-            conf = action.get("confidence", 0)
-            action_counts[act_name] += 1
-            action_log.append({
-                "frame": frame_idx,
-                "player_id": tid,
-                "action": act_name,
-                "confidence": conf,
-            })
-            recent_actions[tid] = (frame_idx, act_name, conf)
-            print(f"  Frame {frame_idx}: Player {tid} -> {act_name} ({conf:.2f})")
+            record_action(action, frame_idx)
 
         # Draw court
         if court.is_calibrated:
@@ -157,6 +180,10 @@ def main():
 
         if writer:
             writer.write(frame)
+
+    # Finalise the last contact still held for its look-ahead (context layer).
+    for action in action_classifier.flush():
+        record_action(action, frame_idx)
 
     cap.release()
     if writer:

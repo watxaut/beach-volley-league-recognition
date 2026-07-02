@@ -223,6 +223,15 @@ class FrameProcessor:
         frame_result["processing_time"] = time.time() - start_time
         return frame_result
 
+    def flush_actions(self) -> List[Dict[str, Any]]:
+        """Return the last action(s) the classifier held back for look-ahead.
+
+        The action classifier finalises each contact only once the next contact
+        arrives (needed to tell a set from an overpass), so the final contact of
+        a video stays pending until flushed. Call once after the last frame.
+        """
+        return self.action_classifier.flush()
+
     def reset_trackers(self) -> None:
         """Reset all tracking state."""
         self.player_tracker.tracks = {}
@@ -231,6 +240,8 @@ class FrameProcessor:
         self.player_tracker._initialized = False
 
         self.ball_tracker.reset()
+        self.ball_detector.reset()
+        self.action_classifier.reset()
 
         self.game_state_manager = GameStateManager(self.config)
         self.logger.debug("Trackers and game state reset")

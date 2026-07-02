@@ -1,13 +1,28 @@
 """
-Event-driven action classifier for beach volleyball.
+Visual layer of the two-layer action recognizer for beach volleyball.
 
-Instead of classifying every player every frame, this classifier:
-1. Detects ball trajectory inflection points (direction changes).
-2. Finds the closest player at each inflection.
-3. Classifies the action based on pose, court position, and ball direction.
+Action recognition is split into two layers (see also `action_context.py`):
 
-Requires a CourtCalibration instance for spatial context (net position,
-baseline, team zones).
+  Layer 1 -- THIS module -- watches the ball-in-play trajectory and fires only
+  at ball *contacts*, then reports the *context-free* :class:`VisualGesture`:
+  what the body/ball did, independent of the rally. A contact is a bottom-of-arc
+  (ball falls to a player and is sent back up) or a horizontal redirect (ball
+  deflected sideways without rising); every candidate must have a player within
+  reach, which rejects the arc's natural apex. The gesture is read from:
+    - **Ball motion** around the contact (a sideways drive vs a fall-and-rise);
+    - **Court geometry** (near the net?) via :class:`CourtCalibration`;
+    - **Pose** (when MediaPipe returns it) -- overhead hands support a block.
+  The gestures are deliberately coarse: BUMP_SET, ATTACK, BLOCK. A bump-set is
+  ambiguous on purpose -- it could be a dig, a set, or an overpass.
+
+  Layer 2 -- :class:`ActionContextResolver` -- turns a sequence of gestures into
+  canonical actions (dig/set/spike/block/serve/overpass) using rally state
+  (touch number + previous/next contact). Because it needs a one-contact
+  look-ahead, this class holds each contact back until the next one arrives and
+  finalises it then; call :meth:`flush` at end of video for the last one.
+
+Requires a :class:`CourtCalibration` instance for spatial context. Works without
+pose (falls back to ball motion).
 """
 
 from typing import List, Dict, Any, Optional, Tuple
@@ -16,18 +31,33 @@ import numpy as np
 import logging
 
 from .pose_estimator import PoseEstimator
-from .volleyball_actions import VolleyballAction
+from .volleyball_actions import VisualGesture
+from .action_context import ActionContextResolver
 
 
 class ActionClassifier:
     """Event-driven volleyball action classifier.
 
-    Actions are only classified when the ball trajectory changes direction
-    (inflection point), which corresponds to a ball contact event.
+    Actions are emitted only at detected ball contacts. Because a contact is
+    confirmed once the ball trajectory is seen on both sides of it, events are
+    finalised a few frames late and reported at their true contact frame via the
+    ``frame_number`` field of each result.
     """
 
-    # Minimum frames between ball contacts to avoid double-counting
-    MIN_CONTACT_GAP = 8
+    # --- Contact-detection tuning ---
+    MIN_CONTACT_GAP = 9      # min frames between successive contacts
+    CONTACT_DELAY = 7        # frames to wait before confirming a contact
+    NEIGH = 7                # frames each side used to test a contact vertex
+    MIN_PROMINENCE = 26.0    # px the ball must rise on both sides of a bounce
+    XREV_MIN = 20.0          # px net horizontal displacement for a redirect
+    CONTACT_REACH = 240.0    # max px from ball to nearest player for a contact
+
+    # --- Classification tuning ---
+    NEAR_NET_PX = 120        # |y - midcourt| under this counts as "near the net"
+    DRIVE_MIN_PX = 55.0      # min outgoing horizontal speed for an attack drive
+    RISE_MIN_PX = 30.0       # outgoing vertical speed treated as "ball rising"
+    HANDS_OVERHEAD = 1.0     # avg_wrist_height_ratio above this = hands overhead
+    RALLY_RESET_GAP = 90     # frames of no contact after which a new rally starts
 
     def __init__(
         self,
@@ -43,22 +73,35 @@ class ActionClassifier:
         self.confidence_threshold = confidence_threshold
         self.court = court_calibration
 
-        # Ball trajectory history: list of (frame_num, x, y)
-        self._ball_history: deque = deque(maxlen=60)
-        self._last_contact_frame: int = -100
+        # Ball trajectory of REAL (non-predicted) positions: (frame, x, y).
+        self._ball_history: deque = deque(maxlen=120)
+        self._last_contact_frame: int = -1000
 
-        # Per-player pose history for temporal features
+        # Per-player pose/position history for temporal features. Kept long
+        # enough to look back to a contact confirmed CONTACT_DELAY frames ago.
+        self._pose_hist_len = max(temporal_window, self.CONTACT_DELAY + self.NEIGH + 4)
         self._player_pose_history: Dict[int, deque] = {}
 
-        # Rally state
-        self._rally_active = False
-        self._rally_start_frame: Optional[int] = None
+        # Context layer: turns the visual gestures this class emits into
+        # canonical actions using rally state. A one-contact look-ahead is
+        # needed (set vs overpass), so each contact is finalised when the next
+        # one arrives; the pending contact waits in ``self._pending``.
+        self._resolver = ActionContextResolver(rally_reset_gap=self.RALLY_RESET_GAP)
+        self._pending: Optional[Dict[str, Any]] = None
 
         self.logger = logging.getLogger(__name__)
 
     def set_court_calibration(self, court) -> None:
         """Set court calibration for spatial reasoning."""
         self.court = court
+
+    def reset(self) -> None:
+        """Reset all per-video state."""
+        self._ball_history.clear()
+        self._player_pose_history.clear()
+        self._last_contact_frame = -1000
+        self._resolver.reset()
+        self._pending = None
 
     def classify_actions(
         self,
@@ -71,233 +114,284 @@ class ActionClassifier:
     ) -> List[Dict[str, Any]]:
         """Classify actions for the current frame.
 
-        Returns a list of action dicts. Most frames return empty -- actions
-        are only emitted at ball contact events (trajectory inflections).
+        Returns a list of action dicts. Most frames return empty -- actions are
+        only emitted at ball-contact events. An emitted event's ``frame_number``
+        is the true contact frame, which is ``CONTACT_DELAY`` frames before the
+        current one.
         """
         if frame_number is None:
             frame_number = 0
 
-        # Update ball history
+        # Track the ball only when it is really detected (not tracker-predicted).
         if ball_info and not ball_info.get("is_predicted", False):
             center = ball_info.get("center")
             if center and center[0] is not None:
-                self._ball_history.append((frame_number, center[0], center[1]))
+                self._ball_history.append((frame_number, float(center[0]), float(center[1])))
 
-        # Estimate poses for all players
+        # Estimate + store poses for all players this frame.
         poses = self.pose_estimator.estimate_poses_batch(frame, player_detections)
-
-        # Store pose history per player
         for det, pose in zip(player_detections, poses):
             tid = det.get("track_id")
-            if tid is None or pose is None:
+            if tid is None:
                 continue
             if tid not in self._player_pose_history:
-                self._player_pose_history[tid] = deque(maxlen=self.temporal_window)
+                self._player_pose_history[tid] = deque(maxlen=self._pose_hist_len)
             self._player_pose_history[tid].append({
                 "frame": frame_number,
                 "pose": pose,
-                "center": det["center"],
-                "bbox": det["bbox"],
+                "center": det.get("center"),
+                "bbox": det.get("bbox"),
                 "team": det.get("team"),
             })
 
-        # Check for ball contact event (trajectory inflection)
-        contact = self._detect_ball_contact(frame_number)
+        # Confirm a contact that happened CONTACT_DELAY frames ago (we now have
+        # trajectory on both sides of it).
+        contact_frame = frame_number - self.CONTACT_DELAY
+        contact = self._detect_contact(contact_frame)
         if contact is None:
             return []
 
-        # Find closest player to the contact point
-        contact_point, ball_direction = contact
-        closest = self._find_closest_player(contact_point, player_detections)
-        if closest is None:
+        contact_point, kind, inc, out = contact
+
+        chosen = self._closest_player_at(contact_frame, contact_point)
+        if chosen is None:
+            return []
+        pdata, distance, lr_index = chosen
+        if distance > self.CONTACT_REACH:
             return []
 
-        det, pose, distance = closest
+        self._last_contact_frame = contact_frame
 
-        # Classify the action
-        action, confidence = self._classify_contact(
-            det, pose, contact_point, ball_direction, frame_number
+        # Layer 1: read the context-free visual gesture at this contact.
+        contact_evt = self._build_contact(
+            pdata, lr_index, contact_point, kind, inc, out, contact_frame
         )
 
-        if action == VolleyballAction.UNKNOWN or confidence < self.confidence_threshold:
+        # Layer 2 (streaming): finalise the *previous* contact now that we know
+        # its successor, and hold this one back until its own successor arrives.
+        emitted: List[Dict[str, Any]] = []
+        if self._pending is not None:
+            emitted.append(self._finalize(self._pending, contact_evt))
+        self._pending = contact_evt
+        return [e for e in emitted if e is not None]
+
+    def flush(self) -> List[Dict[str, Any]]:
+        """Finalise the last pending contact at end of video (no successor)."""
+        if self._pending is None:
             return []
+        event = self._finalize(self._pending, None)
+        self._pending = None
+        return [event] if event is not None else []
 
-        self._last_contact_frame = frame_number
+    def _finalize(
+        self, contact_evt: Dict[str, Any], next_contact: Optional[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        """Resolve a gesture-contact to a canonical action event, or None if
+        it falls below the confidence threshold."""
+        resolved = self._resolver.resolve(contact_evt, next_contact)
+        if resolved["confidence"] < self.confidence_threshold:
+            return None
+        cp = contact_evt["contact_point"]
+        return {
+            "track_id": contact_evt["track_id"],
+            "player_id": contact_evt["player_id"],   # left-to-right index (GT convention)
+            "action": resolved["action"],
+            "gesture": contact_evt["gesture"].value,
+            "confidence": resolved["confidence"],
+            "frame_number": contact_evt["frame"],
+            "contact_point": [round(cp[0], 1), round(cp[1], 1)],
+            "player_center": contact_evt["player_center"],
+            "team": resolved["team_in_possession"],
+            "touch_number": resolved["touch_number"],
+            "rally_id": resolved["rally_id"],
+            "contact_kind": contact_evt["contact_kind"],
+        }
 
-        return [{
-            "track_id": det.get("track_id"),
-            "action": action.value,
-            "confidence": round(confidence, 3),
-            "frame_number": frame_number,
-            "contact_point": contact_point,
-            "player_center": det["center"],
-            "ball_direction": ball_direction,
-            "team": det.get("team"),
-        }]
+    # --- Ball-contact detection ---
 
-    # --- Ball contact detection ---
+    def _real_points(self, lo: int, hi: int) -> List[Tuple[int, float, float]]:
+        """Real ball points with frame in [lo, hi], ordered by frame."""
+        return [p for p in self._ball_history if lo <= p[0] <= hi]
 
-    def _detect_ball_contact(
-        self, current_frame: int
-    ) -> Optional[Tuple[List[float], str]]:
-        """Detect if a ball contact (trajectory inflection) happened.
+    def _point_at(self, f: int) -> Optional[Tuple[int, float, float]]:
+        for p in self._ball_history:
+            if p[0] == f:
+                return p
+        return None
 
-        Returns:
-            Tuple of (contact_point, ball_direction) or None.
-            ball_direction: "up", "down", "left", "right"
+    def _detect_contact(
+        self, c: int
+    ) -> Optional[Tuple[List[float], str, Tuple[float, float], Tuple[float, float]]]:
+        """Test whether frame ``c`` is a ball contact.
+
+        Returns (contact_point, kind, incoming_vec, outgoing_vec) or None.
+        ``kind`` is "bounce" (fall-and-rise) or "redirect" (horizontal deflect).
         """
-        if len(self._ball_history) < 5:
+        if c <= self.NEIGH:
+            return None
+        if c - self._last_contact_frame < self.MIN_CONTACT_GAP:
             return None
 
-        # Don't detect contacts too close together
-        if current_frame - self._last_contact_frame < self.MIN_CONTACT_GAP:
+        vertex = self._point_at(c)
+        if vertex is None:
+            return None
+        _, vx, vy = vertex
+
+        left = self._real_points(c - self.NEIGH, c - 1)
+        right = self._real_points(c + 1, c + self.NEIGH)
+        if len(left) < 2 or len(right) < 2:
             return None
 
-        # Look at the last few positions
-        recent = list(self._ball_history)[-5:]
-        frames = [r[0] for r in recent]
-        xs = [r[1] for r in recent]
-        ys = [r[2] for r in recent]
+        contact_point = [vx, vy]
+        inc = (vx - left[0][1], vy - left[0][2])       # net incoming vector
+        out = (right[-1][1] - vx, right[-1][2] - vy)    # net outgoing vector
 
-        # Check if frames are recent (within last 10 frames)
-        if current_frame - frames[-1] > 5:
-            return None
+        # Bottom-of-arc: vertex is the lowest point and the ball rises (smaller
+        # y) by MIN_PROMINENCE on both sides.
+        lowest = all(p[2] <= vy for p in left + right)
+        if lowest:
+            rise_l = vy - min(p[2] for p in left)
+            rise_r = vy - min(p[2] for p in right)
+            if rise_l >= self.MIN_PROMINENCE and rise_r >= self.MIN_PROMINENCE:
+                return contact_point, "bounce", inc, out
 
-        # Check for vertical direction change (most common in volleyball)
-        # vy before midpoint vs vy after midpoint
-        mid = len(ys) // 2
-        vy_before = ys[mid] - ys[0]  # positive = moving down
-        vy_after = ys[-1] - ys[mid]  # positive = moving down
-
-        # Direction change: sign flip in vertical velocity
-        if vy_before * vy_after < 0 and (abs(vy_before) > 5 or abs(vy_after) > 5):
-            contact_point = [xs[mid], ys[mid]]
-            direction = "up" if vy_after < 0 else "down"
-            return contact_point, direction
-
-        # Check for horizontal direction change (less common but happens with blocks)
-        vx_before = xs[mid] - xs[0]
-        vx_after = xs[-1] - xs[mid]
-        if vx_before * vx_after < 0 and (abs(vx_before) > 10 or abs(vx_after) > 10):
-            contact_point = [xs[mid], ys[mid]]
-            direction = "left" if vx_after < 0 else "right"
-            return contact_point, direction
+        # Horizontal redirect: ball arrives from one side and leaves to the
+        # other (block/spike drive) without a clean bounce.
+        if inc[0] * out[0] < 0 and abs(inc[0]) > self.XREV_MIN and abs(out[0]) > self.XREV_MIN:
+            return contact_point, "redirect", inc, out
 
         return None
 
-    def _find_closest_player(
-        self,
-        contact_point: List[float],
-        player_detections: List[Dict[str, Any]],
-        max_distance: float = 200.0,
-    ) -> Optional[Tuple[Dict, Optional[Dict], float]]:
-        """Find the player closest to the ball contact point.
+    def _closest_player_at(
+        self, frame: int, point: List[float]
+    ) -> Optional[Tuple[Dict[str, Any], float, Optional[int]]]:
+        """Find the tracked player closest to ``point`` around ``frame``.
 
-        Returns:
-            Tuple of (detection, pose_data, distance) or None.
+        Returns (player_snapshot, distance, left_to_right_index) or None. The
+        snapshot is the history entry nearest ``frame`` for that player; the
+        L-R index ranks all players present near ``frame`` by x (matching the
+        ground-truth annotation convention).
         """
+        snapshots: List[Dict[str, Any]] = []
+        for tid, hist in self._player_pose_history.items():
+            if not hist:
+                continue
+            snap = min(hist, key=lambda h: abs(h["frame"] - frame))
+            if abs(snap["frame"] - frame) > self.NEIGH + 2:
+                continue
+            if snap.get("center") is None:
+                continue
+            snap = dict(snap)
+            snap["track_id"] = tid
+            snapshots.append(snap)
+
+        if not snapshots:
+            return None
+
+        ordered = sorted(snapshots, key=lambda s: s["center"][0])
         best = None
         best_dist = float("inf")
+        for s in snapshots:
+            cx, cy = s["center"]
+            d = float(np.hypot(cx - point[0], cy - point[1]))
+            if d < best_dist:
+                best_dist = d
+                best = s
+        lr_index = ordered.index(best) + 1
+        return best, best_dist, lr_index
 
-        for det in player_detections:
-            center = det.get("center", [0, 0])
-            dist = np.sqrt(
-                (center[0] - contact_point[0]) ** 2
-                + (center[1] - contact_point[1]) ** 2
-            )
-            if dist < best_dist and dist < max_distance:
-                best_dist = dist
-                tid = det.get("track_id")
-                pose = None
-                if tid and tid in self._player_pose_history and self._player_pose_history[tid]:
-                    pose = self._player_pose_history[tid][-1].get("pose")
-                best = (det, pose, best_dist)
+    # --- Layer 1: visual gesture detection (context-free) ---
 
-        return best
-
-    # --- Action classification ---
-
-    def _classify_contact(
+    def _build_contact(
         self,
-        detection: Dict[str, Any],
-        pose: Optional[Dict[str, Any]],
+        pdata: Dict[str, Any],
+        lr_index: Optional[int],
         contact_point: List[float],
-        ball_direction: str,
-        frame_number: int,
-    ) -> Tuple[VolleyballAction, float]:
-        """Classify what action the player performed at a ball contact.
+        kind: str,
+        inc: Tuple[float, float],
+        out: Tuple[float, float],
+        frame: int,
+    ) -> Dict[str, Any]:
+        """Assemble a gesture-contact: the visual gesture plus the court/spatial
+        facts the context layer needs. No rally reasoning happens here."""
+        bbox = pdata.get("bbox") or [0, 0, 0, 0]
+        foot = (int((bbox[0] + bbox[2]) / 2), int(bbox[3]))
 
-        Uses tiered classification:
-        - Tier 1 (spatial): serve, block - high accuracy
-        - Tier 2 (pose+ball): dig, set, spike - moderate accuracy
+        # Court context. "Near the net" is judged on the player's FEET, not their
+        # torso centre: a net player has feet on the midcourt line but a torso
+        # that sits high in the frame, so a centre-based test reads "far".
+        team = pdata.get("team")
+        near_net = False
+        behind_baseline = False
+        if self.court is not None and getattr(self.court, "is_calibrated", False):
+            foot_team = self.court.get_team_for_bbox(bbox)
+            team = foot_team or team
+            near_net = self.court.is_near_net(foot, threshold_px=self.NEAR_NET_PX)
+            if foot_team:
+                behind_baseline = self.court.is_behind_baseline(foot, foot_team)
+
+        gesture, gconf = self._detect_gesture(pdata, kind, inc, out, near_net)
+
+        return {
+            "frame": frame,
+            "gesture": gesture,
+            "gesture_confidence": gconf,
+            "track_id": pdata.get("track_id"),
+            "player_id": lr_index,
+            "team": team,
+            "near_net": near_net,
+            "behind_baseline": behind_baseline,
+            "contact_point": contact_point,
+            "contact_kind": kind,
+            "ball_in": inc,
+            "ball_out": out,
+            "player_center": pdata.get("center"),
+        }
+
+    def _detect_gesture(
+        self,
+        pdata: Dict[str, Any],
+        kind: str,
+        inc: Tuple[float, float],
+        out: Tuple[float, float],
+        near_net: bool,
+    ) -> Tuple[VisualGesture, float]:
+        """Classify the context-free visual gesture at a contact.
+
+        Only ball motion (around the contact), whether the player is at the net,
+        and pose are used -- never rally position. The bump-set gesture is
+        intentionally coarse; the context layer decides dig/set/overpass/serve.
         """
-        player_center = detection.get("center", [0, 0])
-        team = detection.get("team")
+        out_x, out_y = out
+        horiz = abs(out_x)
+        vert = abs(out_y)
+        going_up = out_y < -self.RISE_MIN_PX
+        driven_sideways = horiz >= self.DRIVE_MIN_PX and horiz >= vert * 0.8
+        driven_down = out_y > self.RISE_MIN_PX
 
-        # Extract pose features
-        features = {}
+        feats: Dict[str, Any] = {}
+        pose = pdata.get("pose")
         if pose and "pose_features" in pose:
-            features = pose["pose_features"]
+            feats = pose["pose_features"]
+        avg_wrist = feats.get("avg_wrist_height_ratio")
+        hands_overhead = avg_wrist is not None and avg_wrist > self.HANDS_OVERHEAD
 
-        # --- Tier 1: Spatial checks ---
+        # BLOCK -- at the net, ball redirected roughly horizontally (not rising)
+        # with hands overhead or a clean sideways redirect (a stuffed attack).
+        if near_net and not going_up and horiz > self.DRIVE_MIN_PX:
+            if hands_overhead or kind == "redirect":
+                return VisualGesture.BLOCK, (0.7 if hands_overhead else 0.55)
 
-        # SERVE: behind baseline + rally not active (or at rally start)
-        if self.court and team:
-            if self.court.is_behind_baseline((int(player_center[0]), int(player_center[1])), team):
-                if not self._rally_active or frame_number == self._rally_start_frame:
-                    self._rally_active = True
-                    self._rally_start_frame = frame_number
-                    return VolleyballAction.SERVE, 0.8
+        # ATTACK -- an attacking drive: ball leaves strongly sideways or is
+        # driven downward near the net.
+        if near_net and (driven_sideways or driven_down):
+            return VisualGesture.ATTACK, 0.6
 
-        # BLOCK: near net + arms above shoulders
-        if self.court and self.court.is_near_net((int(player_center[0]), int(player_center[1])), threshold_px=100):
-            avg_wrist = features.get("avg_wrist_height_ratio", 0)
-            if avg_wrist > 1.0:  # wrists above shoulders
-                return VolleyballAction.BLOCK, 0.7
+        # BUMP_SET -- a controlled up-touch (ball fell in and is sent back up).
+        if kind == "bounce" or going_up or vert > self.DRIVE_MIN_PX:
+            return VisualGesture.BUMP_SET, 0.55
 
-        # Start rally if not started
-        if not self._rally_active:
-            self._rally_active = True
-            self._rally_start_frame = frame_number
-
-        # --- Tier 2: Pose + ball direction ---
-
-        avg_wrist = features.get("avg_wrist_height_ratio", 0)
-        wrist_diff = features.get("wrist_height_diff", 0)
-        body_lean = features.get("body_lean", 0)
-
-        # DIG: arms below shoulders + ball goes up from low position
-        if ball_direction == "up" and avg_wrist < 0.5:
-            confidence = 0.5
-            if body_lean > 30:  # leaning forward
-                confidence += 0.1
-            return VolleyballAction.DIG, confidence
-
-        # SET: both arms symmetric and high + ball goes up moderately
-        if ball_direction == "up" and avg_wrist > 0.8 and wrist_diff < 0.3:
-            return VolleyballAction.SET, 0.45
-
-        # SPIKE: near net + one arm high + ball goes down
-        if ball_direction == "down":
-            near_net = False
-            if self.court:
-                near_net = self.court.is_near_net(
-                    (int(player_center[0]), int(player_center[1])), threshold_px=150
-                )
-            if near_net and wrist_diff > 0.3 and avg_wrist > 0.6:
-                return VolleyballAction.SPIKE, 0.45
-            # Even without net proximity, asymmetric high arm + ball down suggests spike
-            if wrist_diff > 0.4 and avg_wrist > 0.8:
-                return VolleyballAction.SPIKE, 0.35
-
-        # Fallback: if ball goes up with arms at mid height, likely a dig or set
-        if ball_direction == "up":
-            if avg_wrist < 0.8:
-                return VolleyballAction.DIG, 0.35
-            return VolleyballAction.SET, 0.3
-
-        # Ball goes down but doesn't match spike criteria
-        if ball_direction == "down":
-            return VolleyballAction.SPIKE, 0.25
-
-        return VolleyballAction.UNKNOWN, 0.0
+        # Fallback: a sideways redirect near the net looks like an attack drive.
+        if near_net and horiz > vert:
+            return VisualGesture.ATTACK, 0.4
+        return VisualGesture.BUMP_SET, 0.4
