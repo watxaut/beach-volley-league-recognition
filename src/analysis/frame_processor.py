@@ -64,11 +64,13 @@ class FrameProcessor:
                 device=self.config.get("device", "cpu"),
             )
 
-            # Player detection (YOLO-based)
+            # Player detection (YOLO-based). The detector cap is a generous
+            # safety limit (max_detections), NOT the team size -- capping it to
+            # the roster would drop real in-court players before tracking.
             self.player_detector = PlayerDetector(
                 confidence_threshold=self.config.get("player_confidence", 0.5),
                 device=self.config.get("device", "cpu"),
-                max_players=self.config.get("max_players", 4),
+                max_players=self.config.get("max_detections", 20),
             )
 
             # Connect court calibration to player detector for filtering

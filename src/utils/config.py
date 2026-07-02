@@ -23,7 +23,8 @@ class Config:
         "detection_method": "template",  # Default to Wilson ball template matching
         "ball_confidence": 0.7,  # Much lower for better ball detection
         "player_confidence": 0.5,
-        "max_players": 4,
+        "max_players": 6,       # players the tracker follows (training drills run >4)
+        "max_detections": 20,   # detector safety cap (must exceed people on court)
         "ball_horizontal_margin_percent": 0.25,  # Horizontal margin to exclude from ball detection (15% on each side)
 
         # Tracking settings -- tuned for the conservative BallTracker used by

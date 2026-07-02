@@ -78,7 +78,7 @@ def main():
     ball_detector = BallDetector(model_path=ball_model, confidence_threshold=0.15)
     player_detector = PlayerDetector(confidence_threshold=0.5)
     ball_tracker = BallTracker(max_missing_frames=10, low_confidence_threshold=0.4, max_trajectory_gap=60.0)
-    player_tracker = PlayerTracker(max_players=4, court_calibration=court)
+    player_tracker = PlayerTracker(max_players=6, court_calibration=court)
     pose_estimator = PoseEstimator(min_detection_confidence=0.5, model_complexity=1)
     action_classifier = ActionClassifier(
         pose_estimator=pose_estimator,

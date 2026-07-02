@@ -26,7 +26,7 @@ class PlayerDetector(BaseDetector):
         model_path: Optional[str] = None,
         confidence_threshold: float = 0.5,
         device: str = "cpu",
-        max_players: int = 4
+        max_players: int = 20
     ):
         """Initialize the player detector.
 
@@ -34,7 +34,12 @@ class PlayerDetector(BaseDetector):
             model_path: Path to custom YOLO model, uses pretrained if None
             confidence_threshold: Minimum confidence for player detections
             device: Device to run inference on ("cpu" or "cuda")
-            max_players: Maximum number of players expected in frame
+            max_players: Safety cap on how many person detections to return. This
+                is a DETECTION limit, not the team size -- it must stay well above
+                the number of people who can be on/around the court, otherwise the
+                top-N-by-confidence cull drops real players (courtside bystanders
+                near the camera outscore distant players). Downstream stages
+                (court filter, tracker, ball proximity) do the real selection.
         """
         super().__init__(confidence_threshold, device)
         self.model_path = model_path or "yolov8n.pt"
