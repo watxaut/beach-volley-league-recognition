@@ -65,8 +65,11 @@ class StatisticsAnalyzer:
                 confidence = action_data.get("confidence", 0.0)
                 frame_index = action_data.get("frame_index", 0)
 
-                # Only count high-confidence actions
-                if confidence > 0.6:
+                # Count every emitted action. These are already the finalised,
+                # confidence-gated events from the classifier (dig/set score
+                # ~0.5-0.6), so a further >0.6 filter here silently dropped all
+                # digs and sets from the summary.
+                if action_type != "unknown":
                     action_counts[action_type] += 1
 
                 confidence_scores[action_type].append(confidence)
@@ -119,7 +122,7 @@ class StatisticsAnalyzer:
                 action_type = action.get("action", "unknown")
                 confidence = action.get("confidence", 0.0)
 
-                if confidence > 0.6:  # High confidence threshold
+                if action_type != "unknown":  # already emission-gated upstream
                     all_actions.append(action_type)
                     action_timeline.append({
                         "frame": frame_index,

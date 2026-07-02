@@ -69,7 +69,10 @@ class Config:
         "log_file": None,
 
         # Court detection settings
-        "court_detection_method": "yolo",  # "yolo", "geometric", or "vision"
+        # LEGACY/unused: court is now the interactive CourtCalibration JSON
+        # (calibrations/<video>.json), not a detected/model-based court. Kept only
+        # so Config.validate() and old configs don't break; "yolo" was invalid.
+        "court_detection_method": "geometric",  # "geometric" or "vision" (unused)
         "court_model_path": "weights/court/court_best.pt",  # Path to YOLO court model
         "court_confidence": 0.5,  # Confidence threshold for YOLO court detection
         "court_height_ratio": 0.2,  # Court takes 60% of frame height (fallback for geometric)

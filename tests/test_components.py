@@ -142,7 +142,7 @@ class TestConfig(unittest.TestCase):
         config = Config.default()
         self.assertIsNotNone(config)
         self.assertEqual(config.get("device"), "cpu")
-        self.assertEqual(config.get("ball_confidence"), 0.3)
+        self.assertEqual(config.get("ball_confidence"), 0.7)
 
     def test_config_validation(self):
         """Test configuration validation."""
