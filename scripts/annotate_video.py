@@ -580,7 +580,7 @@ class AnnotationTool:
             if self.pending_player_id:
                 keys_str = f">> Click player for ID {self.pending_player_id} << | ESC=cancel"
         else:
-            keys_str = "S/D/T/K/B/O=action, click | V=raw +/-=touch# P=flip poss | SPACE=pause Q=quit"
+            keys_str = "s=serve d=dig t=set k=spike b=block o=overpass, click | V=raw +/-=touch# P=flip poss | SPACE=pause Q=quit"
             if self.pending_action:
                 raw_str = ""
                 if self.pending_raw_visual_actions:
