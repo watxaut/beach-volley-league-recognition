@@ -95,6 +95,17 @@ class PlayerTracker:
     # --- Initialization ---
 
     @staticmethod
+    def _iou(b1: List[float], b2: List[float]) -> float:
+        """Intersection-over-union of two [x1,y1,x2,y2] boxes."""
+        x1 = max(b1[0], b2[0]); y1 = max(b1[1], b2[1])
+        x2 = min(b1[2], b2[2]); y2 = min(b1[3], b2[3])
+        inter = max(0.0, x2 - x1) * max(0.0, y2 - y1)
+        a1 = (b1[2] - b1[0]) * (b1[3] - b1[1])
+        a2 = (b2[2] - b2[0]) * (b2[3] - b2[1])
+        union = a1 + a2 - inter
+        return inter / union if union > 0 else 0.0
+
+    @staticmethod
     def _deduplicate_detections(detections: List[Dict[str, Any]], iou_threshold: float = 0.4) -> List[Dict[str, Any]]:
         """Remove overlapping detections, keeping the higher confidence one."""
         if len(detections) <= 1:
@@ -251,36 +262,74 @@ class PlayerTracker:
             out["team"] = self._get_locked_team(tid)
             tracked_players.append(out)
 
-        # Unmatched tracks: increment disappeared
-        for i, tid in enumerate(track_ids):
-            if tid not in matched_tracks:
-                self.disappeared[tid] = self.disappeared.get(tid, 0) + 1
-                if self.disappeared[tid] > self.max_disappeared:
-                    self._remove_track(tid)
-                else:
-                    # Keep track in output with predicted position
-                    track = self.tracks.get(tid)
-                    if track:
-                        out = {
-                            "bbox": track["bbox"],
-                            "center": track["center"],
-                            "confidence": max(0.1, track["confidence"] - 0.05),
-                            "track_id": tid,
-                            "team": self._get_locked_team(tid),
-                            "predicted": True,
-                        }
-                        tracked_players.append(out)
-
-        # Unmatched detections: DISCARD (never create 5th track)
-        # Only create new track if we have fewer than max_players
+        # Second pass -- re-acquisition: a leftover detection that overlaps a
+        # still-unmatched track is almost certainly that same player (the
+        # Hungarian pass missed it on appearance/cost). Re-attach it to the SAME
+        # id instead of leaving the track to coast or spawning a duplicate. This
+        # is the main defence against ID churn and stacked boxes under occlusion.
         for j in range(n_dets):
-            if j not in matched_dets and len(self.tracks) < self.max_players:
-                det = detections[j]
-                tid = self._create_track(det)
+            if j in matched_dets:
+                continue
+            det = detections[j]
+            best_tid, best_iou = None, 0.35
+            for tid in track_ids:
+                if tid in matched_tracks:
+                    continue
+                ov = self._iou(det["bbox"], self.tracks[tid]["bbox"])
+                if ov > best_iou:
+                    best_iou, best_tid = ov, tid
+            if best_tid is not None:
+                self._update_track(best_tid, det)
+                matched_tracks.add(best_tid)
+                matched_dets.add(j)
                 out = det.copy()
-                out["track_id"] = tid
-                out["team"] = self._get_locked_team(tid)
+                out["track_id"] = best_tid
+                out["team"] = self._get_locked_team(best_tid)
                 tracked_players.append(out)
+
+        matched_boxes = [p["bbox"] for p in tracked_players]
+
+        # Unmatched tracks: coast with a predicted box -- but suppress a ghost
+        # that sits on top of a player already matched to another id (a duplicate).
+        for tid in track_ids:
+            if tid in matched_tracks:
+                continue
+            self.disappeared[tid] = self.disappeared.get(tid, 0) + 1
+            if self.disappeared[tid] > self.max_disappeared:
+                self._remove_track(tid)
+                continue
+            track = self.tracks.get(tid)
+            if not track:
+                continue
+            if any(self._iou(track["bbox"], mb) > 0.4 for mb in matched_boxes):
+                continue
+            tracked_players.append({
+                "bbox": track["bbox"],
+                "center": track["center"],
+                "confidence": max(0.1, track["confidence"] - 0.05),
+                "track_id": tid,
+                "team": self._get_locked_team(tid),
+                "predicted": True,
+            })
+
+        # Unmatched detections: create a new track only if there is room AND the
+        # detection is not already covered by an existing track (never stack two
+        # ids on one player).
+        existing_boxes = [t["bbox"] for t in self.tracks.values()]
+        for j in range(n_dets):
+            if j in matched_dets or len(self.tracks) >= self.max_players:
+                continue
+            det = detections[j]
+            if any(self._iou(det["bbox"], eb) > 0.35 for eb in existing_boxes):
+                continue
+            tid = self._create_track(det)
+            if tid < 0:
+                continue
+            existing_boxes.append(det["bbox"])
+            out = det.copy()
+            out["track_id"] = tid
+            out["team"] = self._get_locked_team(tid)
+            tracked_players.append(out)
 
         return tracked_players
 
@@ -294,15 +343,16 @@ class PlayerTracker:
         track_center = np.array(track["center"])
         det_center = np.array(detection["center"])
 
-        # Distance cost
+        # Gate on the actual gap to the last known position.
         distance = float(np.linalg.norm(track_center - det_center))
         if distance > self.max_distance:
             return None
 
-        # Velocity check
-        velocity = distance  # per frame
-        if velocity > self.max_velocity:
-            return None
+        # Rank by the gap to the MOTION-PREDICTED position (constant velocity).
+        # Anticipating motion is what keeps crossing/converging players from
+        # swapping IDs -- the detection that continues a track's trajectory wins.
+        predicted = track_center + np.array(track.get("velocity", [0.0, 0.0]))
+        pred_distance = float(np.linalg.norm(predicted - det_center))
 
         # Appearance cost (color histogram similarity)
         appearance_cost = 0.0
@@ -311,9 +361,13 @@ class PlayerTracker:
             if det_hist is not None and track["histogram"] is not None:
                 similarity = cv2.compareHist(track["histogram"], det_hist, cv2.HISTCMP_CORREL)
                 appearance_cost = 1.0 - max(0.0, similarity)  # 0=identical, 1=different
+                # A very different-looking detection cannot steal an ID unless it
+                # is essentially on top of the track (blocks appearance swaps).
+                if similarity < 0.15 and pred_distance > 0.35 * self.max_distance:
+                    return None
 
         # Combined cost
-        cost = (1.0 - self.appearance_weight) * distance + self.appearance_weight * appearance_cost * self.max_distance
+        cost = (1.0 - self.appearance_weight) * pred_distance + self.appearance_weight * appearance_cost * self.max_distance
         return cost
 
     # --- Appearance features ---
