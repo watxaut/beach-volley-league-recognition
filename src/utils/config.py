@@ -26,16 +26,18 @@ class Config:
         "max_players": 4,
         "ball_horizontal_margin_percent": 0.25,  # Horizontal margin to exclude from ball detection (15% on each side)
 
-        # Tracking settings
-        "ball_max_missing": 30,  # Increased from 10 for better continuity
-        "trajectory_smoothing": 8,  # Increased smoothing
+        # Tracking settings -- tuned for the conservative BallTracker used by
+        # FrameProcessor (matches scripts/test_action_recognition.py). Loose
+        # values here let the tracker chase noise and break contact detection.
+        "ball_max_missing": 10,
+        "trajectory_smoothing": 5,
         "player_max_disappeared": 30,
         "tracking_max_distance": 100.0,
-        
+
         # Enhanced trajectory-based tracking settings
-        "low_confidence_threshold": 0.15,  # Accept lower confidence with good trajectory
+        "low_confidence_threshold": 0.4,  # Min confidence for the tracker to accept a detection
         "trajectory_confidence_boost": 0.3,  # Boost confidence for trajectory-consistent detections
-        "max_trajectory_gap": 150.0,  # Maximum distance to consider trajectory continuation
+        "max_trajectory_gap": 60.0,  # Maximum distance to consider trajectory continuation
         "velocity_consistency_weight": 0.4,  # Weight for velocity consistency in scoring
         "acceleration_consistency_weight": 0.2,  # Weight for acceleration consistency
         "trajectory_prediction_frames": 5,  # Number of frames to predict ahead
@@ -45,7 +47,7 @@ class Config:
         "pose_confidence": 0.5,
         "pose_complexity": 1,
         "temporal_window": 10,
-        "action_confidence": 0.7,  # Higher threshold for actions
+        "action_confidence": 0.4,  # Min confidence to emit an action (classifier scores ~0.45-0.8)
 
         # Processing settings
         "batch_size": 1,

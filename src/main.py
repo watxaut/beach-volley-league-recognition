@@ -68,7 +68,17 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--court",
         type=str,
-        help="Path to court calibration JSON (from scripts/test_court_calibration.py)"
+        help="Path to court calibration JSON (auto-detected from calibrations/<video>.json if omitted)"
+    )
+    parser.add_argument(
+        "--ball-model",
+        type=str,
+        help="Path to fine-tuned ball model (auto-detected from models/volleyball_ball_best.pt if omitted)"
+    )
+    parser.add_argument(
+        "--save-video",
+        action="store_true",
+        help="Save an annotated video (headless-friendly). Combine with --debug-live to also show it live."
     )
 
     return parser.parse_args()
@@ -122,27 +132,59 @@ def main() -> int:
 
         # Load configuration
         config = Config.load(args.config) if args.config else Config.default()
-        
-        # Set court calibration path if provided
-        if args.court:
-            config["court_calibration_path"] = args.court
+
+        # Court calibration: explicit --court, else auto-detect calibrations/<stem>.json.
+        court_path = args.court
+        if not court_path:
+            auto_court = Path("calibrations") / f"{video_file.stem}.json"
+            if auto_court.exists():
+                court_path = str(auto_court)
+        if court_path:
+            config["court_calibration_path"] = court_path
+            logger.info(f"Using court calibration: {court_path}")
+        else:
+            logger.warning(
+                "No court calibration found (calibrations/%s.json). Serve/net/team "
+                "features will be limited. Pass --court to supply one.", video_file.stem
+            )
+
+        # Ball detector: explicit --ball-model, else auto-detect the fine-tuned model.
+        # The COCO fallback (yolov8n) rarely finds a volleyball on real footage.
+        ball_model = args.ball_model
+        if not ball_model:
+            auto_model = Path("models/volleyball_ball_best.pt")
+            if auto_model.exists():
+                ball_model = str(auto_model)
+        if ball_model:
+            config["ball_model_path"] = ball_model
+            # The fine-tuned model needs a low confidence threshold; the 0.7 default
+            # misses the ball entirely. Only override if left at that stale default.
+            if config.get("ball_confidence", 0.7) > 0.3:
+                config["ball_confidence"] = 0.15
+            logger.info(
+                f"Using ball model: {ball_model} (ball_confidence={config.get('ball_confidence')})"
+            )
 
         # Create output directory
         output_dir = Path(args.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Initialize video processor
-        processor = VideoProcessor(config)
-
-        # Check if debug live mode is enabled
-        if args.debug_live:
-            logger.info("Starting live debug mode...")
+        # Live and/or save-annotated-video paths share the visual processor.
+        if args.debug_live or args.save_video:
             from src.analysis.live_debug_processor import LiveDebugProcessor
             debug_processor = LiveDebugProcessor(config, debug_speed=args.debug_speed)
-            debug_processor.process_video_live(str(video_file))
+            save_path = str(output_dir / f"{video_file.stem}_annotated.mp4") if args.save_video else None
+            if args.debug_live:
+                logger.info("Starting live debug mode...")
+            if save_path:
+                logger.info(f"Saving annotated video to {save_path}")
+            debug_processor.process_video_live(
+                str(video_file), save_video=save_path, display=args.debug_live
+            )
             return 0
 
-        # Process the video
+        # Batch processing
+        processor = VideoProcessor(config)
         logger.info("Starting video processing...")
         analysis_results = processor.process_video(str(video_file))
 

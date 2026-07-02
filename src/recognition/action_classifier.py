@@ -50,7 +50,7 @@ class ActionClassifier:
     NEIGH = 7                # frames each side used to test a contact vertex
     MIN_PROMINENCE = 26.0    # px the ball must rise on both sides of a bounce
     XREV_MIN = 20.0          # px net horizontal displacement for a redirect
-    CONTACT_REACH = 240.0    # max px from ball to nearest player for a contact
+    CONTACT_REACH = 140.0    # max px from ball to nearest player's bbox (arm reach)
 
     # --- Classification tuning ---
     NEAR_NET_PX = 120        # |y - midcourt| under this counts as "near the net"
@@ -292,13 +292,31 @@ class ActionClassifier:
         best = None
         best_dist = float("inf")
         for s in snapshots:
-            cx, cy = s["center"]
-            d = float(np.hypot(cx - point[0], cy - point[1]))
+            # Distance to the player's BODY, not their torso centre: a player
+            # digging low or reaching overhead at the net contacts the ball far
+            # from their centre, but close to their bounding box (which spans
+            # feet to raised hands). Centre distance would reject those touches.
+            d = self._point_to_bbox_distance(point, s.get("bbox"), s["center"])
             if d < best_dist:
                 best_dist = d
                 best = s
         lr_index = ordered.index(best) + 1
         return best, best_dist, lr_index
+
+    @staticmethod
+    def _point_to_bbox_distance(
+        point: List[float], bbox: Optional[List[float]], center: List[float]
+    ) -> float:
+        """Distance from ``point`` to a bbox: 0 inside, else to the nearest edge.
+
+        Falls back to centre distance when no bbox is available.
+        """
+        if not bbox or len(bbox) != 4:
+            return float(np.hypot(center[0] - point[0], center[1] - point[1]))
+        x1, y1, x2, y2 = bbox
+        dx = max(x1 - point[0], 0.0, point[0] - x2)
+        dy = max(y1 - point[1], 0.0, point[1] - y2)
+        return float(np.hypot(dx, dy))
 
     # --- Layer 1: visual gesture detection (context-free) ---
 

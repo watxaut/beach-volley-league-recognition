@@ -55,6 +55,7 @@ class LiveDebugProcessor:
             'action_block': (0, 165, 255), # Orange for blocks
             'action_ace': (128, 0, 128),  # Purple for aces
             'action_serve': (255, 20, 147), # Deep pink for serves
+            'action_overpass': (0, 100, 255), # Orange-red for overpass
             'game_state_off': (128, 128, 128),  # Gray for game off
             'game_state_on': (0, 255, 0),       # Green for game on
             'game_state_serve': (255, 165, 0),  # Orange for serve prep
@@ -77,6 +78,12 @@ class LiveDebugProcessor:
 
         # Performance tracking
         self.frame_times = deque(maxlen=30)
+
+        # Recent actions per track_id for on-screen persistence. Actions are
+        # emitted on a single frame (and the last one only on flush), so we keep
+        # each visible for a window of frames near its player.
+        self.recent_actions: Dict[int, Dict[str, Any]] = {}
+        self.action_persist_frames = 45
         
         # Quick access to shared components for visualization
         self.ball_detector = self.frame_processor.get_ball_detector()
@@ -85,13 +92,22 @@ class LiveDebugProcessor:
 
     # Removed _initialize_components - now handled by FrameProcessor
 
-    def process_video_live(self, video_path: str) -> None:
-        """Process video with real-time debugging visualization.
+    def process_video_live(
+        self,
+        video_path: str,
+        save_video: Optional[str] = None,
+        display: bool = True,
+    ) -> None:
+        """Process a video with debug overlays, shown live and/or written to file.
 
         Args:
-            video_path: Path to the video file
+            video_path: Path to the video file.
+            save_video: If set, write the annotated frames to this path. Enables
+                headless use (no display needed).
+            display: If True, show the live window (needs a display) with
+                q/space/r controls. Set False for headless save-only runs.
         """
-        self.logger.info(f"Starting live debug processing: {video_path}")
+        self.logger.info(f"Starting debug processing: {video_path}")
 
         # Open video
         cap = cv2.VideoCapture(video_path)
@@ -106,15 +122,24 @@ class LiveDebugProcessor:
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
         self.logger.info(f"Video: {total_frames} frames, {fps} FPS, {width}x{height}")
-        
+
         # Setup frame processor with video properties
         self.frame_processor.setup_video_fps(fps)
         self.frame_processor.setup_video_dimensions(width, height)
-        
-        self.logger.info("Press 'q' to quit, SPACE to pause/resume, 'r' to restart")
+
+        writer = None
+        if save_video:
+            writer = cv2.VideoWriter(
+                save_video, cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height)
+            )
+
+        if display:
+            self.logger.info("Press 'q' to quit, SPACE to pause/resume, 'r' to restart")
 
         frame_count = 0
         paused = False
+        debug_frame = None
+        last_frame = None
 
         while True:
             if not paused:
@@ -122,12 +147,14 @@ class LiveDebugProcessor:
                 if not ret:
                     self.logger.info("End of video reached")
                     break
+                last_frame = frame
 
                 start_time = time.time()
 
                 # Process frame using shared processor
                 frame_result = self.frame_processor.process_frame(frame, frame_count, enable_court_redetection=True)
-                
+                self._ingest_actions(frame_result.get("actions", []), frame_count)
+
                 # Create debug visualization
                 debug_frame = self._create_debug_visualization(frame, frame_result, frame_count)
 
@@ -140,27 +167,62 @@ class LiveDebugProcessor:
                 processing_time = time.time() - start_time
                 self.frame_times.append(processing_time)
 
-            # Display frame
-            cv2.imshow('Volleyball Analysis Debug', debug_frame)
+                if writer is not None:
+                    writer.write(debug_frame)
 
-            # Handle keyboard input
-            key = cv2.waitKey(int(frame_delay * 1000) if not paused else 0) & 0xFF
+            if display and debug_frame is not None:
+                cv2.imshow('Volleyball Analysis Debug', debug_frame)
+                key = cv2.waitKey(int(frame_delay * 1000) if not paused else 0) & 0xFF
+                if key == ord('q'):
+                    break
+                elif key == ord(' '):  # Space to pause/resume
+                    paused = not paused
+                    self.logger.info(f"{'Paused' if paused else 'Resumed'}")
+                elif key == ord('r'):  # Restart video
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    frame_count = 0
+                    self.ball_trajectory.clear()
+                    self.recent_actions.clear()
+                    self.frame_processor.reset_trackers()
+                    self.logger.info("Video restarted")
 
-            if key == ord('q'):
-                break
-            elif key == ord(' '):  # Space to pause/resume
-                paused = not paused
-                self.logger.info(f"{'Paused' if paused else 'Resumed'}")
-            elif key == ord('r'):  # Restart video
-                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                frame_count = 0
-                self.ball_trajectory.clear()
-                self.frame_processor.reset_trackers()
-                self.logger.info("Video restarted")
+        # Flush the final contact the classifier held back for its look-ahead.
+        flushed = self.frame_processor.flush_actions()
+        if flushed and last_frame is not None:
+            self._ingest_actions(flushed, frame_count)
+            final = self._create_debug_visualization(last_frame, {"actions": flushed}, frame_count)
+            if writer is not None:
+                writer.write(final)
+            if display:
+                cv2.imshow('Volleyball Analysis Debug', final)
+                cv2.waitKey(500)
 
         cap.release()
-        cv2.destroyAllWindows()
-        self.logger.info("Live debug session ended")
+        if writer is not None:
+            writer.release()
+            self.logger.info(f"Annotated video written: {save_video}")
+        if display:
+            cv2.destroyAllWindows()
+        self.logger.info("Debug session ended")
+
+    def _ingest_actions(self, actions: List[Dict[str, Any]], frame_index: int) -> None:
+        """Record emitted actions per track_id for on-screen persistence."""
+        for action in actions:
+            tid = action.get("track_id")
+            if tid is None:
+                continue
+            self.recent_actions[tid] = {
+                "frame": frame_index,
+                "action": action.get("action", "?"),
+                "confidence": action.get("confidence", 0.0),
+                "touch_number": action.get("touch_number"),
+                "gesture": action.get("gesture"),
+            }
+            self.logger.info(
+                "Action: frame~%s player %s -> %s (%.2f)",
+                action.get("frame_number", frame_index), tid,
+                action.get("action"), action.get("confidence", 0.0),
+            )
 
     def _create_debug_visualization(self, frame: np.ndarray, frame_result: Dict[str, Any], frame_index: int) -> np.ndarray:
         """Create debug visualization from frame processing results.
@@ -174,6 +236,7 @@ class LiveDebugProcessor:
             Debug frame with overlays
         """
         debug_frame = frame.copy()
+        self._current_frame = frame_index
 
         try:
             # Extract results
@@ -265,7 +328,32 @@ class LiveDebugProcessor:
             center_y = (y1 + y2) // 2
             cv2.circle(frame, (center_x, center_y), 3, self.colors['player'], -1)
 
+            # Overlay a recent action for this player (persisted for a window of
+            # frames, since actions are emitted on a single frame).
+            self._draw_player_action(frame, track_id, x1, y1, x2, y2)
+
         return frame
+
+    def _draw_player_action(self, frame: np.ndarray, track_id: int,
+                            x1: int, y1: int, x2: int, y2: int) -> None:
+        """Draw the most recent action for a player, if still within its window."""
+        rec = self.recent_actions.get(track_id)
+        if not rec:
+            return
+        age = self._current_frame - rec["frame"] if hasattr(self, "_current_frame") else 0
+        if age < 0 or age > self.action_persist_frames:
+            return
+        action = rec["action"]
+        color = self.colors.get(f"action_{action}", (255, 255, 255))
+        # Highlight border + label above the box.
+        cv2.rectangle(frame, (x1 - 3, y1 - 3), (x2 + 3, y2 + 3), color, 3)
+        touch = rec.get("touch_number")
+        touch_str = f" t{touch}" if touch else ""
+        label = f"{action.upper()}{touch_str} ({rec['confidence']:.2f})"
+        size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+        ly = y2 + 28
+        cv2.rectangle(frame, (x1, ly - size[1] - 6), (x1 + size[0] + 6, ly + 4), color, -1)
+        cv2.putText(frame, label, (x1 + 3, ly), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
 
     def _draw_ball_and_trajectory(self, frame: np.ndarray, tracked_ball: Optional[Dict[str, Any]], current_detections: List[Dict[str, Any]] = None) -> np.ndarray:
         """Draw enhanced ball detection and trajectory with comprehensive visual feedback.

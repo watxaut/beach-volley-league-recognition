@@ -7,7 +7,10 @@ name = "volley-recognition"
 version = "0.1.0"
 description = "Beach volleyball video analysis system for action recognition and player tracking"
 readme = "README.md"
-requires-python = ">=3.11"
+# Capped below 3.13: MediaPipe dropped the legacy `mp.solutions` API (used by
+# PoseEstimator) in the 0.10.3x wheels that ship for Python 3.13. Pinning
+# Python <3.13 keeps us on a mediapipe release that still has it.
+requires-python = ">=3.11,<3.13"
 authors = [
     {name = "Joan Heredia"}
 ]
@@ -22,7 +25,7 @@ classifiers = [
 dependencies = [
     "opencv-python>=4.8.0",
     "ultralytics>=8.0.0", # YOLO models
-    "mediapipe>=0.10.0", # Pose estimation
+    "mediapipe>=0.10.9,<0.10.15", # Pose estimation (needs the legacy mp.solutions API)
     "numpy>=1.24.0",
     "pandas>=2.0.0",
     "matplotlib>=3.7.0",
