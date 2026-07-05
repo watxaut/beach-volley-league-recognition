@@ -1,6 +1,7 @@
 # Beach Volleyball Video Analysis System
 
-A comprehensive computer vision system for analyzing beach volleyball videos, detecting players and ball, tracking movements, and recognizing actions (digs, sets, blocks, aces, spikes).
+A comprehensive computer vision system for analyzing beach volleyball videos, detecting players and ball, tracking
+movements, and recognizing actions (digs, sets, blocks, aces, spikes).
 
 ## Features
 
@@ -19,18 +20,21 @@ A comprehensive computer vision system for analyzing beach volleyball videos, de
 ## Installation
 
 1. Clone the repository:
+
 ```bash
 git clone <repository-url>
 cd volley_recognition
 ```
 
 2. Create and activate virtual environment:
+
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
 3. Install dependencies using uv:
+
 ```bash
 pip install uv
 uv pip install -e .
@@ -38,22 +42,54 @@ uv pip install -e .
 
 ## Quick Start
 
-### Basic Usage
+Sample videos live in `resources/` (e.g. `video_entreno_1.mp4`, `video_entreno_2.mp4`). Court calibration and the ball
+model are auto-detected, so you usually don't need `--court` or `--ball-model`.
 
-Analyze a volleyball video:
+### Live debug (real-time overlay)
+
 ```bash
-python -m src.main path/to/your/video.mp4
+uv run python -m src.main resources/video_entreno_1.mp4 --debug-live --debug-speed 0.5
 ```
 
-### Advanced Usage
+### Save an annotated video (headless)
 
-With custom output directory and configuration:
 ```bash
-python -m src.main path/to/your/video.mp4 \
-    --output-dir ./results \
-    --config config.yaml \
-    --log-level DEBUG
+uv run python -m src.main resources/video_entreno_2.mp4 --save-video
 ```
+
+Writes `output/video_entreno_2_annotated.mp4`. Add `--debug-live` to also view it live.
+
+### Court calibration (one-time click, reused forever)
+
+```bash
+uv run python scripts/test_court_calibration.py resources/video_entreno_3.mp4
+```
+
+### Test a single component
+
+```bash
+venv/bin/python scripts/test_action_recognition.py resources/video_entreno_1.mp4 --save-video
+```
+
+Per-component scripts live in `scripts/` (see `CLAUDE.md` for the full list).
+
+### Evaluate against ground truth
+
+```bash
+venv/bin/python scripts/evaluate.py \
+  --predictions output/action_test/video_entreno_1_action_log.json \
+  --ground-truth ground_truth/video_entreno_1_annotations.json \
+  --component actions --ignore-player
+```
+
+### Other useful flags
+
+- `--output-dir ./results` — change where results are written (default `./output`)
+- `--config config.yaml` — override defaults (YAML or JSON)
+- `--court calibrations/<video>.json` / `--ball-model models/volleyball_ball_best.pt` — explicit paths (auto-detected
+  when omitted)
+- `--skip-visualization` — skip the summary graphs
+- `--log-level DEBUG` — verbosity
 
 ## Configuration
 
@@ -114,6 +150,35 @@ volley_recognition/
 └── README.md                      # This file
 ```
 
+## Model Weights & Training
+
+The pipeline loads **two** model files at runtime. Keep these:
+
+| File                             | Role                                                                                                                                                                                  | Loaded by                                                                                                          |
+|----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
+| `models/volleyball_ball_best.pt` | **Fine-tuned volleyball ball detector** — the only custom-trained weight. Auto-detected when present (see `--ball-model`).                                                            | `src/main.py`, `scripts/test_action_recognition.py`, `scripts/annotate_video.py`, `scripts/test_ball_detection.py` |
+| `yolov8n.pt`                     | COCO-pretrained YOLOv8n — **player detector** (and ball fallback if the fine-tuned model is absent). Ultralytics auto-downloads it on first use; a local copy avoids the re-download. | `src/detection/player_detector.py`, `src/detection/ball_detector.py`                                               |
+
+> Court detection does **not** use a model — it uses the interactive `CourtCalibration` JSON in `calibrations/` (
+> one-time click, reused forever).
+
+### How `volleyball_ball_best.pt` was trained
+
+The ball detector was fine-tuned in Google Colab (T4 GPU). To reproduce or retrain, these files are required — **do not
+delete them**:
+
+1. **`notebooks/finetune_yolo_ball.ipynb`** — the training notebook. Starts from `yolov8n.pt` (COCO weights),
+   `freeze=10` (retrain detection head only), `imgsz=1280`, `epochs=100`, `patience=15`, with HSV / mosaic / scale /
+   flip augmentation.
+2. **`scripts/prepare_dataset_for_training.py`** — packs `datasets/ball_detection/` into
+   `datasets/ball_detection/ball_dataset.zip` (train/valid splits + `data.yaml`) for upload to Colab.
+3. **`scripts/auto_label_balls.py`** — semi-automated YOLO labeling used to generate the label files.
+4. **`datasets/ball_detection/`** — the labeled dataset (605 images + 605 YOLO labels + the packaged
+   `ball_dataset.zip`). This is the source of truth for retraining.
+
+**Workflow:** `auto_label_balls.py` (label frames) → `prepare_dataset_for_training.py` (build zip) → upload zip to
+Colab → run `finetune_yolo_ball.ipynb` → download `best.pt` → save as `models/volleyball_ball_best.pt`.
+
 ## Output Files
 
 The system generates three main output files:
@@ -121,10 +186,10 @@ The system generates three main output files:
 1. **results.csv**: Player action summary with counts per player
 2. **results_detailed.csv**: Frame-by-frame action timeline
 3. **summary_graphs.png**: Visualization graphs including:
-   - Total action counts bar chart
-   - Per-player action breakdown
-   - Game activity over time
-   - Action distribution pie chart
+    - Total action counts bar chart
+    - Per-player action breakdown
+    - Game activity over time
+    - Action distribution pie chart
 
 ## Supported Actions
 
@@ -156,11 +221,13 @@ The system generates three main output files:
 ## Testing
 
 Run the test suite:
+
 ```bash
 python -m pytest tests/ -v
 ```
 
 Run specific test categories:
+
 ```bash
 # Test detection components
 python -m pytest tests/test_components.py::TestBallDetector -v
@@ -183,6 +250,7 @@ To add a new volleyball action:
 ### Custom Models
 
 Replace default YOLO models:
+
 ```yaml
 ball_model_path: "path/to/custom/ball_model.pt"
 player_model_path: "path/to/custom/player_model.pt"
@@ -191,6 +259,7 @@ player_model_path: "path/to/custom/player_model.pt"
 ### Debug Mode
 
 Enable debug frame saving:
+
 ```yaml
 save_debug_frames: true
 debug_output_dir: "./debug_frames"
@@ -225,6 +294,7 @@ debug_output_dir: "./debug_frames"
 ## Citation
 
 If you use this system in research, please cite:
+
 ```bibtex
 @software{volleyball_analysis,
   title={Beach Volleyball Video Analysis System},

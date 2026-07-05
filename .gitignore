@@ -236,3 +236,4 @@ docs/build/
 .ruff_cache/
 
 .claude
+archive/

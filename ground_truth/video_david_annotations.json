@@ -1,0 +1,41 @@
+{
+  "video": "resources/video_david.mov",
+  "fps": 59.83820224719101,
+  "resolution": [
+    2978,
+    1564
+  ],
+  "annotated_frames": {
+    "ball": {
+      "description": "Ball center position every 5 frames",
+      "frames": {}
+    },
+    "players": {
+      "description": "Player bounding boxes + IDs every 10 frames",
+      "frames": {}
+    },
+    "actions": {
+      "description": "Action events with rally-state context. Each event has: frame, player_id, final_action (canonical label), raw_visual_actions (open-vocabulary multi-label), player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides.",
+      "events": [
+        {
+          "frame": 83,
+          "player_id": 2,
+          "final_action": "serve",
+          "raw_visual_actions": [
+            "serve"
+          ],
+          "player_team": "?",
+          "team_in_possession": "?",
+          "touch_number": 1,
+          "preceded_by_attack": false,
+          "rally_id": 1,
+          "overrides": {}
+        }
+      ]
+    }
+  },
+  "court": {
+    "corners": [],
+    "net_posts": []
+  }
+}

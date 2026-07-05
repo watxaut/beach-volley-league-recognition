@@ -125,6 +125,12 @@ The system follows a modular computer vision pipeline designed for a **fixed cam
 - **Visualization**: Multi-panel graphs (action totals, per-player breakdown, temporal analysis)
 - **Debug Mode**: Real-time visualization with adjustable playback speed
 
+### Model Weights & Training Data
+- **Required runtime weights** (git-ignored, keep on disk): `models/volleyball_ball_best.pt` — the fine-tuned ball detector, auto-loaded by `main.py` and the `scripts/test_*` scripts; and `yolov8n.pt` — COCO YOLOv8n used as the player detector (and ball fallback), auto-downloaded by ultralytics.
+- **Court detection uses no model.** It is the interactive `CourtCalibration` JSON in `calibrations/`. The `court_model_path` / `weights/court/...` config entries are stale and never loaded — do not wire them up.
+- **Training provenance for the ball model** (keep to retrain): `notebooks/finetune_yolo_ball.ipynb` (Colab; base `yolov8n.pt`, `freeze=10`, `imgsz=1280`), `scripts/prepare_dataset_for_training.py`, `scripts/auto_label_balls.py`, and the labeled set `datasets/ball_detection/`. Full workflow in README §"Model Weights & Training".
+- **`archive/`** holds unused weights/artifacts (legacy Wilson CNN, leftover base models, the unused court model) and dead code (`motion_ball_tracker.py`, `config_front_video.py`, stray root debug/test scripts) staged for deletion — do not depend on them.
+
 ## Ground Truth & Evaluation
 
 - Annotations stored in `ground_truth/` as JSON (see `ground_truth/README.md` for format)
