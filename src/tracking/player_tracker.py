@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
 import cv2
 from scipy.optimize import linear_sum_assignment
-from collections import defaultdict
+from collections import defaultdict, deque, Counter
 import logging
 
 
@@ -34,6 +34,9 @@ class PlayerTracker:
         appearance_weight: float = 0.4,
         init_frames: int = 60,
         court_calibration=None,
+        team_vote_window: int = 15,
+        coast_extrapolation_cap: int = 15,
+        coast_velocity_decay: float = 0.85,
     ):
         """Initialize the player tracker.
 
@@ -54,6 +57,9 @@ class PlayerTracker:
         self.appearance_weight = appearance_weight
         self.init_frames = init_frames
         self.court_calibration = court_calibration
+        self.team_vote_window = team_vote_window
+        self.coast_extrapolation_cap = coast_extrapolation_cap
+        self.coast_velocity_decay = coast_velocity_decay
 
         # Tracking state
         self.tracks: Dict[int, Dict[str, Any]] = {}
@@ -259,7 +265,7 @@ class PlayerTracker:
 
             out = det.copy()
             out["track_id"] = tid
-            out["team"] = self._get_locked_team(tid)
+            out["team"] = self._get_smoothed_team(tid)
             tracked_players.append(out)
 
         # Second pass -- re-acquisition: a leftover detection that overlaps a
@@ -284,7 +290,7 @@ class PlayerTracker:
                 matched_dets.add(j)
                 out = det.copy()
                 out["track_id"] = best_tid
-                out["team"] = self._get_locked_team(best_tid)
+                out["team"] = self._get_smoothed_team(best_tid)
                 tracked_players.append(out)
 
         matched_boxes = [p["bbox"] for p in tracked_players]
@@ -301,6 +307,13 @@ class PlayerTracker:
             track = self.tracks.get(tid)
             if not track:
                 continue
+            # Coast: extrapolate the box along its (decaying) velocity for up to
+            # coast_extrapolation_cap frames so a moving player who re-emerges is
+            # still gated to the SAME id. Beyond the cap the box freezes.
+            if self.disappeared[tid] <= self.coast_extrapolation_cap:
+                self._coast_step(track)
+            # Suppress a coasting ghost that now sits on a player matched to another
+            # id (uses the extrapolated box -- preserves 42e35dd duplicate suppression).
             if any(self._iou(track["bbox"], mb) > 0.4 for mb in matched_boxes):
                 continue
             tracked_players.append({
@@ -308,7 +321,7 @@ class PlayerTracker:
                 "center": track["center"],
                 "confidence": max(0.1, track["confidence"] - 0.05),
                 "track_id": tid,
-                "team": self._get_locked_team(tid),
+                "team": self._get_smoothed_team(tid),
                 "predicted": True,
             })
 
@@ -328,7 +341,7 @@ class PlayerTracker:
             existing_boxes.append(det["bbox"])
             out = det.copy()
             out["track_id"] = tid
-            out["team"] = self._get_locked_team(tid)
+            out["team"] = self._get_smoothed_team(tid)
             tracked_players.append(out)
 
         return tracked_players
@@ -419,8 +432,13 @@ class PlayerTracker:
         tid = available[0]
 
         hist = self._compute_histogram(detection["bbox"]) if self._current_frame is not None else None
-        # Always use foot position (bottom-center of bbox) for team assignment
+        # Team is derived per-frame from foot position (side of the midcourt line,
+        # per project spec) and smoothed over a vote window -- NOT locked at
+        # creation. Seed the window with the creation-time reading.
         team = self._get_team_from_calibration(detection["bbox"])
+        team_votes: deque = deque(maxlen=self.team_vote_window)
+        if team is not None:
+            team_votes.append(team)
 
         self.tracks[tid] = {
             "bbox": detection["bbox"],
@@ -429,7 +447,7 @@ class PlayerTracker:
             "history": [detection["center"]],
             "velocity": [0.0, 0.0],
             "histogram": hist,
-            "team": team,  # locked at creation, never re-evaluated
+            "team_votes": team_votes,
         }
         self.disappeared[tid] = 0
         self.logger.debug(f"Created track {tid}")
@@ -454,6 +472,12 @@ class PlayerTracker:
         track["center"] = new_center
         track["confidence"] = detection["confidence"]
         track["history"].append(new_center)
+
+        # Re-evaluate team from the new foot position and add it to the smoothing
+        # window (majority vote read via _get_smoothed_team).
+        team_vote = self._get_team_from_calibration(detection["bbox"])
+        if team_vote is not None:
+            track.setdefault("team_votes", deque(maxlen=self.team_vote_window)).append(team_vote)
         # Keep last 60 positions
         if len(track["history"]) > 60:
             track["history"] = track["history"][-60:]
@@ -470,6 +494,33 @@ class PlayerTracker:
 
         self.disappeared[tid] = 0
 
+    def _coast_step(self, track: Dict[str, Any]) -> Tuple[List[float], List[float]]:
+        """Advance a lost track one frame by (decaying) constant velocity, in place.
+
+        Shifts the stored bbox/center along the track's velocity and decays the
+        velocity by coast_velocity_decay, so a player who is briefly missed (dive,
+        net occlusion) keeps moving with their trajectory instead of freezing on a
+        stale box. Advancing the STORED position is what lets the re-emerging
+        detection stay gated to the same id next frame (constant-velocity gate at
+        _compute_assignment_cost). Box size is preserved and clamped to the frame.
+        Returns the updated (bbox, center).
+        """
+        vx, vy = track.get("velocity", [0.0, 0.0])
+        cx, cy = track["center"]
+        w = track["bbox"][2] - track["bbox"][0]
+        h = track["bbox"][3] - track["bbox"][1]
+        ncx, ncy = cx + vx, cy + vy
+        nb = [ncx - w / 2, ncy - h / 2, ncx + w / 2, ncy + h / 2]
+        if self._current_frame is not None:
+            fh, fw = self._current_frame.shape[:2]
+            nb = [max(0.0, min(nb[0], fw - 1)), max(0.0, min(nb[1], fh - 1)),
+                  max(0.0, min(nb[2], fw - 1)), max(0.0, min(nb[3], fh - 1))]
+            ncx, ncy = (nb[0] + nb[2]) / 2, (nb[1] + nb[3]) / 2
+        track["bbox"] = nb
+        track["center"] = [ncx, ncy]
+        track["velocity"] = [vx * self.coast_velocity_decay, vy * self.coast_velocity_decay]
+        return nb, [ncx, ncy]
+
     def _remove_track(self, tid: int) -> None:
         """Remove a track."""
         self.tracks.pop(tid, None)
@@ -485,12 +536,14 @@ class PlayerTracker:
                 self._remove_track(tid)
             else:
                 track = self.tracks[tid]
+                if self.disappeared[tid] <= self.coast_extrapolation_cap:
+                    self._coast_step(track)
                 result.append({
                     "bbox": track["bbox"],
                     "center": track["center"],
                     "confidence": max(0.1, track["confidence"] - 0.05),
                     "track_id": tid,
-                    "team": self._get_locked_team(tid),
+                    "team": self._get_smoothed_team(tid),
                     "predicted": True,
                 })
         return result
@@ -503,12 +556,20 @@ class PlayerTracker:
             return self.court_calibration.get_team_for_bbox([int(v) for v in bbox])
         return None
 
-    def _get_locked_team(self, tid: int) -> Optional[str]:
-        """Get the locked team for a track. Team is assigned once and never changes."""
+    def _get_smoothed_team(self, tid: int) -> Optional[str]:
+        """Team for a track: majority vote of recent foot-position readings.
+
+        Team is the side of the midcourt line the feet fall on (project spec),
+        smoothed over a window so a transient dive/step across the line does not
+        flip the label. Recomputed every frame -- never locked at creation.
+        """
         track = self.tracks.get(tid)
-        if track:
-            return track.get("team")
-        return None
+        if not track:
+            return None
+        votes = [t for t in track.get("team_votes", ()) if t is not None]
+        if not votes:
+            return None
+        return Counter(votes).most_common(1)[0][0]
 
     def set_court_calibration(self, calibration) -> None:
         """Set or update court calibration for team assignment."""
@@ -535,6 +596,6 @@ class PlayerTracker:
                 "center": track["center"],
                 "confidence": track["confidence"],
                 "track_id": tid,
-                "team": self._get_locked_team(tid),
+                "team": self._get_smoothed_team(tid),
             })
         return result

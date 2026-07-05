@@ -22,7 +22,8 @@ class Config:
         # Detection settings
         "detection_method": "template",  # Default to Wilson ball template matching
         "ball_confidence": 0.7,  # Much lower for better ball detection
-        "player_confidence": 0.5,
+        "player_confidence": 0.5,  # 0.35 lifts recall ~3pp on far-side players but adds false detections; kept at 0.5
+        "player_imgsz": 1280,   # YOLO inference size; 640 default loses small far-side players
         "max_players": 6,       # players the tracker follows (training drills run >4)
         "max_detections": 20,   # detector safety cap (must exceed people on court)
         "ball_horizontal_margin_percent": 0.25,  # Horizontal margin to exclude from ball detection (15% on each side)
@@ -34,6 +35,11 @@ class Config:
         "trajectory_smoothing": 5,
         "player_max_disappeared": 30,
         "tracking_max_distance": 100.0,
+
+        # Player tracker: team smoothing + coast extrapolation
+        "player_team_vote_window": 15,   # frames of foot-position votes for team label
+        "coast_extrapolation_cap": 15,   # max frames to extrapolate a lost track's box
+        "coast_velocity_decay": 0.85,    # per-frame velocity decay while coasting
 
         # Enhanced trajectory-based tracking settings
         "low_confidence_threshold": 0.4,  # Min confidence for the tracker to accept a detection

@@ -26,7 +26,8 @@ class PlayerDetector(BaseDetector):
         model_path: Optional[str] = None,
         confidence_threshold: float = 0.5,
         device: str = "cpu",
-        max_players: int = 20
+        max_players: int = 20,
+        imgsz: int = 1280
     ):
         """Initialize the player detector.
 
@@ -44,6 +45,10 @@ class PlayerDetector(BaseDetector):
         super().__init__(confidence_threshold, device)
         self.model_path = model_path or "yolov8n.pt"
         self.max_players = max_players
+        # Inference resolution. Video is 1920x1080; YOLO's default 640 shrinks the
+        # small, backlit far-side players below the detection floor. 1280 recovers
+        # them at the cost of ~2x inference time.
+        self.imgsz = imgsz
         self._person_class_ids = {0}  # COCO class ID for person
         self.court_detector = None  # Will be set later via set_court_detector
         self.load_model()
@@ -83,7 +88,7 @@ class PlayerDetector(BaseDetector):
             processed_frame = self.preprocess_frame(frame)
 
             # Run YOLO inference
-            results = self._model(processed_frame, verbose=False)
+            results = self._model(processed_frame, verbose=False, imgsz=self.imgsz)
 
             # Process detections
             detections = self.postprocess_detections(results)

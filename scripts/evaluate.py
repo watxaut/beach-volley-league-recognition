@@ -27,6 +27,25 @@ def load_json(path: str) -> dict:
         return json.load(f)
 
 
+def load_tracks_as_predictions(path: str) -> dict:
+    """Convert a dump_player_tracks.py JSON into the predictions layout that
+    evaluate_player_tracking expects:
+
+        {"players": {"frames": { "<frame_int_as_str>": [{"id","bbox","team"}] }}}
+
+    Includes coasting/ghost boxes (the tracker's claim that the player is there);
+    a ghost that does not overlap GT simply won't IoU-match and won't count.
+    """
+    data = load_json(path)
+    frames = {}
+    for fr in data.get("frames", []):
+        frames[str(fr["frame"])] = [
+            {"id": p["track_id"], "bbox": p["bbox"], "team": p.get("team")}
+            for p in fr.get("players", [])
+        ]
+    return {"players": {"frames": frames}}
+
+
 # --- Ball Detection Evaluation ---
 
 def evaluate_ball_detection(
@@ -374,23 +393,27 @@ def _match_action_events(
 # --- Main ---
 
 def run_evaluation(predictions_path: str, ground_truth_path: str, component: Optional[str] = None,
-                   match_player: bool = True):
+                   match_player: bool = True, tracks_json: Optional[str] = None):
     """Run evaluation and print results."""
     gt = load_json(ground_truth_path)
     gt_annotated = gt.get("annotated_frames", gt)
 
-    # Try to load predictions
-    pred_path = Path(predictions_path)
-    if pred_path.is_file():
-        predictions = load_json(str(pred_path))
-    elif pred_path.is_dir():
-        # Look for component-specific files
-        predictions = {}
-        for f in pred_path.glob("*.json"):
-            predictions[f.stem] = load_json(str(f))
+    if tracks_json:
+        # dump_player_tracks.py output -> predictions layout for the players component
+        predictions = load_tracks_as_predictions(tracks_json)
     else:
-        print(f"Error: predictions path not found: {predictions_path}")
-        sys.exit(1)
+        # Try to load predictions
+        pred_path = Path(predictions_path)
+        if pred_path.is_file():
+            predictions = load_json(str(pred_path))
+        elif pred_path.is_dir():
+            # Look for component-specific files
+            predictions = {}
+            for f in pred_path.glob("*.json"):
+                predictions[f.stem] = load_json(str(f))
+        else:
+            print(f"Error: predictions path not found: {predictions_path}")
+            sys.exit(1)
 
     components = [component] if component else ["ball", "players", "actions"]
     results = {}
@@ -446,7 +469,8 @@ def _print_dict(d: Dict, indent: int = 0):
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate volleyball tracking pipeline")
-    parser.add_argument("--predictions", required=True, help="Path to predictions JSON or directory")
+    parser.add_argument("--predictions", help="Path to predictions JSON or directory")
+    parser.add_argument("--tracks-json", help="dump_player_tracks.py output (converted for player eval)")
     parser.add_argument("--ground-truth", required=True, help="Path to ground truth annotations JSON")
     parser.add_argument(
         "--component",
@@ -461,9 +485,14 @@ def main():
     )
     args = parser.parse_args()
 
+    if not args.predictions and not args.tracks_json:
+        print("Error: provide either --predictions or --tracks-json")
+        sys.exit(1)
+
     results = run_evaluation(
         args.predictions, args.ground_truth, args.component,
         match_player=not args.ignore_player,
+        tracks_json=args.tracks_json,
     )
 
     if args.output:

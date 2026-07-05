@@ -71,6 +71,7 @@ class FrameProcessor:
                 confidence_threshold=self.config.get("player_confidence", 0.5),
                 device=self.config.get("device", "cpu"),
                 max_players=self.config.get("max_detections", 20),
+                imgsz=self.config.get("player_imgsz", 1280),
             )
 
             # Connect court calibration to player detector for filtering
@@ -95,6 +96,9 @@ class FrameProcessor:
                 max_velocity=self.config.get("player_max_velocity", 150.0),
                 max_players=self.config.get("max_players", 4),
                 court_calibration=self.court_calibration,
+                team_vote_window=self.config.get("player_team_vote_window", 15),
+                coast_extrapolation_cap=self.config.get("coast_extrapolation_cap", 15),
+                coast_velocity_decay=self.config.get("coast_velocity_decay", 0.85),
             )
 
             # Pose estimation (video mode for temporal smoothing)
@@ -238,7 +242,6 @@ class FrameProcessor:
         """Reset all tracking state."""
         self.player_tracker.tracks = {}
         self.player_tracker.disappeared = {}
-        self.player_tracker.next_id = 1
         self.player_tracker._initialized = False
 
         self.ball_tracker.reset()
