@@ -68,7 +68,7 @@ uv run python scripts/test_court_calibration.py resources/video_entreno_3.mp4
 ### Test a single component
 
 ```bash
-venv/bin/python scripts/test_action_recognition.py resources/video_entreno_1.mp4 --save-video
+uv run python scripts/test_action_recognition.py resources/video_entreno_1.mp4 --save-video
 ```
 
 Per-component scripts live in `scripts/` (see `CLAUDE.md` for the full list).
@@ -76,10 +76,18 @@ Per-component scripts live in `scripts/` (see `CLAUDE.md` for the full list).
 ### Evaluate against ground truth
 
 ```bash
-venv/bin/python scripts/evaluate.py \
+uv run python scripts/evaluate.py \
   --predictions output/action_test/video_entreno_1_action_log.json \
   --ground-truth ground_truth/video_entreno_1_annotations.json \
   --component actions --ignore-player
+```
+
+### Annotate / create ground truth for a video
+
+```bash
+uv run python scripts/annotate_video.py resources/video_entreno_6.mp4 \
+  --court calibrations/video_entreno_1.json \
+  --ball-model models/volleyball_ball_best.pt;
 ```
 
 ### Other useful flags

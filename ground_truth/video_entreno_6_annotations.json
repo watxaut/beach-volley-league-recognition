@@ -1,6 +1,6 @@
 {
-  "video": "resources/video_entreno_3.mp4",
-  "fps": 30.00545553737043,
+  "video": "resources/video_entreno_6.mp4",
+  "fps": 30.005317746855045,
   "resolution": [
     1920,
     1080
@@ -18,96 +18,12 @@
       "description": "Action events with rally-state context. Each event has: frame, player_id, final_action (canonical label), raw_visual_actions (open-vocabulary multi-label), player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides.",
       "events": [
         {
-          "frame": 56,
-          "player_id": 2,
-          "final_action": "serve",
-          "raw_visual_actions": [
-            "serve"
-          ],
-          "player_team": "A",
-          "team_in_possession": "A",
-          "touch_number": 1,
-          "preceded_by_attack": false,
-          "rally_id": 1,
-          "overrides": {}
-        },
-        {
-          "frame": 69,
-          "player_id": 2,
-          "final_action": "dig",
-          "raw_visual_actions": [
-            "dig"
-          ],
-          "player_team": "B",
-          "team_in_possession": "B",
-          "touch_number": 1,
-          "preceded_by_attack": true,
-          "rally_id": 1,
-          "overrides": {}
-        },
-        {
-          "frame": 128,
-          "player_id": 2,
-          "final_action": "set",
-          "raw_visual_actions": [
-            "set"
-          ],
-          "player_team": "B",
-          "team_in_possession": "B",
-          "touch_number": 2,
-          "preceded_by_attack": false,
-          "rally_id": 1,
-          "overrides": {}
-        },
-        {
-          "frame": 178,
-          "player_id": 3,
-          "final_action": "spike",
-          "raw_visual_actions": [
-            "spike"
-          ],
-          "player_team": "B",
-          "team_in_possession": "B",
-          "touch_number": 3,
-          "preceded_by_attack": false,
-          "rally_id": 1,
-          "overrides": {}
-        },
-        {
-          "frame": 211,
+          "frame": 75,
           "player_id": 3,
           "final_action": "dig",
           "raw_visual_actions": [
             "dig"
           ],
-          "player_team": "A",
-          "team_in_possession": "A",
-          "touch_number": 1,
-          "preceded_by_attack": true,
-          "rally_id": 1,
-          "overrides": {}
-        },
-        {
-          "frame": 248,
-          "player_id": 2,
-          "final_action": "set",
-          "raw_visual_actions": [
-            "set"
-          ],
-          "player_team": "A",
-          "team_in_possession": "A",
-          "touch_number": 2,
-          "preceded_by_attack": false,
-          "rally_id": 1,
-          "overrides": {}
-        },
-        {
-          "frame": 297,
-          "player_id": 4,
-          "final_action": "spike",
-          "raw_visual_actions": [
-            "spike"
-          ],
           "player_team": "B",
           "team_in_possession": "B",
           "touch_number": 1,
@@ -116,36 +32,36 @@
           "overrides": {}
         },
         {
-          "frame": 379,
-          "player_id": 3,
-          "final_action": "set",
-          "raw_visual_actions": [
-            "set"
-          ],
-          "player_team": "B",
-          "team_in_possession": "B",
-          "touch_number": 3,
-          "preceded_by_attack": false,
-          "rally_id": 1,
-          "overrides": {}
-        },
-        {
-          "frame": 433,
-          "player_id": 2,
-          "final_action": "spike",
-          "raw_visual_actions": [
-            "spike"
-          ],
-          "player_team": "B",
-          "team_in_possession": "B",
-          "touch_number": 4,
-          "preceded_by_attack": false,
-          "rally_id": 1,
-          "overrides": {}
-        },
-        {
-          "frame": 453,
+          "frame": 120,
           "player_id": 1,
+          "final_action": "set",
+          "raw_visual_actions": [
+            "set"
+          ],
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 2,
+          "preceded_by_attack": false,
+          "rally_id": 1,
+          "overrides": {}
+        },
+        {
+          "frame": 173,
+          "player_id": 3,
+          "final_action": "spike",
+          "raw_visual_actions": [
+            "spike"
+          ],
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 3,
+          "preceded_by_attack": false,
+          "rally_id": 1,
+          "overrides": {}
+        },
+        {
+          "frame": 212,
+          "player_id": 4,
           "final_action": "dig",
           "raw_visual_actions": [
             "dig"
@@ -158,8 +74,8 @@
           "overrides": {}
         },
         {
-          "frame": 488,
-          "player_id": 3,
+          "frame": 262,
+          "player_id": 2,
           "final_action": "set",
           "raw_visual_actions": [
             "set"
@@ -172,39 +88,25 @@
           "overrides": {}
         },
         {
-          "frame": 541,
+          "frame": 311,
           "player_id": 4,
           "final_action": "spike",
           "raw_visual_actions": [
             "spike"
           ],
-          "player_team": "A",
-          "team_in_possession": "A",
-          "touch_number": 3,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
           "preceded_by_attack": false,
           "rally_id": 1,
           "overrides": {}
         },
         {
-          "frame": 563,
+          "frame": 311,
           "player_id": 3,
-          "final_action": "dig",
+          "final_action": "block",
           "raw_visual_actions": [
-            "dig"
-          ],
-          "player_team": "B",
-          "team_in_possession": "B",
-          "touch_number": 1,
-          "preceded_by_attack": true,
-          "rally_id": 1,
-          "overrides": {}
-        },
-        {
-          "frame": 332,
-          "player_id": 2,
-          "final_action": "dig",
-          "raw_visual_actions": [
-            "dig"
+            "block"
           ],
           "player_team": "B",
           "team_in_possession": "B",

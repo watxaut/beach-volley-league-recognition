@@ -54,7 +54,7 @@ class Config:
         "pose_confidence": 0.5,
         "pose_complexity": 1,
         "temporal_window": 10,
-        "action_confidence": 0.4,  # Min confidence to emit an action (classifier scores ~0.45-0.8)
+        "action_confidence": 0.3,  # Min confidence to emit an action; matches scripts/test_action_recognition.py (classifier scores ~0.3-0.8)
 
         # Processing settings
         "batch_size": 1,
