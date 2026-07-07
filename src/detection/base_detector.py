@@ -12,6 +12,44 @@ import cv2
 import logging
 
 
+def resolve_device(requested: str = "auto") -> str:
+    """Resolve a requested compute device to a concrete, available backend.
+
+    Args:
+        requested: "auto", "cpu", "cuda", or "mps". "auto" selects the best
+            available backend in the order CUDA > MPS (Apple Silicon GPU) > CPU.
+
+    Returns:
+        A concrete device string ("cpu", "cuda", or "mps"). An explicit device
+        that is not available falls back to "cpu" with a warning.
+    """
+    import torch  # local import: torch is heavy and only needed here
+
+    logger = logging.getLogger(__name__)
+    requested = (requested or "auto").lower()
+
+    cuda_ok = torch.cuda.is_available()
+    mps_ok = torch.backends.mps.is_available() and torch.backends.mps.is_built()
+
+    if requested == "auto":
+        if cuda_ok:
+            return "cuda"
+        if mps_ok:
+            return "mps"
+        return "cpu"
+
+    if requested == "cuda" and not cuda_ok:
+        logger.warning("device='cuda' requested but CUDA is unavailable; using CPU")
+        return "cpu"
+    if requested == "mps" and not mps_ok:
+        logger.warning("device='mps' requested but MPS is unavailable; using CPU")
+        return "cpu"
+    if requested not in ("cpu", "cuda", "mps"):
+        logger.warning("Unknown device '%s'; using CPU", requested)
+        return "cpu"
+    return requested
+
+
 class BaseDetector(ABC):
     """Abstract base class for all object detectors in the volleyball analysis system.
 
@@ -19,15 +57,17 @@ class BaseDetector(ABC):
     objects (players, balls) in volleyball video frames.
     """
 
-    def __init__(self, confidence_threshold: float = 0.5, device: str = "cpu"):
+    def __init__(self, confidence_threshold: float = 0.5, device: str = "auto"):
         """Initialize the base detector.
 
         Args:
             confidence_threshold: Minimum confidence score for detections
-            device: Device to run inference on ("cpu" or "cuda")
+            device: Device to run inference on -- "auto", "cpu", "cuda", or
+                "mps". "auto" picks the best available backend
+                (CUDA > MPS > CPU). Resolved to a concrete device here.
         """
         self.confidence_threshold = confidence_threshold
-        self.device = device
+        self.device = resolve_device(device)
         self.logger = logging.getLogger(self.__class__.__name__)
         self._model = None
 

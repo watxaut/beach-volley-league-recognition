@@ -18,7 +18,6 @@ from typing import List, Dict, Any, Optional
 from collections import deque
 
 import numpy as np
-import torch
 from ultralytics import YOLO
 
 from .base_detector import BaseDetector
@@ -102,11 +101,12 @@ class BallDetector(BaseDetector):
             self.logger.info(f"Loading YOLO ball detector from {self.model_path}")
             self._model = YOLO(self.model_path)
 
-            if self.device == "cuda" and torch.cuda.is_available():
-                self._model.to("cuda")
-                self.logger.info("Using CUDA for ball detection")
+            # self.device is already resolved to an available backend by
+            # BaseDetector.__init__ (CUDA > MPS > CPU).
+            if self.device in ("cuda", "mps"):
+                self._model.to(self.device)
+                self.logger.info(f"Using {self.device.upper()} for ball detection")
             else:
-                self.device = "cpu"
                 self.logger.info("Using CPU for ball detection")
 
         except Exception as e:

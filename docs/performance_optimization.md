@@ -65,6 +65,12 @@ Ranked by value ÷ effort. Impact = projected wall time for `video_entreno_4.mp4
 
 #### 1. Run the detectors on MPS (Apple GPU)
 
+> **✅ Implemented.** `make run` now defaults to `--device auto` (→ MPS on Apple Silicon).
+> Measured on `video_entreno_4.mp4`: **100 s → 57 s (1.75×)**. MPS is deterministic
+> run-to-run, but its detections differ slightly from CPU at action-classification
+> boundaries (same *total* action count on v4, different dig/set/spike attribution).
+> Pass **`--device cpu`** to reproduce exact CPU numbers for eval baselines.
+
 The machine has Metal/MPS available and built, but the pipeline never uses it: the default
 device is `"cpu"` ([config.py:20](src/utils/config.py:20)) and `Config.validate()` **rejects**
 anything other than `cpu`/`cuda` ([config.py:365](src/utils/config.py:365)). Both detectors

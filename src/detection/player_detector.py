@@ -9,7 +9,6 @@ from typing import List, Dict, Any, Optional
 import numpy as np
 import cv2
 from ultralytics import YOLO
-import torch
 
 from .base_detector import BaseDetector
 
@@ -59,12 +58,12 @@ class PlayerDetector(BaseDetector):
             self.logger.info(f"Loading YOLO model from {self.model_path}")
             self._model = YOLO(self.model_path)
 
-            # Set device
-            if self.device == "cuda" and torch.cuda.is_available():
-                self._model.to("cuda")
-                self.logger.info("Using CUDA for player detection")
+            # self.device is already resolved to an available backend by
+            # BaseDetector.__init__ (CUDA > MPS > CPU).
+            if self.device in ("cuda", "mps"):
+                self._model.to(self.device)
+                self.logger.info(f"Using {self.device.upper()} for player detection")
             else:
-                self.device = "cpu"
                 self.logger.info("Using CPU for player detection")
 
         except Exception as e:

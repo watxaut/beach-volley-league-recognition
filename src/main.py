@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 from src.analysis.video_processor import VideoProcessor
+from src.detection.base_detector import resolve_device
 from src.output_gen.csv_exporter import CSVExporter
 from src.output_gen.visualization import VisualizationGenerator
 from src.utils.config import Config
@@ -76,6 +77,14 @@ def parse_arguments() -> argparse.Namespace:
         help="Path to fine-tuned ball model (auto-detected from models/volleyball_ball_best.pt if omitted)"
     )
     parser.add_argument(
+        "--device",
+        type=str,
+        choices=["auto", "cpu", "cuda", "mps"],
+        default=None,
+        help="Compute device for YOLO detection. 'auto' (default) picks "
+             "CUDA > MPS (Apple GPU) > CPU. Pass 'cpu' to force CPU (e.g. for parity checks)."
+    )
+    parser.add_argument(
         "--save-video",
         action="store_true",
         help="Save an annotated video (headless-friendly). Combine with --debug-live to also show it live."
@@ -132,6 +141,12 @@ def main() -> int:
 
         # Load configuration
         config = Config.load(args.config) if args.config else Config.default()
+
+        # Resolve compute device: explicit --device overrides the config value;
+        # "auto" picks the best available backend (CUDA > MPS (Apple GPU) > CPU).
+        requested_device = args.device or config.get("device", "auto")
+        config["device"] = resolve_device(requested_device)
+        logger.info(f"Compute device: {config['device']}")
 
         # Court calibration: explicit --court, else auto-detect calibrations/<stem>.json.
         court_path = args.court

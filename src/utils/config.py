@@ -17,7 +17,7 @@ class Config:
 
     DEFAULT_CONFIG = {
         # Device settings
-        "device": "cpu",  # or "cuda" if GPU available
+        "device": "auto",  # auto-selects CUDA > MPS (Apple GPU) > CPU; force with "cpu"/"cuda"/"mps"
 
         # Detection settings
         "detection_method": "template",  # Default to Wilson ball template matching
@@ -361,9 +361,9 @@ class Config:
             valid = False
 
         # Validate device setting
-        device = self.get("device", "cpu")
-        if device not in ["cpu", "cuda"]:
-            logging.error("device must be 'cpu' or 'cuda'")
+        device = self.get("device", "auto")
+        if device not in ["auto", "cpu", "cuda", "mps"]:
+            logging.error("device must be 'auto', 'cpu', 'cuda', or 'mps'")
             valid = False
 
         # Validate pose complexity
