@@ -41,8 +41,12 @@ ATTACK_ACTIONS = {
 class ActionContextResolver:
     """Resolve context-free gestures into canonical actions using rally state."""
 
-    def __init__(self, rally_reset_gap: int = 90):
+    def __init__(self, rally_reset_gap: int = 90, spike_on_net_touch3: bool = True):
         self.rally_reset_gap = rally_reset_gap
+        # Whether a soft 3rd touch at the net is read as an attack (spike) rather
+        # than a dig. True fits beach doubles (the 3rd ball almost always goes
+        # over); set False for drills where players rally the ball up at the net.
+        self.spike_on_net_touch3 = spike_on_net_touch3
         self.reset()
 
     def reset(self) -> None:
@@ -135,8 +139,12 @@ class ActionContextResolver:
             if has_follow:
                 return VolleyballAction.SET, 0.6
             return VolleyballAction.OVERPASS, 0.45
-        # Third (or later) soft touch: in open/defensive play this is another
-        # dig. A genuine third-touch attack arrives as an ATTACK gesture above.
+        # Third (or later) touch. At the net a soft third touch is still an
+        # attack -- in beach doubles the third ball almost always goes over, and
+        # a poke/roll/"cobra" clears the net without the driven trajectory that
+        # the ATTACK gesture keys on. Deep in the court it is a defensive dig.
+        if near_net and self.spike_on_net_touch3:
+            return VolleyballAction.SPIKE, 0.5
         return VolleyballAction.DIG, 0.5
 
 

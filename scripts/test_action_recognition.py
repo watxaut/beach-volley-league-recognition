@@ -100,15 +100,17 @@ def main():
 
     action_counts = defaultdict(int)
     action_log = []
-    recent_actions = {}  # track_id -> (frame, action, confidence) for display persistence
 
-    def record_action(action, display_frame):
+    def record_action(action):
         act_name = action["action"]
         tid = action.get("track_id", -1)
         conf = action.get("confidence", 0)
-        # The classifier confirms a contact a few frames late; report it at its
-        # true contact frame so it lines up with ground truth.
-        contact_frame = action.get("frame_number", display_frame)
+        # frame_number is the TRUE contact frame. The classifier confirms a
+        # contact a few frames late and finalises it only once the NEXT contact
+        # arrives (look-ahead), so an event is *emitted* well after its contact.
+        # We anchor the on-screen label to frame_number in pass 2 so the label
+        # appears on the contact frame, not where it happened to be emitted.
+        contact_frame = action.get("frame_number")
         action_counts[act_name] += 1
         action_log.append({
             "frame": contact_frame,
@@ -122,71 +124,90 @@ def main():
             "rally_id": action.get("rally_id"),
             "contact_kind": action.get("contact_kind"),
         })
-        recent_actions[tid] = (display_frame, act_name, conf)
         print(f"  Frame {contact_frame}: Player {tid} (idx {action.get('player_id')}) "
               f"[{action.get('gesture')}] -> {act_name} ({conf:.2f})")
 
+    # ---- Pass 1: detect / track / classify. Cache lightweight per-frame overlay
+    # data (ball + player boxes) so pass 2 can redraw without re-running YOLO. ----
+    frame_cache = []
     for frame_idx in range(min(args.max_frames, total)):
         ret, frame = cap.read()
         if not ret:
             break
 
-        # Detection
         ball_dets = ball_detector.detect(frame)
         player_dets = player_detector.detect(frame)
         if court.is_calibrated:
             player_dets = court.filter_detections_by_court(player_dets)
 
-        # Tracking
         tracked_players = player_tracker.update(player_dets, frame)
         tracked_ball = ball_tracker.update(ball_dets)
 
-        # Action classification
         actions = action_classifier.classify_actions(
             frame, tracked_players, tracked_ball, frame_number=frame_idx
         )
-
         for action in actions:
-            record_action(action, frame_idx)
+            record_action(action)
 
-        # Draw court
-        if court.is_calibrated:
-            frame = court.draw_court_overlay(frame)
-
-        # Draw ball
-        if tracked_ball:
-            cx, cy = int(tracked_ball["center"][0]), int(tracked_ball["center"][1])
-            color = (0, 0, 255) if tracked_ball.get("is_predicted") else (0, 255, 0)
-            cv2.circle(frame, (cx, cy), 8, color, -1)
-
-        # Draw players with action labels
-        for player in tracked_players:
-            tid = player.get("track_id", -1)
-            bbox = player["bbox"]
-            x1, y1, x2, y2 = [int(v) for v in bbox]
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-
-            label = f"P{tid}"
-            # Show recent action (persist for 30 frames)
-            if tid in recent_actions:
-                act_frame, act_name, act_conf = recent_actions[tid]
-                if frame_idx - act_frame < 30:
-                    label += f" {act_name.upper()}"
-                    color = ACTION_COLORS.get(act_name, (255, 255, 255))
-                    cv2.putText(frame, f"{act_name} ({act_conf:.2f})", (x1, y1 - 25),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-
-            cv2.putText(frame, label, (x1, y1 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-
-        if writer:
-            writer.write(frame)
+        ball_draw = None
+        if tracked_ball and tracked_ball.get("center") and tracked_ball["center"][0] is not None:
+            ball_draw = (int(tracked_ball["center"][0]), int(tracked_ball["center"][1]),
+                         bool(tracked_ball.get("is_predicted")))
+        frame_cache.append({
+            "ball": ball_draw,
+            "players": [(p.get("track_id", -1), [int(v) for v in p["bbox"]]) for p in tracked_players],
+        })
 
     # Finalise the last contact still held for its look-ahead (context layer).
     for action in action_classifier.flush():
-        record_action(action, frame_idx)
+        record_action(action)
 
     cap.release()
+
+    # ---- Build a per-track label plan anchored on each action's contact frame ----
+    LABEL_PERSIST = 30  # frames a label stays on screen after its contact
+    events_by_track = defaultdict(list)
+    for e in action_log:
+        if e["frame"] is not None:
+            events_by_track[e["track_id"]].append((e["frame"], e["action"], e["confidence"]))
+
+    def label_for(tid, frame_idx):
+        """Most-recent action for this track whose window covers frame_idx."""
+        best = None
+        for cf, name, conf in events_by_track.get(tid, []):
+            if cf <= frame_idx < cf + LABEL_PERSIST and (best is None or cf > best[0]):
+                best = (cf, name, conf)
+        return best
+
+    # ---- Pass 2: redraw from cache, labels anchored on the true contact frame ----
     if writer:
+        cap = cv2.VideoCapture(args.video)
+        for frame_idx, cache in enumerate(frame_cache):
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            if court.is_calibrated:
+                frame = court.draw_court_overlay(frame)
+
+            if cache["ball"] is not None:
+                bx, by, pred = cache["ball"]
+                cv2.circle(frame, (bx, by), 8, (0, 0, 255) if pred else (0, 255, 0), -1)
+
+            for tid, (x1, y1, x2, y2) in cache["players"]:
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                lab = label_for(tid, frame_idx)
+                if lab is not None:
+                    _, act_name, act_conf = lab
+                    color = ACTION_COLORS.get(act_name, (255, 255, 255))
+                    cv2.putText(frame, f"{act_name} ({act_conf:.2f})", (x1, y1 - 25),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                cv2.putText(frame, f"P{tid}", (x1, y1 - 8),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+            writer.write(frame)
+
+        cap.release()
         writer.release()
         print(f"\nAnnotated video saved to {output_dir / f'{video_name}_action_recognition.mp4'}")
 

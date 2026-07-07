@@ -52,6 +52,20 @@ class ActionClassifier:
     XREV_MIN = 20.0          # px net horizontal displacement for a redirect
     CONTACT_REACH = 140.0    # max px from ball to nearest player's bbox (arm reach)
 
+    # --- Drive (attacking hit) detection ---
+    # A spike drives the ball down/across: unlike a dig it does not pop the ball
+    # back up (so the bounce test misses it) and it need not flip the ball's
+    # horizontal direction (so the redirect test misses it). What it always does
+    # is change the ball's velocity in a way free flight cannot -- a ball under
+    # gravity keeps a near-constant horizontal speed and accelerates downward, so
+    # a sharp horizontal impulse OR a sudden check of the downward speed marks a
+    # contact. Velocities are per-frame so thresholds are frame-rate consistent.
+    DRIVE_MIN_SPEED = 8.0    # px/frame; ball must be genuinely in flight
+    DRIVE_DECEL = 8.0        # px/frame drop in downward speed gravity can't explain
+    DRIVE_XIMPULSE = 12.0    # px/frame horizontal-velocity change (a sideways hit)
+    DRIVE_RISE_TOL = 3.0     # px/frame; a spike sends the ball down/flat -- if it
+                             # rises after the contact it is a dig/pass (a bounce)
+
     # --- Classification tuning ---
     NEAR_NET_PX = 120        # |y - midcourt| under this counts as "near the net"
     DRIVE_MIN_PX = 55.0      # min outgoing horizontal speed for an attack drive
@@ -219,6 +233,22 @@ class ActionClassifier:
                 return p
         return None
 
+    @staticmethod
+    def _mean_velocity(
+        points: List[Tuple[int, float, float]]
+    ) -> Tuple[float, float]:
+        """Mean per-frame velocity (dx/dt, dy/dt) across ordered (frame,x,y) points.
+
+        Dividing by the frame span (not the point count) keeps the estimate
+        correct across the gaps left by undetected ball frames.
+        """
+        if len(points) < 2:
+            return (0.0, 0.0)
+        dt = points[-1][0] - points[0][0]
+        if dt <= 0:
+            return (0.0, 0.0)
+        return ((points[-1][1] - points[0][1]) / dt, (points[-1][2] - points[0][2]) / dt)
+
     def _detect_contact(
         self, c: int
     ) -> Optional[Tuple[List[float], str, Tuple[float, float], Tuple[float, float]]]:
@@ -259,6 +289,33 @@ class ActionClassifier:
         # other (block/spike drive) without a clean bounce.
         if inc[0] * out[0] < 0 and abs(inc[0]) > self.XREV_MIN and abs(out[0]) > self.XREV_MIN:
             return contact_point, "redirect", inc, out
+
+        # Attacking DRIVE: the ball's motion is checked in a way free flight
+        # cannot produce -- its downward speed is sharply cut (a ball hit down
+        # into the sand / driven flat) or it gets a strong horizontal impulse --
+        # yet it does not pop cleanly back up like a dig. This is the spike
+        # signature the two tests above miss (no rise, no horizontal sign flip).
+        #
+        # Estimate the velocity from points within +/-3 frames of the vertex: a
+        # bounce/apex further out (or one pulled close by a run of undetected
+        # ball frames) would otherwise fake a deceleration on a dig's approach.
+        left3 = [p for p in left if p[0] >= c - 3]
+        right3 = [p for p in right if p[0] <= c + 3]
+        if left3 and right3:
+            vin = self._mean_velocity(left3 + [vertex])
+            vout = self._mean_velocity([vertex] + right3)
+            dvx = vout[0] - vin[0]
+            dvy = vout[1] - vin[1]
+            speed = max(float(np.hypot(*vin)), float(np.hypot(*vout)))
+            # A dig rebounds the ball back up above the contact within a few
+            # frames; a spike keeps it at or below. Checking the full outgoing
+            # window rejects the 1-2 frames just before a dig's bottom, where the
+            # short window alone still looks like a downward check.
+            stays_down = (right[-1][2] - vy) >= 0.0
+            pops_up = vout[1] < -self.DRIVE_RISE_TOL
+            if speed >= self.DRIVE_MIN_SPEED and stays_down and not pops_up:
+                if dvy <= -self.DRIVE_DECEL or abs(dvx) >= self.DRIVE_XIMPULSE:
+                    return contact_point, "drive", inc, out
 
         return None
 
@@ -393,6 +450,18 @@ class ActionClassifier:
             feats = pose["pose_features"]
         avg_wrist = feats.get("avg_wrist_height_ratio")
         hands_overhead = avg_wrist is not None and avg_wrist > self.HANDS_OVERHEAD
+
+        # DRIVE -- the drive test only exists to ADD a contact the bounce and
+        # redirect tests miss (a ball hit down/across that never pops up). Its
+        # label is left to the context layer (touch number + court position): a
+        # 3rd-ball drive at the net resolves to a spike, while a hard, flat set
+        # or dig keeps its true label. Forcing ATTACK here turned every driven
+        # set/dig into a spike (regressed the net-rally drills). Overhead hands
+        # at the net over a non-rising horizontal ball is still a block.
+        if kind == "drive":
+            if near_net and hands_overhead and not going_up and horiz > vert:
+                return VisualGesture.BLOCK, 0.6
+            return VisualGesture.BUMP_SET, 0.5
 
         # BLOCK -- at the net, ball redirected roughly horizontally (not rising)
         # with hands overhead or a clean sideways redirect (a stuffed attack).

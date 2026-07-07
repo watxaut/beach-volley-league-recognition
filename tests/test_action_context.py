@@ -35,15 +35,27 @@ def test_receive_set_attack_possession():
     assert _labels(contacts) == ["dig", "set", "spike"]
 
 
-def test_third_soft_touch_is_dig_not_overpass():
-    """A soft 3rd touch (bump-set, not an attack) stays a dig in open play --
-    matches the entreno_1 ground truth (dig at touch 3)."""
+def test_third_soft_touch_backcourt_is_dig():
+    """A soft 3rd touch (bump-set) away from the net is a defensive dig -- the
+    ball was kept up in open/backcourt play, not attacked."""
     contacts = [
-        _contact(10, VisualGesture.BUMP_SET),
-        _contact(40, VisualGesture.BUMP_SET),
-        _contact(65, VisualGesture.BUMP_SET),
+        _contact(10, VisualGesture.BUMP_SET, near_net=False),
+        _contact(40, VisualGesture.BUMP_SET, near_net=False),
+        _contact(65, VisualGesture.BUMP_SET, near_net=False),
     ]
     assert _labels(contacts) == ["dig", "set", "dig"]
+
+
+def test_third_soft_touch_at_net_is_spike():
+    """A soft 3rd touch AT the net is an attack (a poke/roll/"cobra" that clears
+    the net without a driven trajectory) -- in beach doubles the 3rd ball goes
+    over. This recovers entreno_3's spike@178, which pops up softly."""
+    contacts = [
+        _contact(10, VisualGesture.BUMP_SET, near_net=False),  # dig (reception, deep)
+        _contact(40, VisualGesture.BUMP_SET),                  # set (near net)
+        _contact(65, VisualGesture.BUMP_SET),                  # 3rd at net -> spike
+    ]
+    assert _labels(contacts) == ["dig", "set", "spike"]
 
 
 def test_second_touch_over_net_is_overpass():
