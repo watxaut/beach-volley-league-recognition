@@ -27,14 +27,7 @@ from src.tracking.ball_tracker import BallTracker
 from src.tracking.player_tracker import PlayerTracker
 from src.recognition.pose_estimator import PoseEstimator
 from src.recognition.action_classifier import ActionClassifier
-
-ACTION_COLORS = {
-    "serve": (0, 255, 0),
-    "block": (255, 0, 0),
-    "dig": (0, 255, 255),
-    "set": (255, 255, 0),
-    "spike": (0, 0, 255),
-}
+from src.output_gen import overlay
 
 
 def main():
@@ -165,19 +158,9 @@ def main():
     cap.release()
 
     # ---- Build a per-track label plan anchored on each action's contact frame ----
-    LABEL_PERSIST = 30  # frames a label stays on screen after its contact
-    events_by_track = defaultdict(list)
+    plan = overlay.LabelPlan()
     for e in action_log:
-        if e["frame"] is not None:
-            events_by_track[e["track_id"]].append((e["frame"], e["action"], e["confidence"]))
-
-    def label_for(tid, frame_idx):
-        """Most-recent action for this track whose window covers frame_idx."""
-        best = None
-        for cf, name, conf in events_by_track.get(tid, []):
-            if cf <= frame_idx < cf + LABEL_PERSIST and (best is None or cf > best[0]):
-                best = (cf, name, conf)
-        return best
+        plan.add(e["track_id"], e["frame"], e["action"], e["confidence"])
 
     # ---- Pass 2: redraw from cache, labels anchored on the true contact frame ----
     if writer:
@@ -192,18 +175,15 @@ def main():
 
             if cache["ball"] is not None:
                 bx, by, pred = cache["ball"]
-                cv2.circle(frame, (bx, by), 8, (0, 0, 255) if pred else (0, 255, 0), -1)
+                overlay.draw_ball(frame, bx, by, predicted=pred)
 
             for tid, (x1, y1, x2, y2) in cache["players"]:
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                lab = label_for(tid, frame_idx)
-                if lab is not None:
-                    _, act_name, act_conf = lab
-                    color = ACTION_COLORS.get(act_name, (255, 255, 255))
-                    cv2.putText(frame, f"{act_name} ({act_conf:.2f})", (x1, y1 - 25),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-                cv2.putText(frame, f"P{tid}", (x1, y1 - 8),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                lab = plan.active(tid, frame_idx)
+                overlay.draw_player(
+                    frame, tid, (x1, y1, x2, y2),
+                    action=lab[0] if lab is not None else None,
+                    confidence=lab[1] if lab is not None else None,
+                )
 
             writer.write(frame)
 

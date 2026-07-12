@@ -21,7 +21,7 @@ OUTPUT_DIR := output/$(VIDEO_NAME)
 # Skip visualization unless VIZ is set.
 VIZ_FLAG := $(if $(VIZ),,--skip-visualization)
 
-.PHONY: run help
+.PHONY: run run-video run-live help
 
 run:
 ifeq ($(strip $(VIDEO)),)
@@ -31,7 +31,25 @@ endif
 	@echo ""
 	@echo "Per-player results CSV: $(OUTPUT_DIR)/results.csv"
 
+run-video:
+ifeq ($(strip $(VIDEO)),)
+	$(error VIDEO is not set. Usage: make run VIDEO=path/to/video.mp4)
+endif
+	$(PYTHON) -m src.main "$(VIDEO)" --output-dir "$(OUTPUT_DIR)" $(VIZ_FLAG) --save-video
+	@echo ""
+	@echo "Per-player results CSV: $(OUTPUT_DIR)/results.csv"
+
+run-live:
+ifeq ($(strip $(VIDEO)),)
+	$(error VIDEO is not set. Usage: make run VIDEO=path/to/video.mp4)
+endif
+	$(PYTHON) -m src.main "$(VIDEO)" --output-dir "$(OUTPUT_DIR)" --debug-live --debug-speed 2
+	@echo ""
+	@echo "Per-player results CSV: $(OUTPUT_DIR)/results.csv"
+
 help:
-	@echo "make run VIDEO=path/to/video.mp4   Analyze a video -> $(OUTPUT_DIR)/results.csv"
-	@echo "  VIZ=1                            Also generate summary_graphs.png"
-	@echo "  PYTHON=...                       Override the python interpreter"
+	@echo "make run VIDEO=path/to/video.mp4        Analyze a video -> $(OUTPUT_DIR)/results.csv"
+	@echo "make run-video VIDEO=path/to/video.mp4  Also save an annotated .mp4 (two-pass, contact-anchored labels)"
+	@echo "make run-live VIDEO=path/to/video.mp4   Play the annotated video live (buffered ~3s so labels land on contact)"
+	@echo "  VIZ=1                                 Also generate summary_graphs.png (run / run-video)"
+	@echo "  PYTHON=...                            Override the python interpreter"
