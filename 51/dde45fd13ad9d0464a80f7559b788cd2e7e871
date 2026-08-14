@@ -1,0 +1,21 @@
+CLAUDE.md
+  s_9ed08fada71d0a::t_69dfceec5f785d 142-146
+STATUS.md
+  s_9ed08fada71d0a::t_ce892c6e6ea593 1-83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "51dde45fd13ad9d0464a80f7559b788cd2e7e871",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
