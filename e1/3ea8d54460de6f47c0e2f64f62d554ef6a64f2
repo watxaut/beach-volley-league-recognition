@@ -1,0 +1,33 @@
+scripts/dump_player_tracks.py
+  s_9ed08fada71d0a::t_9dc61bb2bd5d3b 36,98-116,122-138,160,162-186
+src/analysis/frame_processor.py
+  s_9ed08fada71d0a::t_58ea344a7cbfb2 60-66,105-106,111-122,210-217,220-226,276
+src/detection/court_calibration.py
+  s_9ed08fada71d0a::t_277dd773a65fab 61-71,285-288,387-399,440-451,453-457,467-516,520-595
+src/detection/player_detector.py
+  s_9ed08fada71d0a::t_c4a4f216f00405 171-175,178-181,188
+src/tracking/player_tracker.py
+  s_9ed08fada71d0a::t_4b27a7f84eec88 40-51,76-92,96-100,105-109,116-122,127-129,131-137,144-149,152,203-217,219-223,225-237,240-242,244-250,255-263,266-273,283-284,286,288,291,295,298,300-314,317-321,323-327,411,434-446,449-452,455,460-462,495-497,499-507,542-565,568-582,586-587,589-601,604-610,617-624,640-642,678-680,684,688-702,733-741,743-995,1003,1057-1073
+src/utils/config.py
+  s_9ed08fada71d0a::t_d3fcae5296609b 27-28,45-64
+tests/test_court_ground_plane.py
+  s_9ed08fada71d0a::t_fac0f11ed849a7 1-67
+tests/test_player_tracker_gallery.py
+  s_9ed08fada71d0a::t_68d3166a603451 1-231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "e13ea8d54460de6f47c0e2f64f62d554ef6a64f2",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
