@@ -139,6 +139,11 @@ The system follows a modular computer vision pipeline designed for a **fixed cam
 
 ## Claude Code Workflow Guidance
 
+### Progress Tracking (STATUS.md)
+- `STATUS.md` at the repo root is the cross-session memory: current state, open points (ranked), and a per-session log. The owner returns to this project every 1–3 weeks and relies on it to remember context.
+- **Read `STATUS.md` at the start of every session** (before planning work) and treat its Open points as the backlog.
+- **Update `STATUS.md` at the end of every session** that changes anything: refresh "Where we are", move finished items into the "Log" (newest first, with dates and commit hashes), re-rank Open points. Commit it together with the work.
+
 ### Implementation Strategies
 - When asked to implement a new feature, draft a short plan in the conversation and confirm the approach with the user before writing production code.
 - Prefer extending existing modules under `src/` over creating new top-level files.
