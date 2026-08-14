@@ -1,0 +1,31 @@
+STATUS.md
+  s_9ed08fada71d0a::t_772e6afad2fa50 8,12-16,28,30-33,36-52,56,60,66-82
+ground_truth/video_entreno_1_annotations.json
+  s_9ed08fada71d0a::t_225ec5d5071bfb 15-2029
+scripts/annotate_player_gt.py
+  s_9ed08fada71d0a::t_1e79452a992474 1-284
+scripts/evaluate.py
+  s_9ed08fada71d0a::t_9b4260e3b9cfd5 43,138,149-154,184
+scripts/flag_occluded_gt.py
+  s_9ed08fada71d0a::t_b6f062a848fef6 1-100
+tests/test_annotate_player_gt.py
+  s_9ed08fada71d0a::t_5acc621ce790b8 1-127
+tests/test_flag_occluded_gt.py
+  s_9ed08fada71d0a::t_dad533accd927a 1-83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "c5d2de0f628f378c607816ee2fc4d88504dd2db2",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
