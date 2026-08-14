@@ -12,7 +12,2021 @@
     },
     "players": {
       "description": "Player bounding boxes + IDs every 10 frames",
-      "frames": {}
+      "frames": {
+        "0": [
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              590,
+              477,
+              690,
+              769
+            ],
+            "visible": true
+          },
+          {
+            "id": 2,
+            "team": "B",
+            "bbox": [
+              870,
+              387,
+              941,
+              575
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "A",
+            "bbox": [
+              1144,
+              442,
+              1274,
+              710
+            ],
+            "visible": true
+          }
+        ],
+        "10": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              1167,
+              451,
+              1291,
+              716
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              865,
+              383,
+              932,
+              574
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              589,
+              506,
+              715,
+              785
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1144,
+              433,
+              1211,
+              597
+            ],
+            "visible": false
+          }
+        ],
+        "20": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              1211,
+              456,
+              1300,
+              743
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              855,
+              383,
+              919,
+              573
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              619,
+              503,
+              755,
+              802
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1096,
+              397,
+              1237,
+              601
+            ],
+            "visible": true
+          }
+        ],
+        "30": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              1229,
+              472,
+              1348,
+              760
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              835,
+              387,
+              908,
+              573
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              678,
+              510,
+              795,
+              802
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1130,
+              399,
+              1200,
+              598
+            ],
+            "visible": true
+          }
+        ],
+        "40": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              1225,
+              448,
+              1371,
+              784
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              823,
+              385,
+              886,
+              570
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              729,
+              483,
+              833,
+              770
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1120,
+              395,
+              1193,
+              590
+            ],
+            "visible": true
+          }
+        ],
+        "50": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              1200,
+              492,
+              1351,
+              842
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              819,
+              385,
+              883,
+              528
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              788,
+              480,
+              911,
+              756
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1102,
+              395,
+              1191,
+              589
+            ],
+            "visible": true
+          }
+        ],
+        "60": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              1135,
+              514,
+              1267,
+              847
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              810,
+              382,
+              864,
+              559
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              847,
+              461,
+              932,
+              730
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1117,
+              433,
+              1186,
+              584
+            ],
+            "visible": true
+          }
+        ],
+        "70": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              1075,
+              464,
+              1209,
+              804
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              797,
+              376,
+              857,
+              551
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              859,
+              442,
+              959,
+              673
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1099,
+              405,
+              1178,
+              556
+            ],
+            "visible": false
+          }
+        ],
+        "80": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              1065,
+              458,
+              1181,
+              775
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              795,
+              381,
+              853,
+              550
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              887,
+              434,
+              956,
+              656
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1096,
+              402,
+              1175,
+              553
+            ],
+            "visible": false
+          }
+        ],
+        "90": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              1042,
+              450,
+              1156,
+              763
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              795,
+              377,
+              849,
+              545
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              876,
+              405,
+              962,
+              624
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1096,
+              402,
+              1175,
+              553
+            ],
+            "visible": false
+          }
+        ],
+        "100": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              1042,
+              457,
+              1156,
+              740
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              789,
+              380,
+              848,
+              543
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              851,
+              410,
+              944,
+              604
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1070,
+              388,
+              1134,
+              516
+            ],
+            "visible": true
+          }
+        ],
+        "110": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              1011,
+              520,
+              1156,
+              736
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              787,
+              379,
+              847,
+              544
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              839,
+              420,
+              921,
+              614
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1053,
+              392,
+              1117,
+              549
+            ],
+            "visible": true
+          }
+        ],
+        "120": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              918,
+              572,
+              1149,
+              729
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              779,
+              387,
+              838,
+              542
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              825,
+              412,
+              896,
+              605
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1044,
+              385,
+              1116,
+              549
+            ],
+            "visible": true
+          }
+        ],
+        "130": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              914,
+              567,
+              1129,
+              718
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              761,
+              399,
+              813,
+              538
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              793,
+              407,
+              850,
+              622
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1040,
+              382,
+              1102,
+              546
+            ],
+            "visible": true
+          }
+        ],
+        "150": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              947,
+              505,
+              1063,
+              719
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              715,
+              405,
+              807,
+              637
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              736,
+              417,
+              781,
+              551
+            ],
+            "visible": false
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1011,
+              383,
+              1080,
+              550
+            ],
+            "visible": true
+          }
+        ],
+        "160": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              935,
+              471,
+              1024,
+              693
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              691,
+              414,
+              782,
+              654
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              736,
+              417,
+              781,
+              551
+            ],
+            "visible": false
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1002,
+              396,
+              1067,
+              564
+            ],
+            "visible": true
+          }
+        ],
+        "170": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              922,
+              454,
+              1012,
+              720
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              677,
+              430,
+              767,
+              659
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              716,
+              372,
+              777,
+              513
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              962,
+              397,
+              1023,
+              548
+            ],
+            "visible": false
+          }
+        ],
+        "180": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              924,
+              444,
+              1026,
+              730
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              690,
+              438,
+              773,
+              658
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              718,
+              370,
+              763,
+              484
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              890,
+              390,
+              952,
+              550
+            ],
+            "visible": true
+          }
+        ],
+        "190": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              919,
+              441,
+              1033,
+              731
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              684,
+              449,
+              766,
+              659
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              704,
+              368,
+              748,
+              486
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              806,
+              391,
+              885,
+              567
+            ],
+            "visible": true
+          }
+        ],
+        "200": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              902,
+              451,
+              1014,
+              750
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              665,
+              428,
+              759,
+              657
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              678,
+              373,
+              721,
+              494
+            ],
+            "visible": false
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              756,
+              392,
+              824,
+              583
+            ],
+            "visible": true
+          }
+        ],
+        "210": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              885,
+              447,
+              1011,
+              751
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              650,
+              415,
+              749,
+              644
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              638,
+              386,
+              685,
+              520
+            ],
+            "visible": false
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              725,
+              323,
+              790,
+              577
+            ],
+            "visible": true
+          }
+        ],
+        "220": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              905,
+              454,
+              1015,
+              751
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              626,
+              410,
+              718,
+              641
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              583,
+              395,
+              629,
+              558
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              702,
+              374,
+              774,
+              594
+            ],
+            "visible": true
+          }
+        ],
+        "230": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              891,
+              468,
+              1015,
+              751
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              588,
+              414,
+              694,
+              632
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              516,
+              376,
+              584,
+              558
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              713,
+              380,
+              800,
+              580
+            ],
+            "visible": true
+          }
+        ],
+        "240": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              872,
+              467,
+              994,
+              752
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              497,
+              409,
+              647,
+              611
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              506,
+              395,
+              549,
+              565
+            ],
+            "visible": false
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              739,
+              380,
+              796,
+              594
+            ],
+            "visible": true
+          }
+        ],
+        "250": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              860,
+              471,
+              988,
+              759
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              497,
+              362,
+              569,
+              617
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              747,
+              373,
+              824,
+              577
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              483,
+              294,
+              604,
+              482
+            ],
+            "visible": true
+          }
+        ],
+        "260": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              848,
+              476,
+              990,
+              767
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "B",
+            "bbox": [
+              494,
+              288,
+              612,
+              575
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              786,
+              379,
+              847,
+              575
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              505,
+              290,
+              577,
+              542
+            ],
+            "visible": false
+          }
+        ],
+        "270": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              872,
+              493,
+              1007,
+              770
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              481,
+              388,
+              562,
+              609
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              786,
+              382,
+              908,
+              584
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              490,
+              384,
+              568,
+              557
+            ],
+            "visible": false
+          }
+        ],
+        "280": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              942,
+              423,
+              1043,
+              760
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              499,
+              416,
+              577,
+              623
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              808,
+              382,
+              915,
+              580
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              499,
+              381,
+              566,
+              551
+            ],
+            "visible": false
+          }
+        ],
+        "290": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              967,
+              457,
+              1083,
+              774
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              527,
+              428,
+              648,
+              640
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              530,
+              385,
+              606,
+              571
+            ],
+            "visible": false
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              868,
+              392,
+              945,
+              573
+            ],
+            "visible": true
+          }
+        ],
+        "300": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              995,
+              447,
+              1137,
+              773
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              622,
+              424,
+              762,
+              645
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              579,
+              382,
+              644,
+              551
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              888,
+              396,
+              993,
+              583
+            ],
+            "visible": true
+          }
+        ],
+        "310": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              1010,
+              457,
+              1120,
+              777
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              746,
+              418,
+              838,
+              640
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              628,
+              389,
+              694,
+              556
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              932,
+              395,
+              1009,
+              580
+            ],
+            "visible": true
+          }
+        ],
+        "320": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              1002,
+              459,
+              1117,
+              772
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              814,
+              426,
+              916,
+              635
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              674,
+              377,
+              731,
+              547
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              974,
+              395,
+              1049,
+              578
+            ],
+            "visible": true
+          }
+        ],
+        "330": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              996,
+              467,
+              1123,
+              765
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              828,
+              400,
+              945,
+              636
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              699,
+              395,
+              780,
+              555
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1003,
+              389,
+              1067,
+              565
+            ],
+            "visible": false
+          }
+        ],
+        "340": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              1002,
+              458,
+              1104,
+              721
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              809,
+              411,
+              902,
+              637
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              715,
+              390,
+              778,
+              552
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1010,
+              383,
+              1080,
+              551
+            ],
+            "visible": false
+          }
+        ],
+        "350": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              928,
+              455,
+              1094,
+              691
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              795,
+              409,
+              874,
+              636
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              711,
+              413,
+              796,
+              555
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1016,
+              378,
+              1082,
+              541
+            ],
+            "visible": false
+          }
+        ],
+        "360": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              920,
+              439,
+              1016,
+              666
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              764,
+              399,
+              832,
+              632
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              721,
+              401,
+              788,
+              549
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              997,
+              377,
+              1082,
+              546
+            ],
+            "visible": true
+          }
+        ],
+        "370": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              849,
+              334,
+              969,
+              658
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              725,
+              407,
+              810,
+              634
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              993,
+              382,
+              1066,
+              550
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              715,
+              378,
+              806,
+              538
+            ],
+            "visible": false
+          }
+        ],
+        "380": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              825,
+              408,
+              941,
+              638
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              689,
+              406,
+              776,
+              635
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              995,
+              386,
+              1062,
+              540
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              691,
+              395,
+              791,
+              540
+            ],
+            "visible": false
+          }
+        ],
+        "390": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              786,
+              416,
+              892,
+              645
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              665,
+              407,
+              733,
+              632
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              983,
+              383,
+              1068,
+              557
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              628,
+              411,
+              780,
+              522
+            ],
+            "visible": true
+          }
+        ],
+        "410": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              824,
+              400,
+              908,
+              641
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              605,
+              411,
+              685,
+              642
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              911,
+              387,
+              1000,
+              554
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              488,
+              451,
+              646,
+              519
+            ],
+            "visible": true
+          }
+        ],
+        "420": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              804,
+              398,
+              888,
+              642
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              600,
+              417,
+              678,
+              641
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              889,
+              391,
+              964,
+              560
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              504,
+              449,
+              661,
+              523
+            ],
+            "visible": true
+          }
+        ],
+        "430": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              751,
+              402,
+              882,
+              643
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              602,
+              417,
+              710,
+              642
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              881,
+              381,
+              927,
+              554
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              507,
+              450,
+              646,
+              514
+            ],
+            "visible": true
+          }
+        ],
+        "400": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              817,
+              404,
+              921,
+              640
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              619,
+              407,
+              706,
+              639
+            ],
+            "visible": true
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              932,
+              392,
+              1047,
+              548
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              532,
+              437,
+              711,
+              524
+            ],
+            "visible": true
+          }
+        ],
+        "140": [
+          {
+            "id": 2,
+            "team": "A",
+            "bbox": [
+              930,
+              529,
+              1054,
+              712
+            ],
+            "visible": true
+          },
+          {
+            "id": 1,
+            "team": "A",
+            "bbox": [
+              742,
+              411,
+              833,
+              635
+            ],
+            "visible": true
+          },
+          {
+            "id": 3,
+            "team": "B",
+            "bbox": [
+              742,
+              414,
+              787,
+              547
+            ],
+            "visible": false
+          },
+          {
+            "id": 4,
+            "team": "B",
+            "bbox": [
+              1018,
+              389,
+              1102,
+              555
+            ],
+            "visible": true
+          }
+        ]
+      }
     },
     "actions": {
       "description": "Action events with rally-state context. Each event has: frame, player_id, final_action (canonical label), raw_visual_actions (open-vocabulary multi-label), player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides.",

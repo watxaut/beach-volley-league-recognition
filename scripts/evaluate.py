@@ -40,7 +40,7 @@ def load_tracks_as_predictions(path: str) -> dict:
     frames = {}
     for fr in data.get("frames", []):
         frames[str(fr["frame"])] = [
-            {"id": p["track_id"], "bbox": p["bbox"], "team": p.get("team")}
+            {"id": p["track_id"], "bbox": p["bbox"], "team": p.get("team") or p.get("foot_team")}
             for p in fr.get("players", [])
         ]
     return {"players": {"frames": frames}}
@@ -135,6 +135,7 @@ def evaluate_player_tracking(
         return {"error": "No ground truth player frames"}
 
     total_gt_players = 0
+    total_gt_occluded = 0
     total_detected = 0
     total_matched = 0
     id_mappings = []  # list of (gt_id, pred_id) per frame
@@ -144,6 +145,12 @@ def evaluate_player_tracking(
     for frame_str, gt_players in gt_frames.items():
         if gt_players is None:
             continue
+
+        # Occluded GT players (visible: false, set by scripts/flag_occluded_gt.py)
+        # are excluded everywhere -- no detector can be expected to find them.
+        visible_gt = [p for p in gt_players if p.get("visible", True)]
+        total_gt_occluded += len(gt_players) - len(visible_gt)
+        gt_players = visible_gt
 
         pred_players = predictions.get(frame_str, [])
         total_gt_players += len(gt_players)
@@ -174,6 +181,7 @@ def evaluate_player_tracking(
         "detection_rate": round(detection_rate, 3),
         "ghost_player_rate": round(ghost_rate, 3),
         "total_gt_players": total_gt_players,
+        "total_gt_occluded": total_gt_occluded,
         "total_detected": total_detected,
         "total_matched": total_matched,
         "id_consistency": id_consistency,

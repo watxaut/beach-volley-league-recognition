@@ -5,17 +5,15 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-08-14
+**Last updated:** 2026-08-15
 
 ## Where we are
 
-The **player-identity plan (phase 1) is implemented and committed** (`e13ea8d`):
-the tracker now keeps exactly 4 stable IDs across occlusions, off-court servers,
-and re-appearances, via two-zone filtering, a dormant-ID gallery with
-re-acquisition, and an appearance+biometrics signature. Validated on the
-`video_entreno_*` drills (e.g. entreno_1: dropped-player frames 29.7% → 0.8%,
-coverage 78% → 94%; entreno_3: 0 dropped serves, 0 resurrections, 0 swaps).
-48 unit tests green.
+The **player-identity plan (phase 1) is implemented and committed** (`e13ea8d`),
+and **entreno_1 now has real player-ID ground truth** (44 frames, canonical IDs
+1–4, occlusion-flagged) with the metric awake: `id_consistency` 0.97, team
+accuracy 0.98. **First GT-based finding: near-side tracking is essentially
+perfect, but the far side suffers bystander takeover** — see Open point 2.
 
 **Plan reference:** the full design lives in the session plan file
 (`~/.claude-zai/plans/i-want-to-start-golden-naur.md`) and the summary in
@@ -27,31 +25,60 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Open points
 
-1. **[blocked on footage] Validate side-change survival on a real match.** The
+1. **[BLOCKED — no footage] Validate side-change survival on a real match.** The
    gallery's marquee use case (players swap ends every 7 points) is untested —
-   the entreno drills have no side changes. Need one set-to-21 clip, calibrated,
-   then: `python scripts/dump_player_tracks.py <match>.mp4 --max-players 4` →
+   the entreno drills have no side changes. Blocked as of 2026-08-14: no video
+   of a full set is available yet. Unblock by recording/obtaining one
+   set-to-21 clip, calibrated, then:
+   `python scripts/dump_player_tracks.py <match>.mp4 --max-players 4` →
    `python scripts/analyze_tracking.py <json> --max-players 4`, and scrub the
    annotated video through a side change watching each ID.
-2. **[next, small] One-time identity ground truth** to wake up the dead metric:
-   populate `players.frames` (currently empty in every `ground_truth/*.json`)
-   for ~30–50 sampled frames of 1–2 videos with canonical IDs 1–4, spanning a
-   side change if possible, then
-   `python scripts/evaluate.py <tracks.json> <gt.json> --component players`
-   (`_compute_id_consistency` target → 1.0).
-3. **[conditional] Phase 2: offline global stitch.** Post-processing pass that
+2. **[next, real bug] Far-side bystander takeover** (found via the new GT on
+   entreno_1). Far-side tracks (small boxes) get assigned YOLO detections of
+   people standing *outside* the court and never recover: pred tracks in-court
+   rate 41% / 20% for the two far players; 35/39 unmatched far-side boxes are
+   real detections with the foot outside the court polygon. Cause: court
+   membership is enforced only at track creation (`_create_track` bystander
+   guard, `player_tracker.py:590`); the assignment path accepts any detection,
+   and the detector's `_is_player_in_court` is bbox-overlap vs court+margin,
+   which near-court bystanders pass. Fix direction: reject (or heavily
+   downweight) out-of-court detections in the assignment step so the track
+   coasts/dormants instead — aligned with the plan's "no match beats wrong
+   match". Careful not to break off-court servers (they're within the margin;
+   bystanders are beyond it). Re-check with the eval command below.
+3. **[optional, repeatable] GT for a second video** (e.g. entreno_3) using
+   `scripts/annotate_player_gt.py` (~30 min) to confirm the takeover is
+   systematic, not a one-off.
+4. **[conditional] Phase 2: offline global stitch.** Post-processing pass that
    re-clusters all track fragments into exactly 4 identities (ensemble
    signature + time/space gaps + k=4). Only build if match validation shows
    residual swaps/fragmentation that phase 1 doesn't catch.
-4. **[optional, separate axis] Detection recall.** Residual drops on entreno_3
+5. **[optional, separate axis] Detection recall.** Residual drops on entreno_3
    (~15% of frames) are genuine YOLO misses, not tracking failures. Levers:
    `player_confidence` (0.5 → 0.35 lifts recall ~3pp, adds false dets) or
    `player_imgsz`. Not part of the identity plan.
-5. **[minor cleanup] `CourtCalibration.filter_detections_by_play_area` is
+6. **[minor cleanup] `CourtCalibration.filter_detections_by_play_area` is
    currently unused** (the detector's bbox-overlap `detect_play_area` filter
    replaced it). Keep or remove.
 
 ## Log (newest first)
+
+### 2026-08-15 — first player-ID ground truth + occlusion-aware eval; found far-side bystander takeover
+- Annotated 44 frames of entreno_1 (canonical IDs 1–4; GT 1/2 near side, 3/4
+  far; 61 boxes redrawn/added by hand, so GT is independent of predictions).
+- New tooling: `scripts/annotate_player_gt.py` (interactive, resumable,
+  pre-draws tracker boxes; 1–4 assign, D drop, A add, per-frame redo via
+  `--start F --end F+1 --redo`), `scripts/flag_occluded_gt.py` (geometric
+  occlusion flags: smaller box ≥50% contained in another → `visible: false`;
+  20 flagged), `evaluate.py` now skips invisible GT + reads `foot_team`.
+  67 unit tests green (was 48).
+- Eval on 1c tracks: detection 0.69 (occlusion excluded), id_consistency 0.97,
+  team 0.98. Near side (GT1/2) perfect — every box matched, stable ID map
+  (pred3=GT1, pred1=GT2). Far side broken by bystander takeover → Open point 2.
+- Learned: phase-1 "coverage 94%" on entreno_1 was partly fake — the tracker
+  was covering far-side slots with out-of-court bystanders. The
+  "detection-limited" story for entrenos is really "far-side detection weak
+  AND tracker papers over it with wrong people".
 
 ### 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped
 - **1a** two-zone filter + bootstrap-at-first-rally + hardened 4-cap; **1b**
