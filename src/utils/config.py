@@ -24,7 +24,8 @@ class Config:
         "ball_confidence": 0.7,  # Much lower for better ball detection
         "player_confidence": 0.5,  # 0.35 lifts recall ~3pp on far-side players but adds false detections; kept at 0.5
         "player_imgsz": 1280,   # YOLO inference size; 640 default loses small far-side players
-        "max_players": 6,       # players the tracker follows (training drills run >4)
+        "max_players": 4,       # exactly 4 for match identity (gallery/bootstrap assume a 4-roster).
+                                #   NOTE: training drills with >4 on court need a separate profile.
         "max_detections": 20,   # detector safety cap (must exceed people on court)
         "ball_horizontal_margin_percent": 0.25,  # Horizontal margin to exclude from ball detection (15% on each side)
 
@@ -40,6 +41,26 @@ class Config:
         "player_team_vote_window": 15,   # frames of foot-position votes for team label
         "coast_extrapolation_cap": 15,   # max frames to extrapolate a lost track's box
         "coast_velocity_decay": 0.85,    # per-frame velocity decay while coasting
+
+        # Player identity (continuity-first re-ID). See plan "Consistent 4-Player
+        # Identity". Identity is propagated by motion continuity; the keys below
+        # tune the two-zone admission, the rally bootstrap, the dormant gallery,
+        # and the enriched appearance+biometric signature.
+        "player_appearance_weight": 0.4,        # surface of PlayerTracker ctor default
+        "player_init_frames": 60,               # surface of ctor default; = bootstrap_max_wait fallback
+        "player_play_area_margin_px": 100,      # how far beyond the court polygon ESTABLISHED tracks may roam
+        "player_gallery_enabled": True,         # match-long dormant gallery (never delete a player)
+        "player_gallery_reacquire_distance_px": 120.0,  # motion/position gate to re-acquire a dormant id
+        "player_gallery_reacquire_min_appearance": 0.15,  # signature floor below which a re-acquire is flagged low-confidence
+        "player_gallery_reacquire_appearance_min": 0.5,  # ensemble similarity bar for appearance-only re-acquire (moved player / side change)
+        "player_gallery_evict_min_hold_frames": 60,  # protect a freshly-retired id for this long before it's reclaimable
+        "player_bootstrap_min_window": 8,       # consecutive ball-active frames with a stable 4-roster to lock
+        "player_bootstrap_ball_required": True,  # skip the warmup opening (only lock once the ball is live)
+        "player_signature_color_weight": 0.4,   # torso HSV histogram (existing)
+        "player_signature_height_weight": 0.3,  # relative body size from the ground plane (uniform-independent)
+        "player_signature_head_weight": 0.15,   # head/hair HSV histogram
+        "player_signature_proportions_weight": 0.15,  # body height/width ratio
+        "player_signature_height_smoothing": 30,  # rolling-median window (frames) for the world body-size estimate
 
         # Enhanced trajectory-based tracking settings
         "low_confidence_threshold": 0.4,  # Min confidence for the tracker to accept a detection

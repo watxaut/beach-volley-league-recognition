@@ -168,17 +168,24 @@ class PlayerDetector(BaseDetector):
             else:
                 self.logger.debug(f"Filtered player with invalid aspect ratio: {aspect_ratio}")
 
-        # Court filtering: keep only players inside or intersecting with the court
+        # Court filtering: keep players inside/intersecting the PLAY AREA (court
+        # + margin) so a player who steps off-court (server behind the baseline,
+        # a chaser) is still detected. Strict foot-in-court admission is applied
+        # later in PlayerTracker, so bystanders outside the play area are still
+        # rejected from becoming tracks.
         if self.court_detector and frame is not None:
             court_filtered = []
-            court_mask = self.court_detector.detect_court(frame)
+            if hasattr(self.court_detector, "detect_play_area"):
+                court_mask = self.court_detector.detect_play_area(frame)
+            else:
+                court_mask = self.court_detector.detect_court(frame)
 
             if court_mask is not None:
                 for detection in player_filtered:
                     if self._is_player_in_court(detection, court_mask):
                         court_filtered.append(detection)
                     else:
-                        self.logger.debug(f"Filtered player outside court bounds")
+                        self.logger.debug(f"Filtered player outside play area")
                 player_filtered = court_filtered
             else:
                 self.logger.warning("Court detection failed, keeping all players")

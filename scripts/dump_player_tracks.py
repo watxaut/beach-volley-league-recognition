@@ -33,6 +33,7 @@ import cv2
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.detection.player_detector import PlayerDetector
+from src.detection.ball_detector import BallDetector
 from src.detection.court_calibration import CourtCalibration
 from src.tracking.player_tracker import PlayerTracker
 from src.utils.config import Config
@@ -94,11 +95,47 @@ def main():
     court = CourtCalibration(court_path) if court_path else CourtCalibration()
 
     detector = PlayerDetector(confidence_threshold=PROD_PLAYER_CONFIDENCE)
+
+    # Ball detector -- only used to drive the bootstrap's ball_active gate
+    # (skip warmup). Optional: if it can't be built, the bootstrap falls back to
+    # locking at bootstrap_max_wait, so measurement still works.
+    ball_detector = None
+    try:
+        auto_ball = Path(__file__).resolve().parent.parent / "models" / "volleyball_ball_best.pt"
+        ball_model = str(auto_ball) if auto_ball.exists() else None
+        ball_detector = BallDetector(
+            model_path=ball_model,
+            confidence_threshold=_CFG.get("ball_confidence", 0.5),
+            device=_CFG.get("device", "cpu"),
+        )
+    except Exception as exc:  # pragma: no cover - best-effort measurement aid
+        print(f"(warn) ball detector unavailable, bootstrap will use the time fallback: {exc}")
+
+    if court.is_calibrated:
+        court.set_play_area_margin(_CFG.get("player_play_area_margin_px", 100))
+
     tracker = PlayerTracker(
         max_players=args.max_players,
         max_disappeared=PROD_MAX_DISAPPEARED,
         max_distance=PROD_MAX_DISTANCE,
         court_calibration=court,
+        appearance_weight=_CFG.get("player_appearance_weight", 0.4),
+        init_frames=_CFG.get("player_init_frames", 60),
+        team_vote_window=_CFG.get("player_team_vote_window", 15),
+        coast_extrapolation_cap=_CFG.get("coast_extrapolation_cap", 15),
+        coast_velocity_decay=_CFG.get("coast_velocity_decay", 0.85),
+        gallery_enabled=_CFG.get("player_gallery_enabled", True),
+        gallery_reacquire_distance_px=_CFG.get("player_gallery_reacquire_distance_px", 120.0),
+        gallery_reacquire_min_appearance=_CFG.get("player_gallery_reacquire_min_appearance", 0.15),
+        gallery_reacquire_appearance_min=_CFG.get("player_gallery_reacquire_appearance_min", 0.5),
+        gallery_evict_min_hold_frames=_CFG.get("player_gallery_evict_min_hold_frames", 60),
+        bootstrap_min_window=_CFG.get("player_bootstrap_min_window", 8),
+        bootstrap_ball_required=_CFG.get("player_bootstrap_ball_required", True),
+        signature_color_weight=_CFG.get("player_signature_color_weight", 0.4),
+        signature_head_weight=_CFG.get("player_signature_head_weight", 0.15),
+        signature_height_weight=_CFG.get("player_signature_height_weight", 0.3),
+        signature_proportions_weight=_CFG.get("player_signature_proportions_weight", 0.15),
+        signature_height_smoothing=_CFG.get("player_signature_height_smoothing", 30),
     )
 
     output_dir = Path(args.output)
@@ -120,13 +157,33 @@ def main():
         if not ret:
             break
 
-        detections = detector.detect(frame)
+        raw = detector.detect(frame)
         if court.is_calibrated:
-            detections = court.filter_detections_by_court(detections)
-        # Raw in-court detection count -- the live/dead-ball signal analyze_tracking
-        # uses (live play = 4 in court; dead ball = extras walk in, > 4).
-        n_court_det = len(detections)
-        tracked = tracker.update(detections, frame)
+            strict = court.filter_detections_by_court(raw)
+        else:
+            strict = raw
+        # Association set = the detector output (already play-area bbox-overlap
+        # filtered), wider than the strict set so an established track can follow
+        # a player who steps off-court. NEW tracks are still gated by the strict
+        # foot-in-court admission test inside PlayerTracker.
+        play_area = raw
+        # Raw in-court detection count -- the live/dead-ball signal
+        # analyze_tracking uses (live play = 4 in court; dead ball = extras walk
+        # in, > 4). Kept on the STRICT set even though the tracker is fed the
+        # wider play-area set, so the live/dead logic stays correct.
+        n_court_det = len(strict)
+        ball_active = False
+        if ball_detector is not None:
+            try:
+                ball_active = len(ball_detector.detect(frame)) > 0
+            except Exception:
+                ball_active = False
+        tracked = tracker.update(
+            play_area, frame,
+            strict_detections=strict,
+            ball_active=ball_active,
+            n_court_det=n_court_det,
+        )
         max_simultaneous = max(max_simultaneous, len(tracked))
 
         # --- JSON dump (real boxes only by default; ghosts flagged via `predicted`) ---

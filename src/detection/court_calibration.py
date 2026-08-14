@@ -58,6 +58,17 @@ class CourtCalibration:
         self.court_bounds: Optional[Tuple[int, int, int, int]] = None  # x1, y1, x2, y2
         self.frame_dimensions: Optional[Tuple[int, int]] = None  # (h, w)
 
+        # Play area = the court polygon dilated by play_area_margin_px. NEW tracks
+        # must still prove a foot in the STRICT court (bystander-proof admission);
+        # ESTABLISHED tracks may roam the wider play area so the server (behind the
+        # baseline) and chasers are not dropped. See plan "two-zone policy".
+        self.play_area_margin_px: int = 100
+        self._play_area_mask: Optional[np.ndarray] = None
+
+        # Ground-plane homography (image px -> world m), cached lazily for the
+        # relative body-size signature (phase 1c).
+        self._ground_H: Optional[np.ndarray] = None
+
         self._calibrated = False
 
         if calibration_path and Path(calibration_path).exists():
@@ -271,6 +282,10 @@ class CourtCalibration:
     def _apply_points(self, points: List[Tuple[int, int]], frame_shape: Tuple[int, int]) -> None:
         """Compute all derived geometry from the calibration points."""
         self.frame_dimensions = frame_shape
+        # Invalidate any cached play-area mask so it rebuilds with the current
+        # court polygon + margin on next use.
+        self._play_area_mask = None
+        self._ground_H = None
         h, w = frame_shape
 
         self.court_corners = np.array(points[:4], dtype=np.int32)
@@ -369,9 +384,19 @@ class CourtCalibration:
 
     def get_team_for_bbox(self, bbox: List[int]) -> Optional[str]:
         """Return team using player's foot position (bottom-center of bbox)."""
-        foot_x = (bbox[0] + bbox[2]) / 2
-        foot_y = bbox[3]
-        return self.get_team((int(foot_x), int(foot_y)))
+        return self.get_team(self.foot_point(bbox))
+
+    @staticmethod
+    def foot_point(bbox) -> Tuple[int, int]:
+        """Bottom-center of a bbox -- the player's foot position on the ground.
+
+        Shared by team assignment, the strict court-admission test, and the
+        ground-plane body-size estimate, so the convention stays identical
+        everywhere (was previously inlined in three places).
+        """
+        foot_x = int((bbox[0] + bbox[2]) / 2)
+        foot_y = int(bbox[3])
+        return (foot_x, foot_y)
 
     def get_net_y(self) -> Optional[int]:
         """Return the y-coordinate of the midcourt line center."""
@@ -412,8 +437,24 @@ class CourtCalibration:
             return None
         return self.court_mask
 
+    def detect_play_area(self, frame: np.ndarray) -> Optional[np.ndarray]:
+        """Return the dilated play-area mask (court + margin), built lazily.
+
+        The player detector filters by bbox-overlap with THIS wider mask so a
+        player who steps off-court (server behind the baseline) is still
+        detected; strict foot-in-court admission is applied later in the tracker.
+        """
+        if not self._calibrated:
+            self.frame_dimensions = frame.shape[:2]
+            return None
+        return self._ensure_play_area_mask()
+
     def filter_detections_by_court(self, detections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Filter detections to only include those within the court polygon."""
+        """Filter detections to only include those within the STRICT court polygon.
+
+        Used both as the live/dead-ball count and as the admission pool for NEW
+        tracks (a bystander outside the court can never bootstrap into a track).
+        """
         if not self._calibrated:
             return detections
 
@@ -422,13 +463,135 @@ class CourtCalibration:
             bbox = det.get("bbox", [])
             if len(bbox) != 4:
                 continue
-            x1, y1, x2, y2 = bbox
             # Use foot position (bottom-center) — consistent with team assignment
-            foot_x = (x1 + x2) / 2
-            foot_y = y2
-            if self.is_point_in_court((int(foot_x), int(foot_y))):
+            if self.is_point_in_court(self.foot_point(bbox)):
                 filtered.append(det)
         return filtered
+
+    # --- Play area (wider zone for ESTABLISHED tracks) ---
+
+    def _ensure_play_area_mask(self) -> Optional[np.ndarray]:
+        """Lazily build and cache the dilated play-area mask."""
+        if self._play_area_mask is not None:
+            return self._play_area_mask
+        if self.court_mask is None:
+            return None
+        m = max(1, int(self.play_area_margin_px))
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (m * 2 + 1, m * 2 + 1))
+        self._play_area_mask = cv2.dilate(self.court_mask, kernel)
+        return self._play_area_mask
+
+    def set_play_area_margin(self, margin_px: int) -> None:
+        """Override the play-area margin and rebuild the mask."""
+        self.play_area_margin_px = max(1, int(margin_px))
+        self._play_area_mask = None
+        self._ensure_play_area_mask()
+
+    def is_point_in_play_area(self, point: Tuple[int, int]) -> bool:
+        """Check if a point is inside the (dilated) play area."""
+        mask = self._ensure_play_area_mask()
+        if mask is None:
+            return True
+        x, y = point
+        h, w = mask.shape
+        if x < 0 or x >= w or y < 0 or y >= h:
+            return False
+        return mask[int(y), int(x)] > 0
+
+    def filter_detections_by_play_area(self, detections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Filter detections to those within the wider play area.
+
+        This is the set fed to the tracker for association: established tracks
+        can match an off-court detection here (e.g. the server behind the
+        baseline), whereas new-track creation still requires the strict court
+        test (filter_detections_by_court) enforced inside PlayerTracker.
+        """
+        if not self._calibrated:
+            return list(detections)
+        filtered = []
+        for det in detections:
+            bbox = det.get("bbox", [])
+            if len(bbox) != 4:
+                continue
+            if self.is_point_in_play_area(self.foot_point(bbox)):
+                filtered.append(det)
+        return filtered
+
+    # --- Ground-plane geometry (phase 1c: relative body-size signature) ---
+
+    # Beach court real-world dimensions (metres): 16 baseline-to-baseline x 8
+    # sideline-to-sideline. Used to turn the 4 clicked corners into an image ->
+    # ground-plane homography.
+    BEACH_COURT_LENGTH_M = 16.0
+    BEACH_COURT_WIDTH_M = 8.0
+
+    def compute_ground_homography(self) -> Optional[np.ndarray]:
+        """Image-pixel -> world-metre homography from the 4 court corners.
+
+        Corner order (from calibration) clockwise from far-left is far-left,
+        far-right, near-right, near-left, mapped to world metres
+        (0,0),(W,0),(W,L),(0,L). Cached on first use. Returns None if the court
+        is not calibrated.
+        """
+        if self._ground_H is not None:
+            return self._ground_H
+        if self.court_corners is None or len(self.court_corners) < 4:
+            return None
+        L, W = self.BEACH_COURT_LENGTH_M, self.BEACH_COURT_WIDTH_M
+        image_pts = np.array(self.court_corners[:4], dtype=np.float32).reshape(-1, 1, 2)
+        world_pts = np.array([[0, 0], [W, 0], [W, L], [0, L]], dtype=np.float32).reshape(-1, 1, 2)
+        H, _ = cv2.findHomography(image_pts, world_pts)
+        self._ground_H = H
+        return H
+
+    def image_to_world(self, point: Tuple[int, int]) -> Optional[Tuple[float, float]]:
+        """Map an image pixel to a ground-plane point in metres. None if uncalibrated."""
+        H = self.compute_ground_homography()
+        if H is None:
+            return None
+        arr = np.array([[[float(point[0]), float(point[1])]]], dtype=np.float32)
+        out = cv2.perspectiveTransform(arr, H)[0, 0]
+        return (float(out[0]), float(out[1]))
+
+    def world_scale_at(self, point: Tuple[int, int]) -> Optional[float]:
+        """Local metres-per-pixel at an image point (ground-plane Jacobian).
+
+        Lets a pixel body extent be converted to metres locally. Only a RELATIVE
+        size signal -- a 2D homography cannot recover true vertical height since
+        the head is off the ground plane (see plan, honest limit).
+        """
+        base = self.image_to_world(point)
+        if base is None:
+            return None
+        x, y = float(point[0]), float(point[1])
+        dx = self.image_to_world((x + 1, y))
+        dy = self.image_to_world((x, y + 1))
+        sx = float(np.hypot(dx[0] - base[0], dx[1] - base[1]))
+        sy = float(np.hypot(dy[0] - base[0], dy[1] - base[1]))
+        return (sx + sy) / 2.0
+
+    def world_body_size(self, bbox) -> Optional[Dict[str, float]]:
+        """Relative body size in ground-plane metres for a detection bbox.
+
+        Returns world_height, world_width, ratio (h/w), and foot_world (the
+        player's court position in metres). Height/width are perspective-attenuated
+        RELATIVE measurements, not true metric height. None if unavailable.
+        """
+        foot = self.foot_point(bbox)
+        scale = self.world_scale_at(foot)
+        if scale is None or scale <= 0:
+            return None
+        pixel_h = float(bbox[3] - bbox[1])
+        pixel_w = float(bbox[2] - bbox[0])
+        if pixel_w <= 0 or pixel_h <= 0:
+            return None
+        wh, ww = pixel_h * scale, pixel_w * scale
+        return {
+            "world_height": wh,
+            "world_width": ww,
+            "ratio": wh / ww,
+            "foot_world": self.image_to_world(foot),
+        }
 
     def is_point_in_court(self, point: Tuple[int, int]) -> bool:
         """Check if a point is inside the court polygon."""

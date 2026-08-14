@@ -57,6 +57,13 @@ class FrameProcessor:
             # For backward compat: expose court_detector attribute (same interface)
             self.court_detector = self.court_calibration
 
+            # Play-area margin (how far beyond the court polygon established tracks
+            # may roam). Set once here from config; the mask builds lazily on use.
+            if self.court_calibration.is_calibrated:
+                self.court_calibration.set_play_area_margin(
+                    self.config.get("player_play_area_margin_px", 100)
+                )
+
             # Ball detection (YOLO-based)
             self.ball_detector = BallDetector(
                 model_path=self.config.get("ball_model_path"),
@@ -95,10 +102,24 @@ class FrameProcessor:
                 max_distance=self.config.get("tracking_max_distance", 150.0),
                 max_velocity=self.config.get("player_max_velocity", 150.0),
                 max_players=self.config.get("max_players", 4),
+                appearance_weight=self.config.get("player_appearance_weight", 0.4),
+                init_frames=self.config.get("player_init_frames", 60),
                 court_calibration=self.court_calibration,
                 team_vote_window=self.config.get("player_team_vote_window", 15),
                 coast_extrapolation_cap=self.config.get("coast_extrapolation_cap", 15),
                 coast_velocity_decay=self.config.get("coast_velocity_decay", 0.85),
+                gallery_enabled=self.config.get("player_gallery_enabled", True),
+                gallery_reacquire_distance_px=self.config.get("player_gallery_reacquire_distance_px", 120.0),
+                gallery_reacquire_min_appearance=self.config.get("player_gallery_reacquire_min_appearance", 0.15),
+                gallery_reacquire_appearance_min=self.config.get("player_gallery_reacquire_appearance_min", 0.5),
+                gallery_evict_min_hold_frames=self.config.get("player_gallery_evict_min_hold_frames", 60),
+                bootstrap_min_window=self.config.get("player_bootstrap_min_window", 8),
+                bootstrap_ball_required=self.config.get("player_bootstrap_ball_required", True),
+                signature_color_weight=self.config.get("player_signature_color_weight", 0.4),
+                signature_head_weight=self.config.get("player_signature_head_weight", 0.15),
+                signature_height_weight=self.config.get("player_signature_height_weight", 0.3),
+                signature_proportions_weight=self.config.get("player_signature_proportions_weight", 0.15),
+                signature_height_smoothing=self.config.get("player_signature_height_smoothing", 30),
             )
 
             # Pose estimation (video mode for temporal smoothing)
@@ -186,11 +207,23 @@ class FrameProcessor:
             frame_result["ball_detections"] = ball_detections
             frame_result["player_detections"] = player_detections
 
-            # 2. Filter by court
-            filtered_players = self.court_calibration.filter_detections_by_court(player_detections)
+            # 2. Two-zone filter. STRICT (foot-in-court) is the admission pool for
+            # NEW tracks and the live/dead-ball count; the detector output (already
+            # play-area bbox-overlap filtered) is the association set, so an
+            # established track can follow a player who steps off-court (server
+            # behind baseline, chaser). NEW tracks are still gated by the strict
+            # foot-in-court admission test inside PlayerTracker.
+            strict_players = self.court_calibration.filter_detections_by_court(player_detections)
+            play_area_players = player_detections
 
             # 3. Tracking
-            tracked_players = self.player_tracker.update(filtered_players, frame)
+            tracked_players = self.player_tracker.update(
+                play_area_players,
+                frame,
+                strict_detections=strict_players,
+                ball_active=bool(ball_detections),
+                n_court_det=len(strict_players),
+            )
             tracked_ball = self.ball_tracker.update(ball_detections)
 
             frame_result["tracked_players"] = tracked_players
@@ -240,9 +273,7 @@ class FrameProcessor:
 
     def reset_trackers(self) -> None:
         """Reset all tracking state."""
-        self.player_tracker.tracks = {}
-        self.player_tracker.disappeared = {}
-        self.player_tracker._initialized = False
+        self.player_tracker.reset()
 
         self.ball_tracker.reset()
         self.ball_detector.reset()

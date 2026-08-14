@@ -37,6 +37,18 @@ class PlayerTracker:
         team_vote_window: int = 15,
         coast_extrapolation_cap: int = 15,
         coast_velocity_decay: float = 0.85,
+        gallery_enabled: bool = True,
+        gallery_reacquire_distance_px: float = 120.0,
+        gallery_reacquire_min_appearance: float = 0.15,
+        gallery_reacquire_appearance_min: float = 0.5,
+        gallery_evict_min_hold_frames: int = 60,
+        bootstrap_min_window: int = 8,
+        bootstrap_ball_required: bool = True,
+        signature_color_weight: float = 0.4,
+        signature_head_weight: float = 0.15,
+        signature_height_weight: float = 0.3,
+        signature_proportions_weight: float = 0.15,
+        signature_height_smoothing: int = 30,
     ):
         """Initialize the player tracker.
 
@@ -61,37 +73,83 @@ class PlayerTracker:
         self.coast_extrapolation_cap = coast_extrapolation_cap
         self.coast_velocity_decay = coast_velocity_decay
 
+        # --- Identity (continuity-first) config (1a/1b/1c) ---
+        self.gallery_enabled = gallery_enabled
+        self.gallery_reacquire_distance_px = gallery_reacquire_distance_px
+        self.gallery_reacquire_min_appearance = gallery_reacquire_min_appearance
+        self.gallery_reacquire_appearance_min = gallery_reacquire_appearance_min
+        self.gallery_evict_min_hold_frames = gallery_evict_min_hold_frames
+        self.bootstrap_min_window = bootstrap_min_window
+        self.bootstrap_ball_required = bootstrap_ball_required
+        self.bootstrap_max_wait = init_frames  # fallback: never block the whole video
+        self.signature_weights = {
+            "color": signature_color_weight,
+            "head": signature_head_weight,
+            "height": signature_height_weight,
+            "proportions": signature_proportions_weight,
+        }
+        self.signature_height_smoothing = signature_height_smoothing
+
         # Tracking state
         self.tracks: Dict[int, Dict[str, Any]] = {}
         self.disappeared: Dict[int, int] = {}
+        # 1b: dormant gallery -- retired (lost) tracks held match-long so their
+        # original id can be restored on re-acquisition. The hard cap counts
+        # active + dormant together, so a dormant id can't be stolen. Empty
+        # until _retire_track is wired (phase 1b).
+        self.gallery: Dict[int, Dict[str, Any]] = {}
         # No next_id — IDs are recycled from range 1..max_players
         self.frame_count = 0
         self._initialized = False
 
-        # Initialization buffer: collect detections from first N frames
-        self._init_buffer: List[List[Dict[str, Any]]] = []
+        # Bootstrap (1a): accumulate foot-in-court detections on ball-active
+        # frames, then lock the 4 most persistent as the roster.
+        self._bootstrap_buffer: List[List[Dict[str, Any]]] = []
+        self._bootstrap_qualifying = 0
+        self._last_strict_detections: List[Dict[str, Any]] = []
         # Current frame for appearance extraction
         self._current_frame: Optional[np.ndarray] = None
 
         self.logger = logging.getLogger(__name__)
 
     def update(
-        self, detections: List[Dict[str, Any]], frame: Optional[np.ndarray] = None
+        self,
+        detections: List[Dict[str, Any]],
+        frame: Optional[np.ndarray] = None,
+        *,
+        strict_detections: Optional[List[Dict[str, Any]]] = None,
+        ball_active: bool = False,
+        n_court_det: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """Update tracker with new detections.
 
         Args:
-            detections: List of player detections with 'bbox', 'center', 'confidence'.
+            detections: Player detections within the PLAY AREA (court + margin)
+                -- the wider set, so an established track can match a player who
+                has stepped off-court (server behind baseline, chaser).
             frame: Current video frame (needed for appearance features).
+            strict_detections: Foot-in-court detections only -- the admission
+                pool for NEW tracks and the persistence source for the bootstrap.
+                If None (legacy callers), falls back to `detections`.
+            ball_active: True when the ball is in play this frame -- gates the
+                bootstrap to skip the warmup opening.
+            n_court_det: Strict in-court count (live/dead-ball signal); stored
+                for diagnostics, not used in association.
 
         Returns:
             List of tracked players with stable 'track_id' and 'team' fields.
         """
         self._current_frame = frame
         self.frame_count += 1
+        self._last_n_court_det = n_court_det
+        # Admission/persistence reference: strict foot-in-court set, falling back
+        # to all detections for legacy callers (single-zone behaviour).
+        self._last_strict_detections = (
+            strict_detections if strict_detections is not None else detections
+        )
 
         if not self._initialized:
-            return self._initialization_phase(detections)
+            return self._bootstrap_phase(detections, self._last_strict_detections, ball_active)
 
         if not detections:
             return self._handle_no_detections()
@@ -142,40 +200,79 @@ class PlayerTracker:
                 keep.append(det)
         return keep
 
-    def _initialization_phase(self, detections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Collect detections for init_frames, then pick the best 4 tracks."""
-        detections = self._deduplicate_detections(detections)
-        self._init_buffer.append(detections)
+    def _bootstrap_phase(
+        self,
+        detections: List[Dict[str, Any]],
+        strict_detections: List[Dict[str, Any]],
+        ball_active: bool,
+    ) -> List[Dict[str, Any]]:
+        """Skip the warmup; lock the 4-roster at the first reliable rally.
 
-        if self.frame_count < self.init_frames and len(self._init_buffer) < self.init_frames:
-            # Still collecting -- return detections with temporary IDs
+        Persistence-on-court decides WHO the 4 are: only foot-in-court
+        (`strict_detections`) centers accumulate, so an off-court bystander can
+        never bootstrap into the roster. The ball-active gate skips the opening
+        warmup where players are not in position / partly off-frame. Falls back
+        to locking with whatever is available at `bootstrap_max_wait` so a missed
+        ball signal never blocks the whole video.
+        """
+        detections = self._deduplicate_detections(detections)
+        strict = (
+            self._deduplicate_detections(strict_detections)
+            if strict_detections is not None
+            else detections
+        )
+
+        # Accumulate persistence only on qualifying (ball-active) frames.
+        qualify = bool(ball_active) or (not self.bootstrap_ball_required)
+        if qualify:
+            self._bootstrap_buffer.append(strict)
+            self._bootstrap_qualifying += 1
+
+        ready = (
+            self._bootstrap_qualifying >= self.bootstrap_min_window
+            and sum(len(f) for f in self._bootstrap_buffer) >= self.max_players
+        )
+        timed_out = self.frame_count >= self.bootstrap_max_wait
+
+        if not (ready or timed_out):
             return self._temp_track_output(detections)
 
-        # Cluster all collected detections to find 4 most persistent players
-        self._initialize_from_buffer()
+        # Lock the roster, then run a normal association for this frame.
+        qualifying = self._bootstrap_qualifying
+        self._lock_roster_from_buffer()
         self._initialized = True
-        self._init_buffer = []
-
-        # Now do a normal association for this frame
+        self._bootstrap_buffer = []
+        self._bootstrap_qualifying = 0
+        self.logger.info(
+            f"Bootstrap locked {len(self.tracks)} tracks at frame {self.frame_count} "
+            f"(qualifying={qualifying}, ball_active={ball_active}, "
+            f"timed_out={timed_out})"
+        )
         if detections:
             return self._associate_detections(detections)
         return self._get_current_tracks()
 
-    def _initialize_from_buffer(self) -> None:
-        """Initialize exactly max_players tracks from the buffered detections."""
-        # Collect all detection centers
-        all_centers = []
-        for frame_dets in self._init_buffer:
-            for det in frame_dets:
-                all_centers.append(det["center"])
+    def _lock_roster_from_buffer(self) -> None:
+        """Create exactly max_players tracks from the accumulated on-court frames.
+
+        K-means over the buffered foot-in-court centers finds the most
+        persistent positions; each cluster is seeded from its closest detection
+        in the last buffered frame (a real bbox, so team assignment is sound).
+        """
+        frames = self._bootstrap_buffer
+        all_centers = [det["center"] for frame_dets in frames for det in frame_dets]
 
         if len(all_centers) < self.max_players:
-            # Not enough detections -- initialize with whatever we have
-            for det in (self._init_buffer[-1] if self._init_buffer else []):
-                self._create_track(det)
+            # Not enough persistence yet (e.g. the ball signal never fired, so
+            # the buffer only has a frame or two). Seed from the most recent
+            # on-court detections so the tracker is never left empty -- note
+            # _associate_detections returns early when there are zero tracks, so
+            # a failed seed here would leave the tracker stuck for the video.
+            seed = frames[-1] if frames else self._last_strict_detections
+            for det in seed:
+                self._create_track(det, require_court_admission=False)
             return
 
-        # K-means clustering to find player positions
         centers_arr = np.array(all_centers, dtype=np.float32)
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 1.0)
         k = min(self.max_players, len(centers_arr))
@@ -183,42 +280,51 @@ class PlayerTracker:
             centers_arr, k, None, criteria, 10, cv2.KMEANS_PP_CENTERS
         )
 
-        # Count points per cluster to rank by persistence
+        # Rank clusters by persistence (point count) -- the 4 most persistent
+        # on-court positions are the players; sporadic bystanders fall out.
         cluster_counts = np.bincount(labels.flatten(), minlength=k)
-        top_clusters = np.argsort(-cluster_counts)[:self.max_players]
+        top_clusters = np.argsort(-cluster_counts)[: self.max_players]
 
-        # For each cluster, pick the detection from the last frame closest to center.
-        # Use cluster center for team assignment (stable across frames) instead of
-        # the last-frame bbox which might be mid-squat.
-        last_frame_dets = self._init_buffer[-1] if self._init_buffer else []
+        last_frame_dets = frames[-1] if frames else []
         for cluster_idx in top_clusters:
             center = cluster_centers[cluster_idx]
-            # Find closest detection in last frame
-            best_det = None
-            best_dist = float("inf")
+            best_det, best_dist = None, float("inf")
             for det in last_frame_dets:
                 d = np.linalg.norm(np.array(det["center"]) - center)
                 if d < best_dist:
-                    best_dist = d
-                    best_det = det
+                    best_dist, best_det = d, det
 
             if best_det is not None:
-                # Use the detection's bbox for team assignment (foot position)
-                # instead of the cluster center which is a bbox-center average
-                tid = self._create_track(best_det)
+                self._create_track(best_det, require_court_admission=False)
             else:
-                tid = self._create_track({
-                    "bbox": [int(center[0]-30), int(center[1]-60), int(center[0]+30), int(center[1]+60)],
-                    "center": center.tolist(),
-                    "confidence": 0.5,
-                })
+                # Synthetic seed around the cluster centre (last resort).
+                self._create_track(
+                    {
+                        "bbox": [int(center[0] - 30), int(center[1] - 60),
+                                 int(center[0] + 30), int(center[1] + 60)],
+                        "center": center.tolist(),
+                        "confidence": 0.5,
+                    },
+                    require_court_admission=False,
+                )
 
-        self.logger.info(f"Initialized {len(self.tracks)} player tracks from {len(self._init_buffer)} frames")
+        self.logger.info(
+            f"Bootstrap: initialized {len(self.tracks)} tracks from "
+            f"{len(frames)} qualifying frames"
+        )
 
     def _temp_track_output(self, detections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """During initialization, return detections with temporary track IDs."""
+        """During bootstrap, return detections with temporary track IDs.
+
+        Sorted by center-x so temp IDs 1..N stay spatially stable frame-to-frame
+        (instead of shuffling by detection order) while we wait for the rally lock.
+        """
         result = []
-        for i, det in enumerate(detections[:self.max_players]):
+        ordered = sorted(
+            detections[: self.max_players],
+            key=lambda d: d.get("center", [0, 0])[0],
+        )
+        for i, det in enumerate(ordered):
             d = det.copy()
             d["track_id"] = i + 1
             d["team"] = None
@@ -302,7 +408,7 @@ class PlayerTracker:
                 continue
             self.disappeared[tid] = self.disappeared.get(tid, 0) + 1
             if self.disappeared[tid] > self.max_disappeared:
-                self._remove_track(tid)
+                self._retire_track(tid)
                 continue
             track = self.tracks.get(tid)
             if not track:
@@ -325,16 +431,35 @@ class PlayerTracker:
                 "predicted": True,
             })
 
+        # Gallery re-acquisition (phase 1b): an unmatched detection that lines up
+        # with a DORMANT player's last trajectory restores that player's ORIGINAL
+        # id. This is what holds identity across gaps longer than max_disappeared
+        # (long occlusions; the backbone of surviving side changes once continuity
+        # is also maintained through the walk-around). Runs after IoU
+        # re-acquisition and the coast/retire loop, before new-track creation.
+        if self.gallery_enabled and self.gallery:
+            for _j, _gid, out in self._reacquire_from_gallery(
+                detections, matched_dets, matched_tracks
+            ):
+                tracked_players.append(out)
+                matched_boxes.append(out["bbox"])
+
         # Unmatched detections: create a new track only if there is room AND the
         # detection is not already covered by an existing track (never stack two
-        # ids on one player).
+        # ids on one player). If every slot is reserved (active + dormant), first
+        # reclaim the stalest dormant id past its min-hold so an on-court player
+        # is tracked rather than dropped (the trap avoidance). Recent retirements
+        # are protected so a genuinely-occluded player's id isn't stolen.
         existing_boxes = [t["bbox"] for t in self.tracks.values()]
         for j in range(n_dets):
-            if j in matched_dets or len(self.tracks) >= self.max_players:
+            if j in matched_dets:
                 continue
             det = detections[j]
             if any(self._iou(det["bbox"], eb) > 0.35 for eb in existing_boxes):
                 continue
+            if len(self.tracks) + len(self.gallery) >= self.max_players:
+                if not (self.gallery_enabled and self._evict_stalest_dormant()):
+                    continue
             tid = self._create_track(det)
             if tid < 0:
                 continue
@@ -367,17 +492,19 @@ class PlayerTracker:
         predicted = track_center + np.array(track.get("velocity", [0.0, 0.0]))
         pred_distance = float(np.linalg.norm(predicted - det_center))
 
-        # Appearance cost (color histogram similarity)
+        # Appearance cost (ensemble signature similarity -- phase 1c). When the
+        # track has a real signature and the detection looks very different AND
+        # is far away, reject (blocks appearance-driven ID swaps).
         appearance_cost = 0.0
-        if self._current_frame is not None and "histogram" in track:
-            det_hist = self._compute_histogram(detection["bbox"])
-            if det_hist is not None and track["histogram"] is not None:
-                similarity = cv2.compareHist(track["histogram"], det_hist, cv2.HISTCMP_CORREL)
-                appearance_cost = 1.0 - max(0.0, similarity)  # 0=identical, 1=different
-                # A very different-looking detection cannot steal an ID unless it
-                # is essentially on top of the track (blocks appearance swaps).
-                if similarity < 0.15 and pred_distance > 0.35 * self.max_distance:
-                    return None
+        if self._current_frame is not None:
+            similarity = self._signature_similarity(track, detection)
+            appearance_cost = 1.0 - similarity  # 0=identical, 1=different
+            if (
+                track.get("histogram") is not None
+                and similarity < 0.15
+                and pred_distance > 0.35 * self.max_distance
+            ):
+                return None
 
         # Combined cost
         cost = (1.0 - self.appearance_weight) * pred_distance + self.appearance_weight * appearance_cost * self.max_distance
@@ -412,26 +539,89 @@ class PlayerTracker:
         cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
         return hist
 
+    def _compute_head_histogram(self, bbox: List[float]) -> Optional[np.ndarray]:
+        """HSV histogram of the top ~20% of a bbox (hair/hat region).
+
+        A uniform-independent-ish channel that helps tell partners apart even
+        when their torsos share a jersey colour (phase 1c).
+        """
+        if self._current_frame is None:
+            return None
+        h, w = self._current_frame.shape[:2]
+        x1, y1, x2, y2 = [int(v) for v in bbox]
+        x1, y1 = max(0, x1), max(0, y1)
+        x2, y2 = min(w, x2), min(h, y2)
+        if x2 <= x1 or y2 <= y1:
+            return None
+        box_h = y2 - y1
+        head_y2 = y1 + max(1, box_h // 5)
+        crop = self._current_frame[y1:head_y2, x1:x2]
+        if crop.size == 0:
+            return None
+        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+        hist = cv2.calcHist([hsv], [0, 1], None, [18, 8], [0, 180, 0, 256])
+        cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
+        return hist
+
     # --- Track management ---
 
-    def _create_track(self, detection: Dict[str, Any]) -> int:
-        """Create a new track. Respects max_players limit.
+    def _create_track(
+        self, detection: Dict[str, Any], require_court_admission: bool = True
+    ) -> int:
+        """Create a new track.
+
+        Two continuity-first safeguards (see plan "two-zone policy" + "exactly 4"):
+          * Admission gate: a brand-new track must start with a foot inside the
+            STRICT court, so an off-court bystander can never bootstrap in.
+            Established tracks roaming the play area never hit this path (they
+            match via the Hungarian pass, not creation). Skipped for bootstrap
+            seeds (which already come from the foot-in-court set) and when no
+            court calibration is available.
+          * Active+dormant cap: counts active tracks AND the dormant gallery, so
+            a dormant (lost-but-not-forgotten) id cannot be recycled onto a new
+            player.
 
         Args:
             detection: Detection dict with bbox, center, confidence.
+            require_court_admission: If True, reject detections whose foot is
+                outside the strict court (the bystander guard for new tracks).
         """
-        if len(self.tracks) >= self.max_players:
-            self.logger.debug("Max players reached, not creating new track")
+        if (
+            require_court_admission
+            and self.court_calibration is not None
+            and getattr(self.court_calibration, "is_calibrated", False)
+        ):
+            foot = self.court_calibration.foot_point(detection["bbox"])
+            if not self.court_calibration.is_point_in_court(foot):
+                self.logger.debug("Reject new track: foot outside court (bystander guard)")
+                return -1
+
+        committed = len(self.tracks) + len(self.gallery)
+        if committed >= self.max_players:
+            self.logger.debug("Max players reached (active+dormant), not creating new track")
             return -1
 
-        # Recycle IDs: pick the lowest unused ID in 1..max_players
-        available = sorted(set(range(1, self.max_players + 1)) - set(self.tracks.keys()))
+        # Recycle IDs: pick the lowest unused ID in 1..max_players that is neither
+        # active nor dormant (a dormant id is reserved for its original player).
+        available = sorted(
+            set(range(1, self.max_players + 1))
+            - set(self.tracks.keys())
+            - set(self.gallery.keys())
+        )
         if not available:
             self.logger.debug("No available IDs in 1..max_players range")
             return -1
         tid = available[0]
 
         hist = self._compute_histogram(detection["bbox"]) if self._current_frame is not None else None
+        head_hist = self._compute_head_histogram(detection["bbox"]) if self._current_frame is not None else None
+        world_h: deque = deque(maxlen=self.signature_height_smoothing)
+        world_w: deque = deque(maxlen=self.signature_height_smoothing)
+        if self.court_calibration is not None:
+            size = self.court_calibration.world_body_size(detection["bbox"])
+            if size:
+                world_h.append(size["world_height"])
+                world_w.append(size["world_width"])
         # Team is derived per-frame from foot position (side of the midcourt line,
         # per project spec) and smoothed over a vote window -- NOT locked at
         # creation. Seed the window with the creation-time reading.
@@ -447,6 +637,9 @@ class PlayerTracker:
             "history": [detection["center"]],
             "velocity": [0.0, 0.0],
             "histogram": hist,
+            "head_histogram": head_hist,
+            "world_height_samples": world_h,
+            "world_width_samples": world_w,
             "team_votes": team_votes,
         }
         self.disappeared[tid] = 0
@@ -482,15 +675,31 @@ class PlayerTracker:
         if len(track["history"]) > 60:
             track["history"] = track["history"][-60:]
 
-        # Update appearance histogram periodically
+        # Refresh the appearance ensemble (phase 1c): torso + head histograms
+        # blend slowly (every 10 frames); a fresh world body-size sample is
+        # pushed every update and median-smoothed for stability.
         if self._current_frame is not None and self.frame_count % 10 == 0:
             hist = self._compute_histogram(detection["bbox"])
             if hist is not None:
-                if track["histogram"] is not None:
-                    # Blend old and new histogram
+                if track.get("histogram") is not None:
                     track["histogram"] = 0.7 * track["histogram"] + 0.3 * hist
                 else:
                     track["histogram"] = hist
+            head_hist = self._compute_head_histogram(detection["bbox"])
+            if head_hist is not None:
+                if track.get("head_histogram") is not None:
+                    track["head_histogram"] = 0.7 * track["head_histogram"] + 0.3 * head_hist
+                else:
+                    track["head_histogram"] = head_hist
+        if self.court_calibration is not None:
+            size = self.court_calibration.world_body_size(detection["bbox"])
+            if size:
+                track.setdefault(
+                    "world_height_samples", deque(maxlen=self.signature_height_smoothing)
+                ).append(size["world_height"])
+                track.setdefault(
+                    "world_width_samples", deque(maxlen=self.signature_height_smoothing)
+                ).append(size["world_width"])
 
         self.disappeared[tid] = 0
 
@@ -521,11 +730,269 @@ class PlayerTracker:
         track["velocity"] = [vx * self.coast_velocity_decay, vy * self.coast_velocity_decay]
         return nb, [ncx, ncy]
 
-    def _remove_track(self, tid: int) -> None:
-        """Remove a track."""
-        self.tracks.pop(tid, None)
+    def _retire_track(self, tid: int) -> None:
+        """Retire a track to the dormant gallery (match-long) instead of deleting.
+
+        The id is NEVER freed -- it stays reserved so a later re-acquisition
+        restores the original id rather than recycling it onto a new player. The
+        hard cap (_create_track) counts active + dormant, so a dormant id cannot
+        be stolen by a bystander-driven new track either.
+        """
+        track = self.tracks.pop(tid, None)
         self.disappeared.pop(tid, None)
-        self.logger.debug(f"Removed track {tid}")
+        if self.gallery_enabled and track is not None:
+            self.gallery[tid] = {
+                "bbox": track.get("bbox"),
+                "center": track.get("center"),
+                "velocity": track.get("velocity", [0.0, 0.0]),
+                "histogram": track.get("histogram"),
+                "head_histogram": track.get("head_histogram"),
+                "world_height_samples": track.get("world_height_samples"),
+                "world_width_samples": track.get("world_width_samples"),
+                "team_votes": track.get("team_votes"),
+                "retired_frame": self.frame_count,
+            }
+            self.logger.debug(
+                f"Retired track {tid} to gallery (size={len(self.gallery)})"
+            )
+        else:
+            self.logger.debug(f"Removed track {tid}")
+
+    def _evict_stalest_dormant(self) -> bool:
+        """Reclaim the dormant id that has been gone longest (and is past its
+        min-hold) to free a slot for an on-court detection that would otherwise
+        be dropped. Returns True if a slot was freed.
+
+        Recent retirements (within gallery_evict_min_hold_frames) are protected
+        -- they may still be re-acquired by position, so a new detection must not
+        steal them. Only the stalest eligible dormant id is reclaimed, and only
+        when the create-loop is actually forced (a detection needs the slot).
+        """
+        if not self.gallery:
+            return False
+        candidates = [
+            (gid, g)
+            for gid, g in self.gallery.items()
+            if self.frame_count - g.get("retired_frame", self.frame_count)
+            >= self.gallery_evict_min_hold_frames
+        ]
+        if not candidates:
+            return False
+        # Oldest retirement first = least likely to re-acquire.
+        candidates.sort(key=lambda kv: kv[1].get("retired_frame", 0))
+        gid = candidates[0][0]
+        self.gallery.pop(gid, None)
+        self.logger.debug(
+            f"Evicted stale dormant id {gid} to free a slot for a new detection"
+        )
+        return True
+
+    def _reacquire_from_gallery(
+        self,
+        detections: List[Dict[str, Any]],
+        matched_dets: set,
+        matched_tracks: set,
+    ) -> List[Tuple[int, int, Dict[str, Any]]]:
+        """Match still-unmatched detections to dormant gallery tracks.
+
+        Position+motion is the primary gate (continuity-first): a dormant track
+        is searched near its last coasted position. The stored colour signature
+        is a tie-break and flags the restore low-confidence when weak. Each
+        detection and each gallery id is used at most once (greedy, nearest
+        first). Restored tracks come back under their ORIGINAL id.
+        """
+        results: List[Tuple[int, int, Dict[str, Any]]] = []
+        if not self.gallery:
+            return results
+
+        candidates = []
+        for j in range(len(detections)):
+            if j in matched_dets:
+                continue
+            dc = np.array(detections[j]["center"])
+            for gid, g in self.gallery.items():
+                dormant = max(0, self.frame_count - g.get("retired_frame", self.frame_count))
+                base = np.array(g.get("center", [0.0, 0.0]))
+                # Trust motion only over short gaps; clamp the extrapolation so a
+                # long-dormant player is searched near their last known position
+                # (a side-change reappearance on the far side won't match here --
+                # that needs the appearance signature, phase 1c).
+                vel = np.array(g.get("velocity", [0.0, 0.0]))
+                steps = min(dormant, self.coast_extrapolation_cap)
+                pred = base + vel * steps
+                dist = float(np.linalg.norm(pred - dc))
+                if dist <= self.gallery_reacquire_distance_px:
+                    sim = self._signature_similarity(g, detections[j])
+                    # sort key: nearest first, then highest similarity
+                    candidates.append((dist, -sim, j, gid))
+
+        candidates.sort()
+        used_dets: set = set()
+        used_gids: set = set()
+        for dist, neg_sim, j, gid in candidates:
+            if j in used_dets or gid in used_gids:
+                continue
+            g = self.gallery.pop(gid)
+            sim = -neg_sim
+            self._restore_track(gid, g, detections[j])
+            matched_dets.add(j)
+            matched_tracks.add(gid)
+            used_dets.add(j)
+            used_gids.add(gid)
+            out = detections[j].copy()
+            out["track_id"] = gid
+            out["team"] = self._get_smoothed_team(gid)
+            out["reacquired"] = True
+            out["low_confidence"] = sim < self.gallery_reacquire_min_appearance
+            results.append((j, gid, out))
+
+        # Pass 2: appearance-based (phase 1c). A detection that did NOT line up
+        # by position with any dormant id -- a player who reappeared elsewhere,
+        # e.g. after walking around for a side change -- can still reclaim its
+        # original id by ensemble signature, but only when the match is strong
+        # (>= gallery_reacquire_appearance_min) to avoid stealing a same-colour
+        # partner's id.
+        if self.gallery:
+            for j in range(len(detections)):
+                if j in matched_dets or j in used_dets:
+                    continue
+                best_gid, best_sim = None, self.gallery_reacquire_appearance_min
+                for gid in list(self.gallery.keys()):
+                    if gid in used_gids:
+                        continue
+                    sim = self._signature_similarity(self.gallery[gid], detections[j])
+                    if sim > best_sim:
+                        best_sim, best_gid = sim, gid
+                if best_gid is not None:
+                    g = self.gallery.pop(best_gid)
+                    self._restore_track(best_gid, g, detections[j])
+                    matched_dets.add(j)
+                    matched_tracks.add(best_gid)
+                    used_dets.add(j)
+                    used_gids.add(best_gid)
+                    out = detections[j].copy()
+                    out["track_id"] = best_gid
+                    out["team"] = self._get_smoothed_team(best_gid)
+                    out["reacquired"] = True
+                    out["appearance_matched"] = True
+                    out["low_confidence"] = False
+                    results.append((j, best_gid, out))
+
+        if results:
+            self.logger.debug(
+                f"Gallery re-acquired {len(results)} tracks: {[g for _, g, _ in results]}"
+            )
+        return results
+
+    def _restore_track(
+        self, gid: int, gallery_entry: Dict[str, Any], detection: Dict[str, Any]
+    ) -> None:
+        """Resurrect a dormant gallery track under its original id, then refresh
+        it from the re-acquiring detection."""
+        center = gallery_entry.get("center")
+        self.tracks[gid] = {
+            "bbox": gallery_entry.get("bbox"),
+            "center": center,
+            "confidence": gallery_entry.get("confidence", 0.5),
+            "history": [center] if center is not None else [],
+            "velocity": gallery_entry.get("velocity", [0.0, 0.0]),
+            "histogram": gallery_entry.get("histogram"),
+            "head_histogram": gallery_entry.get("head_histogram"),
+            "world_height_samples": deque(
+                gallery_entry.get("world_height_samples") or [],
+                maxlen=self.signature_height_smoothing,
+            ),
+            "world_width_samples": deque(
+                gallery_entry.get("world_width_samples") or [],
+                maxlen=self.signature_height_smoothing,
+            ),
+            "team_votes": gallery_entry.get("team_votes") or deque(maxlen=self.team_vote_window),
+        }
+        self.disappeared[gid] = 0
+        # Re-anchor the appearance signature to the current detection so future
+        # gallery/association matches reflect where the player is now.
+        if self._current_frame is not None:
+            new_hist = self._compute_histogram(detection["bbox"])
+            if new_hist is not None:
+                old = gallery_entry.get("histogram")
+                self.tracks[gid]["histogram"] = (
+                    0.5 * old + 0.5 * new_hist if old is not None else new_hist
+                )
+        # Refresh bbox/center/velocity (histogram handled above).
+        self._update_track(gid, detection)
+
+    # Tolerances for the biometric channels of the ensemble signature. height:
+    # metres difference at which two players score 0 height-similarity (~0.4m
+    # spans most of the adult range, so that = "clearly different build"). ratio:
+    # body h/w-ratio difference for 0 similarity.
+    _SIG_HEIGHT_TOL_M = 0.4
+    _SIG_RATIO_TOL = 1.0
+
+    @staticmethod
+    def _median(values) -> Optional[float]:
+        if not values:
+            return None
+        return float(np.median(list(values)))
+
+    def _track_ratio(self, track: Dict[str, Any]) -> Optional[float]:
+        mh = self._median(track.get("world_height_samples"))
+        mw = self._median(track.get("world_width_samples"))
+        if mh is None or mw is None or mw <= 0:
+            return None
+        return mh / mw
+
+    def _detection_signature(self, detection: Dict[str, Any]) -> Dict[str, Any]:
+        """On-the-fly signature for a detection (compared against a track/gallery)."""
+        sig: Dict[str, Any] = {
+            "color": None, "head": None,
+            "world_height": None, "world_width": None, "ratio": None,
+        }
+        if self._current_frame is not None:
+            sig["color"] = self._compute_histogram(detection["bbox"])
+            sig["head"] = self._compute_head_histogram(detection["bbox"])
+        if self.court_calibration is not None:
+            size = self.court_calibration.world_body_size(detection["bbox"])
+            if size:
+                sig["world_height"] = size["world_height"]
+                sig["world_width"] = size["world_width"]
+                sig["ratio"] = size["ratio"]
+        return sig
+
+    def _signature_similarity(
+        self, track_or_gallery: Dict[str, Any], detection: Dict[str, Any]
+    ) -> float:
+        """Confidence-weighted ensemble similarity in [0,1]: torso colour +
+        head/hair + relative body height + body proportions.
+
+        Each channel contributes only when both sides have it (a channel is
+        silently dropped when unavailable -- no frame, or too few samples).
+        When nothing discriminates, returns 0 -- callers then defer to motion.
+        """
+        sig = self._detection_signature(detection)
+        w = self.signature_weights
+        sim_sum = 0.0
+        total_w = 0.0
+
+        if sig["color"] is not None and track_or_gallery.get("histogram") is not None:
+            c = cv2.compareHist(track_or_gallery["histogram"], sig["color"], cv2.HISTCMP_CORREL)
+            sim_sum += w["color"] * max(0.0, float(c))
+            total_w += w["color"]
+        if sig["head"] is not None and track_or_gallery.get("head_histogram") is not None:
+            h = cv2.compareHist(track_or_gallery["head_histogram"], sig["head"], cv2.HISTCMP_CORREL)
+            sim_sum += w["head"] * max(0.0, float(h))
+            total_w += w["head"]
+        th = self._median(track_or_gallery.get("world_height_samples"))
+        if sig.get("world_height") is not None and th is not None:
+            diff = abs(sig["world_height"] - th)
+            sim_sum += w["height"] * max(0.0, 1.0 - diff / self._SIG_HEIGHT_TOL_M)
+            total_w += w["height"]
+        tr = self._track_ratio(track_or_gallery)
+        if sig.get("ratio") is not None and tr is not None:
+            diff = abs(sig["ratio"] - tr)
+            sim_sum += w["proportions"] * max(0.0, 1.0 - diff / self._SIG_RATIO_TOL)
+            total_w += w["proportions"]
+
+        return float(sim_sum / total_w) if total_w > 0 else 0.0
 
     def _handle_no_detections(self) -> List[Dict[str, Any]]:
         """Handle frame with no detections."""
@@ -533,7 +1000,7 @@ class PlayerTracker:
         for tid in list(self.tracks.keys()):
             self.disappeared[tid] = self.disappeared.get(tid, 0) + 1
             if self.disappeared[tid] > self.max_disappeared:
-                self._remove_track(tid)
+                self._retire_track(tid)
             else:
                 track = self.tracks[tid]
                 if self.disappeared[tid] <= self.coast_extrapolation_cap:
@@ -586,6 +1053,23 @@ class PlayerTracker:
     def get_active_tracks(self) -> Dict[int, Dict[str, Any]]:
         """Get all currently active tracks."""
         return dict(self.tracks)
+
+    def reset(self) -> None:
+        """Wipe all tracking state (active tracks, dormant gallery, bootstrap).
+
+        Used by FrameProcessor.reset_trackers so re-running on a new video does
+        not inherit the previous match's dormant ids or bootstrap buffer.
+        """
+        self.tracks = {}
+        self.disappeared = {}
+        self.gallery = {}
+        self.frame_count = 0
+        self._initialized = False
+        self._bootstrap_buffer = []
+        self._bootstrap_qualifying = 0
+        self._last_strict_detections = []
+        self._current_frame = None
+        self.logger.debug("Player tracker reset")
 
     def _get_current_tracks(self) -> List[Dict[str, Any]]:
         """Return current track states as tracked player list."""
