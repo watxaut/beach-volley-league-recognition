@@ -10,13 +10,14 @@
 ## Where we are
 
 The **player-identity plan (phase 1) is implemented and committed** (`e13ea8d`),
-**entreno_1 has real player-ID ground truth** (44 frames, canonical IDs 1–4,
-occlusion-flagged), and the **far-side bystander-hijack bug found via that GT is
-fixed** (`c5d2de0` follow-up): assignment-level court membership in
-`PlayerTracker` (`_may_feed_track`). On entreno_1 GT eval: detection 0.65 →
-**0.92**, ghost rate 0.35 → **0.13**, id_consistency **0.98**, team **0.99**;
-near-side is essentially perfect (GT1/2 matched every frame, stable ID map).
-75 unit tests green.
+**entreno_1 and entreno_3 have real player-ID ground truth** (44 + 67 frames,
+canonical IDs, occlusion-flagged), and the **far-side bystander-hijack bug
+found via that GT is fixed and validated on both videos**: assignment-level
+court membership in `PlayerTracker` (`_may_feed_track`). entreno_1: detection
+0.65 → **0.92**, ghosts 0.35 → **0.13**. entreno_3: detection 0.69 → **0.88**,
+ghosts 0.32 → **0.11**, id_consistency 0.82 → **0.93** — and GT2 (the server)
+went from 2/67 matched frames in the 1c baseline (it was tracking a frame-edge
+bystander) to 50/67 with 0.96 consistency. 75 unit tests green.
 
 **Plan reference:** the full design lives in the session plan file
 (`~/.claude-zai/plans/i-want-to-start-golden-naur.md`) and the summary in
@@ -36,23 +37,34 @@ constraint. Side changes need no special handling as long as IDs survive.
    `python scripts/dump_player_tracks.py <match>.mp4 --max-players 4` →
    `python scripts/analyze_tracking.py <json> --max-players 4`, and scrub the
    annotated video through a side change watching each ID.
-2. **[optional, repeatable] GT for a second video** (e.g. entreno_3) using
-   `scripts/annotate_player_gt.py` (~30 min) — would confirm the hijack fix's
-   effect where baseline coverage was fake (entreno_3 ID2 tracked a frame-edge
-   bystander for 70+ frames in the 1c run).
-3. **[conditional] Phase 2: offline global stitch.** Post-processing pass that
+2. **[conditional] Phase 2: offline global stitch.** Post-processing pass that
    re-clusters all track fragments into exactly 4 identities (ensemble
    signature + time/space gaps + k=4). Only build if match validation shows
    residual swaps/fragmentation that phase 1 doesn't catch.
-4. **[optional, separate axis] Detection recall.** Residual drops on entreno_3
-   (~15% of frames) are genuine YOLO misses, not tracking failures. Levers:
-   `player_confidence` (0.5 → 0.35 lifts recall ~3pp, adds false dets) or
-   `player_imgsz`. Not part of the identity plan.
-5. **[minor cleanup] `CourtCalibration.filter_detections_by_play_area` is
+3. **[optional, separate axis] Detection recall.** The remaining honest gaps
+   are genuine YOLO misses: entreno_3 GT2 was invisible to the tracker for
+   frames 10–170 (serve outside court + entry, confirmed by GT); entreno_1
+   far-side misses similar. Levers: `player_confidence` (0.5 → 0.35 lifts
+   recall ~3pp, adds false dets) or `player_imgsz`. Not part of the identity
+   plan.
+4. **[minor cleanup] `CourtCalibration.filter_detections_by_play_area` is
    currently unused** (the detector's bbox-overlap `detect_play_area` filter
    replaced it). Keep or remove.
 
 ## Log (newest first)
+
+### 2026-08-15 — entreno_3 GT validates the bystander-hijack fix
+- 67 frames × 4 players annotated (serve + entry gap and a heavy dig-and-fall
+  occlusion included); occlusion flagger caught the fall window (GT3 invisible
+  from ~590; GT3 then has ZERO visible-but-unmatched frames).
+- Baseline (1c) vs fixed (fix2) on the same GT: detection 0.686→0.876, ghosts
+  0.324→0.114, id_consistency 0.818→0.929, team 0.994→0.996. GT2: 2/67 →
+  50/67 matched, 0.96 consistency — the 1c run had been tracking a frame-edge
+  bystander; the fixed run's ID2 restore at f180 is the REAL player.
+  Remaining GT2 misses (frames 10–170) = serve outside court + undetected
+  entry: honest detection gaps, open point 3.
+- Annotator usability: added [R] reset-frame, and actually wired up [B] back
+  (was advertised but unimplemented).
 
 ### 2026-08-15 — bystander-hijack fix: assignment-level court membership in PlayerTracker
 - **Mechanism (via GT + a new opt-in tracker audit trail**, `debug_assignments`

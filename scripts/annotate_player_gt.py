@@ -148,7 +148,7 @@ def draw_annotation_frame(frame, boxes, assignments, dropped, current,
     hud = [
         f"frame {frame_idx}  [{message}]" if message else f"frame {frame_idx}",
         f"boxes: {n_assigned} assigned / {n_drop} dropped / {len(boxes) - n_assigned - n_drop} left",
-        "[1-4] assign  [D] drop  [A] add box  [F] skip frame  [B] back  [Q] save&quit",
+        "[1-4] assign  [D] drop  [A] add  [R] reset frame  [F] skip  [B] back  [Q] quit",
     ]
     for j, line in enumerate(hud):
         cv2.putText(out, line, (10, 30 + 28 * j),
@@ -185,6 +185,11 @@ def annotate_frame(window, frame, frame_idx, boxes):
         elif key == ord('d') and current < len(boxes):
             dropped.add(current)
             current += 1
+        elif key == ord('r'):
+            # Reset the whole frame: clear every assignment/drop and start over
+            assignments.clear()
+            dropped.clear()
+            current = 0
         elif key == ord('a'):
             roi = cv2.selectROI(window, frame, showCrosshair=True)
             if any(roi):
@@ -195,6 +200,8 @@ def annotate_frame(window, frame, frame_idx, boxes):
             return assignments, dropped
         elif key == ord('f'):
             return None, None
+        elif key == ord('b'):
+            return "back", None
         elif key == ord('q'):
             return "quit", None
 
@@ -257,6 +264,10 @@ def main():
         if assignments == "quit":
             quit_requested = True
             break
+        if assignments == "back":
+            # Redo the previous sampled frame; re-accepting overwrites its GT.
+            pos = max(0, pos - 2) + 1
+            continue
         if assignments is None:  # skipped
             pos += 1
             continue
