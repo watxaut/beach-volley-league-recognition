@@ -487,36 +487,6 @@ class CourtCalibration:
         self._play_area_mask = None
         self._ensure_play_area_mask()
 
-    def is_point_in_play_area(self, point: Tuple[int, int]) -> bool:
-        """Check if a point is inside the (dilated) play area."""
-        mask = self._ensure_play_area_mask()
-        if mask is None:
-            return True
-        x, y = point
-        h, w = mask.shape
-        if x < 0 or x >= w or y < 0 or y >= h:
-            return False
-        return mask[int(y), int(x)] > 0
-
-    def filter_detections_by_play_area(self, detections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Filter detections to those within the wider play area.
-
-        This is the set fed to the tracker for association: established tracks
-        can match an off-court detection here (e.g. the server behind the
-        baseline), whereas new-track creation still requires the strict court
-        test (filter_detections_by_court) enforced inside PlayerTracker.
-        """
-        if not self._calibrated:
-            return list(detections)
-        filtered = []
-        for det in detections:
-            bbox = det.get("bbox", [])
-            if len(bbox) != 4:
-                continue
-            if self.is_point_in_play_area(self.foot_point(bbox)):
-                filtered.append(det)
-        return filtered
-
     # --- Ground-plane geometry (phase 1c: relative body-size signature) ---
 
     # Beach court real-world dimensions (metres): 16 baseline-to-baseline x 8
@@ -592,6 +562,38 @@ class CourtCalibration:
             "ratio": wh / ww,
             "foot_world": self.image_to_world(foot),
         }
+
+    def is_in_serve_zone(
+        self,
+        point: Tuple[int, int],
+        depth_m: float = 3.0,
+        side_margin_m: float = 1.0,
+    ) -> Optional[str]:
+        """Which team's serve zone a ground point is in, if any.
+
+        The serve zone is the band just BEHIND each baseline (the serving player
+        stands there before the serve): world y in (16, 16+depth] behind the
+        near baseline (team A) or [-depth, 0) behind the far baseline (team B),
+        within the sidelines extended by side_margin. Measured on the ground
+        plane via the court homography, so perspective is handled and the band
+        is a real-world depth (beach servers serve 0-3m back).
+
+        Returns 'A' or 'B', or None when the point is not in either zone (or
+        the court is not calibrated). This is the ONLY place a foot outside the
+        strict court may still be admitted as a new track (server admission);
+        everywhere else off-court remains bystander territory.
+        """
+        world = self.image_to_world(point)
+        if world is None:
+            return None
+        wx, wy = world
+        if not (-side_margin_m <= wx <= self.BEACH_COURT_WIDTH_M + side_margin_m):
+            return None
+        if self.BEACH_COURT_LENGTH_M < wy <= self.BEACH_COURT_LENGTH_M + depth_m:
+            return "A"
+        if -depth_m <= wy < 0.0:
+            return "B"
+        return None
 
     def is_point_in_court(self, point: Tuple[int, int]) -> bool:
         """Check if a point is inside the court polygon."""

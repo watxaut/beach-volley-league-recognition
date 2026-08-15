@@ -50,6 +50,10 @@ class PlayerTracker:
         signature_proportions_weight: float = 0.15,
         signature_height_smoothing: int = 30,
         off_court_grace_frames: int = 45,
+        serve_zone_enabled: bool = True,
+        serve_zone_depth_m: float = 3.0,
+        serve_zone_side_margin_m: float = 1.0,
+        coast_vertical_damping: float = 0.5,
         debug_assignments: bool = False,
     ):
         """Initialize the player tracker.
@@ -73,6 +77,20 @@ class PlayerTracker:
                 so a bystander standing just off-court can never inherit it
                 (bystander-hijack guard, complements the new-track admission
                 test).
+            serve_zone_enabled: Admit a NEW track for a detection whose foot is
+                in a serve zone (just behind a baseline, on the ground plane)
+                when a roster slot is free -- the serving player at video/rally
+                start is off-court and would otherwise never be tracked (they
+                also hold the 4th slot closed for everyone else).
+            serve_zone_depth_m / serve_zone_side_margin_m: serve-zone geometry
+                in metres (see CourtCalibration.is_in_serve_zone).
+            coast_vertical_damping: Extra per-step multiplier on the UPWARD
+                coast velocity. A track lost mid-jump would otherwise ride its
+                upward velocity for the whole coast window, drifting the ghost
+                box far above the player; players land near their takeoff spot,
+                so upward coasting decays fast (cosmetic for ghost boxes and
+                keeps re-acquisition gating honest after jumps). Downward
+                velocity is court-axis running and coasts normally.
         """
         self.max_disappeared = max_disappeared
         self.max_distance = max_distance
@@ -126,6 +144,10 @@ class PlayerTracker:
         self.debug_assignments = debug_assignments
         self.assignment_log: List[Dict[str, Any]] = []
         self.off_court_grace_frames = off_court_grace_frames
+        self.serve_zone_enabled = serve_zone_enabled
+        self.serve_zone_depth_m = serve_zone_depth_m
+        self.serve_zone_side_margin_m = serve_zone_side_margin_m
+        self.coast_vertical_damping = max(0.0, min(1.0, coast_vertical_damping))
 
         self.logger = logging.getLogger(__name__)
 
@@ -158,6 +180,30 @@ class PlayerTracker:
             self.court_calibration.is_point_in_court((float(foot[0]), float(foot[1])))
         )
 
+    def _detection_in_serve_zone(self, detection: Dict[str, Any]) -> Optional[bool]:
+        """Serve-zone test for a detection (see CourtCalibration.is_in_serve_zone).
+        None when the court offers no serve-zone geometry (uncalibrated or a
+        test double) -- then nothing is ever in the zone."""
+        court = self.court_calibration
+        fn = getattr(court, "is_in_serve_zone", None)
+        if court is None or not getattr(court, "is_calibrated", False) or fn is None:
+            return None
+        foot = court.foot_point(detection["bbox"])
+        return fn(
+            (float(foot[0]), float(foot[1])),
+            depth_m=self.serve_zone_depth_m,
+            side_margin_m=self.serve_zone_side_margin_m,
+        ) is not None
+
+    def _track_admission_ok(self, detection: Dict[str, Any]) -> bool:
+        """May this detection ever become a NEW track? Foot strictly in court,
+        or (server admission) in a serve zone. Established tracks never hit this
+        path -- they associate via Hungarian/IoU/gallery, which have their own
+        (stricter for off-court) rules."""
+        if self._detection_in_court(detection) is not False:
+            return True
+        return bool(self.serve_zone_enabled and self._detection_in_serve_zone(detection))
+
     def _may_feed_track(self, track: Dict[str, Any], detection: Dict[str, Any]) -> bool:
         """Bystander-hijack guard for ONGOING assignment (new tracks have their
         own admission test in _create_track).
@@ -183,7 +229,10 @@ class PlayerTracker:
             return True  # continuous observation -- no gap to hijack through
         last_in = track.get("last_in_court_frame")
         if last_in is None:
-            return True
+            # Never in court yet: a serve-zone seed. Identity may continue
+            # out-of-court only from the serve zone itself (where it was
+            # admitted) -- not from an arbitrary gap-filling bystander.
+            return bool(self._detection_in_serve_zone(detection))
         return (self.frame_count - last_in) <= self.off_court_grace_frames
 
     def update(
@@ -360,6 +409,7 @@ class PlayerTracker:
         top_clusters = np.argsort(-cluster_counts)[: self.max_players]
 
         last_frame_dets = frames[-1] if frames else []
+        locked_boxes: List[List[float]] = []
         for cluster_idx in top_clusters:
             center = cluster_centers[cluster_idx]
             best_det, best_dist = None, float("inf")
@@ -368,19 +418,28 @@ class PlayerTracker:
                 if d < best_dist:
                     best_dist, best_det = d, det
 
-            if best_det is not None:
-                self._create_track(best_det, require_court_admission=False)
-            else:
+            if best_det is None:
                 # Synthetic seed around the cluster centre (last resort).
-                self._create_track(
-                    {
-                        "bbox": [int(center[0] - 30), int(center[1] - 60),
-                                 int(center[0] + 30), int(center[1] + 60)],
-                        "center": center.tolist(),
-                        "confidence": 0.5,
-                    },
-                    require_court_admission=False,
+                best_det = {
+                    "bbox": [int(center[0] - 30), int(center[1] - 60),
+                             int(center[0] + 30), int(center[1] + 60)],
+                    "center": center.tolist(),
+                    "confidence": 0.5,
+                }
+            # k-means is forced to k=max_players even when fewer people are on
+            # court, which splits one person into two clusters ~10px apart. Both
+            # clusters then resolve to the SAME seed detection; seeding both
+            # inflates the roster with a phantom that never matches, retires
+            # dormant, and blocks the real missing player (the server) from the
+            # slot (observed on entreno_3: t3/t4 locked 10px apart, t4 never
+            # matched once). Same stacking threshold as the create-loop.
+            if any(self._iou(best_det["bbox"], lb) > 0.35 for lb in locked_boxes):
+                self.logger.debug(
+                    "Bootstrap: skipped duplicate seed (overlaps an already-locked player)"
                 )
+                continue
+            if self._create_track(best_det, require_court_admission=False) >= 0:
+                locked_boxes.append(best_det["bbox"])
 
         self.logger.info(
             f"Bootstrap: initialized {len(self.tracks)} tracks from "
@@ -533,6 +592,11 @@ class PlayerTracker:
             det = detections[j]
             if any(self._iou(det["bbox"], eb) > 0.35 for eb in existing_boxes):
                 continue
+            # Admission BEFORE eviction: a detection that could never pass the
+            # new-track gate must not force a dormant id out of its slot only
+            # to then be rejected itself.
+            if not self._track_admission_ok(det):
+                continue
             if len(self.tracks) + len(self.gallery) >= self.max_players:
                 if not (self.gallery_enabled and self._evict_stalest_dormant()):
                     continue
@@ -654,7 +718,10 @@ class PlayerTracker:
 
         Two continuity-first safeguards (see plan "two-zone policy" + "exactly 4"):
           * Admission gate: a brand-new track must start with a foot inside the
-            STRICT court, so an off-court bystander can never bootstrap in.
+            STRICT court, so an off-court bystander can never bootstrap in. The
+            one exception is the serve zone (just behind a baseline): the
+            serving player stands off-court at video/rally start, and a
+            serve-zone detection may open a track when a slot is free.
             Established tracks roaming the play area never hit this path (they
             match via the Hungarian pass, not creation). Skipped for bootstrap
             seeds (which already come from the foot-in-court set) and when no
@@ -666,8 +733,10 @@ class PlayerTracker:
         Args:
             detection: Detection dict with bbox, center, confidence.
             require_court_admission: If True, reject detections whose foot is
-                outside the strict court (the bystander guard for new tracks).
+                outside the strict court AND outside the serve zones (the
+                bystander guard for new tracks).
         """
+        serve_zone_seed = False
         if (
             require_court_admission
             and self.court_calibration is not None
@@ -675,8 +744,12 @@ class PlayerTracker:
         ):
             foot = self.court_calibration.foot_point(detection["bbox"])
             if not self.court_calibration.is_point_in_court(foot):
-                self.logger.debug("Reject new track: foot outside court (bystander guard)")
-                return -1
+                serve_zone_seed = bool(
+                    self.serve_zone_enabled and self._detection_in_serve_zone(detection)
+                )
+                if not serve_zone_seed:
+                    self.logger.debug("Reject new track: foot outside court (bystander guard)")
+                    return -1
 
         committed = len(self.tracks) + len(self.gallery)
         if committed >= self.max_players:
@@ -723,7 +796,11 @@ class PlayerTracker:
             "world_height_samples": world_h,
             "world_width_samples": world_w,
             "team_votes": team_votes,
-            "last_in_court_frame": self.frame_count,
+            # A serve-zone seed starts OFF-court: identity is admitted behind
+            # the baseline, so the off-court grace window must not count from
+            # here -- it opens at the first real in-court sighting (None means
+            # never-in-court-yet, see _may_feed_track).
+            "last_in_court_frame": None if serve_zone_seed else self.frame_count,
             "last_matched_frame": self.frame_count,
         }
         self.disappeared[tid] = 0
@@ -800,12 +877,25 @@ class PlayerTracker:
         Shifts the stored bbox/center along the track's velocity and decays the
         velocity by coast_velocity_decay, so a player who is briefly missed (dive,
         net occlusion) keeps moving with their trajectory instead of freezing on a
-        stale box. Advancing the STORED position is what lets the re-emerging
-        detection stay gated to the same id next frame (constant-velocity gate at
-        _compute_assignment_cost). Box size is preserved and clamped to the frame.
+        stale box. The UPWARD component is damped harder
+        (coast_vertical_damping): a track lost mid-jump would otherwise ride its
+        upward velocity for the whole coast window and drift the ghost box far
+        above the player (players land near their takeoff spot), which also
+        mis-sets the re-acquisition gate for the landing. Downward motion is
+        court-axis running and coasts normally. Advancing the STORED position is
+        what lets the re-emerging detection stay gated to the same id next frame
+        (constant-velocity gate at _compute_assignment_cost). Box size is
+        preserved and clamped to the frame.
         Returns the updated (bbox, center).
         """
         vx, vy = track.get("velocity", [0.0, 0.0])
+        # Damp only UPWARD velocity: a jump is transient (it self-reverses at
+        # the apex), so riding it coasts the box far above the player. Downward
+        # velocity is legitimate ground-plane motion (running toward the camera
+        # along the court axis is image-vertical) and must keep coasting --
+        # damping it fragmented ids through long far-side occlusions.
+        if vy < 0:
+            vy = vy * self.coast_vertical_damping
         cx, cy = track["center"]
         w = track["bbox"][2] - track["bbox"][0]
         h = track["bbox"][3] - track["bbox"][1]
@@ -818,6 +908,7 @@ class PlayerTracker:
             ncx, ncy = (nb[0] + nb[2]) / 2, (nb[1] + nb[3]) / 2
         track["bbox"] = nb
         track["center"] = [ncx, ncy]
+        # `vy` was already damped for this step; decay both for the next one.
         track["velocity"] = [vx * self.coast_velocity_decay, vy * self.coast_velocity_decay]
         return nb, [ncx, ncy]
 

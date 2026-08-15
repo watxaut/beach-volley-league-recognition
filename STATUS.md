@@ -5,19 +5,25 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-08-15
+**Last updated:** 2026-08-16
 
 ## Where we are
 
-The **player-identity plan (phase 1) is implemented and committed** (`e13ea8d`),
-**entreno_1 and entreno_3 have real player-ID ground truth** (44 + 67 frames,
-canonical IDs, occlusion-flagged), and the **far-side bystander-hijack bug
-found via that GT is fixed and validated on both videos**: assignment-level
-court membership in `PlayerTracker` (`_may_feed_track`). entreno_1: detection
-0.65 → **0.92**, ghosts 0.35 → **0.13**. entreno_3: detection 0.69 → **0.88**,
-ghosts 0.32 → **0.11**, id_consistency 0.82 → **0.93** — and GT2 (the server)
-went from 2/67 matched frames in the 1c baseline (it was tracking a frame-edge
-bystander) to 50/67 with 0.96 consistency. 75 unit tests green.
+On top of the bystander-hijack fix (`d219aae`), the **server-tracking gap
+(open point 3) is fixed and GT-validated**: probing raw YOLO showed the
+entreno_3 server was detected at conf 0.84–0.91 in *every* frame — the gap was
+tracker admission, not recall. Fixes shipped: **bootstrap seed dedup** (k-means
+split clusters used to lock a phantom 4th track that held the roster slot) and
+**serve-zone admission** (`CourtCalibration.is_in_serve_zone`, ground-plane
+metres behind a baseline — the one sanctioned off-court admission). entreno_3:
+detection 0.88 → **0.96**, ghosts 0.11 → **0.06**, id_consistency 0.93 →
+**0.97**, team 1.00, GT2 (server) 50/67 → **65/67** tracked from f0; entreno_1
+identical to before (no regression). Also: **ghost boxes no longer ride jumps
+upward** (open point 4: upward-only coast damping — damping *all* vertical
+velocity fragmented far-side ids because court-axis running is image-vertical;
+downward coasts normally), and `filter_detections_by_play_area` removed (open
+point 6, dead since the detector-side play-area mask filter). 94 unit tests
+green.
 
 **Plan reference:** the full design lives in the session plan file
 (`~/.claude-zai/plans/i-want-to-start-golden-naur.md`) and the summary in
@@ -56,31 +62,70 @@ constraint. Side changes need no special handling as long as IDs survive.
    (attack→opponent digs unless a block intervened), plus per-contact
    foot-based candidate teams (court.get_team_for_bbox on the snapshot) rather
    than the smoothed tracker team.
-3. **[optional, detection axis] Server tracking gap (live-debug bug 1).** The
-   serving player (outside court, behind baseline) is untracked until ~1s
-   after entering; entreno_3's serve at f56 is missed entirely by action
-   recognition as a result. Root cause is detection recall (GT2 invisible
-   frames 10–170; entreno_1 far-side misses similar — genuine YOLO misses of
-   small/off-court players) plus no serve-zone admission — the original plan
-   stubbed a `serve_zone` concept (`dump_player_tracks.py --serve-zone*` args
-   are no-op). Levers: `player_confidence` 0.5→0.35 (lifts recall ~3pp, adds
-   false dets), `player_imgsz`, or a serve-zone admission rule (allow new
-   tracks/restores behind own baseline when ball is dead / rally starting).
-4. **[minor, visualization] Ghost boxes drift upward after jumps** (coast
-   extrapolation rides the jump velocity up to 15 frames, e.g. entreno_3 f378,
-   f488 windows). Cosmetic now that action attribution ignores ghosts
-   (`predicted` players are excluded from the classifier since 2026-08-15);
-   would only matter if some consumer re-trusts ghost geometry. Damping
-   vertical coast velocity would fix the visuals.
-5. **[conditional] Phase 2: offline global stitch.** Post-processing pass that
+   **New evidence 2026-08-16 (server now tracked)**: the entreno_3 serve
+   contact IS detected as an event (f76, ball trajectory bottom) and the ball
+   sits INSIDE the server's bbox (pred4, dist 0.0; nearest other non-ghost
+   187px) — yet the classifier emitted "Player 3 → dig". The retry must also
+   fix serve-time attribution (bbox containment beats center-distance here)
+   and the serve label (behind baseline + hands overhead + first touch).
+3. **[conditional] Phase 2: offline global stitch.** Post-processing pass that
    re-clusters all track fragments into exactly 4 identities (ensemble
    signature + time/space gaps + k=4). Only build if match validation shows
    residual swaps/fragmentation that phase 1 doesn't catch.
-6. **[minor cleanup] `CourtCalibration.filter_detections_by_play_area` is
-   currently unused** (the detector's bbox-overlap `detect_play_area` filter
-   replaced it). Keep or remove.
+4. **[watch] Serve-zone admission in crowded drills.** Serve-zone admission is
+   geometric (≤3m behind a baseline, ≤1m beyond sidelines, free slot). In
+   drills with extras standing in that band, an extra can take the free slot
+   before the real server. Not observed on entreno_1/3 GT (admission fired
+   only for the server), but if a future dump shows a ghost behind a baseline,
+   tighten with a live/dead-ball gate (admit only when n_court_det < 4).
+5. **[minor] entreno_1 far-side recall.** The remaining entreno_1 misses
+   (detection 0.923 ceiling) are genuine YOLO misses of small far-side players
+   (unlike the server gap, which looked identical but was admission). Levers
+   if needed: `player_confidence` 0.5→0.35 (recall +~3pp, more false dets) or
+   `player_imgsz` ↑. Not blocking anything currently.
 
 ## Log (newest first)
+
+### 2026-08-16 — server tracking fixed (open point 3) + ghost drift damped (4) + dead filter removed (6)
+- **Diagnosis first** (output/diag_serve_probe.py + diag_serve_audit.py,
+  git-ignored): the entreno_3 server was detected at conf 0.84–0.91 in EVERY
+  frame 0–200 — the f10–175 untracked window was 100% tracker admission, NOT
+  detection recall (the previous "honest detection gaps" read was wrong for
+  the server). Three stacked causes: (a) bootstrap k-means forces k=4 from 3
+  on-court people → a split cluster seeded a phantom 4th track (t3/t4 10px
+  apart) that retired dormant at f38 and held the slot; (b) strict
+  foot-in-court admission can never admit a server behind the baseline;
+  (c) the dormant slot wasn't reclaimable for 60 frames (min-hold) and at f90
+  a far-side walker position-restored it — wrong person.
+- **Fixes**: (1) `_lock_roster_from_buffer` dedups seeds (IoU>0.35 with an
+  already-locked seed) — a split cluster no longer inflates the roster;
+  (2) serve-zone admission: `CourtCalibration.is_in_serve_zone` (ground-plane
+  metres via the court homography; ≤3m behind a baseline, ≤1m beyond
+  sidelines) is the only off-court foot that may open a NEW track (free slot
+  required); serve-zone seeds start `last_in_court_frame=None` and
+  `_may_feed_track` lets them re-feed out-of-court only from the zone itself
+  (no gap-hijack); (3) create-loop now checks admission BEFORE eviction so an
+  inadmissible detection can't burn a dormant slot; (4) `--serve-zone*` args
+  in dump_player_tracks are real now. Config: `player_serve_zone_enabled/
+  depth_m/side_margin_m`.
+- **Measured** (dump + GT eval, output/servezone/): entreno_3 detection
+  0.876→0.961, ghosts 0.114→0.064, id_consistency 0.929→0.972, team 1.00;
+  GT2 (server) 50/67→65/67 @0.97, tracked from f0 with a 1:1 GT↔pred map the
+  whole video. entreno_1: 0.923/0.133/0.978/0.986 — identical to fix2 (no
+  regression).
+- **Ghost drift (4)**: `_coast_step` damps UPWARD coast velocity
+  (`coast_vertical_damping` 0.5). First attempt damped all vertical velocity
+  and fragmented entreno_1 far-side ids (consistency 0.978→0.794) —
+  court-axis running is image-VERTICAL. Upward-only: no regression on either
+  video, jumps no longer ride up.
+- **Cleanup (6)**: removed dead `CourtCalibration.filter_detections_by_play_area`
+  + `is_point_in_play_area` (the detector-side bbox-overlap `detect_play_area`
+  mask filter is the live path).
+- **Action pipeline re-run** (entreno_3): 14 contacts, same set as before —
+  the serve is still not labeled serve: its contact event fires at f76 but is
+  attributed to the wrong player and labeled dig (see open point 2's new
+  evidence). Server-side tracking is no longer the blocker.
+- Tests: `tests/test_serve_zone.py` (+19); suite 94 green.
 
 ### 2026-08-15 — team-aware attribution attempted and reverted (findings recorded)
 - Implemented ball-vertex-side candidate constraint in `_closest_player_at`

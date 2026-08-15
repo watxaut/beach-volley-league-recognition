@@ -41,6 +41,16 @@ class Config:
         "player_team_vote_window": 15,   # frames of foot-position votes for team label
         "coast_extrapolation_cap": 15,   # max frames to extrapolate a lost track's box
         "coast_velocity_decay": 0.85,    # per-frame velocity decay while coasting
+        "coast_vertical_damping": 0.5,   # extra per-step decay of UPWARD coast velocity (ghost boxes must not ride a jump upward; downward = court-axis running, undamped)
+
+        # Server admission: the serving player stands off-court behind their
+        # baseline at video/rally start and strict foot-in-court admission can
+        # never track them (entreno_3: server detected at conf ~0.9 the whole
+        # time yet untracked f10-175). A serve-zone detection may open a NEW
+        # track when a roster slot is free.
+        "player_serve_zone_enabled": True,
+        "player_serve_zone_depth_m": 3.0,       # how far behind the baseline (ground-plane metres) counts as the serve zone
+        "player_serve_zone_side_margin_m": 1.0, # how far beyond each sideline (metres) the zone extends
 
         # Player identity (continuity-first re-ID). See plan "Consistent 4-Player
         # Identity". Identity is propagated by motion continuity; the keys below

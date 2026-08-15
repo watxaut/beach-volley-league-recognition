@@ -68,9 +68,10 @@ def main():
     parser.add_argument("--max-frames", type=int, default=0, help="Max frames (0 = whole video)")
     parser.add_argument("--max-players", type=int, default=PROD_MAX_PLAYERS, help="Tracker roster size")
     parser.add_argument("--out-json", help="Path to write per-frame tracks JSON")
-    # Serve-zone args (no-op until Phase 1 wires serve_zone_config into CourtCalibration)
-    parser.add_argument("--serve-zone-depth", type=int, default=None, help="(Phase 1) serve-zone depth in px override")
-    parser.add_argument("--no-serve-zone", action="store_true", help="(Phase 1) disable serve-zone admission")
+    # Serve-zone admission (server tracking at video/rally start)
+    parser.add_argument("--serve-zone-depth", type=float, default=None,
+                        help="Serve-zone depth behind each baseline in metres (default: config)")
+    parser.add_argument("--no-serve-zone", action="store_true", help="Disable serve-zone admission")
     parser.add_argument("--save-video", action="store_true", help="Save annotated mp4")
     args = parser.parse_args()
 
@@ -137,6 +138,11 @@ def main():
         signature_proportions_weight=_CFG.get("player_signature_proportions_weight", 0.15),
         signature_height_smoothing=_CFG.get("player_signature_height_smoothing", 30),
         off_court_grace_frames=_CFG.get("player_off_court_grace_frames", 45),
+        serve_zone_enabled=(not args.no_serve_zone),
+        serve_zone_depth_m=(args.serve_zone_depth if args.serve_zone_depth is not None
+                            else _CFG.get("player_serve_zone_depth_m", 3.0)),
+        serve_zone_side_margin_m=_CFG.get("player_serve_zone_side_margin_m", 1.0),
+        coast_vertical_damping=_CFG.get("coast_vertical_damping", 0.5),
     )
 
     output_dir = Path(args.output)
