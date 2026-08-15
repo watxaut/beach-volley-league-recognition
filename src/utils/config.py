@@ -53,6 +53,7 @@ class Config:
         "player_gallery_reacquire_distance_px": 120.0,  # motion/position gate to re-acquire a dormant id
         "player_gallery_reacquire_min_appearance": 0.15,  # signature floor below which a re-acquire is flagged low-confidence
         "player_gallery_reacquire_appearance_min": 0.5,  # ensemble similarity bar for appearance-only re-acquire (moved player / side change)
+        "player_off_court_grace_frames": 45,   # how long an off-court detection may continue a track after its last in-court sighting (server step-out); blocks bystander hijack
         "player_gallery_evict_min_hold_frames": 60,  # protect a freshly-retired id for this long before it's reclaimable
         "player_bootstrap_min_window": 8,       # consecutive ball-active frames with a stable 4-roster to lock
         "player_bootstrap_ball_required": True,  # skip the warmup opening (only lock once the ball is live)

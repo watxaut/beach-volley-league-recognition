@@ -10,10 +10,13 @@
 ## Where we are
 
 The **player-identity plan (phase 1) is implemented and committed** (`e13ea8d`),
-and **entreno_1 now has real player-ID ground truth** (44 frames, canonical IDs
-1–4, occlusion-flagged) with the metric awake: `id_consistency` 0.97, team
-accuracy 0.98. **First GT-based finding: near-side tracking is essentially
-perfect, but the far side suffers bystander takeover** — see Open point 2.
+**entreno_1 has real player-ID ground truth** (44 frames, canonical IDs 1–4,
+occlusion-flagged), and the **far-side bystander-hijack bug found via that GT is
+fixed** (`c5d2de0` follow-up): assignment-level court membership in
+`PlayerTracker` (`_may_feed_track`). On entreno_1 GT eval: detection 0.65 →
+**0.92**, ghost rate 0.35 → **0.13**, id_consistency **0.98**, team **0.99**;
+near-side is essentially perfect (GT1/2 matched every frame, stable ID map).
+75 unit tests green.
 
 **Plan reference:** the full design lives in the session plan file
 (`~/.claude-zai/plans/i-want-to-start-golden-naur.md`) and the summary in
@@ -33,35 +36,47 @@ constraint. Side changes need no special handling as long as IDs survive.
    `python scripts/dump_player_tracks.py <match>.mp4 --max-players 4` →
    `python scripts/analyze_tracking.py <json> --max-players 4`, and scrub the
    annotated video through a side change watching each ID.
-2. **[next, real bug] Far-side bystander takeover** (found via the new GT on
-   entreno_1). Far-side tracks (small boxes) get assigned YOLO detections of
-   people standing *outside* the court and never recover: pred tracks in-court
-   rate 41% / 20% for the two far players; 35/39 unmatched far-side boxes are
-   real detections with the foot outside the court polygon. Cause: court
-   membership is enforced only at track creation (`_create_track` bystander
-   guard, `player_tracker.py:590`); the assignment path accepts any detection,
-   and the detector's `_is_player_in_court` is bbox-overlap vs court+margin,
-   which near-court bystanders pass. Fix direction: reject (or heavily
-   downweight) out-of-court detections in the assignment step so the track
-   coasts/dormants instead — aligned with the plan's "no match beats wrong
-   match". Careful not to break off-court servers (they're within the margin;
-   bystanders are beyond it). Re-check with the eval command below.
-3. **[optional, repeatable] GT for a second video** (e.g. entreno_3) using
-   `scripts/annotate_player_gt.py` (~30 min) to confirm the takeover is
-   systematic, not a one-off.
-4. **[conditional] Phase 2: offline global stitch.** Post-processing pass that
+2. **[optional, repeatable] GT for a second video** (e.g. entreno_3) using
+   `scripts/annotate_player_gt.py` (~30 min) — would confirm the hijack fix's
+   effect where baseline coverage was fake (entreno_3 ID2 tracked a frame-edge
+   bystander for 70+ frames in the 1c run).
+3. **[conditional] Phase 2: offline global stitch.** Post-processing pass that
    re-clusters all track fragments into exactly 4 identities (ensemble
    signature + time/space gaps + k=4). Only build if match validation shows
    residual swaps/fragmentation that phase 1 doesn't catch.
-5. **[optional, separate axis] Detection recall.** Residual drops on entreno_3
+4. **[optional, separate axis] Detection recall.** Residual drops on entreno_3
    (~15% of frames) are genuine YOLO misses, not tracking failures. Levers:
    `player_confidence` (0.5 → 0.35 lifts recall ~3pp, adds false dets) or
    `player_imgsz`. Not part of the identity plan.
-6. **[minor cleanup] `CourtCalibration.filter_detections_by_play_area` is
+5. **[minor cleanup] `CourtCalibration.filter_detections_by_play_area` is
    currently unused** (the detector's bbox-overlap `detect_play_area` filter
    replaced it). Keep or remove.
 
 ## Log (newest first)
+
+### 2026-08-15 — bystander-hijack fix: assignment-level court membership in PlayerTracker
+- **Mechanism (via GT + a new opt-in tracker audit trail**, `debug_assignments`
+  param, paths: hungarian / iou_reattach / gallery_position / gallery_appearance
+  / new_track**)**: far-side player undetected → track coasts/retires → an
+  out-of-court bystander inherits the id (entreno_1: gallery_appearance at
+  f97, hungarian at f181; 586/1635 assignments were out-of-court) → hungarian
+  then feeds the bystander forever. Same bug invalidated part of the 1c
+  entreno_3 numbers (ID2 ghosted, then tracked a frame-edge bystander 70+ frames).
+- **Fix** (`_may_feed_track` + `last_in_court_frame`/`last_matched_frame`
+  bookkeeping): an out-of-court detection may only continue a track while
+  identity is OBSERVED — within `player_off_court_grace_frames` (45) of the
+  last in-court sighting, or continuously matched frame-to-frame (a player who
+  walked out and keeps being detected). Gallery restores (both passes) require
+  a strictly in-court detection, like new-track admission.
+- **Measured**: entreno_1 GT eval detection 0.651→0.923, ghost 0.352→0.133,
+  id_consistency 0.974→0.978, team 0.981→0.986; GT4 matched frames 9→32.
+  Audit under fix: 0/1399 out-of-court assignments. entreno_3: 0 swaps,
+  ID2 dormant during the bystander window then restored IN COURT (f180) —
+  the analyze_tracking "dropped frames" increase (6.3%→17.2%) there is the
+  honest cost of refusing fake bystander coverage, not a regression.
+- New tests `tests/test_bystander_guard.py` (8); suite 75 green.
+- Throwaway diagnostics kept in git-ignored `output/diag_hijack.py` +
+  `output/diag_hijack_log.json` (pre-fix audit), `output/fix1`/`fix2/` dumps.
 
 ### 2026-08-15 — first player-ID ground truth + occlusion-aware eval; found far-side bystander takeover
 - Annotated 44 frames of entreno_1 (canonical IDs 1–4; GT 1/2 near side, 3/4

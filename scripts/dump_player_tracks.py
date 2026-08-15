@@ -136,6 +136,7 @@ def main():
         signature_height_weight=_CFG.get("player_signature_height_weight", 0.3),
         signature_proportions_weight=_CFG.get("player_signature_proportions_weight", 0.15),
         signature_height_smoothing=_CFG.get("player_signature_height_smoothing", 30),
+        off_court_grace_frames=_CFG.get("player_off_court_grace_frames", 45),
     )
 
     output_dir = Path(args.output)

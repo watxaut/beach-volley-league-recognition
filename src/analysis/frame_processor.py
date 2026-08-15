@@ -120,6 +120,7 @@ class FrameProcessor:
                 signature_height_weight=self.config.get("player_signature_height_weight", 0.3),
                 signature_proportions_weight=self.config.get("player_signature_proportions_weight", 0.15),
                 signature_height_smoothing=self.config.get("player_signature_height_smoothing", 30),
+                off_court_grace_frames=self.config.get("player_off_court_grace_frames", 45),
             )
 
             # Pose estimation (video mode for temporal smoothing)

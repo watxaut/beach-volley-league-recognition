@@ -49,6 +49,8 @@ class PlayerTracker:
         signature_height_weight: float = 0.3,
         signature_proportions_weight: float = 0.15,
         signature_height_smoothing: int = 30,
+        off_court_grace_frames: int = 45,
+        debug_assignments: bool = False,
     ):
         """Initialize the player tracker.
 
@@ -61,6 +63,16 @@ class PlayerTracker:
             init_frames: Number of initial frames to collect detections for
                 stable initialization.
             court_calibration: Optional CourtCalibration instance for team assignment.
+            debug_assignments: Record every detection-to-track assignment (path,
+                frame, id, foot-in-court) into self.assignment_log. Off by
+                default; used to audit which association path admits whom.
+            off_court_grace_frames: How long a track may be fed by foot-out-of-
+                court detections after its last in-court sighting (a player who
+                stepped out -- server behind the baseline). Beyond the grace
+                window, out-of-court detections can no longer drive the track,
+                so a bystander standing just off-court can never inherit it
+                (bystander-hijack guard, complements the new-track admission
+                test).
         """
         self.max_disappeared = max_disappeared
         self.max_distance = max_distance
@@ -110,7 +122,69 @@ class PlayerTracker:
         # Current frame for appearance extraction
         self._current_frame: Optional[np.ndarray] = None
 
+        # Optional audit trail of every detection-to-track assignment
+        self.debug_assignments = debug_assignments
+        self.assignment_log: List[Dict[str, Any]] = []
+        self.off_court_grace_frames = off_court_grace_frames
+
         self.logger = logging.getLogger(__name__)
+
+    def _log_assignment(self, path: str, tid: int, detection: Dict[str, Any]) -> None:
+        """Record one assignment (path, frame, id, foot-in-court) when auditing."""
+        if not self.debug_assignments:
+            return
+        foot_in_court = None
+        if self.court_calibration is not None and getattr(
+            self.court_calibration, "is_calibrated", False
+        ):
+            foot = self.court_calibration.foot_point(detection["bbox"])
+            foot_in_court = self.court_calibration.is_point_in_court((float(foot[0]), float(foot[1])))
+        self.assignment_log.append({
+            "frame": self.frame_count,
+            "path": path,
+            "track_id": tid,
+            "foot_in_court": foot_in_court,
+        })
+
+    def _detection_in_court(self, detection: Dict[str, Any]) -> Optional[bool]:
+        """Strict foot-in-court test for a detection. None when uncalibrated
+        (no gating possible -- behave as before)."""
+        if self.court_calibration is None or not getattr(
+            self.court_calibration, "is_calibrated", False
+        ):
+            return None
+        foot = self.court_calibration.foot_point(detection["bbox"])
+        return bool(
+            self.court_calibration.is_point_in_court((float(foot[0]), float(foot[1])))
+        )
+
+    def _may_feed_track(self, track: Dict[str, Any], detection: Dict[str, Any]) -> bool:
+        """Bystander-hijack guard for ONGOING assignment (new tracks have their
+        own admission test in _create_track).
+
+        An out-of-court detection may continue a track while identity is still
+        OBSERVED, not inferred:
+          * within the grace window of the track's last in-court sighting
+            (a player who just stepped out, e.g. a server behind the baseline),
+            OR
+          * the track was matched by a detection on the previous frame too --
+            continuous out-of-court tracking (the player walked out and keeps
+            being seen; there is no observation gap to hijack through).
+        After a detection gap the identity is inferred, so re-feeding requires
+        an in-court sighting: a bystander standing just off-court can then
+        neither inherit a coasting/dormant track nor keep one alive. Both
+        hijack vectors observed on entreno_1 (hungarian onto a coasting track,
+        gallery_appearance onto a dormant id) started from exactly such a gap.
+        """
+        in_court = self._detection_in_court(detection)
+        if in_court is None or in_court:
+            return True
+        if track.get("last_matched_frame") == self.frame_count - 1:
+            return True  # continuous observation -- no gap to hijack through
+        last_in = track.get("last_in_court_frame")
+        if last_in is None:
+            return True
+        return (self.frame_count - last_in) <= self.off_court_grace_frames
 
     def update(
         self,
@@ -365,6 +439,7 @@ class PlayerTracker:
                 continue
             tid = track_ids[row]
             det = detections[col]
+            self._log_assignment("hungarian", tid, det)
             self._update_track(tid, det)
             matched_tracks.add(tid)
             matched_dets.add(col)
@@ -390,7 +465,8 @@ class PlayerTracker:
                 ov = self._iou(det["bbox"], self.tracks[tid]["bbox"])
                 if ov > best_iou:
                     best_iou, best_tid = ov, tid
-            if best_tid is not None:
+            if best_tid is not None and self._may_feed_track(self.tracks[best_tid], det):
+                self._log_assignment("iou_reattach", best_tid, det)
                 self._update_track(best_tid, det)
                 matched_tracks.add(best_tid)
                 matched_dets.add(j)
@@ -463,6 +539,7 @@ class PlayerTracker:
             tid = self._create_track(det)
             if tid < 0:
                 continue
+            self._log_assignment("new_track", tid, det)
             existing_boxes.append(det["bbox"])
             out = det.copy()
             out["track_id"] = tid
@@ -480,6 +557,11 @@ class PlayerTracker:
         """
         track_center = np.array(track["center"])
         det_center = np.array(detection["center"])
+
+        # Bystander-hijack guard: an out-of-court detection can only continue
+        # a recently-in-court track (see _may_feed_track).
+        if not self._may_feed_track(track, detection):
+            return None
 
         # Gate on the actual gap to the last known position.
         distance = float(np.linalg.norm(track_center - det_center))
@@ -641,6 +723,8 @@ class PlayerTracker:
             "world_height_samples": world_h,
             "world_width_samples": world_w,
             "team_votes": team_votes,
+            "last_in_court_frame": self.frame_count,
+            "last_matched_frame": self.frame_count,
         }
         self.disappeared[tid] = 0
         self.logger.debug(f"Created track {tid}")
@@ -665,6 +749,13 @@ class PlayerTracker:
         track["center"] = new_center
         track["confidence"] = detection["confidence"]
         track["history"].append(new_center)
+
+        # Bystander-hijack guard bookkeeping: remember when this track was last
+        # fed by a detection (continuity) and last genuinely on the court (the
+        # off-court grace window).
+        track["last_matched_frame"] = self.frame_count
+        if self._detection_in_court(detection) is not False:
+            track["last_in_court_frame"] = self.frame_count
 
         # Re-evaluate team from the new foot position and add it to the smoothing
         # window (majority vote read via _get_smoothed_team).
@@ -809,6 +900,11 @@ class PlayerTracker:
         for j in range(len(detections)):
             if j in matched_dets:
                 continue
+            # A restore re-admits the id -- same rule as a new track: the foot
+            # must be strictly in court (a bystander just off-court must not be
+            # able to resurrect a dormant id, position OR appearance matched).
+            if self._detection_in_court(detections[j]) is False:
+                continue
             dc = np.array(detections[j]["center"])
             for gid, g in self.gallery.items():
                 dormant = max(0, self.frame_count - g.get("retired_frame", self.frame_count))
@@ -834,6 +930,7 @@ class PlayerTracker:
                 continue
             g = self.gallery.pop(gid)
             sim = -neg_sim
+            self._log_assignment("gallery_position", gid, detections[j])
             self._restore_track(gid, g, detections[j])
             matched_dets.add(j)
             matched_tracks.add(gid)
@@ -856,6 +953,9 @@ class PlayerTracker:
             for j in range(len(detections)):
                 if j in matched_dets or j in used_dets:
                     continue
+                # Same re-admission rule as pass 1 (bystander-hijack guard).
+                if self._detection_in_court(detections[j]) is False:
+                    continue
                 best_gid, best_sim = None, self.gallery_reacquire_appearance_min
                 for gid in list(self.gallery.keys()):
                     if gid in used_gids:
@@ -865,6 +965,7 @@ class PlayerTracker:
                         best_sim, best_gid = sim, gid
                 if best_gid is not None:
                     g = self.gallery.pop(best_gid)
+                    self._log_assignment("gallery_appearance", best_gid, detections[j])
                     self._restore_track(best_gid, g, detections[j])
                     matched_dets.add(j)
                     matched_tracks.add(best_gid)
@@ -907,6 +1008,10 @@ class PlayerTracker:
                 maxlen=self.signature_height_smoothing,
             ),
             "team_votes": gallery_entry.get("team_votes") or deque(maxlen=self.team_vote_window),
+            # Restores are gated to in-court detections (bystander-hijack
+            # guard), so the restored track counts as freshly on-court.
+            "last_in_court_frame": self.frame_count,
+            "last_matched_frame": self.frame_count,
         }
         self.disappeared[gid] = 0
         # Re-anchor the appearance signature to the current detection so future
