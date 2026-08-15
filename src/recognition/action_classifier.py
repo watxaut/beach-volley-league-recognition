@@ -142,9 +142,15 @@ class ActionClassifier:
             if center and center[0] is not None:
                 self._ball_history.append((frame_number, float(center[0]), float(center[1])))
 
-        # Estimate + store poses for all players this frame.
-        poses = self.pose_estimator.estimate_poses_batch(frame, player_detections)
-        for det, pose in zip(player_detections, poses):
+        # Estimate + store poses for players OBSERVED this frame. Ghost boxes
+        # (tracker-coasted, predicted=True) are extrapolations, not sightings:
+        # pose-estimating them is garbage and their drifted bboxes pollute
+        # closest-player attribution (seen on entreno_3: a ghost riding a jump's
+        # upward velocity steals the contact). _closest_player_at still finds
+        # each player via their last REAL snapshot within the history window.
+        observed = [d for d in player_detections if not d.get("predicted", False)]
+        poses = self.pose_estimator.estimate_poses_batch(frame, observed)
+        for det, pose in zip(observed, poses):
             tid = det.get("track_id")
             if tid is None:
                 continue

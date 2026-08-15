@@ -37,21 +37,54 @@ constraint. Side changes need no special handling as long as IDs survive.
    `python scripts/dump_player_tracks.py <match>.mp4 --max-players 4` →
    `python scripts/analyze_tracking.py <json> --max-players 4`, and scrub the
    annotated video through a side change watching each ID.
-2. **[conditional] Phase 2: offline global stitch.** Post-processing pass that
+2. **[next, recognition] Team-aware contact attribution.** Adjacent same-line
+   players break closest-player attribution. Evidence (entreno_3, GT-verified):
+   sets at f378 (true setter canonical 4, mid-jump so their box was a GHOST)
+   and f488 (attributed to canonical 4/B while team A had possession) both go
+   to the wrong player; the same player spiking then digging is only legal via
+   a block. Design direction: constrain `_closest_player_at` candidates to the
+   expected possessing team (and exclude the previous contact player for digs
+   unless a block intervened). Needs care: the resolver derives
+   team-in-possession FROM the chosen player today (chicken-and-egg) — the
+   constraint needs its own rally-state tracking (alternating teams between
+   opponent attacks; serve = server's team; overpass exempt).
+3. **[optional, detection axis] Server tracking gap (live-debug bug 1).** The
+   serving player (outside court, behind baseline) is untracked until ~1s
+   after entering; entreno_3's serve at f56 is missed entirely by action
+   recognition as a result. Root cause is detection recall (GT2 invisible
+   frames 10–170; entreno_1 far-side misses similar — genuine YOLO misses of
+   small/off-court players) plus no serve-zone admission — the original plan
+   stubbed a `serve_zone` concept (`dump_player_tracks.py --serve-zone*` args
+   are no-op). Levers: `player_confidence` 0.5→0.35 (lifts recall ~3pp, adds
+   false dets), `player_imgsz`, or a serve-zone admission rule (allow new
+   tracks/restores behind own baseline when ball is dead / rally starting).
+4. **[minor, visualization] Ghost boxes drift upward after jumps** (coast
+   extrapolation rides the jump velocity up to 15 frames, e.g. entreno_3 f378,
+   f488 windows). Cosmetic now that action attribution ignores ghosts
+   (`predicted` players are excluded from the classifier since 2026-08-15);
+   would only matter if some consumer re-trusts ghost geometry. Damping
+   vertical coast velocity would fix the visuals.
+5. **[conditional] Phase 2: offline global stitch.** Post-processing pass that
    re-clusters all track fragments into exactly 4 identities (ensemble
    signature + time/space gaps + k=4). Only build if match validation shows
    residual swaps/fragmentation that phase 1 doesn't catch.
-3. **[optional, separate axis] Detection recall.** The remaining honest gaps
-   are genuine YOLO misses: entreno_3 GT2 was invisible to the tracker for
-   frames 10–170 (serve outside court + entry, confirmed by GT); entreno_1
-   far-side misses similar. Levers: `player_confidence` (0.5 → 0.35 lifts
-   recall ~3pp, adds false dets) or `player_imgsz`. Not part of the identity
-   plan.
-4. **[minor cleanup] `CourtCalibration.filter_detections_by_play_area` is
+6. **[minor cleanup] `CourtCalibration.filter_detections_by_play_area` is
    currently unused** (the detector's bbox-overlap `detect_play_area` filter
    replaced it). Keep or remove.
 
 ## Log (newest first)
+
+### 2026-08-15 — action attribution: ghosts excluded from classifier (live-debug bugs triaged)
+- Live-debug review of entreno_3 surfaced 3 bugs. Fixed now: `predicted`
+  (ghost) players are excluded from `classify_actions` — no pose estimation on
+  extrapolated boxes, no drifted bboxes in `_closest_player_at` (a ghost riding
+  a jump's upward velocity had been stealing contacts).
+- GT-verified effect on the reported events: dig f211 → now canonical 1 ✓
+  (was the spiker), dig f563 → canonical 4 ✓. Sets f378/f488 still
+  misattributed — adjacent same-line players, the true team-in-possession
+  rules out the chosen player in both → parked as open point 2 (team-aware
+  attribution) with this evidence. Serve f56 missed entirely (server
+  untracked, open point 3). Ghost drift visuals parked (open point 4).
 
 ### 2026-08-15 — entreno_3 GT validates the bystander-hijack fix
 - 67 frames × 4 players annotated (serve + entry gap and a heavy dig-and-fall
