@@ -37,17 +37,25 @@ constraint. Side changes need no special handling as long as IDs survive.
    `python scripts/dump_player_tracks.py <match>.mp4 --max-players 4` →
    `python scripts/analyze_tracking.py <json> --max-players 4`, and scrub the
    annotated video through a side change watching each ID.
-2. **[next, recognition] Team-aware contact attribution.** Adjacent same-line
-   players break closest-player attribution. Evidence (entreno_3, GT-verified):
-   sets at f378 (true setter canonical 4, mid-jump so their box was a GHOST)
-   and f488 (attributed to canonical 4/B while team A had possession) both go
-   to the wrong player; the same player spiking then digging is only legal via
-   a block. Design direction: constrain `_closest_player_at` candidates to the
-   expected possessing team (and exclude the previous contact player for digs
-   unless a block intervened). Needs care: the resolver derives
-   team-in-possession FROM the chosen player today (chicken-and-egg) — the
-   constraint needs its own rally-state tracking (alternating teams between
-   opponent attacks; serve = server's team; overpass exempt).
+2. **[parked after a failed attempt — read the findings first] Team-aware
+   contact attribution.** Adjacent same-line players break closest-player
+   attribution (entreno_3, GT-verified): sets f378/f488 and (before the ghost
+   fix) digs f211/f563 went to the wrong player; same player spiking then
+   digging is only legal via a block.
+   **Attempted 2026-08-15 and REVERTED**: constrain candidates by the court
+   side of the ball's contact vertex + exempt the near-net band. Diagnostic
+   (output/diag_attribution.py, git-ignored) showed two broken signals:
+   (a) the contact VERTEX is not the touch position — it can be the ball's
+   apex on the wrong side (vertex-side disagreed with the GT toucher's team on
+   ≥3/14 contacts: f211, f244, f541); (b) candidates' snapshot `team` (tracker
+   smoothed, 15-frame vote) is wrong near the midcourt band exactly where
+   sets/digs happen (f488 chosen player labelled A, truly B). Net effect was
+   regressions (f563 dig wrong, f294 spike lost, set→dig label cascades), so
+   the code was reverted. Next design must use: incoming-ball TRAJECTORY side
+   over several frames (not the vertex) or rally-state alternation
+   (attack→opponent digs unless a block intervened), plus per-contact
+   foot-based candidate teams (court.get_team_for_bbox on the snapshot) rather
+   than the smoothed tracker team.
 3. **[optional, detection axis] Server tracking gap (live-debug bug 1).** The
    serving player (outside court, behind baseline) is untracked until ~1s
    after entering; entreno_3's serve at f56 is missed entirely by action
@@ -73,6 +81,13 @@ constraint. Side changes need no special handling as long as IDs survive.
    replaced it). Keep or remove.
 
 ## Log (newest first)
+
+### 2026-08-15 — team-aware attribution attempted and reverted (findings recorded)
+- Implemented ball-vertex-side candidate constraint in `_closest_player_at`
+  (+5 unit tests); end-to-end run on entreno_3 showed regressions (vertex ≠
+  touch position; smoothed team labels wrong near midcourt band) → reverted
+  to the ghost-fix state; working tree back to `d219aae`. Everything learned
+  is in open point 2, including the two signals a retry must not use.
 
 ### 2026-08-15 — action attribution: ghosts excluded from classifier (live-debug bugs triaged)
 - Live-debug review of entreno_3 surfaced 3 bugs. Fixed now: `predicted`
