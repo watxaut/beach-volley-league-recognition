@@ -20,7 +20,7 @@ real detection -- lets analyze_tracking.py separate real tracks from ghosts.
 
 Usage:
     python scripts/dump_player_tracks.py resources/video_entreno_1.mp4 \\
-        --save-video --out-json output/baseline/video_entreno_1_tracks.json
+        --out-json output/baseline/video_entreno_1_tracks.json
 """
 
 import argparse

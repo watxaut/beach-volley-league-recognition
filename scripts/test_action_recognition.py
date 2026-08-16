@@ -40,6 +40,10 @@ def main():
     parser.add_argument("--save-video", action="store_true", help="Save annotated video")
     parser.add_argument("--no-team-aware", action="store_true",
                         help="Disable team-aware attribution (legacy closest-player)")
+    parser.add_argument("--pose-complexity", type=int, default=0, choices=[0, 1, 2],
+                        help="MediaPipe pose model complexity. Default 0 matches the "
+                             "Config default (lite; entreno_1/3 GT A/B showed identical "
+                             "action output at 0 and 1, 0 is ~1.6x faster).")
     args = parser.parse_args()
 
     cap = cv2.VideoCapture(args.video)
@@ -78,7 +82,7 @@ def main():
     # disabled serve-zone admission, so the server was untracked in this
     # pipeline while dump_player_tracks/FrameProcessor tracked them fine.
     player_tracker = PlayerTracker(court_calibration=court)
-    pose_estimator = PoseEstimator(min_detection_confidence=0.5, model_complexity=1)
+    pose_estimator = PoseEstimator(min_detection_confidence=0.5, model_complexity=args.pose_complexity)
     action_classifier = ActionClassifier(
         pose_estimator=pose_estimator,
         confidence_threshold=0.3,

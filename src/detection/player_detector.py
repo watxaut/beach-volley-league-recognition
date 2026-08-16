@@ -24,7 +24,7 @@ class PlayerDetector(BaseDetector):
         self,
         model_path: Optional[str] = None,
         confidence_threshold: float = 0.5,
-        device: str = "cpu",
+        device: str = "auto",
         max_players: int = 20,
         imgsz: int = 1280
     ):
@@ -33,7 +33,8 @@ class PlayerDetector(BaseDetector):
         Args:
             model_path: Path to custom YOLO model, uses pretrained if None
             confidence_threshold: Minimum confidence for player detections
-            device: Device to run inference on ("cpu" or "cuda")
+            device: Device to run inference on -- "auto" (CUDA > MPS > CPU),
+                "cpu", "cuda", or "mps". Resolved by BaseDetector.
             max_players: Safety cap on how many person detections to return. This
                 is a DETECTION limit, not the team size -- it must stay well above
                 the number of people who can be on/around the court, otherwise the

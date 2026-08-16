@@ -134,6 +134,7 @@ constraint. Side changes need no special handling as long as IDs survive.
    (unlike the server gap, which looked identical but was admission). Levers
    if needed: `player_confidence` 0.5→0.35 (recall +~3pp, more false dets) or
    `player_imgsz` ↑. Not blocking anything currently.
+6. **[bug] entreno_3 last spike categorized as block** at frame 539.
 
 ## Log (newest first)
 

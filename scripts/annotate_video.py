@@ -90,6 +90,15 @@ class AnnotationTool:
         self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self.current_frame_idx = 0
         self.current_frame: Optional[np.ndarray] = None
+        # Frame index the VideoCapture cursor will read next. Sequential reads
+        # are ~10x faster than a cap.set keyframe seek for the small forward
+        # steps annotation makes (+5/+10), but only valid while contiguous.
+        self._cap_cursor: Optional[int] = None
+        # (frame_idx, mode class) -> detections. Revisiting a frame (scrubbing
+        # back, switching modes, undo) reuses the YOLO results instead of
+        # re-running them. Both detectors are stateless per call here, so
+        # memoising cannot change what a visit returns.
+        self._det_cache: Dict[Tuple[int, str], List[Dict[str, Any]]] = {}
 
         # Mode
         self.mode = MODE_BALL
@@ -497,28 +506,70 @@ class AnnotationTool:
 
     # --- Frame navigation ---
 
+    # Forward steps up to this many frames read sequentially instead of paying
+    # a keyframe seek (~6ms vs ~65ms for a +5 step on the entreno footage).
+    _MAX_SEQ_SEEK = 64
+
     def _seek_frame(self, frame_idx: int):
-        """Seek to a specific frame."""
+        """Seek to a specific frame.
+
+        Small forward steps consume sequential reads (the capture cursor is
+        already positioned after the current frame); anything else falls back
+        to a cap.set keyframe seek.
+        """
         frame_idx = max(0, min(frame_idx, self.total_frames - 1))
+        step = frame_idx - self.current_frame_idx
+
+        if step == 0 and self.current_frame is not None:
+            # Clamped at a boundary: reuse the decoded frame, just refresh.
+            self._refresh_detections()
+            return
+
+        if 0 < step <= self._MAX_SEQ_SEEK and self._cap_cursor == self.current_frame_idx + 1:
+            ret, frame = False, None
+            for _ in range(step):
+                ret, frame = self.cap.read()
+            if ret:
+                self._use_frame(frame_idx, frame)
+                return
+            # Stream ended unexpectedly -- fall through to an explicit seek.
+
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
         ret, frame = self.cap.read()
         if ret:
-            self.current_frame_idx = frame_idx
-            self.current_frame = frame
-            self._refresh_detections()
+            self._use_frame(frame_idx, frame)
+
+    def _use_frame(self, frame_idx: int, frame: np.ndarray):
+        """Adopt a freshly decoded frame as current and refresh detections."""
+        self.current_frame_idx = frame_idx
+        self.current_frame = frame
+        self._cap_cursor = frame_idx + 1
+        self._refresh_detections()
 
     def _advance_frame(self, stride: int = 1):
         """Advance by stride frames."""
         self._seek_frame(self.current_frame_idx + stride)
 
     def _refresh_detections(self):
-        """Re-run detectors on the current frame."""
+        """Load detections for the current frame, memoised per (frame, mode).
+
+        PLAYER and ACTION modes share one cache slot per frame -- both use the
+        player detector -- so switching between them is free too.
+        """
         if self.current_frame is None:
             return
-        if self.mode == MODE_BALL:
-            self.ball_detections = self._detect_balls_all(self.current_frame)
-        elif self.mode == MODE_PLAYER or self.mode == MODE_ACTION:
-            self.player_detections = self._detect_players(self.current_frame)
+        mode_key = "ball" if self.mode == MODE_BALL else "players"
+        key = (self.current_frame_idx, mode_key)
+        if key not in self._det_cache:
+            if mode_key == "ball":
+                self._det_cache[key] = self._detect_balls_all(self.current_frame)
+            else:
+                self._det_cache[key] = self._detect_players(self.current_frame)
+        detections = self._det_cache[key]
+        if mode_key == "ball":
+            self.ball_detections = detections
+        else:
+            self.player_detections = detections
 
     # --- Drawing ---
 
@@ -859,6 +910,7 @@ class AnnotationTool:
                 if ret:
                     self.current_frame_idx = int(self.cap.get(cv2.CAP_PROP_POS_FRAMES)) - 1
                     self.current_frame = frame
+                    self._cap_cursor = self.current_frame_idx + 1
                     # Refresh detections periodically in action mode
                     if self.mode == MODE_ACTION and self.current_frame_idx % 5 == 0:
                         self._refresh_detections()

@@ -84,7 +84,10 @@ class Config:
 
         # Recognition settings
         "pose_confidence": 0.5,
-        "pose_complexity": 1,
+        # 0 (lite) is ~1.6x faster per pose batch and produced byte-identical
+        # action logs vs 1 on the entreno_1/3 GT A/B (2026-08-16); raise to 1/2
+        # only if a future video shows gesture (hands-overhead) misses.
+        "pose_complexity": 0,
         "temporal_window": 10,
         "action_confidence": 0.3,  # Min confidence to emit an action; matches scripts/test_action_recognition.py (classifier scores ~0.3-0.8)
 

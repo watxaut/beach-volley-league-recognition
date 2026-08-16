@@ -37,7 +37,7 @@ class BallDetector(BaseDetector):
         self,
         model_path: Optional[str] = None,
         confidence_threshold: float = 0.05,
-        device: str = "cpu",
+        device: str = "auto",
         max_ball_size: int = 80,
         imgsz: Optional[int] = None,
         keep_all: bool = False,
@@ -54,7 +54,8 @@ class BallDetector(BaseDetector):
         Args:
             model_path: Path to YOLO model weights. Defaults to yolov8n.pt.
             confidence_threshold: Minimum confidence for detections.
-            device: Device for inference ("cpu" or "cuda").
+            device: Device for inference -- "auto" (CUDA > MPS > CPU), "cpu",
+                "cuda", or "mps". Resolved by BaseDetector.
             max_ball_size: Max width/height in pixels for a valid ball detection.
             imgsz: YOLO input resolution. If None, auto-computed from frame size
                 to ensure ~20px ball visibility (capped at 1920).
