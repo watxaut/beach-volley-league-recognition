@@ -1,0 +1,35 @@
+CLAUDE.md
+  s_9ed08fada71d0a::t_3de6c8dc57c917 102
+STATUS.md
+  s_9ed08fada71d0a::t_16c8c2b95ec7a0 12-33,36-41,47-88,140-193
+scripts/evaluate.py
+  s_9ed08fada71d0a::t_c66f56b2396596 289,357-358,362-434,529-531
+scripts/test_action_recognition.py
+  s_9ed08fada71d0a::t_3ef98c8ce214ee 41-42,76-80,86,123,141-144,146-154
+src/analysis/frame_processor.py
+  s_9ed08fada71d0a::t_278a7b73d634a3 142-147
+src/detection/court_calibration.py
+  s_9ed08fada71d0a::t_7a4a28ab5a7210 389-423
+src/recognition/action_classifier.py
+  s_9ed08fada71d0a::t_1cde732597041b 82-88,97-105,109-117,141-143,170-177,210-214,225-236,273-277,285-286,289,327,381-466,468,476-487,505-530,532-537,539,541,543-546,548,578,600,615-618
+src/utils/config.py
+  s_9ed08fada71d0a::t_ef76efb69dad3d 91-106
+tests/test_team_attribution.py
+  s_9ed08fada71d0a::t_848bcb65c98f18 1-302
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "f276ca8079e441d67f8d2fd0b313a79668af5557",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
