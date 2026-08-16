@@ -386,6 +386,41 @@ class CourtCalibration:
         """Return team using player's foot position (bottom-center of bbox)."""
         return self.get_team(self.foot_point(bbox))
 
+    def midcourt_y_at_x(self, x: int) -> Optional[float]:
+        """Interpolate the midcourt ground-line y at ``x`` (None if uncalibrated).
+
+        Public read-only accessor over the team-split line, so callers (e.g.
+        ball-side estimation) don't need to go through a hard A/B decision.
+        """
+        if self.midcourt_points is None:
+            return None
+        return self._midcourt_y_at_x(x)
+
+    def signed_midcourt_offset(self, point: Tuple[int, int]) -> Optional[float]:
+        """Signed pixel distance from the midcourt line at ``point``'s x.
+
+        Positive = team A (near) side, negative = team B (far) side, None if
+        uncalibrated. Unlike :meth:`get_team` this keeps the magnitude, so a
+        caller can judge confidence (small |offset| = ambiguous side).
+        """
+        mid_y = self.midcourt_y_at_x(point[0])
+        if mid_y is None:
+            return None
+        return float(point[1]) - mid_y
+
+    def world_dist_from_net(self, point: Tuple[int, int]) -> Optional[float]:
+        """Absolute ground-plane metres between ``point`` and the net line.
+
+        The image-plane :meth:`is_near_net` is misleading for team filtering:
+        perspective compresses the far half to ~110px, so EVERY far player
+        falls within its default 120px band. This ground-plane version is the
+        one to gate "at the net" exemptions on. None without a homography.
+        """
+        world = self.image_to_world(point)
+        if world is None:
+            return None
+        return abs(world[1] - self.BEACH_COURT_LENGTH_M / 2.0)
+
     @staticmethod
     def foot_point(bbox) -> Tuple[int, int]:
         """Bottom-center of a bbox -- the player's foot position on the ground.

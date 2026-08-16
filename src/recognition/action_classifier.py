@@ -79,6 +79,13 @@ class ActionClassifier:
         temporal_window: int = 10,
         confidence_threshold: float = 0.4,
         court_calibration=None,
+        # --- Team-aware attribution (which team may touch next) ---
+        team_aware: bool = True,
+        width_side_enabled: bool = True,
+        width_window: int = 8,
+        width_far_px: float = 26.0,
+        width_near_px: float = 35.0,
+        near_net_exempt_m: float = 1.5,
         # Accept but ignore legacy params
         enhanced_validation_config: Optional[Dict[str, Any]] = None,
     ):
@@ -87,9 +94,26 @@ class ActionClassifier:
         self.confidence_threshold = confidence_threshold
         self.court = court_calibration
 
-        # Ball trajectory of REAL (non-predicted) positions: (frame, x, y).
+        self._team_aware = team_aware
+        self._width_side_enabled = width_side_enabled
+        self._width_window = width_window
+        self._width_far_px = width_far_px
+        self._width_near_px = width_near_px
+        self._near_net_exempt_m = near_net_exempt_m
+
+        # Ball trajectory of REAL (non-predicted) positions:
+        # (frame, x, y, w, h) -- width feeds the near/far side estimate.
         self._ball_history: deque = deque(maxlen=120)
         self._last_contact_frame: int = -1000
+
+        # Possession memory (attribution only; the context layer keeps its own
+        # attack-based possession for labels). ``_last_touch_team`` is the
+        # foot-side team of the last ATTRIBUTED contact; whether that touch
+        # sent the ball over (attack/serve/block gesture) decides flip vs
+        # carry for the next contact's expectation.
+        self._last_touch_team: Optional[str] = None
+        self._last_touch_frame: Optional[int] = None
+        self._last_touch_went_over: bool = False
 
         # Per-player pose/position history for temporal features. Kept long
         # enough to look back to a contact confirmed CONTACT_DELAY frames ago.
@@ -114,6 +138,9 @@ class ActionClassifier:
         self._ball_history.clear()
         self._player_pose_history.clear()
         self._last_contact_frame = -1000
+        self._last_touch_team = None
+        self._last_touch_frame = None
+        self._last_touch_went_over = False
         self._resolver.reset()
         self._pending = None
 
@@ -140,7 +167,14 @@ class ActionClassifier:
         if ball_info and not ball_info.get("is_predicted", False):
             center = ball_info.get("center")
             if center and center[0] is not None:
-                self._ball_history.append((frame_number, float(center[0]), float(center[1])))
+                bb = ball_info.get("bbox")
+                if bb and len(bb) == 4:
+                    w, h = float(bb[2] - bb[0]), float(bb[3] - bb[1])
+                else:
+                    w = h = 0.0
+                self._ball_history.append(
+                    (frame_number, float(center[0]), float(center[1]), w, h)
+                )
 
         # Estimate + store poses for players OBSERVED this frame. Ghost boxes
         # (tracker-coasted, predicted=True) are extrapolations, not sightings:
@@ -173,7 +207,11 @@ class ActionClassifier:
 
         contact_point, kind, inc, out = contact
 
-        chosen = self._closest_player_at(contact_frame, contact_point)
+        # Which team may be touching now, read from the ball itself (see
+        # _attribution_target): constrains the candidate set below.
+        target_team, side_info = self._attribution_target(contact_frame)
+
+        chosen = self._closest_player_at(contact_frame, contact_point, target_team)
         if chosen is None:
             return []
         pdata, distance, lr_index = chosen
@@ -184,7 +222,18 @@ class ActionClassifier:
 
         # Layer 1: read the context-free visual gesture at this contact.
         contact_evt = self._build_contact(
-            pdata, lr_index, contact_point, kind, inc, out, contact_frame
+            pdata, lr_index, contact_point, kind, inc, out, contact_frame, side_info
+        )
+        self._last_touch_team = contact_evt.get("team")
+        self._last_touch_frame = contact_frame
+        # Did this touch send the ball over the net? Attacks, blocks and the
+        # serve do; a dig/set keeps the ball on this side (an overpass is the
+        # width-side override's job to catch).
+        gesture = contact_evt.get("gesture")
+        self._last_touch_went_over = (
+            gesture in (VisualGesture.ATTACK, VisualGesture.BLOCK)
+            or (bool(contact_evt.get("behind_baseline"))
+                and bool(side_info.get("first_of_rally")))
         )
 
         # Layer 2 (streaming): finalise the *previous* contact now that we know
@@ -221,7 +270,11 @@ class ActionClassifier:
             "frame_number": contact_evt["frame"],
             "contact_point": [round(cp[0], 1), round(cp[1], 1)],
             "player_center": contact_evt["player_center"],
-            "team": resolved["team_in_possession"],
+            # The TOUCHER's per-contact foot team -- not the resolver's latched
+            # possession, which hid wrong-team thefts behind an inherited label
+            # (entreno_3 f244 emitted B for an A-side contact).
+            "team": contact_evt.get("team"),
+            "team_in_possession": resolved["team_in_possession"],
             "touch_number": resolved["touch_number"],
             "rally_id": resolved["rally_id"],
             "contact_kind": contact_evt["contact_kind"],
@@ -229,11 +282,11 @@ class ActionClassifier:
 
     # --- Ball-contact detection ---
 
-    def _real_points(self, lo: int, hi: int) -> List[Tuple[int, float, float]]:
-        """Real ball points with frame in [lo, hi], ordered by frame."""
+    def _real_points(self, lo: int, hi: int) -> List[Tuple]:
+        """Real ball points (frame, x, y, w, h) with frame in [lo, hi]."""
         return [p for p in self._ball_history if lo <= p[0] <= hi]
 
-    def _point_at(self, f: int) -> Optional[Tuple[int, float, float]]:
+    def _point_at(self, f: int) -> Optional[Tuple]:
         for p in self._ball_history:
             if p[0] == f:
                 return p
@@ -271,7 +324,7 @@ class ActionClassifier:
         vertex = self._point_at(c)
         if vertex is None:
             return None
-        _, vx, vy = vertex
+        vx, vy = vertex[1], vertex[2]
 
         left = self._real_points(c - self.NEIGH, c - 1)
         right = self._real_points(c + 1, c + self.NEIGH)
@@ -325,8 +378,94 @@ class ActionClassifier:
 
         return None
 
+    # --- Team-aware attribution: possession + ball-size side ---
+
+    def _court_ready(self) -> bool:
+        return self.court is not None and getattr(self.court, "is_calibrated", False)
+
+    def _width_side(self, frame: int) -> Tuple[Optional[str], int]:
+        """Court side implied by the ball's pixel width just before ``frame``.
+
+        The ball looks bigger on the near half: on entreno_3 the far-half
+        rally ball is 14-28px wide and the near-half one 30-55px. This is a
+        RELATIVE discriminator, not a metric depth -- a 2D ground homography
+        cannot turn size into depth for an airborne ball (the camera is closer
+        to any airborne ball than to the ground under it, so a ground-scale
+        inversion reads everything as near). What the width CAN say, reliably,
+        is "far half" vs "near half" with an abstain band in between.
+
+        Commits only when the last ``_width_window`` real samples with a size
+        agree (any sample on the other side blocks the commit -- mixed
+        evidence means mid-flight or near the net).
+        """
+        if not self._width_side_enabled:
+            return None, 0
+        n_a = n_b = 0
+        for p in self._ball_history:
+            if not (frame - self._width_window <= p[0] <= frame - 1):
+                continue
+            w = p[3]
+            if w <= 0:
+                continue
+            if w < self._width_far_px:
+                n_b += 1
+            elif w > self._width_near_px:
+                n_a += 1
+        if n_a and not n_b:
+            return "A", n_a
+        if n_b and not n_a:
+            return "B", n_b
+        return None, max(n_a, n_b)
+
+    def _attribution_target(self, frame: int) -> Tuple[Optional[str], Dict[str, Any]]:
+        """Which team is expected to touch at ``frame`` (None = unconstrained).
+
+        Two signals, in priority order (validated on entreno_3 GT, 14/14):
+
+        1. **Ball width side** -- direct evidence of which half the ball is
+           approaching from. Catches the two transitions pure alternation
+           cannot: an over-set/overpass dig that crosses (width flips to the
+           other regime) and a block rebound (width stays in the spiker's
+           regime, overriding the after-attack flip).
+        2. **Possession alternation** -- after an attack/serve/block gesture
+           the ball is presumed over the net: expect the OTHER team; after a
+           bump-set (dig/set) expect the SAME team. Survives missed blocks
+           whenever the width side abstains (no ball data) by ... only via the
+           width override; alternation alone would misread a rebound.
+
+        Image-plane trajectory side was evaluated and REJECTED (2026-08-16
+        diagnostic): an airborne ball over the near half projects above the
+        midcourt line, so every high ball reads "far"; and the ball is often
+        entirely undetected on near-half approaches (occlusion), leaving no
+        window to vote over.
+        """
+        info: Dict[str, Any] = {"ball_side": None, "side_votes": 0, "source": None,
+                                "first_of_rally": False}
+        if not self._team_aware or not self._court_ready():
+            return None, info
+
+        side, votes = self._width_side(frame)
+        info["ball_side"], info["side_votes"] = side, votes
+        if side is not None:
+            info["source"] = "width"
+            return side, info
+
+        if self._last_touch_team is None or self._last_touch_frame is None:
+            return None, info
+        rally_reset = frame - self._last_touch_frame > self.RALLY_RESET_GAP
+        info["first_of_rally"] = rally_reset
+        if rally_reset:
+            # New rally (dead-ball gap): a serve from either side may open it --
+            # stay unconstrained and let containment pick the server.
+            return None, info
+        if self._last_touch_went_over:
+            info["source"] = "flip"
+            return ("B" if self._last_touch_team == "A" else "A"), info
+        info["source"] = "carry"
+        return self._last_touch_team, info
+
     def _closest_player_at(
-        self, frame: int, point: List[float]
+        self, frame: int, point: List[float], target_team: Optional[str] = None
     ) -> Optional[Tuple[Dict[str, Any], float, Optional[int]]]:
         """Find the tracked player closest to ``point`` around ``frame``.
 
@@ -334,6 +473,18 @@ class ActionClassifier:
         snapshot is the history entry nearest ``frame`` for that player; the
         L-R index ranks all players present near ``frame`` by x (matching the
         ground-truth annotation convention).
+
+        When ``target_team`` is set, candidates whose FEET (per-contact, via
+        ``court.get_team_for_bbox`` -- the smoothed tracker team is wrong near
+        the midcourt band) sit on the other side are excluded. The one
+        exception is BLOCK geometry: a player at the net within
+        ``near_net_exempt_m`` GROUND metres whose contact point is ABOVE the
+        net-top line (an image-pixel band would swallow the whole
+        perspective-compressed far half; and without the above-net condition a
+        net-standing opponent steals every set -- entreno_3 f488: thief's feet
+        0.5m from the net, contact well below the tape). If the filter would
+        empty the candidate set it is dropped -- a wrong team estimate must
+        not delete a contact outright.
         """
         snapshots: List[Dict[str, Any]] = []
         for tid, hist in self._player_pose_history.items():
@@ -351,18 +502,50 @@ class ActionClassifier:
         if not snapshots:
             return None
 
+        if target_team is not None and self._court_ready():
+            contact_above_net = self.court.is_above_net(
+                (int(point[0]), int(point[1])))
+            eligible: List[Dict[str, Any]] = []
+            for s in snapshots:
+                bbox = s.get("bbox")
+                if not bbox or len(bbox) != 4:
+                    continue
+                if self.court.get_team_for_bbox(bbox) == target_team:
+                    eligible.append(s)
+                    continue
+                foot = (int((bbox[0] + bbox[2]) / 2), int(bbox[3]))
+                dist_m = self.court.world_dist_from_net(foot)
+                if (dist_m is not None and dist_m <= self._near_net_exempt_m
+                        and contact_above_net):
+                    eligible.append(s)
+            if eligible:
+                snapshots = eligible
+            else:
+                # Team filter matched nobody: keep every candidate rather than
+                # lose the contact (side estimate was probably wrong).
+                self.logger.debug(
+                    "attribution: team filter (%s) matched no candidate at f%d",
+                    target_team, frame,
+                )
+
         ordered = sorted(snapshots, key=lambda s: s["center"][0])
+        # Distance to the player's BODY, not their torso centre: a player
+        # digging low or reaching overhead at the net contacts the ball far
+        # from their centre, but close to their bounding box (which spans
+        # feet to raised hands). Centre distance would reject those touches.
+        # Ties on bbox distance (e.g. ball inside two overlapping boxes) break
+        # by centre distance so the choice is deterministic.
         best = None
+        best_key = (float("inf"), float("inf"))
         best_dist = float("inf")
-        for s in snapshots:
-            # Distance to the player's BODY, not their torso centre: a player
-            # digging low or reaching overhead at the net contacts the ball far
-            # from their centre, but close to their bounding box (which spans
-            # feet to raised hands). Centre distance would reject those touches.
+        for s in ordered:
             d = self._point_to_bbox_distance(point, s.get("bbox"), s["center"])
-            if d < best_dist:
-                best_dist = d
+            c = s["center"]
+            cd = float(np.hypot(c[0] - point[0], c[1] - point[1]))
+            if (d, cd) < best_key:
+                best_key = (d, cd)
                 best = s
+                best_dist = d
         lr_index = ordered.index(best) + 1
         return best, best_dist, lr_index
 
@@ -392,6 +575,7 @@ class ActionClassifier:
         inc: Tuple[float, float],
         out: Tuple[float, float],
         frame: int,
+        side_info: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Assemble a gesture-contact: the visual gesture plus the court/spatial
         facts the context layer needs. No rally reasoning happens here."""
@@ -413,7 +597,7 @@ class ActionClassifier:
 
         gesture, gconf = self._detect_gesture(pdata, kind, inc, out, near_net)
 
-        return {
+        contact = {
             "frame": frame,
             "gesture": gesture,
             "gesture_confidence": gconf,
@@ -428,6 +612,10 @@ class ActionClassifier:
             "ball_out": out,
             "player_center": pdata.get("center"),
         }
+        if side_info:
+            contact["ball_side"] = side_info.get("ball_side")
+            contact["attribution_source"] = side_info.get("source")
+        return contact
 
     def _detect_gesture(
         self,

@@ -139,6 +139,12 @@ class FrameProcessor:
                 temporal_window=self.config.get("temporal_window", 10),
                 confidence_threshold=self.config.get("action_confidence", 0.4),
                 court_calibration=self.court_calibration,
+                team_aware=self.config.get("attribution_team_aware", True),
+                width_side_enabled=self.config.get("attribution_width_side", True),
+                width_window=self.config.get("attribution_width_window", 8),
+                width_far_px=self.config.get("attribution_width_far_px", 26.0),
+                width_near_px=self.config.get("attribution_width_near_px", 35.0),
+                near_net_exempt_m=self.config.get("attribution_near_net_exempt_m", 1.5),
             )
 
             # Game state detection

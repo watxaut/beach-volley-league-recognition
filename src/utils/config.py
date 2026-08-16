@@ -88,6 +88,22 @@ class Config:
         "temporal_window": 10,
         "action_confidence": 0.3,  # Min confidence to emit an action; matches scripts/test_action_recognition.py (classifier scores ~0.3-0.8)
 
+        # Team-aware contact attribution: which team may touch next is read from
+        # the ball's pixel WIDTH (bigger = nearer half) when it commits, else
+        # from possession alternation (attack/serve/block went over -> flip,
+        # dig/set -> carry); candidates' teams come from their per-contact foot
+        # position (the smoothed tracker team is wrong near the midcourt band).
+        # Image-plane trajectory side was tried and REJECTED: airborne balls
+        # over the near half project above the midcourt line (entreno_3
+        # f211/f244/f453/f488 all read "far"), and near-half approaches are
+        # often not detected at all (occlusion).
+        "attribution_team_aware": True,       # False = legacy closest-player, no team filter
+        "attribution_width_side": True,       # ball-width near/far override on possession alternation
+        "attribution_width_window": 8,        # frames of incoming ball samples consulted
+        "attribution_width_far_px": 26.0,     # ball width under this = far half (B)
+        "attribution_width_near_px": 35.0,    # ball width over this = near half (A); between = abstain
+        "attribution_near_net_exempt_m": 1.5,  # wrong-team candidates at the net (ground metres) stay eligible only when the CONTACT is above the net-top line (block geometry); image-px would swallow the far half
+
         # Processing settings
         "batch_size": 1,
         "frame_skip": 1,  # Process every nth frame

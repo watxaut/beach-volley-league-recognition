@@ -38,6 +38,8 @@ def main():
     parser.add_argument("--output", default="output/action_test", help="Output directory")
     parser.add_argument("--max-frames", type=int, default=1000, help="Max frames to process")
     parser.add_argument("--save-video", action="store_true", help="Save annotated video")
+    parser.add_argument("--no-team-aware", action="store_true",
+                        help="Disable team-aware attribution (legacy closest-player)")
     args = parser.parse_args()
 
     cap = cv2.VideoCapture(args.video)
@@ -71,12 +73,17 @@ def main():
     ball_detector = BallDetector(model_path=ball_model, confidence_threshold=0.15)
     player_detector = PlayerDetector(confidence_threshold=0.5)
     ball_tracker = BallTracker(max_missing_frames=10, low_confidence_threshold=0.4, max_trajectory_gap=60.0)
-    player_tracker = PlayerTracker(max_players=6, court_calibration=court)
+    # Production tracker config (defaults = Config: max_players 4, serve-zone
+    # admission on). The old explicit max_players=6 + strict-only feeding
+    # disabled serve-zone admission, so the server was untracked in this
+    # pipeline while dump_player_tracks/FrameProcessor tracked them fine.
+    player_tracker = PlayerTracker(court_calibration=court)
     pose_estimator = PoseEstimator(min_detection_confidence=0.5, model_complexity=1)
     action_classifier = ActionClassifier(
         pose_estimator=pose_estimator,
         confidence_threshold=0.3,
         court_calibration=court,
+        team_aware=(not args.no_team_aware),
     )
 
     if court.is_calibrated and court.court_bounds:
@@ -113,6 +120,7 @@ def main():
             "gesture": action.get("gesture"),
             "confidence": conf,
             "team": action.get("team"),
+            "player_center": action.get("player_center"),
             "touch_number": action.get("touch_number"),
             "rally_id": action.get("rally_id"),
             "contact_kind": action.get("contact_kind"),
@@ -130,10 +138,20 @@ def main():
 
         ball_dets = ball_detector.detect(frame)
         player_dets = player_detector.detect(frame)
+        # Same two-zone feeding as FrameProcessor: the detector output (already
+        # play-area filtered) is the association set; the STRICT foot-in-court
+        # subset gates NEW-track admission (incl. serve-zone logic, which needs
+        # the wide set to ever see the server).
         if court.is_calibrated:
-            player_dets = court.filter_detections_by_court(player_dets)
-
-        tracked_players = player_tracker.update(player_dets, frame)
+            strict_players = court.filter_detections_by_court(player_dets)
+        else:
+            strict_players = player_dets
+        tracked_players = player_tracker.update(
+            player_dets, frame,
+            strict_detections=strict_players,
+            ball_active=bool(ball_dets),
+            n_court_det=len(strict_players),
+        )
         tracked_ball = ball_tracker.update(ball_dets)
 
         actions = action_classifier.classify_actions(

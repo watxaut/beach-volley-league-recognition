@@ -286,6 +286,7 @@ def evaluate_actions(
     ground_truth: List[Dict[str, Any]],
     frame_tolerance: int = 15,
     match_player: bool = True,
+    gt_players: Optional[Dict[str, List[Dict[str, Any]]]] = None,
 ) -> Dict[str, Any]:
     """Evaluate action recognition precision and recall.
 
@@ -353,7 +354,82 @@ def evaluate_actions(
             "f1": round(overall_f1, 3),
         },
         "per_action": per_action,
+        **_action_attribution_metrics(
+            predictions, ground_truth, frame_tolerance, gt_players),
     }
+
+
+def _action_attribution_metrics(
+    predictions: List[Dict[str, Any]],
+    ground_truth: List[Dict[str, Any]],
+    frame_tolerance: int,
+    gt_players: Optional[Dict[str, List[Dict[str, Any]]]],
+) -> Dict[str, Any]:
+    """Team + player accuracy of ATTRIBUTION on nearest-frame matched pairs.
+
+    Matching here ignores player_id and action type (nearest prediction within
+    tolerance per GT event, greedy) so team/player are scored independently of
+    label correctness. GT events are frame-sorted first (the entreno_3 file
+    stores f332 last).
+
+    - team: predicted ``team`` vs the GT toucher's ``player_team``.
+    - player (spatial, only when ``gt_players`` given and the prediction has a
+      ``player_center``): the GT box containing the predicted player centre at
+      the nearest annotated frame, compared by left-to-right index (the GT
+      action player_id convention). Convention-free where the L-R index of the
+      predicted player would be biased by an unobserved player.
+    """
+    out: Dict[str, Any] = {}
+    pairs = []
+    used = set()
+    for gt in sorted(ground_truth, key=lambda e: e["frame"]):
+        best, bd = None, frame_tolerance + 1
+        for i, pred in enumerate(predictions):
+            if i in used:
+                continue
+            d = abs(pred.get("frame", -10**9) - gt["frame"])
+            if d < bd:
+                best, bd = i, d
+        if best is not None:
+            used.add(best)
+            pairs.append((gt, predictions[best]))
+
+    if pairs:
+        n_team = sum(1 for gt, p in pairs if p.get("team") is not None)
+        ok_team = sum(1 for gt, p in pairs
+                      if p.get("team") is not None and p["team"] == gt.get("player_team"))
+        out["team_accuracy"] = round(ok_team / n_team, 3) if n_team else None
+        out["team_scored"] = n_team
+
+    if gt_players and pairs:
+        def lr_index_of(gt_frame: int, center) -> Optional[int]:
+            if not center:
+                return None
+            k = min(gt_players.keys(), key=lambda kk: abs(int(kk) - gt_frame))
+            visible = [p for p in gt_players[k] if p.get("visible", True)]
+            hit = None
+            for p in visible:
+                x1, y1, x2, y2 = p["bbox"]
+                if x1 <= center[0] <= x2 and y1 <= center[1] <= y2:
+                    hit = p
+                    break
+            if hit is None:
+                return None
+            xs = sorted(visible, key=lambda p: p["bbox"][0])
+            return xs.index(hit) + 1
+
+        n_pl = ok_pl = 0
+        for gt, p in pairs:
+            idx = lr_index_of(gt["frame"], p.get("player_center"))
+            if idx is None:
+                continue
+            n_pl += 1
+            ok_pl += int(idx == gt.get("player_id"))
+        out["player_accuracy_spatial"] = round(ok_pl / n_pl, 3) if n_pl else None
+        out["player_scored_spatial"] = n_pl
+
+    out["matched_pairs"] = len(pairs)
+    return out
 
 
 def _match_action_events(
@@ -450,7 +526,9 @@ def run_evaluation(predictions_path: str, ground_truth_path: str, component: Opt
             if isinstance(pred_actions, dict) and "events" in pred_actions:
                 pred_actions = pred_actions["events"]
             gt_actions = gt_annotated["actions"].get("events", gt_annotated["actions"])
-            results["actions"] = evaluate_actions(pred_actions, gt_actions, match_player=match_player)
+            results["actions"] = evaluate_actions(
+                pred_actions, gt_actions, match_player=match_player,
+                gt_players=gt_annotated.get("players", {}).get("frames"))
             _print_section("Action Recognition", results["actions"])
 
     return results

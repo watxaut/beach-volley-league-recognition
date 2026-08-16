@@ -9,29 +9,80 @@
 
 ## Where we are
 
-On top of the bystander-hijack fix (`d219aae`), the **server-tracking gap
-(open point 3) is fixed and GT-validated**: probing raw YOLO showed the
-entreno_3 server was detected at conf 0.84–0.91 in *every* frame — the gap was
-tracker admission, not recall. Fixes shipped: **bootstrap seed dedup** (k-means
-split clusters used to lock a phantom 4th track that held the roster slot) and
-**serve-zone admission** (`CourtCalibration.is_in_serve_zone`, ground-plane
-metres behind a baseline — the one sanctioned off-court admission). entreno_3:
-detection 0.88 → **0.96**, ghosts 0.11 → **0.06**, id_consistency 0.93 →
-**0.97**, team 1.00, GT2 (server) 50/67 → **65/67** tracked from f0; entreno_1
-identical to before (no regression). Also: **ghost boxes no longer ride jumps
-upward** (open point 4: upward-only coast damping — damping *all* vertical
-velocity fragmented far-side ids because court-axis running is image-vertical;
-downward coasts normally), and `filter_detections_by_play_area` removed (open
-point 6, dead since the detector-side play-area mask filter). 94 unit tests
-green.
+**Team-aware contact attribution (old open point 2) is shipped and
+GT-validated** on entreno_3: attribution team accuracy 0.69 → **0.92**, player
+(spatial) 0.77 → **0.92**, label F1 0.90 → **0.93**, and the serve contact is
+detected and labeled `serve` for the first time (f29, containment). The
+winning design after a diagnosis-first sweep: candidates are filtered by the
+expected touch team — from the **ball's pixel width** (near/far regime,
+override) and **possession alternation** (flip after attack/serve/block,
+carry after dig/set) — with per-contact **foot teams** via
+`get_team_for_bbox`, a **ground-metre near-net exemption** gated on block
+geometry (contact above the net-top line), and the emitted `team` now the
+toucher's foot team (the resolver's latched possession used to mask
+wrong-team thefts). The action script's tracker feeding was also fixed
+(strict-set + no `strict_detections` had silently disabled serve-zone
+admission in the action pipeline only). 113 unit tests green. Known residual:
+over-set crossings (f294) when the ball's width abstains, and the GT serve
+frame is ~26 frames after the physical hit (annotated f56, hit ~f30) so it
+eval-mismatches at tol 15.
+
+Below that, the player-identity stack stands as of `63ec741`: seed-dedup +
+serve-zone admission (server tracked from f0, entreno_3 detection 0.96 /
+id_consistency 0.97), bystander guard, upward-only ghost damping. 94 of the
+113 tests predate this session.
 
 **Plan reference:** the full design lives in the session plan file
-(`~/.claude-zai/plans/i-want-to-start-golden-naur.md`) and the summary in
-Claude memory (`player-identity-plan`). Short version of the architecture:
-uniforms vary/are uncontrolled → colour can't be a trusted identity signal →
-**motion continuity is the primary identity signal**, appearance/body-size are
+(`~/.claude-zai/plans/i-want-to-start-golden-naur.md`, identity) and
+(`~/.claude-zai/plans/read-status-lets-try-imperative-anchor.md`,
+attribution — including the recorded design pivot away from image-plane
+trajectory side). Short version of the identity architecture: uniforms vary/
+are uncontrolled → colour can't be a trusted identity signal → **motion
+continuity is the primary identity signal**, appearance/body-size are
 conditional tie-breakers, and "exactly 4 players / 2 per side" is a hard
 constraint. Side changes need no special handling as long as IDs survive.
+
+## Open points
+
+1. **[BLOCKED — no footage] Validate side-change survival on a real match.** The
+   gallery's marquee use case (players swap ends every 7 points) is untested —
+   the entreno drills have no side changes. Blocked as of 2026-08-14: no video
+   of a full set is available yet. Unblock by recording/obtaining one
+   set-to-21 clip, calibrated, then:
+   `python scripts/dump_player_tracks.py <match>.mp4 --max-players 4` →
+   `python scripts/analyze_tracking.py <json> --max-players 4`, and scrub the
+   annotated video through a side change watching each ID.
+2. **[residual from the attribution fix] Over-set crossings without width
+   evidence.** When a set/dig crosses the net but the tracked ball's widths sit
+   in the 26–35px abstain band (entreno_3 f294: widths 29–40 through the gap),
+   possession carries and the next contact is attributed to the wrong team.
+   No counter-signal found that doesn't break a correct contact (above-net
+   contact, gap length, touch index all fail on f539). Levers if it matters:
+   per-video width calibration (e.g. from the serve flight), a proper camera
+   calibration so pinhole size→3D works, or ball-detection recall on near-half
+   approaches (currently often zero — occlusion).
+3. **[data] entreno_3 GT serve frame is late.** Annotated at f56; the physical
+   hit is ~f30 (toss apex f23, flight apex f47 over the far court). The
+   pipeline now detects+labels the serve correctly but eval-mismatches at
+   tolerance 15. Fix by re-annotating that one event (or accept).
+4. **[minor, pre-existing] `_detect_gesture`'s image-px `is_near_net` swallows
+   the whole far half** (the far court is only ~110px deep; every far player
+   is "near net" at 120px). The attribution path now uses ground metres
+   (`world_dist_from_net`); the gesture path (block/attack labels) still uses
+   px. Switch it if block labels misfire on far-side play.
+5. **[same-team adjacent-player choice.]** The team filter constrains the TEAM,
+   not which teammate — entreno_3 f69's dig goes to the wrong B player (both
+   runs, team correct). Needs pose/reach signals, not team logic.
+6. **[conditional] Phase 2: offline global stitch.** (unchanged) Post-processing
+   pass that re-clusters all track fragments into exactly 4 identities. Only
+   build if match validation shows residual swaps/fragmentation that phase 1
+   doesn't catch.
+7. **[watch] Serve-zone admission in crowded drills.** (unchanged) In drills
+   with extras in the serve band, an extra can take the free slot before the
+   real server; if a future dump shows a ghost behind a baseline, gate
+   admission on `n_court_det < 4`.
+8. **[minor] entreno_1 far-side recall.** (unchanged) `player_confidence`
+   0.5→0.35 or `player_imgsz` ↑ if needed.
 
 ## Open points
 
@@ -85,6 +136,60 @@ constraint. Side changes need no special handling as long as IDs survive.
    `player_imgsz` ↑. Not blocking anything currently.
 
 ## Log (newest first)
+
+### 2026-08-16 — team-aware contact attribution shipped (old open point 2)
+- **Diagnosis first, and it changed the design.** The sanctioned retry
+  ingredient (incoming-trajectory IMAGE side) was refuted by the diagnostic
+  (output/diag_attribution2.py + probes, git-ignored): an airborne ball over
+  the NEAR half projects ABOVE the midcourt line (line y≈600, net top y≈300,
+  far baseline y≈490), so GT-A contacts f211/f244/f453/f488 all read "B";
+  worse, the ball is often undetected during near-half approaches (occlusion
+  by the large near players) — every A-contact window had 0 samples. Ball-size
+  → ground-depth inversion also fails (an airborne ball is always closer to
+  the camera than the ground under it → everything reads near-side), and a
+  pinhole decomposition of the 4-click homography doesn't close (0.033
+  orthogonality residual, reconstructed feet ~30m off).
+- **f76 mystery solved (two findings).** The f76 contact is the GT f69 DIG by
+  a far-side player (ball descending into GT4's box) — the earlier "serve
+  misattribution" reading conflated it with the serve. The REAL serve contact
+  is ~f30 (toss apex f23) and had been REJECTED (d=177.8) because
+  scripts/test_action_recognition.py fed the tracker the strict in-court set
+  without `strict_detections` — serve-zone admission never fired in the action
+  pipeline (production FrameProcessor was already correct). Also found
+  max_players=6 hardcoded there vs the production 4.
+- **Shipped design** (src/recognition/action_classifier.py): expected touch
+  team = ball pixel WIDTH regime (w<26 → far/B, w>35 → near/A, else abstain;
+  any disagreeing sample blocks) when it commits, else possession
+  alternation (flip after ATTACK/BLOCK/serve gestures, carry after dig/set;
+  unconstrained on rally reset). `_closest_player_at` filters candidates by
+  per-contact foot team (`get_team_for_bbox`), exempts wrong-team candidates
+  only for block geometry (feet ≤1.5 ground metres from the net via new
+  `CourtCalibration.world_dist_from_net` AND contact above the net-top line —
+  image-px bands swallow the whole far half, and without the above-net gate a
+  net-standing setter steals sets, f488), relaxes when the filter empties the
+  set, and breaks 0.0-dist ties by centre distance. Emitted `team` is now the
+  toucher's foot team (`team_in_possession` kept for observability) — the
+  resolver's latch used to mask thefts behind an inherited label. Ball history
+  now carries (frame, x, y, w, h). Resolver label/touch logic deliberately
+  UNCHANGED (crossing-based touch counts match GT 14/14 on numbers but relabel
+  f379 set→spike via the touch-3-at-net rule).
+- **Measured** (13 frame-matched pairs, A/B = same feeding fix +
+  `--no-team-aware`): team 0.692 → **0.923**, player-spatial 0.769 → **0.923**,
+  label F1 0.897 → **0.929**; serve detected + labeled (f29, containment).
+  Fixed: f211, f563, f488 (+ serve). Remaining miss: f294 over-set (width
+  abstained 29–40px through the gap) — open point 2. entreno_1 regression:
+  team 1.0 / player 0.625 identical across A/B, precision 0.778→0.875, recall
+  unchanged (its misses are contact-detection recall, not attribution).
+- **Eval tooling**: evaluate.py actions now report team_accuracy (pred team vs
+  GT player_team) and player_accuracy_spatial (pred player_center → GT box →
+  L-R index; the GT action player_id convention is the L-R index at the
+  annotation frame — probe scored 12/14 vs 7/14 for canonical ids).
+- Files: action_classifier.py, court_calibration.py (+
+  midcourt_y_at_x/signed_midcourt_offset/world_dist_from_net),
+  frame_processor.py, config.py (attribution_* keys),
+  scripts/test_action_recognition.py (feeding fix, player_center,
+  --no-team-aware), scripts/evaluate.py; tests/test_team_attribution.py (+19);
+  suite 113 green.
 
 ### 2026-08-16 — server tracking fixed (open point 3) + ghost drift damped (4) + dead filter removed (6)
 - **Diagnosis first** (output/diag_serve_probe.py + diag_serve_audit.py,

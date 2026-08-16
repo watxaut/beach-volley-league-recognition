@@ -99,7 +99,7 @@ The system follows a modular computer vision pipeline designed for a **fixed cam
 
 #### Action Recognition
 - **PoseEstimator** (`pose_estimator.py`): MediaPipe in video mode (temporal smoothing). Outputs body-relative normalized features (wrist_height_ratio, elbow_height_ratio, etc.) instead of raw pixel coordinates.
-- **ActionClassifier** (`action_classifier.py`): Event-driven -- only classifies at ball trajectory inflection points. Finds closest player, classifies by pose + court position + ball direction. Tiered: Tier 1 spatial (serve, block), Tier 2 pose+ball (dig, set, spike).
+- **ActionClassifier** (`action_classifier.py`): Event-driven -- only classifies at ball trajectory inflection points. Team-aware attribution: candidates are filtered by the expected touch team (ball pixel-width near/far regime overriding possession alternation; flip after attack/serve/block, carry after dig/set), then closest by point-to-bbox distance with per-contact foot teams. Two layers: Layer 1 gesture (bump_set/attack/block from ball motion + court + pose), Layer 2 `ActionContextResolver` resolves dig/set/spike/serve/overpass from touch count. Image-plane ball side is NOT a side signal in this camera geometry (airborne near-half balls project above the midcourt line).
 
 #### Pipeline
 - **FrameProcessor** (`frame_processor.py`): Orchestrates detection -> tracking -> recognition per frame.
