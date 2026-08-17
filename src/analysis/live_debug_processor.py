@@ -42,6 +42,8 @@ class LiveDebugProcessor:
     - Tracked ball as a single circle (green detected / red predicted)
     - Player boxes with ``P<id>``; the box + label take the action colour while
       a recent action for that player is on screen, anchored on its contact frame
+    - A small frame counter, top-right (this processor only; the standalone
+      action script does not draw one)
     """
 
     # Live display/write lag, in seconds. Must exceed the classifier's worst
@@ -124,7 +126,8 @@ class LiveDebugProcessor:
         return ball, players
 
     def _render_frame(self, frame: np.ndarray, frame_idx: int, ball: BallOverlay,
-                      players: PlayerOverlay, plan: overlay.LabelPlan) -> np.ndarray:
+                      players: PlayerOverlay, plan: overlay.LabelPlan,
+                      total_frames: Optional[int] = None) -> np.ndarray:
         """Draw court + ball + player boxes (labels anchored on contact frames)."""
         out = frame
         try:
@@ -142,6 +145,8 @@ class LiveDebugProcessor:
                     action=lab[0] if lab else None,
                     confidence=lab[1] if lab else None,
                 )
+
+            overlay.draw_frame_counter(out, frame_idx, total_frames)
         except Exception as e:
             self.logger.error(f"Error rendering frame {frame_idx}: {e}")
             cv2.putText(out, f"Render Error: {str(e)[:50]}",
@@ -198,7 +203,8 @@ class LiveDebugProcessor:
             ret, frame = cap.read()
             if not ret:
                 break
-            writer.write(self._render_frame(frame, frame_idx, ball, players, plan))
+            writer.write(self._render_frame(frame, frame_idx, ball, players, plan,
+                                            total_frames=total))
         cap.release()
         writer.release()
         self.logger.info(f"Annotated video written: {save_video}")
@@ -253,7 +259,7 @@ class LiveDebugProcessor:
             # 2. Release one frame once the buffer is a full delay deep (or draining).
             if not paused and buffer and (len(buffer) > delay_frames or source_done):
                 f, i, ball, players = buffer.popleft()
-                shown = self._render_frame(f, i, ball, players, plan)
+                shown = self._render_frame(f, i, ball, players, plan, total_frames=total)
                 if writer is not None:
                     writer.write(shown)
 

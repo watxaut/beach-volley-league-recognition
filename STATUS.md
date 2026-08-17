@@ -117,6 +117,17 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Log (newest first)
 
+### 2026-08-17 — live-debug frame counter
+- Small HUD added: `overlay.draw_frame_counter` (top-right, white text on a
+  black underlay so it reads on sand too, format `f<idx>/<total>`), drawn in
+  `LiveDebugProcessor._render_frame` — so both the `--debug-live` window and
+  `--save-video` output now carry the frame number, matching how every event
+  is referenced (GT annotations, STATUS, eval reports). Render-only change;
+  pipeline untouched (mirrors-the-pipeline rule). Standalone
+  `test_action_recognition.py` videos unchanged (noted in the class
+  docstring). 113 tests green.
+- Files: src/output_gen/overlay.py, src/analysis/live_debug_processor.py.
+
 ### 2026-08-17 — near-net gesture flag: point 9 stale, point 4's switch GT-refuted (no code change)
 - **Point 9 did not reproduce**: the shipped state labels entreno_3 f539
   `spike` (GT f541 spike ✓, one of 4/4 correct spikes); it was folded in from

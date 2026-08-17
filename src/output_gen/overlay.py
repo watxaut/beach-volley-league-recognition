@@ -98,3 +98,19 @@ def draw_player(
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, box_color, 2)
     cv2.putText(frame, f"P{track_id}", (x1, y1 - 8),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, PLAYER_COLOR, 1)
+
+
+def draw_frame_counter(frame, frame_idx: int, total: Optional[int] = None) -> None:
+    """Draw a small frame counter in the top-right corner (in place).
+
+    Events are referenced by frame number throughout the project (GT
+    annotations, STATUS.md, eval reports), so burning the number into each
+    rendered frame keeps live scrubbing cross-referenceable. White text over
+    a thin black underlay so it reads on bright sand and dark backgrounds
+    alike. ``total`` (frame count) is appended when known and non-zero.
+    """
+    label = f"f{frame_idx}" if not total else f"f{frame_idx}/{total}"
+    (tw, _), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+    org = (frame.shape[1] - tw - 12, 28)
+    cv2.putText(frame, label, org, cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 4)
+    cv2.putText(frame, label, org, cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
