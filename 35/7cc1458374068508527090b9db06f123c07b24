@@ -1,0 +1,19 @@
+ground_truth/video_entreno_3_annotations.json
+  s_9ed08fada71d0a::t_8b9aaff7daa509 3104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "357cc1458374068508527090b9db06f123c07b24",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
