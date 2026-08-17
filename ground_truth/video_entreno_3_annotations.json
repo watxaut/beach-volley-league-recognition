@@ -3101,7 +3101,7 @@
       "description": "Action events with rally-state context. Each event has: frame, player_id, final_action (canonical label), raw_visual_actions (open-vocabulary multi-label), player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides.",
       "events": [
         {
-          "frame": 56,
+          "frame": 29,
           "player_id": 2,
           "final_action": "serve",
           "raw_visual_actions": [
