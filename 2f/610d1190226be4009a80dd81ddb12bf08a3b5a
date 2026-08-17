@@ -1,0 +1,25 @@
+CLAUDE.md
+  s_9ed08fada71d0a::t_25ec11817404c8 120
+STATUS.md
+  s_9ed08fada71d0a::t_ee2ce128393260 36,38-41,98-101,121-158
+src/utils/config.py
+  s_9ed08fada71d0a::t_a36824ecc9335b 24-27,40-45
+tests/test_components.py
+  s_9ed08fada71d0a::t_fb21d740d27107 145
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "2f610d1190226be4009a80dd81ddb12bf08a3b5a",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
