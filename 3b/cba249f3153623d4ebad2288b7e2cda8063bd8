@@ -1,0 +1,23 @@
+STATUS.md
+  s_9ed08fada71d0a::t_08fb5ae0971cc2 120-130
+src/analysis/live_debug_processor.py
+  s_9ed08fada71d0a::t_9a2f51d24b1f53 45-46,129-130,148-149,206-207,262
+src/output_gen/overlay.py
+  s_9ed08fada71d0a::t_874304719ab597 101-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "3bcba249f3153623d4ebad2288b7e2cda8063bd8",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
