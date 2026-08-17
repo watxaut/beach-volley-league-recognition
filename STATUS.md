@@ -32,6 +32,12 @@ serve-zone admission (server tracked from f0, entreno_3 detection 0.96 /
 id_consistency 0.97), bystander guard, upward-only ghost damping. 94 of the
 113 tests predate this session.
 
+**Near-net flag (2026-08-17, later session):** old open points 4+9 closed by
+diagnosis, no code change — 9 was stale (f539 labels spike in the shipped
+state) and 4's px→metres switch is GT-refuted (label F1 0.929 → 0.857/0.714):
+the px `near_net` is load-bearing for the resolver's touch-3-at-net spike
+rule. Details + revisit trigger in Open point 4 and the Log.
+
 **Perf (2026-08-17):** the detector device defaults were silently CPU —
 `BallDetector`/`PlayerDetector` shadowed `BaseDetector`'s `"auto"` with their
 own `device="cpu"`, so every bare construction (the annotator included) ran
@@ -78,11 +84,23 @@ constraint. Side changes need no special handling as long as IDs survive.
    hit is ~f30 (toss apex f23, flight apex f47 over the far court). The
    pipeline now detects+labels the serve correctly but eval-mismatches at
    tolerance 15. Fix by re-annotating that one event (or accept).
-4. **[minor, pre-existing] `_detect_gesture`'s image-px `is_near_net` swallows
-   the whole far half** (the far court is only ~110px deep; every far player
-   is "near net" at 120px). The attribution path now uses ground metres
-   (`world_dist_from_net`); the gesture path (block/attack labels) still uses
-   px. Switch it if block labels misfire on far-side play.
+4. **[diagnosed 2026-08-17 — deliberate no-change] The gesture path's image-px
+   `near_net` is load-bearing; a px→metres switch is GT-refuted.**
+   `_build_contact`'s `is_near_net` (px, `NEAR_NET_PX=120`) feeds BOTH
+   `_detect_gesture` and the resolver's touch-3-at-net spike rule
+   (`action_context.py:146`). Switching to ground metres regresses entreno_3
+   label F1 0.929 → 0.857 (≤2m) / 0.714 (≤1.5m): GT spikes f174/f431/f539
+   were hit from 1.79/3.77/1.96 m and only the px far-half swallow (every far
+   player "near net") makes the resolver's rule fire for them; keeping all
+   labels needs M≥4 m — re-encoding today's behaviour under a false name. The
+   gesture layer itself is rule-INSENSITIVE on all GT footage (identical
+   gestures under px/m1.5/m2.0 on entreno_1+3; every gesture-deciding contact,
+   incl. entreno_1's only block at 0.23 m, sits within 2 m). The px boundary
+   is nonsense in the abstract (server at 8.4 m reads far, a digger at 8.0 m
+   reads near) but no footage we own can distinguish the rules. Revisit when
+   match footage exists (real overhead digs vs blocks at depth): re-run
+   `output/diag_gesture_net.py <match>.mp4 --modes px m1.5 m2.0` and switch
+   only if gestures differ.
 5. **[same-team adjacent-player choice.]** The team filter constrains the TEAM,
    not which teammate — entreno_3 f69's dig goes to the wrong B player (both
    runs, team correct). Needs pose/reach signals, not team logic.
@@ -96,10 +114,34 @@ constraint. Side changes need no special handling as long as IDs survive.
    admission on `n_court_det < 4`.
 8. **[minor] entreno_1 far-side recall.** (unchanged) `player_confidence`
    0.5→0.35 or `player_imgsz` ↑ if needed.
-9. **[bug] entreno_3 last spike categorized as block** at frame 539 (suspect:
-   open point 4's image-px `is_near_net` swallowing the far half).
 
 ## Log (newest first)
+
+### 2026-08-17 — near-net gesture flag: point 9 stale, point 4's switch GT-refuted (no code change)
+- **Point 9 did not reproduce**: the shipped state labels entreno_3 f539
+  `spike` (GT f541 spike ✓, one of 4/4 correct spikes); it was folded in from
+  a pre-attribution-shipment stale section. No block mislabels exist on any
+  GT footage — the pipeline's only emitted block (entreno_1 f255) is genuinely
+  at 0.23 m from the net.
+- **Diagnosis first** (`output/diag_gesture_net.py` + saved per-variant JSONs,
+  git-ignored; runs the exact test_action_recognition feeding under a
+  monkey-patched `is_near_net`): the naive point-4 switch to ground metres
+  REGRESSES entreno_3 label F1 0.929 → 0.857 (≤2m) / 0.714 (≤1.5m), because
+  `near_net` also gates the resolver's touch-3-at-net spike rule
+  (`action_context.py:146`): GT spikes f174/f431/f539 were hit from
+  1.79/3.77/1.96 m and rely on the px far-half swallow to read "near net".
+  Keeping all labels needs M≥4 m = re-encoding today's behaviour under a
+  false name. The GESTURE layer itself is rule-insensitive on all GT footage
+  (identical gestures under px/m1.5/m2.0 on entreno_1+3); the px boundary is
+  absurd in the abstract (server at 8.4 m reads far, digger at 8.0 m reads
+  near) but nothing we own can tell the rules apart.
+- **Owner decision**: record, no production change. Revisit with match
+  footage via the diag script; switch only if gestures differ there.
+- Diag-tooling gotcha recorded: `classify_actions` builds contact k but
+  EMITS contact k−1 (one-contact look-ahead) — per-contact foot diagnostics
+  must zip build-order calls with event order, not attach per invocation
+  (the first table was shifted by one contact).
+- Files: STATUS.md only (diag script + JSONs git-ignored under output/).
 
 ### 2026-08-17 — perf: detector device defaults, annotator I/O, pose-lite default
 - **Measured first** (output/diag_perf_*.py, git-ignored): per-frame pipeline
