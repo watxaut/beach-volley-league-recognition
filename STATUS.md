@@ -23,9 +23,9 @@ toucher's foot team (the resolver's latched possession used to mask
 wrong-team thefts). The action script's tracker feeding was also fixed
 (strict-set + no `strict_detections` had silently disabled serve-zone
 admission in the action pipeline only). 113 unit tests green. Known residual:
-over-set crossings (f294) when the ball's width abstains, and the GT serve
-frame is ~26 frames after the physical hit (annotated f56, hit ~f30) so it
-eval-mismatches at tol 15.
+over-set crossings (f294) when the ball's width abstains. (The GT serve frame
+was re-annotated f56 → f29 on 2026-08-17, owner-verified against the dumped
+frames — entreno_3 label F1 is now **1.0** at 14/14 matched pairs.)
 
 Below that, the player-identity stack stands as of `63ec741`: seed-dedup +
 serve-zone admission (server tracked from f0, entreno_3 detection 0.96 /
@@ -80,11 +80,7 @@ constraint. Side changes need no special handling as long as IDs survive.
    per-video width calibration (e.g. from the serve flight), a proper camera
    calibration so pinhole size→3D works, or ball-detection recall on near-half
    approaches (currently often zero — occlusion).
-3. **[data] entreno_3 GT serve frame is late.** Annotated at f56; the physical
-   hit is ~f30 (toss apex f23, flight apex f47 over the far court). The
-   pipeline now detects+labels the serve correctly but eval-mismatches at
-   tolerance 15. Fix by re-annotating that one event (or accept).
-4. **[diagnosed 2026-08-17 — deliberate no-change] The gesture path's image-px
+3. **[diagnosed 2026-08-17 — deliberate no-change] The gesture path's image-px
    `near_net` is load-bearing; a px→metres switch is GT-refuted.**
    `_build_contact`'s `is_near_net` (px, `NEAR_NET_PX=120`) feeds BOTH
    `_detect_gesture` and the resolver's touch-3-at-net spike rule
@@ -101,21 +97,32 @@ constraint. Side changes need no special handling as long as IDs survive.
    match footage exists (real overhead digs vs blocks at depth): re-run
    `output/diag_gesture_net.py <match>.mp4 --modes px m1.5 m2.0` and switch
    only if gestures differ.
-5. **[same-team adjacent-player choice.]** The team filter constrains the TEAM,
+4. **[same-team adjacent-player choice.]** The team filter constrains the TEAM,
    not which teammate — entreno_3 f69's dig goes to the wrong B player (both
    runs, team correct). Needs pose/reach signals, not team logic.
-6. **[conditional] Phase 2: offline global stitch.** (unchanged) Post-processing
+5. **[conditional] Phase 2: offline global stitch.** (unchanged) Post-processing
    pass that re-clusters all track fragments into exactly 4 identities. Only
    build if match validation shows residual swaps/fragmentation that phase 1
    doesn't catch.
-7. **[watch] Serve-zone admission in crowded drills.** (unchanged) In drills
+6. **[watch] Serve-zone admission in crowded drills.** (unchanged) In drills
    with extras in the serve band, an extra can take the free slot before the
    real server; if a future dump shows a ghost behind a baseline, gate
    admission on `n_court_det < 4`.
-8. **[minor] entreno_1 far-side recall.** (unchanged) `player_confidence`
+7. **[minor] entreno_1 far-side recall.** (unchanged) `player_confidence`
    0.5→0.35 or `player_imgsz` ↑ if needed.
 
 ## Log (newest first)
+
+### 2026-08-17 — entreno_3 GT serve frame fixed (old open point 3)
+- Owner scrubbed the dumped frames and confirmed the serve contact at **f29**
+  (pipeline's own detection); GT event re-annotated f56 → f29 (single-line
+  JSON edit, `git show 357cc14`). Eval on the existing prediction log
+  (output/attrib_e3_new2): matched_pairs 13 → **14**, serve P/R 0 → 1, label
+  **F1 0.929 → 1.0**; team unchanged 0.929 (13/14, the f294 over-set residual,
+  open point 2). Footnote: player_accuracy_spatial now reads 0.857 (12/14)
+  vs 0.923 (12/13) before — the serve pair entered spatial scoring and is one
+  of the misses (it was previously unscored, not correct; no regression).
+- Files: ground_truth/video_entreno_3_annotations.json, STATUS.md.
 
 ### 2026-08-17 — live-debug frame counter
 - Small HUD added: `overlay.draw_frame_counter` (top-right, white text on a
