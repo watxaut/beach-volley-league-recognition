@@ -106,8 +106,8 @@ def main():
         ball_model = str(auto_ball) if auto_ball.exists() else None
         ball_detector = BallDetector(
             model_path=ball_model,
-            confidence_threshold=_CFG.get("ball_confidence", 0.5),
-            device=_CFG.get("device", "cpu"),
+            confidence_threshold=_CFG.get("ball_confidence", 0.15),
+            device=_CFG.get("device", "auto"),
         )
     except Exception as exc:  # pragma: no cover - best-effort measurement aid
         print(f"(warn) ball detector unavailable, bootstrap will use the time fallback: {exc}")

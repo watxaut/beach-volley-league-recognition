@@ -32,6 +32,13 @@ serve-zone admission (server tracked from f0, entreno_3 detection 0.96 /
 id_consistency 0.97), bystander guard, upward-only ghost damping. 94 of the
 113 tests predate this session.
 
+**Config-drift guard (2026-08-17, later session):** `tests/test_config_drift.py`
+(54 tests) locks the four seams where production and the GT scripts can
+silently fork — DEFAULT_CONFIG ↔ component ctor defaults ↔ GT-script literal
+kwargs + argparse defaults ↔ inline `.get(key, fallback)` fallbacks — so the
+f539 block/spike class of bug can't recur unnoticed; 9 stale inline fallbacks
+defused the same day. Suite 167 green.
+
 **Near-net flag (2026-08-17, later session):** old open points 4+9 closed by
 diagnosis — 4's px→metres switch is GT-refuted (label F1 0.929 → 0.857/0.714):
 the px `near_net` is load-bearing for the resolver's touch-3-at-net spike
@@ -117,6 +124,35 @@ constraint. Side changes need no special handling as long as IDs survive.
    0.5→0.35 or `player_imgsz` ↑ if needed.
 
 ## Log (newest first)
+
+### 2026-08-17 — config-drift guard test built (candidate follow-up from the divergence fix)
+- New `tests/test_config_drift.py` (54 tests) pins the four seams where
+  production (`src.main`/live-debug) and the validated script paths can
+  silently fork: (1) `DEFAULT_CONFIG` vs component **ctor defaults** (the
+  scripts construct PlayerTracker/BallTracker bare, so ctor defaults ARE the
+  script-side config — the original 30/90 + 100/150 drift lived here);
+  (2) literal construction kwargs in test_action_recognition.py +
+  test_ball_tracking.py, read by AST so editing a script literal without the
+  config fails the suite; (3) the script's argparse defaults
+  (`--pose-complexity`); (4) inline `<config>.get(key, fallback)` fallbacks in
+  frame_processor / video_processor / main / dump_player_tracks. Deliberate
+  divergences (ball_confidence 0.15 vs ctor 0.05, pose_complexity 0 vs ctor 1,
+  action_confidence 0.3 vs ctor 0.4) are documented in the module docstring
+  and pinned by the script tests instead. Two meta-guards keep the AST scans
+  from passing vacuously if they stop matching.
+- **Validation:** re-introducing the original drifts (config
+  `player_max_disappeared`→30, main.py `ball_confidence` fallback→0.7) fails
+  exactly the two expected tests; restored, all green.
+- Same sweep defused **9 stale inline fallbacks** — dead today (every key
+  exists in DEFAULT_CONFIG) but landmines the day a key is removed:
+  frame_processor (ball_confidence 0.05, device "cpu" ×2,
+  player_max_disappeared 30, pose_complexity 1, action_confidence 0.4),
+  main.py (ball_confidence 0.7 — the old drifted value), dump_player_tracks
+  (ball_confidence 0.5, device "cpu"). All set to the DEFAULT_CONFIG values;
+  zero behavior change.
+- Suite: 113 → **167 green**.
+- Files: tests/test_config_drift.py, src/analysis/frame_processor.py,
+  src/main.py, scripts/dump_player_tracks.py, STATUS.md.
 
 ### 2026-08-17 — live-debug showed block where the script said spike: config-default divergence FIXED
 - Owner's live-debug screenshot (f562, red BLOCK label) disproved the morning's

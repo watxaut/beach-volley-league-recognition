@@ -172,9 +172,10 @@ def main() -> int:
                 ball_model = str(auto_model)
         if ball_model:
             config["ball_model_path"] = ball_model
-            # The fine-tuned model needs a low confidence threshold; the 0.7 default
-            # misses the ball entirely. Only override if left at that stale default.
-            if config.get("ball_confidence", 0.7) > 0.3:
+            # The fine-tuned model needs a low confidence threshold; a high value
+            # (e.g. a config file still carrying the old 0.7) misses the ball
+            # entirely. Only override if left above the tuned range.
+            if config.get("ball_confidence", 0.15) > 0.3:
                 config["ball_confidence"] = 0.15
             logger.info(
                 f"Using ball model: {ball_model} (ball_confidence={config.get('ball_confidence')})"

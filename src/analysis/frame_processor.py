@@ -48,7 +48,12 @@ class FrameProcessor:
         self._initialize_components()
 
     def _initialize_components(self) -> None:
-        """Initialize all computer vision components."""
+        """Initialize all computer vision components.
+
+        The inline ``self.config.get(key, fallback)`` fallbacks mirror
+        ``Config.DEFAULT_CONFIG`` and are locked by tests/test_config_drift.py
+        (the 2026-08-17 f539 block/spike fork was exactly this class of drift).
+        """
         try:
             # If no calibration loaded, create empty one (will work without spatial features)
             if self.court_calibration is None:
@@ -67,8 +72,8 @@ class FrameProcessor:
             # Ball detection (YOLO-based)
             self.ball_detector = BallDetector(
                 model_path=self.config.get("ball_model_path"),
-                confidence_threshold=self.config.get("ball_confidence", 0.05),
-                device=self.config.get("device", "cpu"),
+                confidence_threshold=self.config.get("ball_confidence", 0.15),
+                device=self.config.get("device", "auto"),
             )
 
             # Player detection (YOLO-based). The detector cap is a generous
@@ -76,7 +81,7 @@ class FrameProcessor:
             # the roster would drop real in-court players before tracking.
             self.player_detector = PlayerDetector(
                 confidence_threshold=self.config.get("player_confidence", 0.5),
-                device=self.config.get("device", "cpu"),
+                device=self.config.get("device", "auto"),
                 max_players=self.config.get("max_detections", 20),
                 imgsz=self.config.get("player_imgsz", 1280),
             )
@@ -98,7 +103,7 @@ class FrameProcessor:
 
             # Player tracker (4-player lock with appearance features)
             self.player_tracker = PlayerTracker(
-                max_disappeared=self.config.get("player_max_disappeared", 30),
+                max_disappeared=self.config.get("player_max_disappeared", 90),
                 max_distance=self.config.get("tracking_max_distance", 150.0),
                 max_velocity=self.config.get("player_max_velocity", 150.0),
                 max_players=self.config.get("max_players", 4),
@@ -130,14 +135,14 @@ class FrameProcessor:
             # Pose estimation (video mode for temporal smoothing)
             self.pose_estimator = PoseEstimator(
                 min_detection_confidence=self.config.get("pose_confidence", 0.5),
-                model_complexity=self.config.get("pose_complexity", 1),
+                model_complexity=self.config.get("pose_complexity", 0),
             )
 
             # Action classifier (event-driven)
             self.action_classifier = ActionClassifier(
                 pose_estimator=self.pose_estimator,
                 temporal_window=self.config.get("temporal_window", 10),
-                confidence_threshold=self.config.get("action_confidence", 0.4),
+                confidence_threshold=self.config.get("action_confidence", 0.3),
                 court_calibration=self.court_calibration,
                 team_aware=self.config.get("attribution_team_aware", True),
                 width_side_enabled=self.config.get("attribution_width_side", True),
