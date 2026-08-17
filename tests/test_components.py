@@ -142,7 +142,7 @@ class TestConfig(unittest.TestCase):
         config = Config.default()
         self.assertIsNotNone(config)
         self.assertEqual(config.get("device"), "auto")
-        self.assertEqual(config.get("ball_confidence"), 0.7)
+        self.assertEqual(config.get("ball_confidence"), 0.15)  # must match scripts/test_action_recognition.py (see config comment)
 
     def test_config_validation(self):
         """Test configuration validation."""

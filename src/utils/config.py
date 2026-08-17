@@ -21,7 +21,10 @@ class Config:
 
         # Detection settings
         "detection_method": "template",  # Default to Wilson ball template matching
-        "ball_confidence": 0.7,  # Much lower for better ball detection
+        "ball_confidence": 0.15,  # MUST match scripts/test_action_recognition.py: the fine-tuned model
+                                  #   + conservative tracker are tuned here, and every GT-validated action
+                                  #   number was measured at 0.15. At 0.7 the ball history starves and
+                                  #   gestures flip in production/live-debug vs the script (f539 block).
         "player_confidence": 0.5,  # 0.35 lifts recall ~3pp on far-side players but adds false detections; kept at 0.5
         "player_imgsz": 1280,   # YOLO inference size; 640 default loses small far-side players
         "max_players": 4,       # exactly 4 for match identity (gallery/bootstrap assume a 4-roster).
@@ -34,8 +37,12 @@ class Config:
         # values here let the tracker chase noise and break contact detection.
         "ball_max_missing": 10,
         "trajectory_smoothing": 5,
-        "player_max_disappeared": 30,
-        "tracking_max_distance": 100.0,
+        # player_max_disappeared / tracking_max_distance: PlayerTracker ctor defaults
+        # (what every validated script path runs: test_action_recognition,
+        # dump_player_tracks). The old 30/100 diverged production/live-debug
+        # from the script (tracks retired sooner, associations tighter).
+        "player_max_disappeared": 90,
+        "tracking_max_distance": 150.0,
 
         # Player tracker: team smoothing + coast extrapolation
         "player_team_vote_window": 15,   # frames of foot-position votes for team label

@@ -117,7 +117,7 @@ The system follows a modular computer vision pipeline designed for a **fixed cam
 
 ### Configuration
 - Defaults live in `src/utils/config.py` (`Config.DEFAULT_CONFIG`). Override by passing `--config <file>` (YAML or JSON) on the CLI.
-- Key settings: `ball_confidence` (0.7), `player_confidence` (0.5), `max_players` (4), `ball_model_path` (optional -- points to a fine-tuned ball model)
+- Key settings: `ball_confidence` (0.15 -- MUST match `scripts/test_action_recognition.py`; every GT-validated action number was measured at 0.15, and a diverging default silently flips gestures in production/live-debug), `player_confidence` (0.5), `max_players` (4), `ball_model_path` (optional -- points to a fine-tuned ball model)
 - Device selection via `device` config or `--device` CLI: `auto` (default -- picks CUDA > MPS (Apple GPU) > CPU), `cpu`, `cuda`, or `mps`. `make run` uses MPS automatically on Apple Silicon (~1.75x faster than CPU); pass `--device cpu` for deterministic parity with CPU eval baselines.
 
 ### Output

@@ -33,11 +33,12 @@ id_consistency 0.97), bystander guard, upward-only ghost damping. 94 of the
 113 tests predate this session.
 
 **Near-net flag (2026-08-17, later session):** old open points 4+9 closed by
-diagnosis, no code change — 9 was stale (f539 labels spike in the shipped
-state; provenance settled by git archaeology, see Log — no run ever showed
-block) and 4's px→metres switch is GT-refuted (label F1 0.929 → 0.857/0.714):
+diagnosis — 4's px→metres switch is GT-refuted (label F1 0.929 → 0.857/0.714):
 the px `near_net` is load-bearing for the resolver's touch-3-at-net spike
-rule. Details + revisit trigger in Open point 3 and the Log.
+rule. Point 9's block turned out to be REAL on the production/live-debug path
+(a config divergence, fixed same day — see Log); the script path (all GT
+numbers) always said spike. Details + revisit trigger in Open point 3 and the
+Log.
 
 **Perf (2026-08-17):** the detector device defaults were silently CPU —
 `BallDetector`/`PlayerDetector` shadowed `BaseDetector`'s `"auto"` with their
@@ -94,7 +95,10 @@ constraint. Side changes need no special handling as long as IDs survive.
    gestures under px/m1.5/m2.0 on entreno_1+3; every gesture-deciding contact,
    incl. entreno_1's only block at 0.23 m, sits within 2 m). The px boundary
    is nonsense in the abstract (server at 8.4 m reads far, a digger at 8.0 m
-   reads near) but no footage we own can distinguish the rules. Revisit when
+   reads near) but no footage we own can distinguish the rules. (2026-08-17
+   addendum: production/live-debug briefly DID take the BLOCK branch at f539 —
+   a config-default divergence, fixed same day, not a near-net regression; all
+   measurements above are from the script path and remain valid.) Revisit when
    match footage exists (real overhead digs vs blocks at depth): re-run
    `output/diag_gesture_net.py <match>.mp4 --modes px m1.5 m2.0` and switch
    only if gestures differ.
@@ -114,7 +118,44 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Log (newest first)
 
-### 2026-08-17 — f539 "block" provenance settled: never existed in any run (owner challenge)
+### 2026-08-17 — live-debug showed block where the script said spike: config-default divergence FIXED
+- Owner's live-debug screenshot (f562, red BLOCK label) disproved the morning's
+  "never existed" verdict: a headless repro (`src.main --save-video`) shows the
+  **production/live-debug path emits f539 → block (0.70)** while the script
+  (and every GT number) says **spike (0.50)** — same contact, same player, same
+  code, different CONFIG.
+- Root cause: `Config.DEFAULT_CONFIG` had drifted from the constructor defaults
+  the validated scripts run — `ball_confidence` **0.7 vs 0.15** (the starved
+  ball history flips the f539 contact into the BLOCK gesture branch),
+  `player_max_disappeared` **30 vs 90**, `tracking_max_distance` **100 vs
+  150**. The tracking-section comment even claimed it "matches
+  scripts/test_action_recognition.py". Verified no YAML/JSON override exists
+  anywhere, so `src.main`/live-debug ran the drifted defaults silently.
+- **Fix**: align `DEFAULT_CONFIG` to the validated values (0.15 / 90 / 150,
+  with comments explaining they must not drift again); one stale assertion in
+  `tests/test_components.py` updated; CLAUDE.md's "ball_confidence (0.7)"
+  corrected.
+- **Acceptance**: production headless re-run on entreno_3 emits the validated
+  event stream EXACTLY (14/14 events, frames+labels+confidences identical to
+  output/attrib_e3_new2; zero blocks). Pixel-level check of the user's exact
+  screenshot frame f562: pre-fix 2400 block-blue px / post-fix 0 blue + 2711
+  spike-red px, and the label region is the only changed area of the frame.
+  113 tests green.
+- **Correction of the morning entry below**: its "f539 block never existed in
+  any run / born stale" conclusion was wrong — the archaeology ran the
+  production path only at OLD commits (where the pre-attribution classifier
+  didn't take the BLOCK branch at 0.7 either) and never ran CURRENT production
+  code. The owner's original instinct (block appeared around the attribution
+  change) was right: the attribution-era classifier + the 0.7-confidence ball
+  stream produce the block; the script's 0.15 stream never does.
+- Lesson recorded: GT-validate the PRODUCTION path too, or assert
+  config-defaults == script-constructions in a test so drift like this can't
+  silently fork the paths. (Candidate follow-up; not built today.)
+- Files: src/utils/config.py, tests/test_components.py, CLAUDE.md, STATUS.md.
+  Artifacts (git-ignored): output/livedebug_repro (pre-fix),
+  output/livedebug_fixed (post-fix).
+
+### 2026-08-17 — f539 "block" provenance settled: never existed in any run (owner challenge) — SUPERSEDED, see entry above
 - Owner challenged the point-9 story: they remembered live debug showing f539
   as `spike` a couple of days ago and suspected the block→spike flip came from
   the team-attribution change. Git archaeology says: **their memory was right
