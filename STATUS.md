@@ -5,7 +5,7 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-08-16
+**Last updated:** 2026-08-17
 
 ## Where we are
 
@@ -31,6 +31,19 @@ Below that, the player-identity stack stands as of `63ec741`: seed-dedup +
 serve-zone admission (server tracked from f0, entreno_3 detection 0.96 /
 id_consistency 0.97), bystander guard, upward-only ghost damping. 94 of the
 113 tests predate this session.
+
+**Perf (2026-08-17):** the detector device defaults were silently CPU —
+`BallDetector`/`PlayerDetector` shadowed `BaseDetector`'s `"auto"` with their
+own `device="cpu"`, so every bare construction (the annotator included) ran
+YOLO on CPU (~150ms per annotation interaction). Defaults are now auto (MPS);
+the annotator also gained sequential forward seeks (~6ms vs ~65ms keyframe
+seek) and a (frame, mode) detection cache → ~30-40ms per interaction,
+revisits free; pose runs the lite model (`pose_complexity` 0, new default)
+after a byte-identical GT A/B on entreno_1/3. Pipeline per-frame ~102 →
+~81ms. Live debug deliberately untouched — the owner wants it identical to
+the shared pipeline for real debugging. Next lever if ever wanted: pose only
+for near-ball players (measured 52→~26ms; needs an occlusion-window fallback
+first).
 
 **Plan reference:** the full design lives in the session plan file
 (`~/.claude-zai/plans/i-want-to-start-golden-naur.md`, identity) and
@@ -83,60 +96,48 @@ constraint. Side changes need no special handling as long as IDs survive.
    admission on `n_court_det < 4`.
 8. **[minor] entreno_1 far-side recall.** (unchanged) `player_confidence`
    0.5→0.35 or `player_imgsz` ↑ if needed.
-
-## Open points
-
-1. **[BLOCKED — no footage] Validate side-change survival on a real match.** The
-   gallery's marquee use case (players swap ends every 7 points) is untested —
-   the entreno drills have no side changes. Blocked as of 2026-08-14: no video
-   of a full set is available yet. Unblock by recording/obtaining one
-   set-to-21 clip, calibrated, then:
-   `python scripts/dump_player_tracks.py <match>.mp4 --max-players 4` →
-   `python scripts/analyze_tracking.py <json> --max-players 4`, and scrub the
-   annotated video through a side change watching each ID.
-2. **[parked after a failed attempt — read the findings first] Team-aware
-   contact attribution.** Adjacent same-line players break closest-player
-   attribution (entreno_3, GT-verified): sets f378/f488 and (before the ghost
-   fix) digs f211/f563 went to the wrong player; same player spiking then
-   digging is only legal via a block.
-   **Attempted 2026-08-15 and REVERTED**: constrain candidates by the court
-   side of the ball's contact vertex + exempt the near-net band. Diagnostic
-   (output/diag_attribution.py, git-ignored) showed two broken signals:
-   (a) the contact VERTEX is not the touch position — it can be the ball's
-   apex on the wrong side (vertex-side disagreed with the GT toucher's team on
-   ≥3/14 contacts: f211, f244, f541); (b) candidates' snapshot `team` (tracker
-   smoothed, 15-frame vote) is wrong near the midcourt band exactly where
-   sets/digs happen (f488 chosen player labelled A, truly B). Net effect was
-   regressions (f563 dig wrong, f294 spike lost, set→dig label cascades), so
-   the code was reverted. Next design must use: incoming-ball TRAJECTORY side
-   over several frames (not the vertex) or rally-state alternation
-   (attack→opponent digs unless a block intervened), plus per-contact
-   foot-based candidate teams (court.get_team_for_bbox on the snapshot) rather
-   than the smoothed tracker team.
-   **New evidence 2026-08-16 (server now tracked)**: the entreno_3 serve
-   contact IS detected as an event (f76, ball trajectory bottom) and the ball
-   sits INSIDE the server's bbox (pred4, dist 0.0; nearest other non-ghost
-   187px) — yet the classifier emitted "Player 3 → dig". The retry must also
-   fix serve-time attribution (bbox containment beats center-distance here)
-   and the serve label (behind baseline + hands overhead + first touch).
-3. **[conditional] Phase 2: offline global stitch.** Post-processing pass that
-   re-clusters all track fragments into exactly 4 identities (ensemble
-   signature + time/space gaps + k=4). Only build if match validation shows
-   residual swaps/fragmentation that phase 1 doesn't catch.
-4. **[watch] Serve-zone admission in crowded drills.** Serve-zone admission is
-   geometric (≤3m behind a baseline, ≤1m beyond sidelines, free slot). In
-   drills with extras standing in that band, an extra can take the free slot
-   before the real server. Not observed on entreno_1/3 GT (admission fired
-   only for the server), but if a future dump shows a ghost behind a baseline,
-   tighten with a live/dead-ball gate (admit only when n_court_det < 4).
-5. **[minor] entreno_1 far-side recall.** The remaining entreno_1 misses
-   (detection 0.923 ceiling) are genuine YOLO misses of small far-side players
-   (unlike the server gap, which looked identical but was admission). Levers
-   if needed: `player_confidence` 0.5→0.35 (recall +~3pp, more false dets) or
-   `player_imgsz` ↑. Not blocking anything currently.
-6. **[bug] entreno_3 last spike categorized as block** at frame 539.
+9. **[bug] entreno_3 last spike categorized as block** at frame 539 (suspect:
+   open point 4's image-px `is_near_net` swallowing the far half).
 
 ## Log (newest first)
+
+### 2026-08-17 — perf: detector device defaults, annotator I/O, pose-lite default
+- **Measured first** (output/diag_perf_*.py, git-ignored): per-frame pipeline
+  on entreno_3 = ~102ms core (pose 52ms CPU + ball 23 + player 25 MPS;
+  trackers/game-state ≤1ms); the live-debug loop adds serialized
+  waitKey(33ms)+render on top → ~5-7fps. The ANNOTATOR was ~150ms per
+  interaction because BOTH its detectors ran on CPU:
+  `BallDetector`/`PlayerDetector` shadow `BaseDetector`'s `device="auto"`
+  with their own `device="cpu"` defaults, so every bare construction
+  (annotate_video, test_action_recognition, dump_player_tracks, auto_label,
+  test_* scripts) silently inherited CPU. Also: `cap.set` forward seek = 65ms
+  vs 6ms for 5 sequential reads.
+- **Fixes**: detector device defaults → "auto" (docstrings updated);
+  annotator `_seek_frame` uses sequential reads for forward steps ≤64 when
+  the capture cursor is contiguous, plus `_use_frame` cursor bookkeeping;
+  detections memoised per (frame, mode-class — PLAYER/ACTION share one slot)
+  so revisits/mode switches/undo are free; `pose_complexity` default 1→0
+  (lite, ~1.6x faster pose) adopted only after the A/B; `--pose-complexity`
+  arg on test_action_recognition.py (default 0 = production, so eval runs
+  can't silently diverge from the pipeline again).
+- **GT regression check** (entreno_1 + entreno_3, players + actions): all
+  four eval JSONs BYTE-IDENTICAL across baseline (CPU detectors, pose 1) →
+  post (MPS detectors, pose 0). entreno_3 tracking 0.961/0.064/0.972/1.0,
+  actions team 0.923 / player-spatial 0.923 (13 pairs); entreno_1 team 1.0 /
+  0.625 (8 pairs) — unchanged from the 2026-08-16 session. 113 unit tests
+  green (run via `venv/`, not `.venv/` — only the former has pytest).
+- **Measured gains**: annotator click-advance ~150ms → ~30-40ms (revisits
+  ~0ms); pipeline per-frame ~102 → ~81ms (pose 52→33ms end-to-end).
+- **Deliberately NOT done**: live-debug pose near-ball gating (52→~26ms
+  measured) + producer/consumer display decoupling — owner wants live debug
+  byte-identical to the shared pipeline while debugging for real. Levers
+  recorded here for whenever they're wanted.
+- STATUS.md cleanup: removed the stale duplicate "Open points" section (it
+  predated the attribution shipment); its one fresh item (f539 block bug) was
+  folded into the live list as point 9.
+- Files: src/detection/{ball_detector,player_detector}.py,
+  scripts/annotate_video.py, scripts/test_action_recognition.py,
+  src/utils/config.py, STATUS.md.
 
 ### 2026-08-16 — team-aware contact attribution shipped (old open point 2)
 - **Diagnosis first, and it changed the design.** The sanctioned retry
