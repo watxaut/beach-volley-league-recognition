@@ -34,9 +34,10 @@ id_consistency 0.97), bystander guard, upward-only ghost damping. 94 of the
 
 **Near-net flag (2026-08-17, later session):** old open points 4+9 closed by
 diagnosis, no code change — 9 was stale (f539 labels spike in the shipped
-state) and 4's px→metres switch is GT-refuted (label F1 0.929 → 0.857/0.714):
+state; provenance settled by git archaeology, see Log — no run ever showed
+block) and 4's px→metres switch is GT-refuted (label F1 0.929 → 0.857/0.714):
 the px `near_net` is load-bearing for the resolver's touch-3-at-net spike
-rule. Details + revisit trigger in Open point 4 and the Log.
+rule. Details + revisit trigger in Open point 3 and the Log.
 
 **Perf (2026-08-17):** the detector device defaults were silently CPU —
 `BallDetector`/`PlayerDetector` shadowed `BaseDetector`'s `"auto"` with their
@@ -112,6 +113,30 @@ constraint. Side changes need no special handling as long as IDs survive.
    0.5→0.35 or `player_imgsz` ↑ if needed.
 
 ## Log (newest first)
+
+### 2026-08-17 — f539 "block" provenance settled: never existed in any run (owner challenge)
+- Owner challenged the point-9 story: they remembered live debug showing f539
+  as `spike` a couple of days ago and suspected the block→spike flip came from
+  the team-attribution change. Git archaeology says: **their memory was right
+  and the flip hypothesis wrong — f539 was spike before attribution too.**
+- Evidence: detached-worktree runs of the PRODUCTION path (src.main =
+  FrameProcessor = what live debug shows) at `128e53a` (Aug 15 morning, i.e.
+  before BOTH the ghost exclusion d219aae and the attribution f276ca8):
+  f539 → `spike (0.50)`, zero blocks in the whole timeline; the action script
+  (buggy feeding and all) at the same commit: `Frame 539 → spike`; the
+  attribution session's own diagnostic (output/diag_attribution2_run1.txt):
+  spike; every attrib_e3_* log and the current state: spike.
+- The "categorized as block" text first appears in STATUS at `6bd07c1` (Aug 17
+  perf session), claimed to be folded from "the stale duplicate Open-points
+  section" — but no committed STATUS version contains it (checked 970430e,
+  d219aae, 63ec741, f276ca8, 663e455; the duplicate section's 5 items have no
+  f539). Point 9 was **born stale** — a mis-sourced note at fold-in time, not
+  a real regression that later got fixed.
+- Incidental pre-fix-era observations recorded while there: the Aug 15
+  production run misses the serve (no serve-zone admission yet) and instead
+  emits a 14th contact ~f620 `overpass` that the current pipeline doesn't
+  (contact-set drift between eras, worth remembering when comparing old logs).
+- STATUS.md only (worktrees removed after use).
 
 ### 2026-08-17 — entreno_3 GT serve frame fixed (old open point 3)
 - Owner scrubbed the dumped frames and confirmed the serve contact at **f29**
