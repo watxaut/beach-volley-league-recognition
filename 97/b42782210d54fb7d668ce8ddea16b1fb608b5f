@@ -1,0 +1,27 @@
+STATUS.md
+  s_9ed08fada71d0a::t_40600ec6ee408a 35-41,128-156
+scripts/dump_player_tracks.py
+  s_9ed08fada71d0a::t_4341fb4d5c4880 109-110
+src/analysis/frame_processor.py
+  s_9ed08fada71d0a::t_e56c094465a1e0 51-56,75-76,84,106,138,145
+src/main.py
+  s_9ed08fada71d0a::t_94c419722eee1e 175-178
+tests/test_config_drift.py
+  s_9ed08fada71d0a::t_84bca47e732e9e 1-307
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "97b42782210d54fb7d668ce8ddea16b1fb608b5f",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
