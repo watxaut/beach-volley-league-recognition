@@ -39,12 +39,18 @@ kwargs + argparse defaults ↔ inline `.get(key, fallback)` fallbacks — so the
 f539 block/spike class of bug can't recur unnoticed; 9 stale inline fallbacks
 defused the same day. Suite 167 green.
 
+**entreno_4/5 GT (2026-08-18):** owner-annotated (players every 10 frames, 6
+action events each — no serves, no occlusion flags, side-noiseier footage as
+warned). Checked end-to-end: boxes + box-teams fully consistent; 6/12 action
+`player_id`s are mis-IDs (teams right) → Open points 1-2; baselines recorded
+in the Log.
+
 **Near-net flag (2026-08-17, later session):** old open points 4+9 closed by
 diagnosis — 4's px→metres switch is GT-refuted (label F1 0.929 → 0.857/0.714):
 the px `near_net` is load-bearing for the resolver's touch-3-at-net spike
 rule. Point 9's block turned out to be REAL on the production/live-debug path
 (a config divergence, fixed same day — see Log); the script path (all GT
-numbers) always said spike. Details + revisit trigger in Open point 3 and the
+numbers) always said spike. Details + revisit trigger in Open point 5 and the
 Log.
 
 **Perf (2026-08-17):** the detector device defaults were silently CPU —
@@ -72,7 +78,23 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Open points
 
-1. **[BLOCKED — no footage] Validate side-change survival on a real match.** The
+1. **[owner action — quick] Re-verify the 6 mis-IDed action events in the
+   entreno_4/5 GT.** In 6 of 12 events the `player_id` contradicts the event's
+   own `player_team` (foot-side geometry of that player's box; 4 at the exact
+   same frame). Arbitrated corrections (pred contact center lands inside the
+   corrected player's box): e4 f133 p2→**p3**, f276 p3→**p2**; e5 f60 p2→**p4**,
+   f250 p3→**p1**. Unarbitrated (pipeline had no event there): e5 f110 p2→?,
+   f300 p1→? (p4 is adjacent at f300). Team labels are usable as-is. Also: no
+   `visible` flags (run `scripts/flag_occluded_gt.py`), and confirm whether ALL
+   touches are annotated — with a partial event list, measured precision is
+   meaningless (e4's only "FP" f182 may be a real un-annotated touch).
+2. **[diagnosis] entreno_5 tracking: roster may have locked to the wrong
+   quartet.** detection 0.722 / ghosts 0.278 (vs e4 0.949/0.026); GT2 matched
+   in only 1/36 frames while pred3 covers GT1 — with the extra people on the
+   side the owner warned about. Dump + scrub the annotated video to see who
+   pred3 actually locked onto; serve-zone admission in a crowded drill is open
+   point 8's exact scenario.
+3. **[BLOCKED — no footage] Validate side-change survival on a real match.** The
    gallery's marquee use case (players swap ends every 7 points) is untested —
    the entreno drills have no side changes. Blocked as of 2026-08-14: no video
    of a full set is available yet. Unblock by recording/obtaining one
@@ -80,7 +102,7 @@ constraint. Side changes need no special handling as long as IDs survive.
    `python scripts/dump_player_tracks.py <match>.mp4 --max-players 4` →
    `python scripts/analyze_tracking.py <json> --max-players 4`, and scrub the
    annotated video through a side change watching each ID.
-2. **[residual from the attribution fix] Over-set crossings without width
+4. **[residual from the attribution fix] Over-set crossings without width
    evidence.** When a set/dig crosses the net but the tracked ball's widths sit
    in the 26–35px abstain band (entreno_3 f294: widths 29–40 through the gap),
    possession carries and the next contact is attributed to the wrong team.
@@ -89,7 +111,7 @@ constraint. Side changes need no special handling as long as IDs survive.
    per-video width calibration (e.g. from the serve flight), a proper camera
    calibration so pinhole size→3D works, or ball-detection recall on near-half
    approaches (currently often zero — occlusion).
-3. **[diagnosed 2026-08-17 — deliberate no-change] The gesture path's image-px
+5. **[diagnosed 2026-08-17 — deliberate no-change] The gesture path's image-px
    `near_net` is load-bearing; a px→metres switch is GT-refuted.**
    `_build_contact`'s `is_near_net` (px, `NEAR_NET_PX=120`) feeds BOTH
    `_detect_gesture` and the resolver's touch-3-at-net spike rule
@@ -109,21 +131,49 @@ constraint. Side changes need no special handling as long as IDs survive.
    match footage exists (real overhead digs vs blocks at depth): re-run
    `output/diag_gesture_net.py <match>.mp4 --modes px m1.5 m2.0` and switch
    only if gestures differ.
-4. **[same-team adjacent-player choice.]** The team filter constrains the TEAM,
+6. **[same-team adjacent-player choice.]** The team filter constrains the TEAM,
    not which teammate — entreno_3 f69's dig goes to the wrong B player (both
    runs, team correct). Needs pose/reach signals, not team logic.
-5. **[conditional] Phase 2: offline global stitch.** (unchanged) Post-processing
+7. **[conditional] Phase 2: offline global stitch.** (unchanged) Post-processing
    pass that re-clusters all track fragments into exactly 4 identities. Only
    build if match validation shows residual swaps/fragmentation that phase 1
    doesn't catch.
-6. **[watch] Serve-zone admission in crowded drills.** (unchanged) In drills
+8. **[watch] Serve-zone admission in crowded drills.** (unchanged) In drills
    with extras in the serve band, an extra can take the free slot before the
    real server; if a future dump shows a ghost behind a baseline, gate
    admission on `n_court_det < 4`.
-7. **[minor] entreno_1 far-side recall.** (unchanged) `player_confidence`
+9. **[minor] entreno_1 far-side recall.** (unchanged) `player_confidence`
    0.5→0.35 or `player_imgsz` ↑ if needed.
 
 ## Log (newest first)
+
+### 2026-08-18 — entreno_4/5 GT checked: structurally valid; 6/12 action player_ids are mis-IDs (teams right)
+- Owner added GT for entreno_4 (40 player frames @stride 10, 6 action events)
+  and entreno_5 (36 frames, 6 events). Schema identical to e3; bboxes all sane
+  and in-frame; court corners + net posts identical to e3 (calibrations 3=4=5
+  byte-identical, same tripod spot) — and the player-box `team` labels are
+  **100% consistent with foot-side geometry** (301/301 via
+  `get_team_for_bbox`). No `visible` occlusion flags (pass not run), no serve
+  events (drills start mid-rally), ball GT empty (as e3).
+- **Finding:** in 6 of 12 action events the `player_id` contradicts the
+  event's own `player_team` (the named player's feet are on the other half; 4
+  contradictions at the exact annotated frame). Arbitration says the TEAM
+  label is right and the PLAYER_ID wrong — annotator picked an adjacent
+  same-area player. Evidence: where the pipeline detected the contact, its
+  attributed player's center lands inside the corrected player's box (e4
+  f133 p2→p3, f276 p3→p2; e5 f60 p2→p4, f250 p3→p1); e5 f110/f300 have no
+  pred to arbitrate. → Open point 1 (owner re-verify; 4 suggested edits).
+- **Baseline eval** (scripts on defaults; output/gt_check_e4|e5, git-ignored):
+  - e4 actions P/R/F1 0.29/0.33/0.31 (7 preds vs 6 GT — the extra f182 spike
+    may be a real un-annotated touch → precision unreliable until the event
+    list is confirmed complete), team 1.0 (6/6), player-spatial 1.0 (5);
+    tracking detection 0.949 / ghosts 0.026 / id 0.988 / team 0.987.
+  - e5 actions P/R/F1 0.33/0.17/0.22 (only 3 contacts detected; both GT sets
+    and both spikes missed — contact-recall problem under the side-noise),
+    team 1.0 (3/3); tracking 0.722 / 0.278 / 0.993 / 0.981, GT2 matched 1/36
+    frames → new open point 2 (roster may have locked onto a bystander
+    quartet).
+- No code changes; STATUS only. Run artifacts under output/gt_check_e4|e5/.
 
 ### 2026-08-17 — config-drift guard test built (candidate follow-up from the divergence fix)
 - New `tests/test_config_drift.py` (54 tests) pins the four seams where
