@@ -317,3 +317,239 @@ class TestCoastVerticalDamping:
         for _ in range(5):
             tracker._coast_step(track)
         assert (y0 - track["center"][1]) > 50  # ~68px with decay only
+
+
+# --- Ball-anchored admission + serve-zone trial (entreno_5 bystander) ---
+
+ZONE_LEFT_X = 1230   # second serve-zone spot (fake zone spans x 1220..1340)
+ZONE_RIGHT_X = 1330
+
+
+class TestServeZoneServerVote:
+    """Two people stand in serve zones; only the one holding/tossing the ball
+    is the server. entreno_5: the top-1 ball was a SPARE ball lying near the
+    bystander on the admission frame, so single-frame distance anchoring
+    admitted the bystander -- the column vote (ball inside the x-span, above
+    the waist, seen repeatedly) does not."""
+
+    def test_ball_column_candidate_wins(self):
+        tracker = _make_tracker()
+        for cx, cy in IN_COURT:
+            tracker._create_track(_det(cx, cy), require_court_admission=False)
+
+        server = _det(ZONE_RIGHT_X, 400, conf=0.80)   # lower confidence...
+        bystander = _det(ZONE_LEFT_X, 400, conf=0.95)  # ...but not the server
+        # Two prior frames: ball above the server's column (a held ball /
+        # early toss), no zone candidates yet.
+        for _ in range(2):
+            tracker.update([_det(cx, cy) for cx, cy in IN_COURT], None,
+                           ball_position=(ZONE_RIGHT_X, 300))
+        out = tracker.update(
+            [_det(cx, cy) for cx, cy in IN_COURT] + [server, bystander],
+            None,
+            ball_position=(ZONE_RIGHT_X, 300),
+        )
+        assert len(tracker.tracks) == 4
+        assert any(o["bbox"] == server["bbox"] for o in out)
+        assert not any(o["bbox"] == bystander["bbox"] for o in out)
+
+    def test_sand_level_ball_beside_bystander_does_not_vote(self):
+        """The exact entreno_5 failure: a spare ball at knee height next to
+        (just outside) the bystander must not qualify them as the server."""
+        tracker = _make_tracker()
+        for cx, cy in IN_COURT:
+            tracker._create_track(_det(cx, cy), require_court_admission=False)
+
+        bystander = _det(ZONE_LEFT_X, 400)
+        # _det(ZONE_LEFT_X, 400) spans x [1210,1250], waist y = 408.
+        spare_balls = [(1255, 430.0), (1255, 430.0)]  # beside the box, below the waist
+        for bp in spare_balls:
+            tracker.update([_det(cx, cy) for cx, cy in IN_COURT], None,
+                           ball_position=bp)
+        out = tracker.update(
+            [_det(cx, cy) for cx, cy in IN_COURT] + [bystander], None,
+            ball_position=spare_balls[-1],
+        )
+        assert len(tracker.tracks) == 3, "a sand-level spare ball must not admit a bystander"
+        assert not any(o["bbox"] == bystander["bbox"] for o in out)
+
+    def test_zone_admission_deferred_when_ball_elsewhere(self):
+        """Ball in the far court (rally live): nobody in a serve zone holds
+        it, so zone admission defers this frame."""
+        tracker = _make_tracker()
+        for cx, cy in IN_COURT:
+            tracker._create_track(_det(cx, cy), require_court_admission=False)
+
+        for _ in range(2):
+            tracker.update([_det(cx, cy) for cx, cy in IN_COURT], None,
+                           ball_position=(500, 400))
+        out = tracker.update(
+            [_det(cx, cy) for cx, cy in IN_COURT]
+            + [_det(ZONE_LEFT_X, 400), _det(ZONE_RIGHT_X, 400)],
+            None,
+            ball_position=(500, 400),
+        )
+        assert len(tracker.tracks) == 3
+
+    def test_single_sighting_is_not_enough(self):
+        """One frame of ball-in-column (a bounce flying past) must not admit;
+        the vote needs serve_zone_ball_votes sightings."""
+        tracker = _make_tracker()
+        for cx, cy in IN_COURT:
+            tracker._create_track(_det(cx, cy), require_court_admission=False)
+
+        out = tracker.update(
+            [_det(cx, cy) for cx, cy in IN_COURT] + [_det(ZONE_RIGHT_X, 400)],
+            None,
+            ball_position=(ZONE_RIGHT_X, 300),
+        )
+        assert len(tracker.tracks) == 3
+
+    def test_no_ball_history_keeps_confidence_order(self):
+        """Legacy behaviour when the ball is never seen: zone candidates
+        compete by confidence as before (calibrated scenes with no ball
+        detector must not deadlock the roster)."""
+        tracker = _make_tracker()
+        for cx, cy in IN_COURT:
+            tracker._create_track(_det(cx, cy), require_court_admission=False)
+
+        hi = _det(ZONE_RIGHT_X, 400, conf=0.95)
+        lo = _det(ZONE_LEFT_X, 400, conf=0.80)
+        out = tracker.update(
+            [_det(cx, cy) for cx, cy in IN_COURT] + [lo, hi], None
+        )
+        assert len(tracker.tracks) == 4
+        assert any(o["bbox"] == hi["bbox"] for o in out)
+        assert not any(o["bbox"] == lo["bbox"] for o in out)
+
+    def test_vote_does_not_touch_in_court_admission(self):
+        tracker = _make_tracker()
+        for cx, cy in IN_COURT:
+            tracker._create_track(_det(cx, cy), require_court_admission=False)
+
+        newcomer = _det(1100, 400)
+        out = tracker.update(
+            [_det(cx, cy) for cx, cy in IN_COURT] + [newcomer], None,
+            ball_position=(ZONE_LEFT_X, 300),
+        )
+        assert any(o["bbox"] == newcomer["bbox"] for o in out)
+
+
+class TestServeZoneTrial:
+    """A serve-zone seed that never enters the court is a squatter, not a
+    player: it holds the slot only for serve_zone_trial_frames."""
+
+    def _seed_squatter(self, tracker):
+        for cx, cy in IN_COURT:
+            tracker._create_track(_det(cx, cy), require_court_admission=False)
+        out = tracker.update(
+            [_det(cx, cy) for cx, cy in IN_COURT] + [_det(SERVER_X, 400)], None
+        )
+        assert len(tracker.tracks) == 4
+        return out
+
+    def test_trial_expiry_frees_slot_without_gallery(self):
+        tracker = _make_tracker(serve_zone_trial_frames=5)
+        self._seed_squatter(tracker)
+        seed_id = next(
+            tid for tid, tr in tracker.tracks.items()
+            if tr.get("last_in_court_frame") is None
+        )
+
+        for _ in range(10):  # squatter keeps being detected in the zone
+            tracker.update(
+                [_det(cx, cy) for cx, cy in IN_COURT] + [_det(SERVER_X, 400)], None
+            )
+        assert seed_id not in tracker.tracks, "past trial the squatter must be removed"
+        assert seed_id not in tracker.gallery, "never-in-court: no gallery reservation"
+        assert len(tracker.tracks) == 3
+
+    def test_expired_squatter_not_readmitted_from_zone(self):
+        tracker = _make_tracker(serve_zone_trial_frames=5)
+        self._seed_squatter(tracker)
+        for _ in range(10):
+            tracker.update(
+                [_det(cx, cy) for cx, cy in IN_COURT] + [_det(SERVER_X, 400)], None
+            )
+        assert len(tracker.tracks) == 3
+
+        # Same stationary person, still detected in the zone: cooldown must
+        # block re-admission even though a slot is free again.
+        tracker.update(
+            [_det(cx, cy) for cx, cy in IN_COURT] + [_det(SERVER_X, 400)], None
+        )
+        assert len(tracker.tracks) == 3
+
+        # But an in-court player takes the freed slot normally.
+        newcomer = _det(1100, 400)
+        out = tracker.update(
+            [_det(cx, cy) for cx, cy in IN_COURT] + [newcomer], None
+        )
+        assert len(tracker.tracks) == 4
+        assert any(o["bbox"] == newcomer["bbox"] for o in out)
+
+    def test_seed_within_trial_survives(self):
+        """The entreno_3 case: the server is admitted from the zone and stays
+        tracked while waiting to serve (well within the trial window)."""
+        tracker = _make_tracker(serve_zone_trial_frames=90)
+        out = self._seed_squatter(tracker)
+        seed_id = next(
+            tid for tid, tr in tracker.tracks.items()
+            if tr.get("last_in_court_frame") is None
+        )
+        for _ in range(20):
+            tracker.update(
+                [_det(cx, cy) for cx, cy in IN_COURT] + [_det(SERVER_X, 400)], None
+            )
+        assert seed_id in tracker.tracks
+        assert len(tracker.tracks) == 4
+
+    def test_entering_court_resets_the_trial_clock(self):
+        """A seed that steps into the court becomes a real track: its
+        last_in_court_frame is set and the trial can never fire again."""
+        tracker = _make_tracker(serve_zone_trial_frames=5)
+        self._seed_squatter(tracker)
+        seed_id = next(
+            tid for tid, tr in tracker.tracks.items()
+            if tr.get("last_in_court_frame") is None
+        )
+        # The (now former) server walks in-court and keeps being detected there.
+        for _ in range(15):
+            tracker.update(
+                [_det(cx, cy) for cx, cy in IN_COURT] + [_det(1100, 400)], None
+            )
+        assert seed_id in tracker.tracks
+        assert tracker.tracks[seed_id]["last_in_court_frame"] is not None
+
+    def test_contested_seed_swapped_to_ball_holder(self):
+        """The full entreno_5 arc: a spare ball votes the bystander in, the
+        ball evidence then moves to the real server, and the seed is swapped
+        out for the ball holder without waiting for the 90-frame trial."""
+        tracker = _make_tracker()
+        for cx, cy in IN_COURT:
+            tracker._create_track(_det(cx, cy), require_court_admission=False)
+
+        bystander = _det(ZONE_LEFT_X, 400)
+        server = _det(ZONE_RIGHT_X, 400)
+        in_court = [_det(cx, cy) for cx, cy in IN_COURT]
+
+        # Warmup: spare ball in the bystander's column -> bystander admitted.
+        for _ in range(2):
+            tracker.update(in_court, None, ball_position=(ZONE_LEFT_X, 370))
+        out = tracker.update(in_court + [bystander], None,
+                             ball_position=(ZONE_LEFT_X, 370))
+        assert any(o["bbox"] == bystander["bbox"] for o in out)
+
+        # The ball moves to the real server (toss). For a few frames the seed
+        # still "holds" via stale history; once the NOW-window clears, the
+        # swap fires.
+        for _ in range(4):
+            out = tracker.update(in_court + [bystander, server], None,
+                                 ball_position=(ZONE_RIGHT_X, 300))
+        assert any(o["bbox"] == server["bbox"] for o in out), \
+            "the ball holder must take the slot"
+        assert len(tracker.tracks) == 4
+        # The bystander must be gone and on cooldown (same spot re-detected).
+        out = tracker.update(in_court + [bystander, server], None,
+                             ball_position=(ZONE_RIGHT_X, 300))
+        assert not any(o["bbox"] == bystander["bbox"] for o in out)

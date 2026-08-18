@@ -53,6 +53,8 @@ class PlayerTracker:
         serve_zone_enabled: bool = True,
         serve_zone_depth_m: float = 3.0,
         serve_zone_side_margin_m: float = 1.0,
+        serve_zone_trial_frames: int = 90,
+        serve_zone_ball_votes: int = 2,
         coast_vertical_damping: float = 0.5,
         debug_assignments: bool = False,
     ):
@@ -84,6 +86,19 @@ class PlayerTracker:
                 also hold the 4th slot closed for everyone else).
             serve_zone_depth_m / serve_zone_side_margin_m: serve-zone geometry
                 in metres (see CourtCalibration.is_in_serve_zone).
+            serve_zone_trial_frames: A serve-zone seed that has not entered the
+                strict court within this many frames is hard-removed (NOT
+                gallery'd): a stationary serve-zone bystander is continuously
+                detected, so neither the off-court grace nor retirement ever
+                fires, and it would hold a roster slot forever (entreno_5: a
+                bottom-left bystander held the 4th slot the whole video while
+                the real server went untracked).
+            serve_zone_ball_votes: How many recent ball sightings inside a
+                serve-zone candidate's column (x-span, above the waist --
+                held at the chest or tossed above the head) qualify that
+                candidate as the server. A sand-level spare ball beside a
+                bystander never enters their column; a held/tossed serve ball
+                stays in the server's column frame after frame.
             coast_vertical_damping: Extra per-step multiplier on the UPWARD
                 coast velocity. A track lost mid-jump would otherwise ride its
                 upward velocity for the whole coast window, drifting the ghost
@@ -147,6 +162,18 @@ class PlayerTracker:
         self.serve_zone_enabled = serve_zone_enabled
         self.serve_zone_depth_m = serve_zone_depth_m
         self.serve_zone_side_margin_m = serve_zone_side_margin_m
+        self.serve_zone_trial_frames = serve_zone_trial_frames
+        self.serve_zone_ball_votes = serve_zone_ball_votes
+
+        # Trial-expiry cooldown: last bboxes of hard-removed serve-zone
+        # squatters, so the same stationary person is not re-admitted from the
+        # zone right after removal (in-court admission is never blocked -- if
+        # they ever step in, they are tracked like anyone else).
+        self._serve_zone_cooldown: deque = deque(maxlen=8)
+        self._last_ball_position: Optional[List[float]] = None
+        # Recent ball sightings (x, y), for the server vote -- see
+        # _filter_serve_zone_candidates.
+        self._ball_history: deque = deque(maxlen=12)
         self.coast_vertical_damping = max(0.0, min(1.0, coast_vertical_damping))
 
         self.logger = logging.getLogger(__name__)
@@ -243,6 +270,7 @@ class PlayerTracker:
         strict_detections: Optional[List[Dict[str, Any]]] = None,
         ball_active: bool = False,
         n_court_det: Optional[int] = None,
+        ball_position: Optional[List[float]] = None,
     ) -> List[Dict[str, Any]]:
         """Update tracker with new detections.
 
@@ -258,6 +286,10 @@ class PlayerTracker:
                 bootstrap to skip the warmup opening.
             n_court_det: Strict in-court count (live/dead-ball signal); stored
                 for diagnostics, not used in association.
+            ball_position: Center of the top-1 ball detection this frame, if
+                any. Anchors serve-zone admission to the likely server (see
+                serve_zone_ball_anchor_px); None keeps the previous
+                confidence-order behaviour.
 
         Returns:
             List of tracked players with stable 'track_id' and 'team' fields.
@@ -265,6 +297,11 @@ class PlayerTracker:
         self._current_frame = frame
         self.frame_count += 1
         self._last_n_court_det = n_court_det
+        self._last_ball_position = list(ball_position) if ball_position else None
+        if self._last_ball_position:
+            self._ball_history.append(
+                (float(self._last_ball_position[0]), float(self._last_ball_position[1]))
+            )
         # Admission/persistence reference: strict foot-in-court set, falling back
         # to all detections for legacy callers (single-zone behaviour).
         self._last_strict_detections = (
@@ -469,6 +506,7 @@ class PlayerTracker:
     def _associate_detections(self, detections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Associate detections with existing tracks using Hungarian algorithm."""
         detections = self._deduplicate_detections(detections)
+        self._expire_serve_zone_trials()
         track_ids = list(self.tracks.keys())
         n_tracks = len(track_ids)
         n_dets = len(detections)
@@ -586,6 +624,7 @@ class PlayerTracker:
         # is tracked rather than dropped (the trap avoidance). Recent retirements
         # are protected so a genuinely-occluded player's id isn't stolen.
         existing_boxes = [t["bbox"] for t in self.tracks.values()]
+        candidates: List[Tuple[int, Dict[str, Any]]] = []
         for j in range(n_dets):
             if j in matched_dets:
                 continue
@@ -596,6 +635,16 @@ class PlayerTracker:
             # new-track gate must not force a dormant id out of its slot only
             # to then be rejected itself.
             if not self._track_admission_ok(det):
+                continue
+            candidates.append((j, det))
+
+        candidates = self._filter_serve_zone_candidates(candidates)
+
+        for j, det in candidates:
+            # Re-check coverage: a candidate may overlap a track created from
+            # an earlier candidate THIS frame (never stack two ids on one
+            # player -- the collection-time check cannot see later creations).
+            if any(self._iou(det["bbox"], eb) > 0.35 for eb in existing_boxes):
                 continue
             if len(self.tracks) + len(self.gallery) >= self.max_players:
                 if not (self.gallery_enabled and self._evict_stalest_dormant()):
@@ -611,6 +660,116 @@ class PlayerTracker:
             tracked_players.append(out)
 
         return tracked_players
+
+    def _ball_hold_votes(self, det: Dict[str, Any]) -> int:
+        """Recent ball sightings that sit in det's column and above its waist.
+
+        A ball held at the chest or tossed above the head lands inside the
+        holder's x-span, above the waist, frame after frame. A spare ball
+        lying on the sand near a bystander can ALSO land in their column
+        (perspective: the bystander is close to the camera, so sand behind
+        them projects at chest height -- entreno_5's spare at (633,794) voted
+        6 times for the bystander), which is why admission alone is not
+        enough: the contested-server swap below re-adjudicates once the ball
+        evidence moves.
+        """
+        x1, y1, x2, y2 = det["bbox"]
+        waist = y1 + 0.6 * (y2 - y1)
+        return sum(
+            1 for bx, by in self._ball_history if x1 <= bx <= x2 and by < waist
+        )
+
+    def _ball_in_column_now(self, bbox: List[float], window: int = 3) -> bool:
+        """Is the ball in bbox's column (x-span, above the waist) in the last
+        `window` sightings? The NOW-test for who holds the ball, immune to
+        stale history (the 12-frame vote window deliberately is not)."""
+        x1, y1, x2, y2 = bbox
+        waist = y1 + 0.6 * (y2 - y1)
+        recent = list(self._ball_history)[-window:]
+        return any(x1 <= bx <= x2 and by < waist for bx, by in recent)
+
+    def _filter_serve_zone_candidates(
+        self, candidates: List[Tuple[int, Dict[str, Any]]]
+    ) -> List[Tuple[int, Dict[str, Any]]]:
+        """Order/restrict serve-zone NEW-track candidates.
+
+        Two guards, both from entreno_5 (two people standing in serve zones;
+        the stationary bystander out-confidenced the real server and held the
+        4th slot for the whole video):
+          * cooldown -- a trial-expired squatter's bbox blocks re-admission
+            from the zone (in-court admission is never blocked);
+          * server vote -- when recent ball sightings exist, a zone candidate
+            is only admissible with >= serve_zone_ball_votes sightings inside
+            its column above the waist (the server holds/tosses the ball; a
+            bystander does not). With a live ball history but no qualifying
+            candidate, zone admission DEFERS this frame -- nobody in the zone
+            is serving. With no ball history at all (ball never seen), the
+            previous confidence-order behaviour stands.
+
+        In-court candidates pass through untouched, in their original order.
+        """
+        keep: List[Tuple[int, Dict[str, Any]]] = []
+        serve_zone: List[Tuple[int, Dict[str, Any]]] = []
+        for item in candidates:
+            det = item[1]
+            if self._detection_in_court(det) is False and self._detection_in_serve_zone(det):
+                serve_zone.append(item)
+            else:
+                keep.append(item)
+
+        if not serve_zone:
+            return keep
+
+        if self._ball_history:
+            best = max(serve_zone, key=lambda item: self._ball_hold_votes(item[1]))
+            if self._ball_hold_votes(best[1]) >= self.serve_zone_ball_votes:
+                self._reassign_contested_server(best[1])
+                serve_zone = [best]
+            else:
+                self.logger.debug(
+                    "Serve-zone admission deferred: no candidate holds the ball"
+                )
+                serve_zone = []
+
+        for item in serve_zone:
+            det = item[1]
+            if any(self._iou(det["bbox"], cb) > 0.4 for cb in self._serve_zone_cooldown):
+                self.logger.debug("Serve-zone admission blocked: trial-expired squatter")
+                continue
+            keep.append(item)
+        return keep
+
+    def _reassign_contested_server(self, winner: Dict[str, Any]) -> None:
+        """Swap out a serve-zone seed that stopped holding the ball.
+
+        entreno_5: a spare ball on the sand voted the bystander in as
+        "server" on the admission frame; three frames later the spare was
+        static-suppressed and the toss ball sat over the REAL server. The
+        seed's own column had gone quiet while another candidate had the
+        votes -- at that point the admission was provably wrong. Remove the
+        seed (hard, with cooldown, exactly like a trial expiry) so the
+        create loop can admit the true server into the freed slot.
+
+        Fires only while the seed has never entered the court (a serving
+        player who walked in is a normal track and untouchable here) and the
+        ball is NOT in the seed's column right now.
+        """
+        for tid in [
+            t for t, tr in self.tracks.items()
+            if tr.get("last_in_court_frame") is None
+        ]:
+            seed = self.tracks[tid]
+            if self._iou(seed["bbox"], winner["bbox"]) > 0.4:
+                continue  # the winner IS the seed's person, already tracked
+            if self._ball_in_column_now(seed["bbox"]):
+                continue  # seed still holds the ball -- no contest
+            self.tracks.pop(tid)
+            self.disappeared.pop(tid, None)
+            self._serve_zone_cooldown.append(list(seed["bbox"]))
+            self.logger.info(
+                f"Serve-zone seed {tid} reassigned: ball left its column for "
+                f"another candidate; slot handed to the ball holder"
+            )
 
     def _compute_assignment_cost(
         self, track: Dict[str, Any], detection: Dict[str, Any]
@@ -802,10 +961,40 @@ class PlayerTracker:
             # never-in-court-yet, see _may_feed_track).
             "last_in_court_frame": None if serve_zone_seed else self.frame_count,
             "last_matched_frame": self.frame_count,
+            "created_frame": self.frame_count,
         }
         self.disappeared[tid] = 0
         self.logger.debug(f"Created track {tid}")
         return tid
+
+    def _expire_serve_zone_trials(self) -> None:
+        """Hard-remove serve-zone seeds that never entered the court within
+        serve_zone_trial_frames.
+
+        A stationary serve-zone bystander is continuously detected, so neither
+        the off-court grace nor retirement ever fires and it holds a roster
+        slot forever (observed on entreno_5: a bottom-left bystander kept the
+        4th slot for the whole video while the real server went untracked).
+        NOT retired to the gallery -- a never-in-court track was never
+        validated as a player, so its id frees immediately. The last bbox goes
+        on the cooldown list so the same person is not re-admitted from the
+        zone right away; in-court admission is unaffected (if they ever step
+        in, they are tracked like anyone else).
+        """
+        expired = [
+            tid for tid, tr in self.tracks.items()
+            if tr.get("last_in_court_frame") is None
+            and self.frame_count - tr.get("created_frame", 0) > self.serve_zone_trial_frames
+        ]
+        for tid in expired:
+            track = self.tracks.pop(tid)
+            self.disappeared.pop(tid, None)
+            self._serve_zone_cooldown.append(list(track.get("bbox", [0, 0, 0, 0])))
+            self.logger.info(
+                f"Serve-zone trial expired for track {tid}: never entered the "
+                f"court in {self.frame_count - track.get('created_frame', 0)} "
+                f"frames, slot freed"
+            )
 
     def _update_track(self, tid: int, detection: Dict[str, Any]) -> None:
         """Update an existing track with a new detection."""

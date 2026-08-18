@@ -129,6 +129,8 @@ class FrameProcessor:
                 serve_zone_enabled=self.config.get("player_serve_zone_enabled", True),
                 serve_zone_depth_m=self.config.get("player_serve_zone_depth_m", 3.0),
                 serve_zone_side_margin_m=self.config.get("player_serve_zone_side_margin_m", 1.0),
+                serve_zone_trial_frames=self.config.get("player_serve_zone_trial_frames", 90),
+                serve_zone_ball_votes=self.config.get("player_serve_zone_ball_votes", 2),
                 coast_vertical_damping=self.config.get("coast_vertical_damping", 0.5),
             )
 
@@ -232,13 +234,22 @@ class FrameProcessor:
             strict_players = self.court_calibration.filter_detections_by_court(player_detections)
             play_area_players = player_detections
 
-            # 3. Tracking
+            # 3. Tracking. The top-1 ball detection anchors serve-zone
+            # admission to the likely server (the server holds/tosses the
+            # ball; a serve-zone bystander does not).
+            ball_position = None
+            if ball_detections:
+                top_ball = max(ball_detections, key=lambda d: d.get("confidence", 0))
+                bc = top_ball.get("center")
+                if bc and bc[0] is not None:
+                    ball_position = (float(bc[0]), float(bc[1]))
             tracked_players = self.player_tracker.update(
                 play_area_players,
                 frame,
                 strict_detections=strict_players,
                 ball_active=bool(ball_detections),
                 n_court_det=len(strict_players),
+                ball_position=ball_position,
             )
             tracked_ball = self.ball_tracker.update(ball_detections)
 

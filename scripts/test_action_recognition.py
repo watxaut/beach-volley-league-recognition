@@ -150,11 +150,18 @@ def main():
             strict_players = court.filter_detections_by_court(player_dets)
         else:
             strict_players = player_dets
+        ball_position = None
+        if ball_dets:
+            top_ball = max(ball_dets, key=lambda d: d.get("confidence", 0))
+            bc = top_ball.get("center")
+            if bc and bc[0] is not None:
+                ball_position = (float(bc[0]), float(bc[1]))
         tracked_players = player_tracker.update(
             player_dets, frame,
             strict_detections=strict_players,
             ball_active=bool(ball_dets),
             n_court_det=len(strict_players),
+            ball_position=ball_position,
         )
         tracked_ball = ball_tracker.update(ball_dets)
 

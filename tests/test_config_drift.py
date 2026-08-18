@@ -110,6 +110,8 @@ CTOR_PARITY = [
     ("player_serve_zone_enabled", PlayerTracker, "serve_zone_enabled"),
     ("player_serve_zone_depth_m", PlayerTracker, "serve_zone_depth_m"),
     ("player_serve_zone_side_margin_m", PlayerTracker, "serve_zone_side_margin_m"),
+    ("player_serve_zone_trial_frames", PlayerTracker, "serve_zone_trial_frames"),
+    ("player_serve_zone_ball_votes", PlayerTracker, "serve_zone_ball_votes"),
 ]
 
 

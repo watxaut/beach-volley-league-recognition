@@ -39,18 +39,25 @@ kwargs + argparse defaults ↔ inline `.get(key, fallback)` fallbacks — so the
 f539 block/spike class of bug can't recur unnoticed; 9 stale inline fallbacks
 defused the same day. Suite 167 green.
 
-**entreno_4/5 GT (2026-08-18):** owner-annotated (players every 10 frames, 6
-action events each — no serves, no occlusion flags, side-noiseier footage as
-warned). Checked end-to-end: boxes + box-teams fully consistent; 6/12 action
-`player_id`s are mis-IDs (teams right) → Open points 1-2; baselines recorded
-in the Log.
+**entreno_4/5 (2026-08-18):** owner-annotated GT (players every 10 frames, 6
+action events each — no serves, no occlusion flags, noisier footage as
+warned). GT check: boxes + box-teams fully consistent; 6/12 action
+`player_id`s are mis-IDs (teams right; corrections verified on dumped contact
+sheets, awaiting owner GT edit → Open point 1). e5's serve-zone-squatter
+tracking bug (bystander held the 4th slot all video, server untracked) is
+FIXED via server-vote admission + contested swap + trial expiry: e5 tracking
+0.722/0.278 → 0.958/0.042, the serve is detected (f17), and the fix is
+byte-neutral on e1/e4, action-stream-identical on e3. Residual: e5 action
+labels (Open point 2); stale e1/e3 baselines (Open point 3).
+
+**Near-net flag (2026-08-17, later session):** old open points 4+9 closed by
 
 **Near-net flag (2026-08-17, later session):** old open points 4+9 closed by
 diagnosis — 4's px→metres switch is GT-refuted (label F1 0.929 → 0.857/0.714):
 the px `near_net` is load-bearing for the resolver's touch-3-at-net spike
 rule. Point 9's block turned out to be REAL on the production/live-debug path
 (a config divergence, fixed same day — see Log); the script path (all GT
-numbers) always said spike. Details + revisit trigger in Open point 5 and the
+numbers) always said spike. Details + revisit trigger in Open point 6 and the
 Log.
 
 **Perf (2026-08-17):** the detector device defaults were silently CPU —
@@ -78,23 +85,34 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Open points
 
-1. **[owner action — quick] Re-verify the 6 mis-IDed action events in the
-   entreno_4/5 GT.** In 6 of 12 events the `player_id` contradicts the event's
-   own `player_team` (foot-side geometry of that player's box; 4 at the exact
-   same frame). Arbitrated corrections (pred contact center lands inside the
-   corrected player's box): e4 f133 p2→**p3**, f276 p3→**p2**; e5 f60 p2→**p4**,
-   f250 p3→**p1**. Unarbitrated (pipeline had no event there): e5 f110 p2→?,
-   f300 p1→? (p4 is adjacent at f300). Team labels are usable as-is. Also: no
-   `visible` flags (run `scripts/flag_occluded_gt.py`), and confirm whether ALL
-   touches are annotated — with a partial event list, measured precision is
-   meaningless (e4's only "FP" f182 may be a real un-annotated touch).
-2. **[diagnosis] entreno_5 tracking: roster may have locked to the wrong
-   quartet.** detection 0.722 / ghosts 0.278 (vs e4 0.949/0.026); GT2 matched
-   in only 1/36 frames while pred3 covers GT1 — with the extra people on the
-   side the owner warned about. Dump + scrub the annotated video to see who
-   pred3 actually locked onto; serve-zone admission in a crowded drill is open
-   point 8's exact scenario.
-3. **[BLOCKED — no footage] Validate side-change survival on a real match.** The
+1. **[owner action — quick] Fold the owner's dictated e5 event list into the GT
+   + re-verify the 6 mis-IDed action events (e4/e5).** The owner confirmed the
+   e5 truth (2026-08-18): serve f20 right-side server, dig f63, set f111,
+   spike f160 (B), overhand dig f200 by the formerly-untracked player A, set
+   f250, spike f300 — the GT has 6 events, no serve, and 6/12 mis-IDed
+   `player_id`s across e4/e5 (arbitrated corrections: e4 f133 p2→p3, f276
+   p3→p2; e5 f60 p2→p4, f250 p3→p1, f110 p2→p3, f300 p1→p4 — all six verified
+   on dumped contact sheets in output/gt_verify/). Team labels are right; ids
+   and the missing serve need an owner-confirmed GT edit. Also run
+   `scripts/flag_occluded_gt.py` (no `visible` flags yet) and confirm whether
+   ALL touches are annotated (e4's "FP" f182 may be real).
+2. **[residual, action layer] entreno_5 labels + 2 missed contacts.** With
+   tracking fixed (below), e5 emits serve f17 ✓, dig f60 ✓, then dig f157 (GT
+   spike f160), set f196 (GT overhand-dig f200), dig f247 (GT set f250) — the
+   dig↔set↔spike disambiguation (an overhand dig reads gesture bump_set, same
+   as a set) plus set f111 / spike f300 never detected (contact-recall gaps).
+   Needs resolver work, not tracking.
+3. **[diagnosed 2026-08-18 — pre-existing, NOT the serve-zone fix] e1/e3
+   tracking baselines are stale.** Old-code (HEAD pre-fix) e1 dump scores id
+   0.771 / ghosts 0.193 vs the recorded 0.978/0.133; e3 id 0.952 vs 0.972.
+   Byte-identical A/B (git stash) proves the serve-zone/vote/swap diff is
+   e1-NEUTRAL (0 differing frames) and e3-neutral beyond 7 lock-window frames
+   (server admitted ~6f later; action stream byte-identical). The drift crept
+   in between the 2026-08-16 servezone baselines and HEAD — prime suspect: the
+   08-17 ball_confidence 0.7→0.15 fix (the dump's ball detector feeds
+   ball_active → bootstrap timing) or device CPU→auto. Diagnose when touching
+   tracking next; until then, compare A/B, not vs recorded numbers.
+4. **[BLOCKED — no footage] Validate side-change survival on a real match.** The
    gallery's marquee use case (players swap ends every 7 points) is untested —
    the entreno drills have no side changes. Blocked as of 2026-08-14: no video
    of a full set is available yet. Unblock by recording/obtaining one
@@ -102,7 +120,7 @@ constraint. Side changes need no special handling as long as IDs survive.
    `python scripts/dump_player_tracks.py <match>.mp4 --max-players 4` →
    `python scripts/analyze_tracking.py <json> --max-players 4`, and scrub the
    annotated video through a side change watching each ID.
-4. **[residual from the attribution fix] Over-set crossings without width
+5. **[residual from the attribution fix] Over-set crossings without width
    evidence.** When a set/dig crosses the net but the tracked ball's widths sit
    in the 26–35px abstain band (entreno_3 f294: widths 29–40 through the gap),
    possession carries and the next contact is attributed to the wrong team.
@@ -111,7 +129,7 @@ constraint. Side changes need no special handling as long as IDs survive.
    per-video width calibration (e.g. from the serve flight), a proper camera
    calibration so pinhole size→3D works, or ball-detection recall on near-half
    approaches (currently often zero — occlusion).
-5. **[diagnosed 2026-08-17 — deliberate no-change] The gesture path's image-px
+6. **[diagnosed 2026-08-17 — deliberate no-change] The gesture path's image-px
    `near_net` is load-bearing; a px→metres switch is GT-refuted.**
    `_build_contact`'s `is_near_net` (px, `NEAR_NET_PX=120`) feeds BOTH
    `_detect_gesture` and the resolver's touch-3-at-net spike rule
@@ -131,21 +149,70 @@ constraint. Side changes need no special handling as long as IDs survive.
    match footage exists (real overhead digs vs blocks at depth): re-run
    `output/diag_gesture_net.py <match>.mp4 --modes px m1.5 m2.0` and switch
    only if gestures differ.
-6. **[same-team adjacent-player choice.]** The team filter constrains the TEAM,
+7. **[same-team adjacent-player choice.]** The team filter constrains the TEAM,
    not which teammate — entreno_3 f69's dig goes to the wrong B player (both
    runs, team correct). Needs pose/reach signals, not team logic.
-7. **[conditional] Phase 2: offline global stitch.** (unchanged) Post-processing
+8. **[conditional] Phase 2: offline global stitch.** (unchanged) Post-processing
    pass that re-clusters all track fragments into exactly 4 identities. Only
    build if match validation shows residual swaps/fragmentation that phase 1
    doesn't catch.
-8. **[watch] Serve-zone admission in crowded drills.** (unchanged) In drills
-   with extras in the serve band, an extra can take the free slot before the
-   real server; if a future dump shows a ghost behind a baseline, gate
-   admission on `n_court_det < 4`.
 9. **[minor] entreno_1 far-side recall.** (unchanged) `player_confidence`
    0.5→0.35 or `player_imgsz` ↑ if needed.
 
 ## Log (newest first)
+
+### 2026-08-18 — entreno_5 serve-zone squatter fixed: server vote + trial expiry + contested swap (old open points 2+8)
+- **Diagnosis** (owner live-debug report + audit trail): bootstrap locked 3
+  tracks at f8 (server stands behind the near baseline, never in the strict
+  pool); the create loop then admitted a STATIONARY bottom-left bystander
+  through the serve-zone exemption — detection order was by confidence and
+  the bystander out-scored the real server — and held the 4th slot for all
+  354 frames (continuously detected → off-court grace never burns; seed has
+  `last_in_court_frame=None`). The server (GT2) was covered in 1/36 GT frames
+  → every action after the first dig misattributed.
+- **First attempt (single-frame ball anchor) failed and taught the real
+  geometry**: the top-1 ball on the admission frame was a SPARE ball lying
+  near the bystander (633,794) — inside the bystander's column ABOVE the
+  waist, because a close-camera bystander's chest height projects where sand
+  3-5m behind them does. Distance/nearest-ball anchoring admits the bystander
+  by construction; the discriminator is temporal (the spare is static-
+  suppressed after `static_min_frames`, the toss ball then sits over the
+  server f8-20).
+- **Shipped design** (player_tracker.py): (1) **server vote** — a serve-zone
+  candidate is only admissible with ≥`player_serve_zone_ball_votes` (2)
+  recent ball sightings inside its x-span column above the waist; live ball
+  history + no qualifying candidate ⇒ zone admission defers that frame; no
+  ball history at all ⇒ legacy confidence order. (2) **contested swap** — an
+  admitted seed whose column the ball has LEFT (last-3 sightings) while
+  another candidate has the votes is hard-removed (cooldown bbox, not
+  gallery) and the true holder takes the slot — e5 swaps bystander→server at
+  ~f10. (3) **trial expiry** — a seed never in court within
+  `player_serve_zone_trial_frames` (90) is hard-removed with cooldown (the
+  "does not let it go" backstop). `update()` gained `ball_position` (top-1
+  ball det) wired through FrameProcessor / dump_player_tracks /
+  test_action_recognition; config keys + drift-guard rows added.
+- **Measured (e5)**: tracking detection 0.722→**0.958**, ghosts
+  0.278→**0.042**, id 0.986, team 0.978; GT2 (server) 1/35→**34/35**; actions:
+  serve detected for the first time (**f17** vs owner's f20), dig f60 ✓,
+  f196/f247 land on the right players (formerly untracked); label residuals
+  are the resolver's dig/set/overhand-dig confusion + 2 missed contacts
+  (open point 2).
+- **Regression gate (byte-level A/B via git stash)**: e1 — **0 differing
+  frames** (the apparent 0.978→0.771 id drop reproduces identically on HEAD;
+  pre-existing drift, now open point 3); e3 — 7 frames differ (server
+  admitted ~6f later, metrics 0.973/0.063/0.952→0.969/0.064/0.952), **action
+  stream byte-identical** to the validated 14/14 attrib_e3_new2 log; e4 —
+  identical numbers.
+- Tests: +11 (server vote incl. the sand-ball non-vote + swap + trial +
+  cooldown); suite 180 green. Old open point 8 (crowded-drill serve-zone
+  watch) closed — implemented, plus a stronger mechanism than the n_court_det
+  gate it suggested.
+- Files: src/tracking/player_tracker.py, src/utils/config.py,
+  src/analysis/frame_processor.py, scripts/dump_player_tracks.py,
+  scripts/test_action_recognition.py, tests/test_serve_zone.py,
+  tests/test_config_drift.py, STATUS.md. Artifacts (git-ignored):
+  output/e5_fix/, output/gt_verify/ (6 owner-verification contact sheets),
+  output/diag_e5_admission.py, output/diag_e1_states.py.
 
 ### 2026-08-18 — entreno_4/5 GT checked: structurally valid; 6/12 action player_ids are mis-IDs (teams right)
 - Owner added GT for entreno_4 (40 player frames @stride 10, 6 action events)

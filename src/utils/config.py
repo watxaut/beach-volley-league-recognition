@@ -58,6 +58,8 @@ class Config:
         "player_serve_zone_enabled": True,
         "player_serve_zone_depth_m": 3.0,       # how far behind the baseline (ground-plane metres) counts as the serve zone
         "player_serve_zone_side_margin_m": 1.0, # how far beyond each sideline (metres) the zone extends
+        "player_serve_zone_trial_frames": 90,   # a serve-zone seed must enter the court within this window or the slot is freed (stationary-bystander guard, entreno_5)
+        "player_serve_zone_ball_votes": 2,      # recent ball sightings inside a zone candidate's column (x-span, above the waist) required to admit them as the server; a sand-level spare ball beside a bystander never votes
 
         # Player identity (continuity-first re-ID). See plan "Consistent 4-Player
         # Identity". Identity is propagated by motion continuity; the keys below

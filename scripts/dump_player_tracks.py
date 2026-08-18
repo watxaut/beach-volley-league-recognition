@@ -142,6 +142,8 @@ def main():
         serve_zone_depth_m=(args.serve_zone_depth if args.serve_zone_depth is not None
                             else _CFG.get("player_serve_zone_depth_m", 3.0)),
         serve_zone_side_margin_m=_CFG.get("player_serve_zone_side_margin_m", 1.0),
+        serve_zone_trial_frames=_CFG.get("player_serve_zone_trial_frames", 90),
+        serve_zone_ball_votes=_CFG.get("player_serve_zone_ball_votes", 2),
         coast_vertical_damping=_CFG.get("coast_vertical_damping", 0.5),
     )
 
@@ -180,9 +182,16 @@ def main():
         # wider play-area set, so the live/dead logic stays correct.
         n_court_det = len(strict)
         ball_active = False
+        ball_position = None
         if ball_detector is not None:
             try:
-                ball_active = len(ball_detector.detect(frame)) > 0
+                ball_dets = ball_detector.detect(frame)
+                ball_active = len(ball_dets) > 0
+                if ball_dets:
+                    top = max(ball_dets, key=lambda d: d.get("confidence", 0))
+                    c = top.get("center")
+                    if c and c[0] is not None:
+                        ball_position = (float(c[0]), float(c[1]))
             except Exception:
                 ball_active = False
         tracked = tracker.update(
@@ -190,6 +199,7 @@ def main():
             strict_detections=strict,
             ball_active=ball_active,
             n_court_det=n_court_det,
+            ball_position=ball_position,
         )
         max_simultaneous = max(max_simultaneous, len(tracked))
 
