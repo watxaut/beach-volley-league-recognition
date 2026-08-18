@@ -319,7 +319,8 @@ def evaluate_actions(
         gt_events = [e for e in ground_truth if _act(e) == action]
         pred_events = [e for e in predictions if _act(e) == action]
 
-        tp, fp, fn = _match_action_events(gt_events, pred_events, frame_tolerance, match_player)
+        tp, fp, fn = _match_action_events(
+            gt_events, pred_events, frame_tolerance, match_player, gt_players)
         total_tp += tp
         total_fp += fp
         total_fn += fn
@@ -375,9 +376,10 @@ def _action_attribution_metrics(
     - team: predicted ``team`` vs the GT toucher's ``player_team``.
     - player (spatial, only when ``gt_players`` given and the prediction has a
       ``player_center``): the GT box containing the predicted player centre at
-      the nearest annotated frame, compared by left-to-right index (the GT
-      action player_id convention). Convention-free where the L-R index of the
-      predicted player would be biased by an unobserved player.
+      the nearest annotated frame, scored under BOTH id conventions --
+      ``player_accuracy_spatial`` compares the box's canonical id (the
+      entreno_4/5 convention), ``player_accuracy_spatial_lr`` its left-to-right
+      index (the entreno_1/3 convention). Use whichever matches the file.
     """
     out: Dict[str, Any] = {}
     pairs = []
@@ -402,39 +404,52 @@ def _action_attribution_metrics(
         out["team_scored"] = n_team
 
     if gt_players and pairs:
-        def lr_index_of(gt_frame: int, center) -> Optional[int]:
-            if not center:
-                return None
-            k = min(gt_players.keys(), key=lambda kk: abs(int(kk) - gt_frame))
-            visible = [p for p in gt_players[k] if p.get("visible", True)]
-            hit = None
-            for p in visible:
-                x1, y1, x2, y2 = p["bbox"]
-                if x1 <= center[0] <= x2 and y1 <= center[1] <= y2:
-                    hit = p
-                    break
-            if hit is None:
-                return None
-            xs = sorted(visible, key=lambda p: p["bbox"][0])
-            return xs.index(hit) + 1
-
-        n_pl = ok_pl = 0
+        n_pl = ok_can = ok_lr = 0
         for gt, p in pairs:
-            idx = lr_index_of(gt["frame"], p.get("player_center"))
-            if idx is None:
+            can, lr = _gt_box_ids_at(gt_players, gt["frame"], p.get("player_center"))
+            if can is None:
                 continue
             n_pl += 1
-            ok_pl += int(idx == gt.get("player_id"))
-        out["player_accuracy_spatial"] = round(ok_pl / n_pl, 3) if n_pl else None
+            ok_can += int(can == gt.get("player_id"))
+            ok_lr += int(lr == gt.get("player_id"))
+        out["player_accuracy_spatial"] = round(ok_can / n_pl, 3) if n_pl else None
+        out["player_accuracy_spatial_lr"] = round(ok_lr / n_pl, 3) if n_pl else None
         out["player_scored_spatial"] = n_pl
 
     out["matched_pairs"] = len(pairs)
     return out
 
 
+def _gt_box_ids_at(
+    gt_players: Optional[Dict[str, List[Dict[str, Any]]]], frame: int, center
+) -> Tuple[Optional[int], Optional[int]]:
+    """(canonical_id, lr_index) of the visible GT box containing `center`.
+
+    The two return values encode the two GT action player_id conventions in
+    the wild: entreno_1/3 action ids follow the L-R index at the annotation
+    frame, entreno_4/5 follow the canonical (annotator) id. Callers accept
+    either so both conventions score fairly.
+    """
+    if not gt_players or not center:
+        return None, None
+    k = min(gt_players.keys(), key=lambda kk: abs(int(kk) - frame))
+    visible = [p for p in gt_players[k] if p.get("visible", True)]
+    hit = None
+    for p in visible:
+        x1, y1, x2, y2 = p["bbox"]
+        if x1 <= center[0] <= x2 and y1 <= center[1] <= y2:
+            hit = p
+            break
+    if hit is None:
+        return None, None
+    lr = sorted(visible, key=lambda p: p["bbox"][0]).index(hit) + 1
+    return hit["id"], lr
+
+
 def _match_action_events(
     gt_events: List[Dict], pred_events: List[Dict], frame_tolerance: int,
     match_player: bool = True,
+    gt_players: Optional[Dict[str, List[Dict[str, Any]]]] = None,
 ) -> Tuple[int, int, int]:
     """Match predicted action events to ground truth within frame tolerance."""
     matched_gt = set()
@@ -452,14 +467,21 @@ def _match_action_events(
             if gi in matched_gt:
                 continue
             frame_dist = abs(pred["frame"] - gt["frame"])
-            # Optionally check player_id match (skipped when match_player=False,
-            # since ground-truth player_id is a per-frame left-to-right index
-            # that need not line up with a predictor's own player numbering).
-            player_match = (
-                not match_player
-                or pred.get("player_id") == gt.get("player_id")
-                or pred.get("player_id") is None
-            )
+            # Optionally check player match (skipped when match_player=False).
+            # With gt_players available this is spatial + convention-agnostic:
+            # the pred's player_center must land in the GT box the event
+            # names, under either id convention (canonical or L-R -- see
+            # _gt_box_ids_at). Without gt_players, or for centerless preds,
+            # fall back to raw player_id equality.
+            if match_player and gt_players and pred.get("player_center"):
+                can, lr = _gt_box_ids_at(gt_players, gt["frame"], pred["player_center"])
+                player_match = can == gt.get("player_id") or lr == gt.get("player_id")
+            else:
+                player_match = (
+                    not match_player
+                    or pred.get("player_id") == gt.get("player_id")
+                    or pred.get("player_id") is None
+                )
             if frame_dist <= frame_tolerance and player_match and frame_dist < best_dist:
                 best_dist = frame_dist
                 best_gi = gi

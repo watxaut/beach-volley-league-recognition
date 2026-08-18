@@ -260,6 +260,51 @@ def test_midcourt_helpers(court):
 
 # --- evaluate.py team / player attribution scoring ---
 
+def test_evaluate_match_action_events_spatial_player_gate():
+    """Per-action TP gating is spatial + convention-agnostic.
+
+    The pred's player_center must land in the GT box the event names, matched
+    under EITHER id convention (canonical id or L-R index) -- pred player_id
+    numbering need not equal GT ids, so raw equality would mis-gate files
+    whose convention differs (e1/e3 = L-R, e4/e5 = canonical).
+    """
+    from scripts.evaluate import _match_action_events
+
+    gt = [{"frame": 100, "player_id": 2, "final_action": "dig"}]
+    gt_players = {
+        "100": [{"id": 1, "bbox": [850, 700, 950, 880], "visible": True},
+                {"id": 2, "bbox": [650, 380, 750, 560], "visible": True},
+                {"id": 3, "bbox": [1050, 700, 1150, 880], "visible": True}],
+    }
+    # centre in canonical-GT1's box == L-R 2 -> matches player_id 2 (L-R conv)
+    tp, fp, fn = _match_action_events(
+        gt, [{"frame": 101, "player_id": 9, "action": "dig",
+              "player_center": [900, 800]}], 15, True, gt_players)
+    assert (tp, fp, fn) == (1, 0, 0)
+    # same pair expressed with a canonical-convention GT id (player_id 1)
+    tp, fp, fn = _match_action_events(
+        [{"frame": 100, "player_id": 1, "final_action": "dig"}],
+        [{"frame": 101, "player_id": 9, "action": "dig",
+          "player_center": [900, 800]}], 15, True, gt_players)
+    assert (tp, fp, fn) == (1, 0, 0)
+    # centre in GT2's box (canonical 2, L-R 1) while the GT names player 3
+    # under neither convention -> FP+FN
+    tp, fp, fn = _match_action_events(
+        [{"frame": 100, "player_id": 3, "final_action": "dig"}],
+        [{"frame": 101, "player_id": 2, "action": "dig",
+          "player_center": [700, 450]}], 15, True, gt_players)
+    assert (tp, fp, fn) == (0, 1, 1)
+    # centre in no box -> no spatial evidence, gate fails (conservative)
+    tp, fp, fn = _match_action_events(
+        gt, [{"frame": 101, "player_id": 9, "action": "dig",
+              "player_center": [10, 10]}], 15, True, gt_players)
+    assert (tp, fp, fn) == (0, 1, 1)
+    # no gt_players -> falls back to raw player_id equality
+    tp, fp, fn = _match_action_events(
+        gt, [{"frame": 101, "player_id": 2, "action": "dig"}], 15, True, None)
+    assert (tp, fp, fn) == (1, 0, 0)
+
+
 def test_evaluate_action_attribution_metrics():
     from scripts.evaluate import evaluate_actions
 
@@ -294,7 +339,11 @@ def test_evaluate_action_attribution_metrics():
     assert res["team_scored"] == 3
     assert res["team_accuracy"] == round(2 / 3, 3)   # f100 A ok, f200 B!=A, f300 B ok
     assert res["player_scored_spatial"] == 2         # f300's centre in no box
-    assert res["player_accuracy_spatial"] == 0.5     # f100 -> GT1 == player_id 1
+    # Both id conventions are scored (e1/e3 GT ids are L-R indices, e4/e5 are
+    # canonical ids). f100: centre in canonical-GT1's box, which is L-R 2.
+    assert res["player_accuracy_spatial"] == 0.0     # canonical 1 != player_id 2
+    assert res["player_accuracy_spatial_lr"] == 0.5  # L-R 2 == player_id 2
+    # f200: centre in canonical-GT4's box (L-R 1), player_id 3 -> wrong either way
 
     # Without players-frames, team scoring still works, player scoring absent.
     res2 = evaluate_actions(preds, gt, match_player=False)
