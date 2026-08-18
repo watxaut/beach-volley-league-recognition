@@ -1,0 +1,33 @@
+STATUS.md
+  s_9ed08fada71d0a::t_273c0822af6ef0 42-53,60,88-115,123,132,152,155,164-216
+scripts/dump_player_tracks.py
+  s_9ed08fada71d0a::t_ca035b40e12ee8 145-146,185,188-194,202
+scripts/test_action_recognition.py
+  s_9ed08fada71d0a::t_8adbda154da26f 153-158,164
+src/analysis/frame_processor.py
+  s_9ed08fada71d0a::t_906c6468ee944f 132-133,237-245,252
+src/tracking/player_tracker.py
+  s_9ed08fada71d0a::t_966df19ba89224 56-57,89-101,165-176,273,289-292,300-304,509,627,639-648,664-773,964,970-998
+src/utils/config.py
+  s_9ed08fada71d0a::t_914cd2312b5b71 61-62
+tests/test_config_drift.py
+  s_9ed08fada71d0a::t_a6d6c3365cfb36 113-114
+tests/test_serve_zone.py
+  s_9ed08fada71d0a::t_8302e301923f33 320-555
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "51d983a354ee2d32b2ddaa187a3f799d074447ff",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
