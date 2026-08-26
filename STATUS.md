@@ -45,6 +45,15 @@ e5. Suite 187 green. evaluate.py now scores BOTH GT player-id conventions
 with honest gating e3's gated F1 is 0.929, not the 1.0 previously recorded
 (the f69 known misattribution used to count as TP by numeric coincidence).
 
+**Generality + e1 (2026-08-26, later session):** e2/e6 (first runs on the
+current stack) show zero bridge false positives and teams 1.0 on scored
+pairs; their residual is genuine contact recall (e6 3/7, e2 2/4). e1's GT
+turned out to be double-annotated (17 events ≈ 9 touches) — after dedup +
+arbitration e1 detects 8/9 contacts with 3 known-class label residuals, so
+the old "e1 = contact-recall-limited" story is retired. Current action
+scores (labels/gated): e3 0.929, e4 0.857, e5 0.857 (7/7 labels), e1
+0.471, e6 0.545, e2 0.222 labels-only.
+
 **Team-aware contact attribution is shipped and GT-validated** on
 entreno_3 (2026-08-16): team accuracy 0.69 → 0.92, label F1 0.90 → 0.93,
 serve detected. Design: candidates filtered by expected touch team (ball
@@ -167,19 +176,66 @@ constraint. Side changes need no special handling as long as IDs survive.
    pass that re-clusters all track fragments into exactly 4 identities. Only
    build if match validation shows residual swaps/fragmentation that phase 1
    doesn't catch.
-7. **[minor] entreno_1 far-side recall + action contact recall.** (unchanged)
-   `player_confidence` 0.5→0.35 or `player_imgsz` ↑ if needed; e1's action
-   misses (F1 0.4) are contact-recall, same class e5 had — the new bridge
-   found zero qualifying gaps there, so it is honest detection absence, not
-   occlusion-across-touch.
+7. **[minor, refuted-then-narrowed 2026-08-26] e1/e2/e6 recall.** e1's
+   action-miss story ("contact-detection recall") was an artifact of its
+   double-annotated GT — after dedup e1 detects 8/9 contacts and its
+   residuals are label-level (open points 5+9). The detection limitation
+   now lives on **e2/e6** (e6 3/7, e2 2/4 contacts; each with one
+   set→dig cascade from a missed dig). e1's far-side player recall lever
+   (`player_confidence` 0.5→0.35, `player_imgsz` ↑) is unchanged/untried.
+   Also pending: e2/e6 GTs lack player boxes (no team/player spatial
+   scoring) and e2's event list is likely incomplete (3 unmatched preds).
 8. **[minor, eval] pred `player_id` is the L-R index among FILTERED
    candidates.** `_closest_player_at` computes the emitted L-R index over the
    team-eligible snapshot set, not all tracked players — the index shifts when
    the filter set changes (seen: e3 f539 pid 2→3 after the exemption widened,
    same attributed player). Harmless today (spatial scoring is
    convention-free) but worth knowing when reading logs.
+9. **[small, resolver] Overpass is only detectable at touch-2.**
+   `ActionContextResolver` labels a no-follow second touch overpass; a
+   LATER touch that crosses without attack gesture reads dig (e1 f113:
+   GT overpass at touch-3, pred dig). Extending the rule needs the
+   ball-crossing signal threaded into the resolver — a naive "last touch
+   with no follow → overpass" breaks e4's f347 dig (last event, no follow).
+   One GT event; do it with the crossing signal or not at all.
 
 ## Log (newest first)
+
+### 2026-08-26 (later session) — e2/e6 generality check clean; e1's "contact recall" was double-annotated GT
+- **Generality check (e2/e6, first runs on the current stack):** zero
+  bridge candidates on either video — the strict gates hold on unseen
+  footage; teams 1.0 on every scored pair. e6: 3/7 GT contacts, all three
+  labels right (dig/set/spike); the f262 set→dig is the missed f212 dig's
+  touch-count cascade (e5's pattern), f311 spike+block missed. e2: 2/4
+  matched (f305 spike ✓; f257 set→dig cascade from the missed f206 dig);
+  3 unmatched preds (f32/f118/f327) — e2's 4-event GT is likely incomplete
+  (the e4-f182 lesson: unmatched preds on sparse GT need contact sheets
+  before trusting precision). **e2/e6 are now the real contact-recall
+  evidence** (detection-limited), not e1.
+- **e1's GT was double-annotated**: two annotation passes interleaved, 17
+  events for ~9 touches (f277 duplicated verbatim; twins at ±1-2f
+  throughout; the passes disagree on frames, touch numbers, and teams). The
+  recorded "e1's misses are contact-detection recall" was an artifact.
+  Dedup applied (17→9): twins merged (f36, f89, f277, f329, f371); f114/115
+  arbitrated to **overpass** (ball rebounds off the net line into the far
+  half with no further A touch — trajectory-proven); the f252-258
+  four-fragment cluster arbitrated to ONE spike+block joust at the single
+  f257-258 trajectory contact (f257 spike p3 B attacking B's f206 toss,
+  f258 block p1 A fully airborne). Sheets: output/gt_verify/
+  video_entreno_1_f{114,255}.png — **owner ratification wanted** (p3 as
+  the spiker is inferred from jump geometry; no pass ever names p3).
+- **e1 after cleanup: 8/9 contacts detected, labels 5/8, teams 7/8, F1
+  0.471** — and the three residuals are known-class, none recall: (a) f113
+  dig vs overpass — the resolver only detects overpass at touch-2, this was
+  touch-3; (b) f208 dig vs set — B's overhand reception of the overpass at
+  touch-1 (pose-level label, open point 5 class); (c) a joust emits one
+  contact for two GT events.
+- e1's GT still has id/team wobbles beyond the deduped events (e.g. f277
+  names p3 whose box is far from the ball's position at the dig) — needs a
+  dedicated re-verification session, not spot fixes.
+- Files: ground_truth/video_entreno_1_annotations.json, STATUS.md.
+  Diagnostics (git-ignored): output/diag_video_entreno_{2,6}_ball.json,
+  output/gen_e{2,6}/, sheets above.
 
 ### 2026-08-26 — e5 action layer fully resolved: gap-bridged bounce + 2.5m net exemption (old open points 1+2); GT folded; eval convention fix
 - **GT folded (owner dictation 2026-08-18 + contact-sheet arbitration).**
