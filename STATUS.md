@@ -13,7 +13,7 @@
 2026-08-26).** The GT now carries the owner's dictated truth (serve f20 p2
 added, frames 63/111/160/200, six id corrections) plus two contact-sheet
 corrections of our own (f160 spiker is GT4 not p3; f300 spiker is GT2 not
-p4 — sheets in output/gt_verify/, **awaiting owner ratification**). Against
+p4 — sheets in output/gt_verify/, **owner-ratified 2026-08-26**). Against
 it the pipeline reads **7/7 contacts, 7/7 labels, 7/7 teams, 6/6 scored
 players** (gated F1 0.857; the 7th pair's GT box is occlusion-flagged).
 The fix was diagnosis-first and turned out to be ONE root cause, not a
@@ -79,7 +79,7 @@ diagnosis — 4's px→metres switch is GT-refuted (label F1 0.929 → 0.857/0.7
 the px `near_net` is load-bearing for the resolver's touch-3-at-net spike
 rule. Point 9's block turned out to be REAL on the production/live-debug path
 (a config divergence, fixed same day — see Log); the script path (all GT
-numbers) always said spike. Details + revisit trigger in Open point 5 and the
+numbers) always said spike. Details + revisit trigger in Open point 4 and the
 Log.
 
 **Perf (2026-08-17):** the detector device defaults were silently CPU —
@@ -107,16 +107,7 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Open points
 
-1. **[owner action — quick] Ratify the two contact-sheet GT corrections in
-   e5.** f160 spike p3→p4 (GT4 airborne at the right antenna, GT3 stands
-   flat 200px left — sheet output/gt_verify/video_entreno_5_f160.png) and
-   f300 spike p4→p2 (GT2 jumps at net-left exactly under the ball, GT4
-   stands flat 320px right — sheet ..._f300.png; the trajectory's contact
-   point (631,277) is 23px above GT2's box corner). Both contradict the
-   earlier owner-verified corrections; the pipeline now agrees with the
-   footage either way on team/label. Also note e4's f182 spike p4 was
-   added on sheet evidence (..._f182.png) — same ratification batch.
-2. **[diagnosed 2026-08-18 — pre-existing, NOT the serve-zone fix] e1/e3
+1. **[diagnosed 2026-08-18 — pre-existing, NOT the serve-zone fix] e1/e3
    tracking baselines are stale.** Old-code (HEAD pre-fix) e1 dump scores id
    0.771 / ghosts 0.193 vs the recorded 0.978/0.133; e3 id 0.952 vs 0.972.
    Byte-identical A/B (git stash) proves the serve-zone/vote/swap diff is
@@ -129,7 +120,7 @@ constraint. Side changes need no special handling as long as IDs survive.
    numbers vs the flag-occluded e4/e5 GT denominators also moved for that
    reason: e4 0.949→0.974 detection, e5 ghosts 0.042→0.083 — occluded GT
    boxes leave the denominator and their covering preds now count as ghosts.)
-3. **[BLOCKED — no footage] Validate side-change survival on a real match.** The
+2. **[BLOCKED — no footage] Validate side-change survival on a real match.** The
    gallery's marquee use case (players swap ends every 7 points) is untested —
    the entreno drills have no side changes. Blocked as of 2026-08-14: no video
    of a full set is available yet. Unblock by recording/obtaining one
@@ -137,7 +128,7 @@ constraint. Side changes need no special handling as long as IDs survive.
    `python scripts/dump_player_tracks.py <match>.mp4 --max-players 4` →
    `python scripts/analyze_tracking.py <json> --max-players 4`, and scrub the
    annotated video through a side change watching each ID.
-4. **[residual from the attribution fix] Over-set crossings without width
+3. **[residual from the attribution fix] Over-set crossings without width
    evidence.** When a set/dig crosses the net but the tracked ball's widths sit
    in the 26–35px abstain band (entreno_3 f294: widths 29–40 through the gap),
    possession carries and the next contact is attributed to the wrong team.
@@ -148,7 +139,7 @@ constraint. Side changes need no special handling as long as IDs survive.
    approaches (currently often zero — occlusion). Note the new bridge
    (2026-08-26) recovers contacts whose BALL was invisible but not
    wrong-TEAM carries like this one.
-5. **[diagnosed 2026-08-17 — deliberate no-change] The gesture path's image-px
+4. **[diagnosed 2026-08-17 — deliberate no-change] The gesture path's image-px
    `near_net` is load-bearing; a px→metres switch is GT-refuted.**
    `_build_contact`'s `is_near_net` (px, `NEAR_NET_PX=120`) feeds BOTH
    `_detect_gesture` and the resolver's touch-3-at-net spike rule
@@ -168,20 +159,20 @@ constraint. Side changes need no special handling as long as IDs survive.
    match footage exists (real overhead digs vs blocks at depth): re-run
    `output/diag_gesture_net.py <match>.mp4 --modes px m1.5 m2.0` and switch
    only if gestures differ.
-6. **[same-team adjacent-player choice.]** The team filter constrains the TEAM,
+5. **[same-team adjacent-player choice.]** The team filter constrains the TEAM,
    not which teammate — entreno_3 f69's dig goes to the wrong B player (both
    runs, team correct; now also visible as e3's only gated-F1 miss under the
    honest scorer). Needs pose/reach signals, not team logic.
-7. **[conditional] Phase 2: offline global stitch.** (unchanged) Post-processing
+6. **[conditional] Phase 2: offline global stitch.** (unchanged) Post-processing
    pass that re-clusters all track fragments into exactly 4 identities. Only
    build if match validation shows residual swaps/fragmentation that phase 1
    doesn't catch.
-8. **[minor] entreno_1 far-side recall + action contact recall.** (unchanged)
+7. **[minor] entreno_1 far-side recall + action contact recall.** (unchanged)
    `player_confidence` 0.5→0.35 or `player_imgsz` ↑ if needed; e1's action
    misses (F1 0.4) are contact-recall, same class e5 had — the new bridge
    found zero qualifying gaps there, so it is honest detection absence, not
    occlusion-across-touch.
-9. **[minor, eval] pred `player_id` is the L-R index among FILTERED
+8. **[minor, eval] pred `player_id` is the L-R index among FILTERED
    candidates.** `_closest_player_at` computes the emitted L-R index over the
    team-eligible snapshot set, not all tracked players — the index shifts when
    the filter set changes (seen: e3 f539 pid 2→3 after the exemption widened,
@@ -196,13 +187,13 @@ constraint. Side changes need no special handling as long as IDs survive.
   its box), frames 60/110/159/197 → 63/111/160/200, ids f63 p4, f111 p3,
   f200 p2 ("overhand dig" kept in raw_visual_actions, final_action `dig` —
   canonical vocab has no overhand dig), f250 p1, f300 p2. e4: f133 p3,
-  f276 p2, f224 pre_atk→true. Two corrections are OURS, pending owner
-  ratification (open point 1): e5 f160 p3→p4 and f300 p4→p2 — both proven
-  on dumped sheets (the named players stand flat-footed while another is
-  airborne under the ball) + trajectory contact points. e4 f182 spike p4
-  ADDED (un-annotated real touch: GT4 airborne at net, ball crosses to A;
-  fixes e4's phantom-precision). flag_occluded_gt run on both (e4 4, e5 9
-  flags).
+  f276 p2, f224 pre_atk→true. Two corrections were OURS and are now
+  owner-ratified (2026-08-26, from the sheets): e5 f160 p3→p4 and f300
+  p4→p2 — both proven on dumped sheets (the named players stand flat-footed
+  while another is airborne under the ball) + trajectory contact points.
+  e4 f182 spike p4 ADDED and likewise ratified (un-annotated real touch:
+  GT4 airborne at net, ball crosses to A; fixes e4's phantom-precision).
+  flag_occluded_gt run on both (e4 4, e5 9 flags).
 - **evaluate.py: GT action player_id conventions differ across files** —
   e1/e3 are L-R indices (probe: e3 canonical 2/14 vs L-R 12/14; e1 1/8 vs
   5/8), e4/e5 are canonical (6/7 vs 4/7; 4/5 vs 1/5). Per-action TP gating
