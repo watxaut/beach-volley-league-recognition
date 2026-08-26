@@ -114,7 +114,7 @@ class Config:
         "attribution_width_window": 8,        # frames of incoming ball samples consulted
         "attribution_width_far_px": 26.0,     # ball width under this = far half (B)
         "attribution_width_near_px": 35.0,    # ball width over this = near half (A); between = abstain
-        "attribution_near_net_exempt_m": 1.5,  # wrong-team candidates at the net (ground metres) stay eligible only when the CONTACT is above the net-top line (block geometry); image-px would swallow the far half
+        "attribution_near_net_exempt_m": 2.5,  # wrong-team candidates at the net (ground metres) stay eligible only when the CONTACT is above the net-top line; 2.5m so a beach spiker taking off ~2m back stays eligible (e5 f300: 2.14m) — a set thief stays excluded via the above-net gate
 
         # Processing settings
         "batch_size": 1,

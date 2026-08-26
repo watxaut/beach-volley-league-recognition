@@ -72,7 +72,10 @@ def _snap(clf, tid, frame, bbox, team):
 A_DEEP = (860, 700, 940, 880)     # feet (900,880) -> team A, 6.5m from net
 A_THIEF = (1100, 560, 1180, 740)  # feet (1140,740) -> team A
 B_NET = (1000, 410, 1080, 590)    # feet (1040,590) -> team B, ~0.9m from net
-B_DEEP = (700, 380, 780, 560)     # feet (740,560) -> team B, 2.4m from net
+B_DEEP = (700, 380, 780, 560)     # feet (740,560) -> team B, 2.4m from net (inside
+                                  # the 2.5m exemption: a spiker taking off ~2m back
+                                  # is legitimately eligible, e5 f300 was at 2.14m)
+B_VERY_DEEP = (520, 365, 600, 545)  # feet (560,545) -> team B, 3.2m from net
 
 
 # --- Ball-width side estimation ---
@@ -200,9 +203,11 @@ def test_net_standing_setter_cannot_steal_below_net_contact(clf):
 
 def test_far_players_are_not_near_net(clf):
     """The image-pixel band swallowed the whole far half (it is only ~110px
-    deep); the exemption must be ground-plane metres (B_DEEP = 2.4m away)."""
+    deep); the exemption must be ground-plane metres. 2.5m deliberately
+    includes take-off spots ~2m back (e5 f300's spiker: 2.14m, exempt) but
+    not genuine back-court defenders (B_VERY_DEEP = 3.2m)."""
     _four_players(clf)
-    foot = (B_DEEP[0] + B_DEEP[2]) // 2, B_DEEP[3]
+    foot = (B_VERY_DEEP[0] + B_VERY_DEEP[2]) // 2, B_VERY_DEEP[3]
     assert clf.court.world_dist_from_net(foot) > clf._near_net_exempt_m
 
 
@@ -349,3 +354,65 @@ def test_evaluate_action_attribution_metrics():
     res2 = evaluate_actions(preds, gt, match_player=False)
     assert res2["team_accuracy"] == round(2 / 3, 3)
     assert "player_accuracy_spatial" not in res2
+
+
+# --- Gap-bridged bounce (contact inside a sighting gap) ---
+
+def _bridge_history(clf, gap=12, rise=142, drop=97):
+    """The e5-f111 shape: ball descends to f102, vanishes for `gap` frames
+    (occluded at the toucher's hands), reappears at f114 rising."""
+    b = 102 + gap
+    y0 = 330
+    _ball(clf, [(96, 1016, 275 - drop, 22), (100, 1015, 238, 22),
+                (101, 1014, 256, 22), (102, 1013, 275, 22),
+                (b, 1018, y0, 24), (b + 2, 1022, y0 - rise * 2 / 6, 24),
+                (b + 4, 1026, y0 - rise * 4 / 6, 24), (b + 6, 1040, y0 - rise, 24)])
+
+
+def test_bridge_fires_on_occluded_contact(clf):
+    """Real sightings stop descending at f102 and resume rising at f114: the
+    touch inside the gap must be seen (as a bounce, touch point interpolated
+    into the gap)."""
+    _bridge_history(clf)
+    r = clf._detect_contact(114)
+    assert r is not None
+    point, kind, inc, out = r
+    assert kind == "bounce"
+    assert 1013 <= point[0] <= 1018          # x interpolated inside the gap
+    assert point[1] > 275                    # bottom sits below both endpoints
+    assert inc[1] > 0 and out[1] < 0         # descending in, ascending out
+
+
+def test_bridge_requires_long_gap(clf):
+    """Short gaps are the normal detector's turf (it can still fire there);
+    bridging them would double-report the same touch."""
+    _bridge_history(clf, gap=4)
+    vertex = clf._point_at(106)
+    assert vertex is not None
+    assert clf._bridge_contact(106, vertex) is None
+
+
+def test_bridge_rejects_gap_too_long(clf):
+    _bridge_history(clf, gap=18)
+    vertex = clf._point_at(120)
+    assert clf._bridge_contact(120, vertex) is None
+
+
+def test_bridge_rejects_sand_bounce(clf):
+    """A ball rebounding off the sand rises far less than a set toss
+    (e5 f332-340: 25px) and must not read as a touch."""
+    _bridge_history(clf, rise=25)
+    vertex = clf._point_at(114)
+    assert clf._bridge_contact(114, vertex) is None
+
+
+def test_bridge_requires_descent_into_gap(clf):
+    _bridge_history(clf, drop=8)
+    vertex = clf._point_at(114)
+    assert clf._bridge_contact(114, vertex) is None
+
+
+def test_bridge_respects_min_contact_gap(clf):
+    _bridge_history(clf)
+    clf._last_contact_frame = 110          # a confirmed contact 4 frames earlier
+    assert clf._detect_contact(114) is None

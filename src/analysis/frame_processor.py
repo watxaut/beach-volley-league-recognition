@@ -151,7 +151,7 @@ class FrameProcessor:
                 width_window=self.config.get("attribution_width_window", 8),
                 width_far_px=self.config.get("attribution_width_far_px", 26.0),
                 width_near_px=self.config.get("attribution_width_near_px", 35.0),
-                near_net_exempt_m=self.config.get("attribution_near_net_exempt_m", 1.5),
+                near_net_exempt_m=self.config.get("attribution_near_net_exempt_m", 2.5),
             )
 
             # Game state detection

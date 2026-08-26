@@ -52,6 +52,26 @@ class ActionClassifier:
     XREV_MIN = 20.0          # px net horizontal displacement for a redirect
     CONTACT_REACH = 140.0    # max px from ball to nearest player's bbox (arm reach)
 
+    # --- Gap-bridged bounce ---
+    # The ball is often UNDETECTED across a touch (occluded by the toucher's
+    # own body/hands -- entreno_5 f111: real sightings stop falling at f102 and
+    # resume rising at f114, the set itself invisible). With no vertex sighting
+    # _detect_contact can never fire, and the missed touch corrupts the whole
+    # downstream touch-counting (one missed set turned spike->dig->set->dig in
+    # a cascade). The bridge fires only where the normal detector PROVABLY
+    # cannot: a sighting gap of at least BRIDGE_MIN_GAP frames has no frame
+    # with a vertex AND no frame with >=2 real points within NEIGH on both
+    # sides, so small flicker gaps (which the normal path handles) are left
+    # alone -- on entreno_1/3/4 histories the >=8-frame gate yields ZERO
+    # candidates, keeping their validated contact streams byte-identical.
+    BRIDGE_MIN_GAP = 8       # frames; below this the normal detector can still fire
+    BRIDGE_MAX_GAP = 14      # frames; beyond this the touch is too uncertain to place
+    BRIDGE_WINDOW = 6        # frames of real sightings each side used to shape-check
+    BRIDGE_MIN_DROP = 20.0   # px net descent into the gap over the left window
+    BRIDGE_MIN_RISE = 60.0   # px net ascent out of the gap over the right window
+                             # (a sand bounce rebounds low: e5 f332-340 rises 25px
+                             # and must NOT read as a touch; a set toss rises 140+)
+
     # --- Drive (attacking hit) detection ---
     # A spike drives the ball down/across: unlike a dig it does not pop the ball
     # back up (so the bounce test misses it) and it need not flip the ball's
@@ -85,7 +105,7 @@ class ActionClassifier:
         width_window: int = 8,
         width_far_px: float = 26.0,
         width_near_px: float = 35.0,
-        near_net_exempt_m: float = 1.5,
+        near_net_exempt_m: float = 2.5,
         # Accept but ignore legacy params
         enhanced_validation_config: Optional[Dict[str, Any]] = None,
     ):
@@ -292,6 +312,55 @@ class ActionClassifier:
                 return p
         return None
 
+    def _bridge_contact(self, c: int, vertex: Tuple):
+        """Bounce whose bottom the detector never saw (ball occluded at the touch).
+
+        Called from :meth:`_detect_contact` at ``c`` = the FIRST ball sighting
+        after a sighting gap. The touch itself happened inside the gap: real
+        sightings stop DESCENDING just before it and resume ASCENDING at ``c``
+        (entreno_5 f111: fall to f102, gap, rising again at f114 -- the set was
+        invisible). Returns the contact tuple with the touch point interpolated
+        into the gap, or None when the gap/shape does not qualify.
+
+        Gates (beyond the class constants): gaps shorter than BRIDGE_MIN_GAP
+        are left to the normal vertex tests (which can still fire there), gaps
+        longer than BRIDGE_MAX_GAP are too uncertain to place; the net descent
+        into / ascent out of the gap must be decisive, and the ascent gate is
+        deliberately high -- a ball rebounding off the SAND rises far less
+        than a set toss (e5 f332-340: 25px vs f111's 142px) and must not read
+        as a touch. On the entreno_1/3/4 histories these gates yield zero
+        candidates, so their validated contact streams are unchanged.
+        """
+        before = [p for p in self._ball_history if p[0] < c]
+        if not before:
+            return None
+        a = before[-1]
+        gap = c - a[0]
+        if not (self.BRIDGE_MIN_GAP <= gap <= self.BRIDGE_MAX_GAP):
+            return None
+        left = self._real_points(a[0] - self.BRIDGE_WINDOW, a[0] - 1)
+        right = self._real_points(c + 1, c + self.BRIDGE_WINDOW)
+        if len(left) < 2 or len(right) < 2:
+            return None
+        # Screen y grows downward: a descent ADDS y, an ascent SUBTRACTS it,
+        # so both magnitudes are positive here.
+        drop = a[2] - left[0][2]
+        ascent = vertex[2] - right[-1][2]
+        if drop < self.BRIDGE_MIN_DROP or ascent < self.BRIDGE_MIN_RISE:
+            return None
+        # Where in the gap the bottom sat: the descent run out of `a` and the
+        # ascent run into `c` meet earlier when the ball fell slower than it
+        # rose. Used only to place the touch point (the event keeps frame c;
+        # the reach gate forgives ~140px of interpolation error).
+        v_in = max(drop / max(1, a[0] - left[0][0]), 1.0)
+        v_out = max(ascent / max(1, right[-1][0] - c), 1.0)
+        v = a[0] + gap * v_in / (v_in + v_out)
+        x = a[1] + (vertex[1] - a[1]) * (v - a[0]) / gap
+        y = (a[2] + v_in * (v - a[0]) + vertex[2] + v_out * (c - v)) / 2.0
+        inc = (a[1] - left[0][1], a[2] - left[0][2])
+        out = (right[-1][1] - vertex[1], right[-1][2] - vertex[2])
+        return [x, y], "bounce", inc, out
+
     @staticmethod
     def _mean_velocity(
         points: List[Tuple[int, float, float]]
@@ -324,6 +393,14 @@ class ActionClassifier:
         vertex = self._point_at(c)
         if vertex is None:
             return None
+
+        # Gap-bridged bounce first (see the BRIDGE_* constants): if c is the
+        # first sighting after a qualifying gap, the normal tests below cannot
+        # fire (the gap leaves no left-side points within NEIGH) and only the
+        # bridge can see the touch that happened inside the gap.
+        bridged = self._bridge_contact(c, vertex)
+        if bridged is not None:
+            return bridged
         vx, vy = vertex[1], vertex[2]
 
         left = self._real_points(c - self.NEIGH, c - 1)
