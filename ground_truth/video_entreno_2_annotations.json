@@ -18,6 +18,20 @@
       "description": "Action events with rally-state context. Each event has: frame, player_id, final_action (canonical label), raw_visual_actions (open-vocabulary multi-label), player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides.",
       "events": [
         {
+          "frame": 32,
+          "player_id": 1,
+          "final_action": "serve",
+          "raw_visual_actions": [
+            "serve"
+          ],
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "preceded_by_attack": false,
+          "rally_id": 1,
+          "overrides": {}
+        },
+        {
           "frame": 79,
           "player_id": 1,
           "final_action": "dig",

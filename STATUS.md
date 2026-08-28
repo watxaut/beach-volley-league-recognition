@@ -76,8 +76,10 @@ arbitration e1 detects 8/9 contacts with 3 known-class label residuals, so
 the old "e1 = contact-recall-limited" story is retired. Current action
 scores (labels-only F1): e3 0.929, e4 0.857, e5 0.857 (7/7 labels), e1
 0.471, e6 0.667, e2 0.600 (both e2/e6 moved by the 2026-08-27 short-gap
-bridge). (2026-08-28 ratification round: e2 0.667, e6 0.667 against the
-owner-corrected GTs.)
+bridge). (2026-08-28 ratification round: e2 **0.615** vs its complete
+7-event GT, e6 0.667 vs the owner-corrected GT — e2's dip from 0.667 is
+denominator honesty: the serve and set events it was under-counting are
+now in and expose their known-class label misses.)
 
 **Team-aware contact attribution is shipped and GT-validated** on
 entreno_3 (2026-08-16): team accuracy 0.69 → 0.92, label F1 0.90 → 0.93,
@@ -228,12 +230,12 @@ constraint. Side changes need no special handling as long as IDs survive.
    (2026-08-27 addendum: e6's f265 now lands here too — with the f212 dig
    recovered it reads touch-2 no-follow overpass while GT says set; the
    follow it needs is the f311 joust, i.e. point 10. Same fix shape.)
-   (2026-08-28: owner proposes the vocabulary split — **overpass** for a
-   touch-1/2 crossing, **freeball** for a touch-3+ soft cross (e1 f114,
-   currently `overpass` in GT, would become freeball). Agreed semantics;
-   emission of either label for touch-3+ needs the same crossing signal, so
-   any freeball rule lands here with it. GT-side relabel pending the vocab
-   decision, point 11e.)
+   (2026-08-28: owner adopted the vocabulary split — **overpass** for a
+   touch-1/2 crossing, **freeball** for a touch-3+ soft cross; e1 f114
+   relabeled overpass→freeball in GT. Pipeline emission of freeball stays
+   parked here until the crossing signal lands: a touch-3+ no-follow is
+   ambiguous between "crossed" (→ freeball) and "detection missed the
+   follow" (→ dig, e4 f347) without it.)
 10. **[diagnosed 2026-08-27 — parked by owner decision, one mechanism per
     session] Reentry contact: touches whose approach is out of frame.** e6's
     joust pair (GT-corrected 2026-08-28: f308 spike 1A t3 + block 2B t1) is
@@ -260,23 +262,30 @@ constraint. Side changes need no special handling as long as IDs survive.
     vector, serve entries / spare balls need the A/B neutrality proof on
     e1–e5 like the bridge got. Evidence + trace: output/diag_e6_missed.py,
     sheets video_entreno_6_f296-322.
-11. **[owner ratification 2026-08-28 — mostly folded; 2 items left].**
-    FOLDED: (a) e2 +2 events — f118 set p4 B t2, f327 dig p4 B t1 (GT 4→6
-    events; labels-only F1 0.222→**0.667**). (b) e6's joust RE-CORRECTED
-    beyond our proposal: contact is at **f308** (not f311), the SPIKER is
-    **1A** (A's 3rd touch — consistent with A's dig f212 + set f262) and the
-    BLOCKER is **2B**; old f311 spike-p4-B/block-p3-B replaced. Owner also
-    observed the TRACKER swaps players at f311 and tracks something
-    out-of-court there, while f308 labels are correct — an e6 tracking bug
-    with no GT to measure it (e6 has no player boxes). (c) e1's joust
-    arbitration RATIFIED as-is (f257 spike p3 B, f258 block p1 A — JSON
-    already correct). PENDING: (d) e2 f32 is a **serve** and the server is
-    UNTRACKED (pred attributed to nearby 2A → dig) — event not yet folded,
-    need the owner's player_id/team for it; the untracked server is an e2
-    tracking observation (serve-zone admission worked on e3/e5, unmeasured
-    here). (e) e1 f114: owner reads it as a touch-3 dig that crosses —
-    proposes **freeball** as the label, overpass reserved for touch-1/2
-    crossings; awaiting vocab decision (see point 9).
+11. **[owner ratification 2026-08-28 — queue nearly empty].**
+    FOLDED: (a) e2 +3 events — f32 **serve p1 A t1** (the untracked near-left
+    server, owner-marked in white on the sheet; the pred had attributed the
+    contact to nearby tracked 2A → dig), f118 set p4 B t2, f327 dig p4 B t1.
+    e2 GT is now the complete 7-event rally (serve → catch → set → dig →
+    set → spike → dig); labels-only F1 vs it: **0.615** (6/7 matched; the
+    two label misses are known-class: f32 dig-vs-serve = the untracked
+    server, f118 overpass-vs-set = its follow is 91f, one frame past
+    rally_reset_gap=90). (b) e6's joust RE-CORRECTED beyond our proposal:
+    contact at **f308** (not f311), the SPIKER is **1A** (A's 3rd touch —
+    consistent with A's dig f212 + set f262), the BLOCKER **2B**; old
+    f311 spike-p4-B/block-p3-B replaced. Owner observed the TRACKER swaps
+    players at f311 and tracks something out-of-court there while f308
+    labels are correct — an e6 tracking bug with no GT to measure it (e6
+    has no player boxes). (c) e1's joust arbitration RATIFIED as-is (f257
+    spike p3 B, f258 block p1 A — JSON already correct). (d) **freeball**
+    added to the GT vocabulary (owner decision): overpass = touch-1/2
+    crossing, freeball = touch-3+ soft cross; e1 f114 relabeled
+    overpass→freeball (pipeline emission parked on the crossing signal,
+    point 9). REMAINING: (e) e2 f79 semantics — the "dig" is a caught/held
+    ball (static f78–82) + toss ~f85; owner call: keep, re-point to the
+    toss, or drop (its p1-with-team-B id also looks like a mis-ID under the
+    1/2=A, 3/4=B convention the new events follow). (f) e1's residual
+    id/team wobbles (e.g. f277) — dedicated re-verification session.
 
 ## Log (newest first)
 
@@ -339,6 +348,14 @@ constraint. Side changes need no special handling as long as IDs survive.
   player_id/team; serve-zone admission unmeasured on e2); the e6 tracker
   swaps players at f311 (f308 labels correct — no tracking GT to measure);
   owner proposes a freeball label for touch-3 soft crosses (open point 9/11e).
+- **Second ratification round (later, same session):** e2 f32 folded as
+  **serve p1 A t1** (owner marked the untracked near-left server in white
+  on the f24-44 sheet) → e2 GT complete at 7 events, labels-only F1 0.615
+  (the two label misses now visible and known-class: untracked-server
+  serve, 91-frame-gap overpass). **freeball adopted** into the GT vocab
+  (overpass = touch-1/2 crossing, freeball = touch-3+ soft cross); e1 f114
+  relabeled; emission parked on the crossing signal (point 9). Ratification
+  queue down to: e2 f79 semantics + e1 id wobbles.
 
 ### 2026-08-26 (later session) — e2/e6 generality check clean; e1's "contact recall" was double-annotated GT
 - **Generality check (e2/e6, first runs on the current stack):** zero

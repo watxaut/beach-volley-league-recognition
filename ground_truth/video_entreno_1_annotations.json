@@ -2062,9 +2062,9 @@
         {
           "frame": 114,
           "player_id": 2,
-          "final_action": "overpass",
+          "final_action": "freeball",
           "raw_visual_actions": [
-            "overpass"
+            "freeball"
           ],
           "player_team": "A",
           "team_in_possession": "A",
