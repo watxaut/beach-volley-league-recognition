@@ -1,0 +1,31 @@
+src/recognition/action_classifier.py
+  s_2f4028a388c9e2::t_ea0052ce2f4085 62-65,67-70,77-80,332-356,363-371,375-390
+tests/test_team_attribution.py
+  s_2f4028a388c9e2::t_1534c2ee46acbb 387-388,419-511
+STATUS.md
+  s_9ed08fada71d0a::t_89ce6bff25482f 8,12-34,77-79,203-212,226-260,264-313
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "c7956153ff43cbb759717b8c5229d80faea78266",
+  "prompts": {},
+  "sessions": {
+    "s_2f4028a388c9e2": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "693fef5c-7304-4ec8-a477-3949fc36ca6e",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    },
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
