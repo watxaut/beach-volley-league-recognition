@@ -1,0 +1,23 @@
+STATUS.md
+  s_9ed08fada71d0a::t_310b20755c0341 79-82,233-238,265-288,351-358
+ground_truth/video_entreno_1_annotations.json
+  s_9ed08fada71d0a::t_94fb6cdc518731 2065,2067
+ground_truth/video_entreno_2_annotations.json
+  s_9ed08fada71d0a::t_9aa7ba2400e87c 20-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "c0a9711f43d5c79d864614c29c5e466b14a24d26",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
