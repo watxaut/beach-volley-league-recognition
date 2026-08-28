@@ -384,8 +384,8 @@ def test_bridge_fires_on_occluded_contact(clf):
 
 
 def test_bridge_requires_long_gap(clf):
-    """Short gaps are the normal detector's turf (it can still fire there);
-    bridging them would double-report the same touch."""
+    """Gaps below BRIDGE_SHORT_MIN_GAP stay the normal detector's turf (it
+    can still fire there); bridging them would double-report the same touch."""
     _bridge_history(clf, gap=4)
     vertex = clf._point_at(106)
     assert vertex is not None
@@ -416,3 +416,96 @@ def test_bridge_respects_min_contact_gap(clf):
     _bridge_history(clf)
     clf._last_contact_frame = 110          # a confirmed contact 4 frames earlier
     assert clf._detect_contact(114) is None
+
+
+# --- Short-gap bridge (5-7 frame occlusion at the toucher's arms) ---
+
+def _short_history(clf, gap=7, rise=142, drop=97, post_x=1018, post_ys=None):
+    """The e2-f206 shape: ball descends to f102, a brief occlusion (5-7f),
+    then reappears at b=102+gap rising with dense post-gap sightings."""
+    b = 102 + gap
+    y0 = 330
+    ys = post_ys or [y0, y0 - rise * 2 / 6, y0 - rise * 4 / 6, y0 - rise]
+    _ball(clf, [(96, 1016, 275 - drop, 22), (100, 1015, 238, 22),
+                (101, 1014, 256, 22), (102, 1013, 275, 22),
+                (b, post_x, ys[0], 24), (b + 2, post_x + 4, ys[1], 24),
+                (b + 4, post_x + 8, ys[2], 24), (b + 6, post_x + 22, ys[3], 24)])
+
+
+def test_short_gap_bridge_fires_dense_right(clf):
+    """e2 f206: a 7-frame occlusion at the digger's arms leaves the normal
+    tests without 2 left points within NEIGH, so the short-gap bridge recovers
+    the touch (measured on video: +f209 dig, and the f256 dig->set cascade
+    heals)."""
+    _short_history(clf, gap=7)
+    r = clf._detect_contact(109)
+    assert r is not None
+    point, kind, inc, out = r
+    assert kind == "bounce"
+    assert 1013 <= point[0] <= 1018          # x interpolated inside the gap
+    assert point[1] > 275                    # bottom sits below both endpoints
+    assert inc[1] > 0 and out[1] < 0         # descending in, ascending out
+
+
+def test_short_gap_bridge_fires_sparse_right_cross_rise(clf):
+    """e6 f212: post-gap sightings are sparse (the dug ball reappears once,
+    8f later -- beyond the decision-time window, which ends at c+6). The
+    CROSS-GAP RISE -- the first post-gap sighting already 144px above the
+    last pre-gap one -- is the only usable ascent evidence, and it needs no
+    future points."""
+    _ball(clf, [(96, 1016, 178, 22), (100, 1015, 238, 22),
+                (101, 1014, 256, 22), (102, 1013, 275, 22),
+                (108, 1018, 131, 24)])
+    r = clf._detect_contact(108)
+    assert r is not None
+    point, kind, inc, out = r
+    assert kind == "bounce"
+    assert inc[1] > 0 and out[1] < -60       # descending in, rising hard out
+
+
+def test_short_gap_bridge_leaves_dense_gaps_to_normal_path(clf):
+    """Gap 6 but >=2 real points within NEIGH on BOTH sides: the normal vertex
+    tests can fire (e6 f265 does exactly this), so the bridge must not
+    relocate the contact."""
+    _ball(clf, [(96, 1016, 178, 22), (101, 1014, 256, 22), (102, 1013, 275, 22),
+                (108, 1018, 330, 24), (110, 1022, 283, 24),
+                (112, 1026, 235, 24), (114, 1040, 188, 24)])
+    vertex = clf._point_at(108)
+    assert vertex is not None
+    assert clf._bridge_contact(108, vertex) is None
+    # ... while the normal bounce test does fire here (it is its turf).
+    assert clf._detect_contact(108) is not None
+
+
+def test_short_gap_bridge_rejects_ball_identity_jump(clf):
+    """A spare ball appearing ~700px away after a game-ball gap must not
+    bridge (e6 f236/f289 and e5 f320/f325 classes, all refused by this gate
+    in the six-video A/B)."""
+    _ball(clf, [(96, 1016, 178, 22), (100, 1015, 238, 22),
+                (101, 1014, 256, 22), (102, 1013, 275, 22),
+                (108, 1718, 131, 24)])
+    vertex = clf._point_at(108)
+    assert vertex is not None
+    assert clf._bridge_contact(108, vertex) is None
+
+
+def test_short_gap_bridge_requires_descent_into_gap(clf):
+    """A rising ball with a detection dropout is not a touch: no descent into
+    the gap, however steep the cross-gap rise."""
+    _ball(clf, [(96, 1016, 285, 22), (100, 1015, 255, 22),
+                (101, 1014, 236, 22), (102, 1013, 218, 22),
+                (108, 1018, 74, 24)])
+    vertex = clf._point_at(108)
+    assert vertex is not None
+    assert clf._bridge_contact(108, vertex) is None
+
+
+def test_classic_band_still_requires_two_right_points(clf):
+    """The cross-gap-rise fallback is SHORT-band only: a classic 12f gap with
+    no post-gap sightings still refuses (pre-change behaviour)."""
+    _ball(clf, [(96, 1016, 178, 22), (100, 1015, 238, 22),
+                (101, 1014, 256, 22), (102, 1013, 275, 22),
+                (114, 1018, 131, 24)])
+    vertex = clf._point_at(114)
+    assert vertex is not None
+    assert clf._bridge_contact(114, vertex) is None

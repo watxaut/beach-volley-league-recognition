@@ -5,9 +5,32 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-08-26
+**Last updated:** 2026-08-27
 
 ## Where we are
+
+**Short-gap bridge shipped (2026-08-27): e2/e6's missed digs recovered.**
+The e2/e6 contact-recall residual (old open point 7) split into two classes
+on diagnosis. (a) A **5–7-frame occlusion at the toucher's arms** — e6 f212
+and e2 f206, both sheet-proven — sat in a hole between the normal detector
+(needs ≥2 points within NEIGH per side) and the bridge (floor was 8f). The
+bridge now takes gap 5–7 under three extra gates: the normal path PROVABLY
+cannot fire (sparse NEIGH on ≥1 side), ball-identity continuity
+(|Δx| ≤ max(24, 3·gap)), and for sparse re-acquisition a CROSS-GAP RISE
+(first post-gap sighting ≥60px above the last pre-gap one — needs no future
+points; decision time is c+7 and the right window ends at c+6). A/B on all
+six videos: e1/e3/e4/e5 **byte-identical**; e2 +f209 dig with the cascade
+healed (f256 dig→set t2, f306 t3); e6 +f216 dig t1, f265 dig→overpass t2
+(GT set — blocked on the joust, open point 10). Labels-only F1: e2 0.222 →
+**0.600**, e6 0.545 → **0.667**. Suite 193 green. (b) The **e6 f311 joust
+is structurally invisible** to any descent/ascent bridge — the set toss
+exits the frame top at f277 and the ball re-enters at net height f314
+already deflected; the f289–302 "ball" is a bottom-left spare handled by 1B.
+A "reentry contact" mechanism is diagnosed and parked (open point 10).
+**GT ratification queue is loaded for the owner** (open point 11): e2's
+three unmatched preds are REAL touches (f32, f118 set, f327 dig — sheets),
+e2 f79 is a caught/held feed ball (static f78–82, then a toss —
+pipeline-invisible by design), e6's f311 block team B is almost surely A.
 
 **entreno_5's action layer is fully resolved (old open points 1+2 closed,
 2026-08-26).** The GT now carries the owner's dictated truth (serve f20 p2
@@ -51,8 +74,9 @@ pairs; their residual is genuine contact recall (e6 3/7, e2 2/4). e1's GT
 turned out to be double-annotated (17 events ≈ 9 touches) — after dedup +
 arbitration e1 detects 8/9 contacts with 3 known-class label residuals, so
 the old "e1 = contact-recall-limited" story is retired. Current action
-scores (labels/gated): e3 0.929, e4 0.857, e5 0.857 (7/7 labels), e1
-0.471, e6 0.545, e2 0.222 labels-only.
+scores (labels-only F1): e3 0.929, e4 0.857, e5 0.857 (7/7 labels), e1
+0.471, e6 0.667, e2 0.600 (both e2/e6 moved by the 2026-08-27 short-gap
+bridge).
 
 **Team-aware contact attribution is shipped and GT-validated** on
 entreno_3 (2026-08-16): team accuracy 0.69 → 0.92, label F1 0.90 → 0.93,
@@ -176,15 +200,16 @@ constraint. Side changes need no special handling as long as IDs survive.
    pass that re-clusters all track fragments into exactly 4 identities. Only
    build if match validation shows residual swaps/fragmentation that phase 1
    doesn't catch.
-7. **[minor, refuted-then-narrowed 2026-08-26] e1/e2/e6 recall.** e1's
-   action-miss story ("contact-detection recall") was an artifact of its
-   double-annotated GT — after dedup e1 detects 8/9 contacts and its
-   residuals are label-level (open points 5+9). The detection limitation
-   now lives on **e2/e6** (e6 3/7, e2 2/4 contacts; each with one
-   set→dig cascade from a missed dig). e1's far-side player recall lever
-   (`player_confidence` 0.5→0.35, `player_imgsz` ↑) is unchanged/untried.
-   Also pending: e2/e6 GTs lack player boxes (no team/player spatial
-   scoring) and e2's event list is likely incomplete (3 unmatched preds).
+7. **[narrowed 2026-08-27] e2/e6 recall residuals after the short-gap
+   bridge.** The two missed digs (e6 f212, e2 f206) are fixed; what remains:
+   the e6 f311 joust pair (→ point 10), e2's f79 GT event (a caught/held
+   feed ball, static f78–82 + toss — no trajectory detector can see it; its
+   GT semantics need an owner call, → point 11), and e2's incomplete event
+   list (3 real un-annotated touches, → point 11). e1's far-side player
+   recall lever (`player_confidence` 0.5→0.35, `player_imgsz` ↑) is
+   unchanged/untried. e2/e6 GTs still lack player boxes (no team/player
+   spatial scoring; raw-id gating makes their gated F1s look brutal — pred
+   player_id is the L-R index, point 8).
 8. **[minor, eval] pred `player_id` is the L-R index among FILTERED
    candidates.** `_closest_player_at` computes the emitted L-R index over the
    team-eligible snapshot set, not all tracked players — the index shifts when
@@ -198,8 +223,93 @@ constraint. Side changes need no special handling as long as IDs survive.
    ball-crossing signal threaded into the resolver — a naive "last touch
    with no follow → overpass" breaks e4's f347 dig (last event, no follow).
    One GT event; do it with the crossing signal or not at all.
+   (2026-08-27 addendum: e6's f265 now lands here too — with the f212 dig
+   recovered it reads touch-2 no-follow overpass while GT says set; the
+   follow it needs is the f311 joust, i.e. point 10. Same fix shape.)
+10. **[diagnosed 2026-08-27 — parked by owner decision, one mechanism per
+    session] Reentry contact: touches whose approach is out of frame.** e6's
+    f311 joust pair (GT spike+block) is invisible to every existing
+    mechanism: A's set toss exits the frame TOP at f277 [1166,17] still
+    ascending, the contact happens above/entering the frame, and the ball
+    re-enters at f314 [1152,278] — above the net tape (verified via
+    `is_above_net`) — flying left at ~48px/f with dense sightings f314–319.
+    The tracker's f289–302 "ball" there is a bottom-left SPARE handled by
+    1B (free-flight x-physics: the toss exited moving right at 8px/f and
+    cannot re-enter at x=177 moving up-left; sheet-proven). Candidate
+    mechanism ("reentry contact"): first sighting after an UNREACHABLE
+    jump (|Δx| ≫ gap·max-speed) with zero left points within NEIGH, ≥2
+    dense right points, ball above the net tape, fast exit (≥DRIVE_MIN_
+    SPEED), player at net within reach; incoming vector manufactured
+    vertical-from-above; gesture via existing near-net rules (→ spike or
+    block). Pays twice on e6: the joust pair AND f265 overpass→set (it
+    supplies the follow). Risks: new contact kind, invented incoming
+    vector, serve entries / spare balls need the A/B neutrality proof on
+    e1–e5 like the bridge got. Evidence + trace: output/diag_e6_missed.py,
+    sheets video_entreno_6_f296-322.
+11. **[waiting on owner] GT ratification queue (sheets in output/gt_verify/,
+    all 2026-08-27 unless noted).** (a) e2 +3 events — f32 touch B, f118 set
+    B, f327 dig B are real un-annotated touches (sheets
+    video_entreno_2_f{24-44,108-130,317-337}); folds e2's GT 4→7 events and
+    its eval stops under-counting recall. (b) e2 f79 "dig" is a caught/held
+    feed ball (static f78–82 at [843,462]) followed by a toss from ~f85 —
+    owner call: keep, re-point to the toss, or drop. (c) e6 f311 block
+    team B→A (blocker is the near-side airborne player; sheet
+    video_entreno_6_f296-322; e1-joust precedent). (d) STILL PENDING from
+    2026-08-26: e1's dedup arbitration (f114 overpass, f255 joust, p3
+    spiker — sheets video_entreno_1_f{114,255}) + e1's residual id/team
+    wobbles (e.g. f277).
 
 ## Log (newest first)
+
+### 2026-08-27 — short-gap bridge shipped (e2/e6 missed digs); e2/e6 GT honesty work; joust diagnosed as "reentry" class
+- **Diagnosis first** (output/diag_e6_missed.py gate trace + sheets, e2 the
+  same via its ball dump): e6's 4 missed GT contacts are TWO classes, not
+  one. (a) f212 dig: 6f occlusion at the digger's arms — sightings f208/210
+  descending to y482, f216 already at y338 rising; gap 6 sits below the
+  bridge floor (8f) while the normal path has 1 left / 0 right points
+  within NEIGH (can't fire); even gap-allowed, the right side is SPARSE
+  (only f224 in the next 12f). e2 f206 identical class (7f gap, dense
+  right). (b) f311 joust: structurally invisible — see new open point 10.
+- **Design lesson recorded:** the obvious sparse-right fix (extend the
+  right window to c+12) CANNOT work — contacts are confirmed at
+  c+CONTACT_DELAY and the right window ends at c+6, so those points are not
+  in history at decision time (first A/B run "passed the gates" and then
+  silently refused for exactly this reason). Deferred evaluation was
+  considered (pending state + ordering guards) and rejected; the
+  CROSS-GAP RISE gate needs no future points and is physically tight: a
+  sand rebound cannot rise 60px in ≤6f and a free-flight apex cannot
+  produce it from a ≥20px descent.
+- **Shipped** (`_bridge_contact` + `BRIDGE_SHORT_MIN_GAP/BRIDGE_X_CONT_*`):
+  short band gap 5–7, gates = normal-path-proof (sparse NEIGH on ≥1 side —
+  e6 f265 fires NORMALLY at gap 6, the bridge must not relocate it) +
+  x-continuity max(24, 3·gap) + the classic left-descent shape + cross-gap
+  rise when the right window is empty. Classic band 8–14f untouched.
+- **A/B (subclass harness, identical feeding, all six videos):** e1/e3/e4/e5
+  streams byte-identical (every short-band candidate refused: dense-NEIGH
+  or x-discontinuity 68–118px — e5's spare windows f320/f325); e2 +f209 dig
+  t1/r2 (the 91f gap lands as rally reset, matching GT's possession
+  numbering) and the cascade heals: f256 dig→SET t2, f306 spike t2→t3; e6
+  +f216 dig t1/r1, f265 dig→overpass t2 (GT set — the follow it needs is
+  the joust; open points 9+10). Production script path re-run: e2/e6
+  identical to the A/B streams, e5's 7-event stream identical to the
+  validated one (f17 serve … f299 spike 0.65).
+- **Eval (GT as-is, labels-only):** e2 F1 0.222 → **0.600** (P 0.5 / R 0.75;
+  3/4 matched, labels 3/3), e6 0.545 → **0.667** (P 0.8 / R 0.571; 4/7
+  matched, labels 4/5). With point 11's GT additions ratified, e2's
+  denominator grows to 7 and its unmatched preds become matches.
+- **GT honesty (owner review pending — NOT folded):** e2's 3 unmatched
+  preds are real touches (f32/f118/f327, sheets in output/gt_verify/);
+  e2 f79 is a caught/held feed ball (static f78–82) — pipeline-invisible BY
+  DESIGN, correctly refused by the new gates (ascent 0 at the catch, drop 0
+  at the toss); e6 f311 block team B→A proposed.
+- Tests: +6 (dense-right fires, cross-rise fires, dense-NEIGH stays
+  normal-turf [asserts the normal path DOES fire there], identity jump,
+  no-descent, classic band keeps ≥2 right); suite **193 green**.
+- Files: src/recognition/action_classifier.py,
+  tests/test_team_attribution.py, STATUS.md. Diagnostics (git-ignored):
+  output/diag_e6_missed.py, output/diag_shortgap_ab.py,
+  output/diag_e2_unmatched.py, output/diag_e6_f216_reach.py,
+  output/shortgap_e{2,5,6}/, sheets output/gt_verify/.
 
 ### 2026-08-26 (later session) — e2/e6 generality check clean; e1's "contact recall" was double-annotated GT
 - **Generality check (e2/e6, first runs on the current stack):** zero

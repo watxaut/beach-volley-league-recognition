@@ -59,18 +59,25 @@ class ActionClassifier:
     # _detect_contact can never fire, and the missed touch corrupts the whole
     # downstream touch-counting (one missed set turned spike->dig->set->dig in
     # a cascade). The bridge fires only where the normal detector PROVABLY
-    # cannot: a sighting gap of at least BRIDGE_MIN_GAP frames has no frame
-    # with a vertex AND no frame with >=2 real points within NEIGH on both
-    # sides, so small flicker gaps (which the normal path handles) are left
-    # alone -- on entreno_1/3/4 histories the >=8-frame gate yields ZERO
+    # cannot: a sighting gap of at least BRIDGE_SHORT_MIN_GAP frames has no
+    # frame with a vertex AND no frame with >=2 real points within NEIGH on
+    # both sides, so small flicker gaps (which the normal path handles) are
+    # left alone -- on entreno_1/3/4 histories these gates yield ZERO
     # candidates, keeping their validated contact streams byte-identical.
-    BRIDGE_MIN_GAP = 8       # frames; below this the normal detector can still fire
+    BRIDGE_SHORT_MIN_GAP = 5  # frames; SHORT-gap band floor (see _bridge_contact)
+    BRIDGE_MIN_GAP = 8       # frames; classic band floor -- below this the bridge
+                             # needs the extra short-band gates (sparse sides +
+                             # ball identity continuity)
     BRIDGE_MAX_GAP = 14      # frames; beyond this the touch is too uncertain to place
     BRIDGE_WINDOW = 6        # frames of real sightings each side used to shape-check
     BRIDGE_MIN_DROP = 20.0   # px net descent into the gap over the left window
     BRIDGE_MIN_RISE = 60.0   # px net ascent out of the gap over the right window
                              # (a sand bounce rebounds low: e5 f332-340 rises 25px
                              # and must NOT read as a touch; a set toss rises 140+)
+    BRIDGE_X_CONT_PX = 24.0      # short-band ball-identity continuity: max |dx|
+    BRIDGE_X_CONT_PER_F = 3.0    # between the last pre-gap and first post-gap
+                                 # sighting (a spare ball appearing elsewhere must
+                                 # not bridge -- e6 f236/f289, e5 f320/f325)
 
     # --- Drive (attacking hit) detection ---
     # A spike drives the ball down/across: unlike a dig it does not pop the ball
@@ -322,29 +329,69 @@ class ActionClassifier:
         invisible). Returns the contact tuple with the touch point interpolated
         into the gap, or None when the gap/shape does not qualify.
 
-        Gates (beyond the class constants): gaps shorter than BRIDGE_MIN_GAP
-        are left to the normal vertex tests (which can still fire there), gaps
-        longer than BRIDGE_MAX_GAP are too uncertain to place; the net descent
-        into / ascent out of the gap must be decisive, and the ascent gate is
-        deliberately high -- a ball rebounding off the SAND rises far less
-        than a set toss (e5 f332-340: 25px vs f111's 142px) and must not read
-        as a touch. On the entreno_1/3/4 histories these gates yield zero
-        candidates, so their validated contact streams are unchanged.
+        Two bands, both A/B-validated byte-neutral on entreno_1/3/4/5:
+
+        * classic, gap in [BRIDGE_MIN_GAP, BRIDGE_MAX_GAP]: >=2 real sightings
+          each side, decisive net descent into / ascent out of the gap. The
+          ascent gate is deliberately high -- a ball rebounding off the SAND
+          rises far less than a set toss (e5 f332-340: 25px vs f111's 142px).
+
+        * SHORT, gap in [BRIDGE_SHORT_MIN_GAP, BRIDGE_MIN_GAP): the occlusion
+          at the toucher's arms can be brief (e2 f206: 6f, e6 f212: 6f) yet
+          still leave the normal tests without their >=2-points-within-NEIGH
+          on a side. Extra gates, because short gaps are otherwise the normal
+          detector's turf (e6 f265 fires normally at gap 6):
+            - the normal path PROVABLY cannot fire: fewer than 2 real points
+              within NEIGH on at least one side of ``c``;
+            - ball identity continuity: |dx| across the gap within
+              BRIDGE_X_CONT_* (a spare ball appearing elsewhere after a
+              game-ball gap must not bridge);
+            - when the right window is empty (sparse re-acquisition, e6: the
+              dug ball is seen once more 8f later), no future points exist at
+              decision time -- contacts are confirmed at c+CONTACT_DELAY and
+              the window ends at c+BRIDGE_WINDOW. Evidence needing no future:
+              the CROSS-GAP RISE, first post-gap sighting decisively higher
+              than the last pre-gap one. Physically tight: a sand rebound
+              cannot rise 60px in <=6 frames and a free-flight apex cannot
+              produce it from a >=20px descent.
         """
         before = [p for p in self._ball_history if p[0] < c]
         if not before:
             return None
         a = before[-1]
         gap = c - a[0]
-        if not (self.BRIDGE_MIN_GAP <= gap <= self.BRIDGE_MAX_GAP):
+        short = self.BRIDGE_SHORT_MIN_GAP <= gap < self.BRIDGE_MIN_GAP
+        if short:
+            if (len(self._real_points(c - self.NEIGH, c - 1)) >= 2
+                    and len(self._real_points(c + 1, c + self.NEIGH)) >= 2):
+                return None  # dense both sides: the normal detector's turf
+            if abs(vertex[1] - a[1]) > max(
+                    self.BRIDGE_X_CONT_PX, self.BRIDGE_X_CONT_PER_F * gap):
+                return None  # identity discontinuity: a different ball
+        elif not (self.BRIDGE_MIN_GAP <= gap <= self.BRIDGE_MAX_GAP):
             return None
         left = self._real_points(a[0] - self.BRIDGE_WINDOW, a[0] - 1)
         right = self._real_points(c + 1, c + self.BRIDGE_WINDOW)
+        drop = a[2] - left[0][2] if left else None
+        # SHORT band, sparse right side: fall back to the cross-gap rise.
+        if len(right) < 2 and short:
+            cross_rise = a[2] - vertex[2]
+            if (len(left) >= 2 and drop is not None
+                    and drop >= self.BRIDGE_MIN_DROP
+                    and cross_rise >= self.BRIDGE_MIN_RISE):
+                v_in = max(drop / max(1, a[0] - left[0][0]), 1.0)
+                v_out = max(cross_rise / gap, 1.0)
+                v = a[0] + gap * v_in / (v_in + v_out)
+                x = a[1] + (vertex[1] - a[1]) * (v - a[0]) / gap
+                y = (a[2] + v_in * (v - a[0]) + vertex[2] + v_out * (c - v)) / 2.0
+                inc = (a[1] - left[0][1], a[2] - left[0][2])
+                out = (vertex[1] - a[1], vertex[2] - a[2])
+                return [x, y], "bounce", inc, out
+            return None
         if len(left) < 2 or len(right) < 2:
             return None
         # Screen y grows downward: a descent ADDS y, an ascent SUBTRACTS it,
         # so both magnitudes are positive here.
-        drop = a[2] - left[0][2]
         ascent = vertex[2] - right[-1][2]
         if drop < self.BRIDGE_MIN_DROP or ascent < self.BRIDGE_MIN_RISE:
             return None
