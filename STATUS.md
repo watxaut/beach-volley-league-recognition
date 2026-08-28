@@ -76,10 +76,11 @@ arbitration e1 detects 8/9 contacts with 3 known-class label residuals, so
 the old "e1 = contact-recall-limited" story is retired. Current action
 scores (labels-only F1): e3 0.929, e4 0.857, e5 0.857 (7/7 labels), e1
 0.471, e6 0.667, e2 0.600 (both e2/e6 moved by the 2026-08-27 short-gap
-bridge). (2026-08-28 ratification round: e2 **0.615** vs its complete
-7-event GT, e6 0.667 vs the owner-corrected GT — e2's dip from 0.667 is
-denominator honesty: the serve and set events it was under-counting are
-now in and expose their known-class label misses.)
+bridge). (2026-08-28 ratification rounds: e2 **0.571** vs its complete
+8-event GT, e6 0.667 vs the owner-corrected GT — the e2 dips along the way
+were denominator honesty: each ratification round exposed events the GT
+had been under-counting, and every remaining miss is now a diagnosed
+class.)
 
 **Team-aware contact attribution is shipped and GT-validated** on
 entreno_3 (2026-08-16): team accuracy 0.69 → 0.92, label F1 0.90 → 0.93,
@@ -203,16 +204,21 @@ constraint. Side changes need no special handling as long as IDs survive.
    pass that re-clusters all track fragments into exactly 4 identities. Only
    build if match validation shows residual swaps/fragmentation that phase 1
    doesn't catch.
-7. **[narrowed 2026-08-27] e2/e6 recall residuals after the short-gap
-   bridge.** The two missed digs (e6 f212, e2 f206) are fixed; what remains:
-   the e6 f311 joust pair (→ point 10), e2's f79 GT event (a caught/held
-   feed ball, static f78–82 + toss — no trajectory detector can see it; its
-   GT semantics need an owner call, → point 11), and e2's incomplete event
-   list (3 real un-annotated touches, → point 11). e1's far-side player
-   recall lever (`player_confidence` 0.5→0.35, `player_imgsz` ↑) is
-   unchanged/untried. e2/e6 GTs still lack player boxes (no team/player
-   spatial scoring; raw-id gating makes their gated F1s look brutal — pred
-   player_id is the L-R index, point 8).
+7. **[narrowed 2026-08-27; e2 GT completed 2026-08-28] recall residuals
+   after the short-gap bridge.** The two missed digs (e6 f212, e2 f206) are
+   fixed. e2's remaining misses are all diagnosed: f90 held-ball release
+   (structurally invisible), f167 reentry (point 10), f32 serve mislabel
+   (tracking — see below), f118 set label (91f follow). e6's is the f308
+   joust pair (point 10). e1's far-side player recall lever
+   (`player_confidence` 0.5→0.35, `player_imgsz` ↑) is unchanged/untried.
+   **e2 tracking observation (owner, 2026-08-28): the tracker holds a
+   player OUTSIDE the court (the e5-squatter class recurring), the server
+   p1 is tracked at the start then LOST, and p3 is untracked around the
+   f90 dig — next tracking session should `dump_player_tracks` e2 + read
+   the audit trail** (the 2026-08-18 server-vote/swap/trial machinery
+   evidently doesn't cover this case). e2/e6 GTs still lack player boxes
+   (no team/player spatial scoring; raw-id gating makes their gated F1s
+   look brutal — pred player_id is the L-R index, point 8).
 8. **[minor, eval] pred `player_id` is the L-R index among FILTERED
    candidates.** `_closest_player_at` computes the emitted L-R index over the
    team-eligible snapshot set, not all tracked players — the index shifts when
@@ -257,8 +263,15 @@ constraint. Side changes need no special handling as long as IDs survive.
     SWAPS players at f311 (and tracks an out-of-court box) while f308
     labels are right — `_closest_player_at` picks the snapshot nearest the
     contact frame, so a reentry event placed at/before f308 can attribute
-    off the clean snapshots, but this needs care. Risks: new contact kind,
-    invented incoming
+    off the clean snapshots, but this needs care. **Second instance found
+    2026-08-28: e2 f167** — B's set f120 sends the ball above the frame,
+    p3's spike contact happens out of frame, and the ball re-enters at
+    f185 descending fast (~16px/f vertical, apex never seen). Note the
+    sub-shapes differ: e6 = horizontal re-entry AT net height (deflection
+    exit), e2 = steep descending re-entry (attack landing flight) — a
+    reentry mechanism must cover both without firing on ordinary
+    frame-entries (serves, balls crossing above frame). Risks: new contact
+    kind, invented incoming
     vector, serve entries / spare balls need the A/B neutrality proof on
     e1–e5 like the bridge got. Evidence + trace: output/diag_e6_missed.py,
     sheets video_entreno_6_f296-322.
@@ -281,11 +294,19 @@ constraint. Side changes need no special handling as long as IDs survive.
     added to the GT vocabulary (owner decision): overpass = touch-1/2
     crossing, freeball = touch-3+ soft cross; e1 f114 relabeled
     overpass→freeball (pipeline emission parked on the crossing signal,
-    point 9). REMAINING: (e) e2 f79 semantics — the "dig" is a caught/held
-    ball (static f78–82) + toss ~f85; owner call: keep, re-point to the
-    toss, or drop (its p1-with-team-B id also looks like a mis-ID under the
-    1/2=A, 3/4=B convention the new events follow). (f) e1's residual
-    id/team wobbles (e.g. f277) — dedicated re-verification session.
+    point 9). REMAINING: (e) RESOLVED 2026-08-28 (later round): f79 dropped —
+    the owner's full re-read of e2: NO dig at f79; the rally is serve f32
+    p1 A → **dig f90 p3 B t1** (reception) → set f120 p4 B (frame corrected
+    from our f118) → **spike f167 p3 B t3** (un-annotated before; explains
+    the steep f185–202 descent into A's dig) → f206 dig p3 A (now
+    preceded_by_attack TRUE) → f257 → f305 → f327. e2 GT = 8 coherent
+    events; labels-only F1 **0.571** with every residual known-class:
+    f32 dig-vs-serve (untracked server), f90 undetected (held-ball
+    release — static hold f78–82 then play, no descent signature,
+    structurally invisible), f118 overpass-vs-set (91f follow), f167
+    undetected (reentry, point 10's SECOND instance). (f) e1's residual
+    id/team wobbles (e.g. f277) — dedicated re-verification session (the
+    only queue item left).
 
 ## Log (newest first)
 
@@ -356,6 +377,16 @@ constraint. Side changes need no special handling as long as IDs survive.
   (overpass = touch-1/2 crossing, freeball = touch-3+ soft cross); e1 f114
   relabeled; emission parked on the crossing signal (point 9). Ratification
   queue down to: e2 f79 semantics + e1 id wobbles.
+- **Third round (owner re-scrubbed e2 end to end):** f79 DROPPED (no dig
+  there); rally corrected to serve f32 p1 A → dig **f90 p3 B** (reception)
+  → set f120 p4 (frame fix) → spike **f167 p3 B t3** (new — explains the
+  f185–202 descent) → f206 dig p3 A (preceded_by_attack→true) → f257 →
+  f305 → f327. e2 GT = 8 coherent events, labels-only F1 0.571; residuals
+  all known-class (2 recall: held-ball release + reentry-f167; 2 label:
+  untracked-server serve, 91f-gap overpass). Owner tracking observations
+  folded into point 7 (out-of-court squatter on e2; server tracked early
+  then lost; p3 untracked at f90) and e2-f167 added as reentry instance #2
+  in point 10 (descending sub-shape vs e6's horizontal one).
 
 ### 2026-08-26 (later session) — e2/e6 generality check clean; e1's "contact recall" was double-annotated GT
 - **Generality check (e2/e6, first runs on the current stack):** zero
