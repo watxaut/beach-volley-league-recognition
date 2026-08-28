@@ -76,7 +76,8 @@ arbitration e1 detects 8/9 contacts with 3 known-class label residuals, so
 the old "e1 = contact-recall-limited" story is retired. Current action
 scores (labels-only F1): e3 0.929, e4 0.857, e5 0.857 (7/7 labels), e1
 0.471, e6 0.667, e2 0.600 (both e2/e6 moved by the 2026-08-27 short-gap
-bridge).
+bridge). (2026-08-28 ratification round: e2 0.667, e6 0.667 against the
+owner-corrected GTs.)
 
 **Team-aware contact attribution is shipped and GT-validated** on
 entreno_3 (2026-08-16): team accuracy 0.69 → 0.92, label F1 0.90 → 0.93,
@@ -216,7 +217,8 @@ constraint. Side changes need no special handling as long as IDs survive.
    the filter set changes (seen: e3 f539 pid 2→3 after the exemption widened,
    same attributed player). Harmless today (spatial scoring is
    convention-free) but worth knowing when reading logs.
-9. **[small, resolver] Overpass is only detectable at touch-2.**
+9. **[small, resolver] Overpass is only detectable at touch-2 — and
+   "freeball" wants the same missing signal.**
    `ActionContextResolver` labels a no-follow second touch overpass; a
    LATER touch that crosses without attack gesture reads dig (e1 f113:
    GT overpass at touch-3, pred dig). Extending the rule needs the
@@ -226,9 +228,16 @@ constraint. Side changes need no special handling as long as IDs survive.
    (2026-08-27 addendum: e6's f265 now lands here too — with the f212 dig
    recovered it reads touch-2 no-follow overpass while GT says set; the
    follow it needs is the f311 joust, i.e. point 10. Same fix shape.)
+   (2026-08-28: owner proposes the vocabulary split — **overpass** for a
+   touch-1/2 crossing, **freeball** for a touch-3+ soft cross (e1 f114,
+   currently `overpass` in GT, would become freeball). Agreed semantics;
+   emission of either label for touch-3+ needs the same crossing signal, so
+   any freeball rule lands here with it. GT-side relabel pending the vocab
+   decision, point 11e.)
 10. **[diagnosed 2026-08-27 — parked by owner decision, one mechanism per
     session] Reentry contact: touches whose approach is out of frame.** e6's
-    f311 joust pair (GT spike+block) is invisible to every existing
+    joust pair (GT-corrected 2026-08-28: f308 spike 1A t3 + block 2B t1) is
+    invisible to every existing
     mechanism: A's set toss exits the frame TOP at f277 [1166,17] still
     ascending, the contact happens above/entering the frame, and the ball
     re-enters at f314 [1152,278] — above the net tape (verified via
@@ -242,22 +251,32 @@ constraint. Side changes need no special handling as long as IDs survive.
     SPEED), player at net within reach; incoming vector manufactured
     vertical-from-above; gesture via existing near-net rules (→ spike or
     block). Pays twice on e6: the joust pair AND f265 overpass→set (it
-    supplies the follow). Risks: new contact kind, invented incoming
+    supplies the follow). 2026-08-28 caveat: the owner observed the tracker
+    SWAPS players at f311 (and tracks an out-of-court box) while f308
+    labels are right — `_closest_player_at` picks the snapshot nearest the
+    contact frame, so a reentry event placed at/before f308 can attribute
+    off the clean snapshots, but this needs care. Risks: new contact kind,
+    invented incoming
     vector, serve entries / spare balls need the A/B neutrality proof on
     e1–e5 like the bridge got. Evidence + trace: output/diag_e6_missed.py,
     sheets video_entreno_6_f296-322.
-11. **[waiting on owner] GT ratification queue (sheets in output/gt_verify/,
-    all 2026-08-27 unless noted).** (a) e2 +3 events — f32 touch B, f118 set
-    B, f327 dig B are real un-annotated touches (sheets
-    video_entreno_2_f{24-44,108-130,317-337}); folds e2's GT 4→7 events and
-    its eval stops under-counting recall. (b) e2 f79 "dig" is a caught/held
-    feed ball (static f78–82 at [843,462]) followed by a toss from ~f85 —
-    owner call: keep, re-point to the toss, or drop. (c) e6 f311 block
-    team B→A (blocker is the near-side airborne player; sheet
-    video_entreno_6_f296-322; e1-joust precedent). (d) STILL PENDING from
-    2026-08-26: e1's dedup arbitration (f114 overpass, f255 joust, p3
-    spiker — sheets video_entreno_1_f{114,255}) + e1's residual id/team
-    wobbles (e.g. f277).
+11. **[owner ratification 2026-08-28 — mostly folded; 2 items left].**
+    FOLDED: (a) e2 +2 events — f118 set p4 B t2, f327 dig p4 B t1 (GT 4→6
+    events; labels-only F1 0.222→**0.667**). (b) e6's joust RE-CORRECTED
+    beyond our proposal: contact is at **f308** (not f311), the SPIKER is
+    **1A** (A's 3rd touch — consistent with A's dig f212 + set f262) and the
+    BLOCKER is **2B**; old f311 spike-p4-B/block-p3-B replaced. Owner also
+    observed the TRACKER swaps players at f311 and tracks something
+    out-of-court there, while f308 labels are correct — an e6 tracking bug
+    with no GT to measure it (e6 has no player boxes). (c) e1's joust
+    arbitration RATIFIED as-is (f257 spike p3 B, f258 block p1 A — JSON
+    already correct). PENDING: (d) e2 f32 is a **serve** and the server is
+    UNTRACKED (pred attributed to nearby 2A → dig) — event not yet folded,
+    need the owner's player_id/team for it; the untracked server is an e2
+    tracking observation (serve-zone admission worked on e3/e5, unmeasured
+    here). (e) e1 f114: owner reads it as a touch-3 dig that crosses —
+    proposes **freeball** as the label, overpass reserved for touch-1/2
+    crossings; awaiting vocab decision (see point 9).
 
 ## Log (newest first)
 
@@ -310,6 +329,16 @@ constraint. Side changes need no special handling as long as IDs survive.
   output/diag_e6_missed.py, output/diag_shortgap_ab.py,
   output/diag_e2_unmatched.py, output/diag_e6_f216_reach.py,
   output/shortgap_e{2,5,6}/, sheets output/gt_verify/.
+- **Owner ratification round (2026-08-28, same working session):** e2
+  +f118 set 4B t2 and +f327 dig 4B t1 folded (GT 4→6 events, labels-only
+  F1 0.222→0.667); e6's joust re-corrected to f308 spike **1A** t3 + block
+  **2B** t1 (the old f311 p4-B/p3-B pair was wrong on BOTH roles; A's
+  3rd-touch spike is the volleyball-consistent reading — A dug f212, set
+  f262); e1's joust arbitration ratified as-is. New observations recorded:
+  e2's f32 is a SERVE by an UNTRACKED server (event pending the owner's
+  player_id/team; serve-zone admission unmeasured on e2); the e6 tracker
+  swaps players at f311 (f308 labels correct — no tracking GT to measure);
+  owner proposes a freeball label for touch-3 soft crosses (open point 9/11e).
 
 ### 2026-08-26 (later session) — e2/e6 generality check clean; e1's "contact recall" was double-annotated GT
 - **Generality check (e2/e6, first runs on the current stack):** zero

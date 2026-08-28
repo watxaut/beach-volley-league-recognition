@@ -32,6 +32,20 @@
           "overrides": {}
         },
         {
+          "frame": 118,
+          "player_id": 4,
+          "final_action": "set",
+          "raw_visual_actions": [
+            "set"
+          ],
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 2,
+          "preceded_by_attack": false,
+          "rally_id": 1,
+          "overrides": {}
+        },
+        {
           "frame": 206,
           "player_id": 3,
           "final_action": "dig",
@@ -70,6 +84,20 @@
           "team_in_possession": "A",
           "touch_number": 3,
           "preceded_by_attack": false,
+          "rally_id": 1,
+          "overrides": {}
+        },
+        {
+          "frame": 327,
+          "player_id": 4,
+          "final_action": "dig",
+          "raw_visual_actions": [
+            "dig"
+          ],
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "preceded_by_attack": true,
           "rally_id": 1,
           "overrides": {}
         }
