@@ -1,0 +1,31 @@
+STATUS.md
+  s_9ed08fada71d0a::t_feb3ef2b5e7603 8,12-39,242-250,344-385
+scripts/dump_player_tracks.py
+  s_9ed08fada71d0a::t_e9176051104214 141
+src/analysis/frame_processor.py
+  s_9ed08fada71d0a::t_017882d7e50a0c 129
+src/tracking/player_tracker.py
+  s_9ed08fada71d0a::t_7345a4552b4acf 53,83-94,175,259-264,275-280
+src/utils/config.py
+  s_9ed08fada71d0a::t_808a5c71f48ebd 76
+tests/test_bystander_guard.py
+  s_9ed08fada71d0a::t_255bafe59f5ece 116-186
+tests/test_config_drift.py
+  s_9ed08fada71d0a::t_d2b9ebb550f651 110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "fa6f2aa78adc2fc85d638aa52830489970bd6323",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
