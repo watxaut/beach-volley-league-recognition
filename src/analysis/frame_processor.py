@@ -126,6 +126,7 @@ class FrameProcessor:
                 signature_proportions_weight=self.config.get("player_signature_proportions_weight", 0.15),
                 signature_height_smoothing=self.config.get("player_signature_height_smoothing", 30),
                 off_court_grace_frames=self.config.get("player_off_court_grace_frames", 45),
+                off_court_hold_frames=self.config.get("player_off_court_hold_frames", 90),
                 serve_zone_enabled=self.config.get("player_serve_zone_enabled", True),
                 serve_zone_depth_m=self.config.get("player_serve_zone_depth_m", 3.0),
                 serve_zone_side_margin_m=self.config.get("player_serve_zone_side_margin_m", 1.0),

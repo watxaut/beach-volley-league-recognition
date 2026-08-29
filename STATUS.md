@@ -5,9 +5,37 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-08-27
+**Last updated:** 2026-08-29
 
 ## Where we are
+
+**Off-court hold horizon shipped (2026-08-29): e2's wasted roster slot
+recovered.** The owner's e2 tracking report decomposed into: (a) a
+right-side OUT-OF-COURT bystander (x≈1660–1890, detected at conf 0.82–0.89,
+feet beyond the right sideline) who straddled the line during bootstrap,
+seeded a track, and was then fed CONTINUOUSLY for 415 frames by
+`_may_feed_track`'s "continuously matched frame-to-frame" exception — which
+had NO horizon and outranked both the grace window and the zone rules; (b)
+the server (p1 A), out-of-court AND beyond the 1m zone margin at f0–8 →
+never admissible, in court from f28 with no free slot; (c) t1 ghosting
+(slot starvation). Fix: the continuous exception now expires
+`player_off_court_hold_frames` (90) after the track's last IN-COURT
+sighting → the track coasts, retires through the normal path, and strict
+admission/gallery-restore re-takes the slot (measured on e2: bystander
+coasting from f104, id reused by an in-court player from ~f188). Safety:
+max real-player out-of-court streak measured on ALL GT videos = 46f (e6),
+90 = 2× margin; zone-seed rules untouched (trial expiry governs them).
+**A/B (6 videos, identical feeding): e1/e3/e4/e5/e6 byte-identical (0
+differing frames); e2 changes only from f104** (the bystander's coast) with
+one attribution change in the action stream (f256 set → track 2; labels/
+teams identical). e2 actions F1 unchanged 0.571 — its residuals are the
+known recall/label classes, not tracking. Accepted limitation: the f32
+serve stays mis-attributed (server unadmissible before the slot frees;
+widening the zone margin to reach x≈73 would re-open the e5-squatter door).
+Suite 198 green (+5 tests). **Diag gotcha recorded:** two PlayerTracker
+instances in ONE process permute bootstrap ids — `cv2.kmeans` consumes the
+process RNG; A/B harnesses must `cv2.setRNGSeed(0)` per instance (production
+single-run is deterministic; fresh process = fresh RNG).
 
 **Short-gap bridge shipped (2026-08-27): e2/e6's missed digs recovered.**
 The e2/e6 contact-recall residual (old open point 7) split into two classes
@@ -211,12 +239,15 @@ constraint. Side changes need no special handling as long as IDs survive.
    (tracking — see below), f118 set label (91f follow). e6's is the f308
    joust pair (point 10). e1's far-side player recall lever
    (`player_confidence` 0.5→0.35, `player_imgsz` ↑) is unchanged/untried.
-   **e2 tracking observation (owner, 2026-08-28): the tracker holds a
-   player OUTSIDE the court (the e5-squatter class recurring), the server
-   p1 is tracked at the start then LOST, and p3 is untracked around the
-   f90 dig — next tracking session should `dump_player_tracks` e2 + read
-   the audit trail** (the 2026-08-18 server-vote/swap/trial machinery
-   evidently doesn't cover this case). e2/e6 GTs still lack player boxes
+   **e2 tracking observation (owner 2026-08-28) — squatter RESOLVED
+   2026-08-29** by the off-court hold horizon (see Where we are): the
+   out-of-court bystander no longer holds a slot (coasts from f104, id
+   reused by an in-court player from ~f188). Still open on e2: the server
+   is inadmissible before f28 (out-of-zone at video start) so the f32 serve
+   stays mis-attributed; and "p3 untracked at f90" did NOT reproduce as a
+   tracking gap (t3 is real on the far receiver f80–94 in the audit —
+   possibly the owner meant the near-side player; ask before chasing).
+   e2/e6 GTs still lack player boxes
    (no team/player spatial scoring; raw-id gating makes their gated F1s
    look brutal — pred player_id is the L-R index, point 8).
 8. **[minor, eval] pred `player_id` is the L-R index among FILTERED
@@ -309,6 +340,48 @@ constraint. Side changes need no special handling as long as IDs survive.
     only queue item left).
 
 ## Log (newest first)
+
+### 2026-08-29 — off-court hold horizon: e2's out-of-court bystander loses its roster slot
+- **Diagnosis** (output/diag_e2_tracking.py audit + sheets; streak probe
+  output/diag_ooc_streaks.py over all six videos): the owner's "we get a
+  hold of the player outside the court" = a right-side bystander (conf
+  0.82–0.89, feet beyond the right sideline, x≈1660–1890) who straddled
+  the line at bootstrap, seeded a track, then stepped out — and
+  `_may_feed_track`'s continuous-match exception (no horizon, outranks
+  grace AND zone rules) fed them for 415 frames. The server p1 (x≈73 at
+  f0–8) was out-of-court AND beyond the 1m zone margin → never admissible;
+  in court from f28 with no free slot. Earlier "0% out-of-court
+  assignments" reads were a diag bug (`np.bool_ is False` never matches).
+- **Measured safety margin**: max real-player continuous out-of-court
+  streak across e1–e6 = 46f (e6 t3); e3's server 44, e5 42, e4 36, e1 1.
+  Horizon default 90 = 2× margin, matching serve_zone_trial_frames.
+- **Shipped**: `player_off_court_hold_frames` (config + ctor +
+  frame_processor + dump_player_tracks + drift-guard row); the continuous
+  exception expires past the horizon measured from the track's last
+  IN-COURT sighting; zone-seed (never-in-court) tracks keep the existing
+  regime (trial expiry governs them). Retirement is the NORMAL path (coast
+  → max_disappeared → dormant) — no new eviction machinery; the freed id
+  came back via new-track/gallery-restore on an in-court player.
+- **A/B (output/diag_ooc_ab.py, identical feeding)**: e1/e3/e4/e5/e6 **0
+  differing track frames, identical action streams**; e2 differs from f104
+  only (bystander coast), action stream unchanged except f256's attributed
+  track (1→2; label/team/touch identical). Production e2 re-run: F1 0.571
+  unchanged.
+- **Gotcha for future diag harnesses**: two PlayerTracker instances in one
+  process permute bootstrap ids — `cv2.kmeans` consumes the process RNG
+  (verified: identical params, sequential instances → [2,3,1,4] vs
+  [4,1,3,2]; `cv2.setRNGSeed(0)` per instance fixes it). Production
+  single-run is deterministic. First A/B attempt was confounded by exactly
+  this (e1/e2/e6 showed id-swap diffs from f7).
+- Tests: +5 (within-hold allowed, beyond-hold blocked, zone-seed regime
+  unchanged, end-to-end slot-freed incl. the bystander-never-tracked and
+  newcomer-takes-slot assertions); suite **198 green**.
+- Files: src/tracking/player_tracker.py, src/utils/config.py,
+  src/analysis/frame_processor.py, scripts/dump_player_tracks.py,
+  tests/test_bystander_guard.py, tests/test_config_drift.py, STATUS.md.
+  Diagnostics (git-ignored): output/diag_e2_tracking.py,
+  output/diag_ooc_streaks.py, output/diag_ooc_ab.py, output/ooc_e2/,
+  sheets output/gt_verify/video_entreno_2_tracking_f*.png.
 
 ### 2026-08-27 — short-gap bridge shipped (e2/e6 missed digs); e2/e6 GT honesty work; joust diagnosed as "reentry" class
 - **Diagnosis first** (output/diag_e6_missed.py gate trace + sheets, e2 the

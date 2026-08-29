@@ -50,6 +50,7 @@ class PlayerTracker:
         signature_proportions_weight: float = 0.15,
         signature_height_smoothing: int = 30,
         off_court_grace_frames: int = 45,
+        off_court_hold_frames: int = 90,
         serve_zone_enabled: bool = True,
         serve_zone_depth_m: float = 3.0,
         serve_zone_side_margin_m: float = 1.0,
@@ -79,6 +80,18 @@ class PlayerTracker:
                 so a bystander standing just off-court can never inherit it
                 (bystander-hijack guard, complements the new-track admission
                 test).
+            off_court_hold_frames: Horizon on CONTINUOUS out-of-court feeding.
+                The grace window above is bypassed while the track is matched
+                frame-to-frame with no gap (a player who walked out and keeps
+                being detected) -- without a horizon that exception lets a
+                person who straddled the sideline at bootstrap hold a roster
+                slot forever (entreno_2: right-side bystander fed for 415
+                frames while two real near-side players shared the remaining
+                slots). Past the horizon the track stops feeding, retires
+                through the normal missing-frames path, and strict in-court
+                admission can take the slot. Real players stay far below it:
+                the longest measured out-of-court streak on the GT videos is
+                46 frames (e6 t3); the default matches serve_zone_trial_frames.
             serve_zone_enabled: Admit a NEW track for a detection whose foot is
                 in a serve zone (just behind a baseline, on the ground plane)
                 when a roster slot is free -- the serving player at video/rally
@@ -159,6 +172,7 @@ class PlayerTracker:
         self.debug_assignments = debug_assignments
         self.assignment_log: List[Dict[str, Any]] = []
         self.off_court_grace_frames = off_court_grace_frames
+        self.off_court_hold_frames = off_court_hold_frames
         self.serve_zone_enabled = serve_zone_enabled
         self.serve_zone_depth_m = serve_zone_depth_m
         self.serve_zone_side_margin_m = serve_zone_side_margin_m
@@ -242,7 +256,12 @@ class PlayerTracker:
             OR
           * the track was matched by a detection on the previous frame too --
             continuous out-of-court tracking (the player walked out and keeps
-            being seen; there is no observation gap to hijack through).
+            being seen; there is no observation gap to hijack through), but
+            only for ``off_court_hold_frames`` since the last IN-COURT
+            sighting: identity observed out of court is borrowable, not
+            owned, and a person never seen in court is not holding a player
+            slot (entreno_2's right-side bystander, seeded while straddling
+            the sideline, was continuously detected and fed for 415 frames).
         After a detection gap the identity is inferred, so re-feeding requires
         an in-court sighting: a bystander standing just off-court can then
         neither inherit a coasting/dormant track nor keep one alive. Both
@@ -253,7 +272,12 @@ class PlayerTracker:
         if in_court is None or in_court:
             return True
         if track.get("last_matched_frame") == self.frame_count - 1:
-            return True  # continuous observation -- no gap to hijack through
+            # Continuous observation -- no gap to hijack through, but the
+            # hold horizon still applies (see docstring).
+            last_in = track.get("last_in_court_frame")
+            if last_in is None:
+                return True  # never in court: zone-seed rules govern (trial expiry)
+            return (self.frame_count - last_in) <= self.off_court_hold_frames
         last_in = track.get("last_in_court_frame")
         if last_in is None:
             # Never in court yet: a serve-zone seed. Identity may continue

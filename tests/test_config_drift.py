@@ -107,6 +107,7 @@ CTOR_PARITY = [
     ("player_signature_proportions_weight", PlayerTracker, "signature_proportions_weight"),
     ("player_signature_height_smoothing", PlayerTracker, "signature_height_smoothing"),
     ("player_off_court_grace_frames", PlayerTracker, "off_court_grace_frames"),
+    ("player_off_court_hold_frames", PlayerTracker, "off_court_hold_frames"),
     ("player_serve_zone_enabled", PlayerTracker, "serve_zone_enabled"),
     ("player_serve_zone_depth_m", PlayerTracker, "serve_zone_depth_m"),
     ("player_serve_zone_side_margin_m", PlayerTracker, "serve_zone_side_margin_m"),

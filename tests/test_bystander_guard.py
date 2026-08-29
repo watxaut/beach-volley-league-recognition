@@ -113,6 +113,77 @@ class TestMayFeedTrack:
         assert tracker._detection_in_court(_det(BYSTANDER_X, 400)) is None
 
 
+class TestOffCourtHoldHorizon:
+    """The hold horizon on CONTINUOUS out-of-court feeding (entreno_2's
+    right-side bystander: seeded while straddling the sideline, then detected
+    continuously OUT of court for 415 frames, holding a roster slot while two
+    real near-side players shared the rest)."""
+
+    def test_continuous_off_court_within_hold_allowed(self):
+        tracker = _make_tracker(off_court_hold_frames=90)
+        (tid,) = _seed_four(tracker, [(500, 400)])
+        track = tracker.tracks[tid]
+        track["last_in_court_frame"] = tracker.frame_count - 60
+        track["last_matched_frame"] = tracker.frame_count - 1  # continuous
+        assert tracker._may_feed_track(track, _det(BYSTANDER_X, 400)) is True
+
+    def test_continuous_off_court_beyond_hold_blocked(self):
+        """The e2 bystander: continuously detected, but not seen IN court for
+        longer than the horizon -> no more feeding; the track must retire so
+        strict in-court admission can take the slot."""
+        tracker = _make_tracker(off_court_hold_frames=90)
+        (tid,) = _seed_four(tracker, [(500, 400)])
+        track = tracker.tracks[tid]
+        track["last_in_court_frame"] = tracker.frame_count - 91
+        track["last_matched_frame"] = tracker.frame_count - 1  # continuous
+        assert tracker._may_feed_track(track, _det(BYSTANDER_X, 400)) is False
+
+    def test_zone_seed_continuous_is_governed_by_zone_rules(self):
+        """Never-in-court tracks (serve-zone seeds) keep their existing
+        regime: continuous matching still feeds them; the zone trial expiry
+        (2026-08-18) is their eviction path, not this horizon."""
+        tracker = _make_tracker(off_court_hold_frames=90)
+        (tid,) = _seed_four(tracker, [(500, 400)])
+        track = tracker.tracks[tid]
+        track["last_in_court_frame"] = None
+        track["last_matched_frame"] = tracker.frame_count - 1
+        assert tracker._may_feed_track(track, _det(BYSTANDER_X, 400)) is True
+
+    def test_bystander_slot_freed_beyond_hold(self):
+        """End to end: the squatter is seeded in court, steps out, keeps being
+        detected every frame past the horizon -> the track retires and a new
+        IN-COURT player takes the freed slot (the off-court detection itself
+        must never become a track)."""
+        tracker = _make_tracker(
+            max_disappeared=4, off_court_grace_frames=5, off_court_hold_frames=10
+        )
+        ids = _seed_four(tracker, IN_COURT)
+        squatter = ids[3]
+        others = [_det(cx, cy) for cx, cy in IN_COURT[:3]]
+        off_det = _det(1300, 400)  # foot x=1300, well off-court
+
+        for _ in range(10):  # within the horizon: still tracked
+            out = tracker.update(others + [off_det], None, ball_active=True)
+        assert squatter in {o["track_id"] for o in out}
+
+        for _ in range(8):  # horizon (10) + max_disappeared (4): retired
+            out = tracker.update(others + [off_det], None, ball_active=True)
+        assert squatter not in {o["track_id"] for o in out}
+        assert squatter not in tracker.tracks
+        assert squatter in tracker.gallery  # dormant, id reserved
+
+        # A new player appears IN court, far from the survivors -> takes the
+        # freed slot (here via the dormant gallery's in-court restore, which
+        # is the designed path -- the box is on the real player). The
+        # off-court bystander itself still never gets a track.
+        newcomer = _det(1100, 600)  # dist ~283px from (900,400) > max_distance
+        out = tracker.update(others + [off_det, newcomer], None, ball_active=True)
+        boxes = {tuple(o["bbox"]) for o in out}
+        assert len({o["track_id"] for o in out}) == 4
+        assert tuple(newcomer["bbox"]) in boxes, "in-court newcomer takes the slot"
+        assert tuple(off_det["bbox"]) not in boxes, "bystander never tracked"
+
+
 class TestOngoingAssignment:
     def test_server_step_out_is_tracked_within_grace(self):
         """A player who steps just off-court keeps their id while young (the
