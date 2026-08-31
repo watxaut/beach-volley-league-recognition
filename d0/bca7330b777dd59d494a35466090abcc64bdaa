@@ -1,0 +1,49 @@
+CLAUDE.md
+  s_9ed08fada71d0a::t_b2e915136dd078 103,137
+STATUS.md
+  s_9ed08fada71d0a::t_36da9498fd71eb 8,12-69,254-260,396-408,411-455
+ground_truth/README.md
+  s_9ed08fada71d0a::t_2aaed3e16f60e5 71-79,238-246
+ground_truth/video_entreno_3_annotations.json
+  s_9ed08fada71d0a::t_2f6c231f2e6786 3101,3157-3167,3199,3204-3206,3209-3219,3230,3244,3247-3257,3299-3309,3334-3335
+scripts/evaluate.py
+  s_9ed08fada71d0a::t_3fc39170434837 419-437
+scripts/test_action_recognition.py
+  s_9ed08fada71d0a::t_0acdc973e89640 30,93-94,176-180,192-193,195-198,202-213,217-220,237-243,272-286
+scripts/verify_action_labels.py
+  s_9ed08fada71d0a::t_1f49e0fdeb2151 67-80,84
+src/analysis/frame_processor.py
+  s_9ed08fada71d0a::t_e72e23c28505ae 22,159-161,178,288-290,308-322,331
+src/analysis/live_debug_processor.py
+  s_9ed08fada71d0a::t_c37479fade78d7 97-109,116-126,163-172,226,291
+src/analysis/spike_analyzer.py
+  s_9ed08fada71d0a::t_9b7a85aed3863a 1-587
+src/analysis/statistics.py
+  s_9ed08fada71d0a::t_9b327c0143b9f0 40-41,46-110
+src/analysis/video_processor.py
+  s_9ed08fada71d0a::t_949efe8051a59a 174-177
+src/detection/court_calibration.py
+  s_9ed08fada71d0a::t_27529613c0239c 561-618
+src/output_gen/csv_exporter.py
+  s_9ed08fada71d0a::t_e2aa6e5d56d28e 47-50,278-325,351-385
+src/output_gen/overlay.py
+  s_9ed08fada71d0a::t_ce933abf5e7555 16,32-36,40-44,65-70,73-75,92-135
+tests/test_spike_analyzer.py
+  s_9ed08fada71d0a::t_372bfa22735c6d 1-354
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "d0bca7330b777dd59d494a35466090abcc64bdaa",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
