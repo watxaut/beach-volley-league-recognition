@@ -44,6 +44,10 @@ class CSVExporter:
             game_state_path = output_path.parent / f"{output_path.stem}_game_state.csv"
             self._export_game_state_timeline(analysis_results, game_state_path)
 
+            # Create per-spike analysis CSV (type / attack zone / outcome)
+            spikes_path = output_path.parent / f"{output_path.stem}_spikes.csv"
+            self._export_spike_analysis(analysis_results, spikes_path)
+
             self.logger.info("CSV export completed successfully")
 
         except Exception as e:
@@ -271,6 +275,54 @@ class CSVExporter:
             "Unit": "actions"
         })
 
+        # Spike attack statistics (zones are "<side><zone 1-9>", e.g. "B3")
+        spike_stats = statistics.get("spike_stats", {})
+        if spike_stats:
+            csv_data.append({
+                "Metric": "Total_Spikes",
+                "Value": spike_stats.get("total_spikes", 0),
+                "Unit": "count"
+            })
+            csv_data.append({
+                "Metric": "Spike_Type_Split",
+                "Value": ", ".join(
+                    f"{k}={v}" for k, v in sorted(spike_stats.get("type_counts", {}).items())
+                ),
+                "Unit": "count"
+            })
+            csv_data.append({
+                "Metric": "Spike_Outcome_Split",
+                "Value": ", ".join(
+                    f"{k}={v}" for k, v in sorted(spike_stats.get("outcome_counts", {}).items())
+                ),
+                "Unit": "count"
+            })
+            for tid, p in sorted(spike_stats.get("players", {}).items()):
+                csv_data.append({
+                    "Metric": f"Player_{tid}_Spike_Attacks",
+                    "Value": p.get("attacks", 0),
+                    "Unit": "count"
+                })
+                csv_data.append({
+                    "Metric": f"Player_{tid}_Kills",
+                    "Value": p.get("kills", 0),
+                    "Unit": "count"
+                })
+                csv_data.append({
+                    "Metric": f"Player_{tid}_Attack_Zones",
+                    "Value": ", ".join(
+                        f"{k}={v}" for k, v in sorted(p.get("attack_zones", {}).items())
+                    ),
+                    "Unit": "count"
+                })
+                csv_data.append({
+                    "Metric": f"Player_{tid}_Landing_Zones",
+                    "Value": ", ".join(
+                        f"{k}={v}" for k, v in sorted(p.get("landing_zones", {}).items())
+                    ),
+                    "Unit": "count"
+                })
+
         # Processing statistics
         processing_stats = analysis_results.get("processing_stats", {})
 
@@ -296,6 +348,41 @@ class CSVExporter:
         df = pd.DataFrame(csv_data)
         df.to_csv(output_path, index=False)
     
+    def _export_spike_analysis(self, analysis_results: Dict[str, Any], output_path: Path) -> None:
+        """Export per-spike enrichment records (touch/hard, zones, outcome).
+
+        Args:
+            analysis_results: Analysis results (uses ``spike_analysis``)
+            output_path: Output CSV path
+        """
+
+        def zone_key(z):
+            return f"{z['side']}{z['zone']}" if z else ""
+
+        rows = []
+        for r in analysis_results.get("spike_analysis", []):
+            rows.append({
+                "Frame": r.get("frame"),
+                "Player_ID": r.get("player_id"),
+                "Track_ID": r.get("track_id"),
+                "Team": r.get("team"),
+                "Spike_Type": r.get("spike_type"),
+                "Attack_Zone": zone_key(r.get("attack_zone")),
+                "Outcome": r.get("outcome"),
+                "Landing_Zone": zone_key(r.get("landing_zone")),
+                "Dug_Zone": zone_key(r.get("dug_zone")),
+                "Exit_Speed_PX": r.get("exit_speed_px"),
+                "Flight_Frames": r.get("flight_frames"),
+                "Resolution_Frame": r.get("resolution_frame"),
+            })
+
+        df = pd.DataFrame(rows, columns=[
+            "Frame", "Player_ID", "Track_ID", "Team", "Spike_Type", "Attack_Zone",
+            "Outcome", "Landing_Zone", "Dug_Zone", "Exit_Speed_PX", "Flight_Frames",
+            "Resolution_Frame",
+        ])
+        df.to_csv(output_path, index=False)
+
     def _export_game_state_timeline(self, analysis_results: Dict[str, Any], output_path: Path) -> None:
         """Export game state timeline with score progression.
         

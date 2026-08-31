@@ -68,6 +68,15 @@ Annotations are stored as JSON files in this directory. Each video gets one JSON
 - **frame**: Frame number where the action occurs (ball contact frame)
 - **player_id**: Which player performed the action (1-4)
 - **action**: One of `serve`, `dig`, `set`, `spike`, `block`, `ace`, `kill`
+- **Spike events** (optional, entreno_3+) also carry:
+  - **spike_type**: `touch` (soft shot / rainbow) or `hard` (driven / accelerated)
+  - **attack_zone**: `{"side": "A"|"B", "zone": 1-9}` — the spiker's 3x3 zone on
+    their own half. Each half is numbered 1-9 left-to-right as seen standing
+    at the net facing that side's OWN baseline (rows: 1-3 at the net, 4-6
+    middle, 7-9 back). In the standard camera view (A near/bottom) A's zone 1
+    is image-right at the net, B's zone 1 is image-left.
+  - **outcome**: `kill` (landed in court, no opponent touch), `out`, `dug`, `blocked`
+  - **landing_zone**: `{"side", "zone"}` for kills — where the ball landed
 
 ### Court
 - **corners**: 4 court corners in pixel coordinates, clockwise from top-left
@@ -226,6 +235,15 @@ Watch → Player 4 digs at frame 145
 - **frame**: Frame number where the action occurs (ball contact frame)
 - **player_id**: Which player performed the action (1-4)
 - **action**: One of `serve`, `dig`, `set`, `spike`, `block`, `ace`, `kill`
+- **Spike events** (optional, entreno_3+) also carry:
+  - **spike_type**: `touch` (soft shot / rainbow) or `hard` (driven / accelerated)
+  - **attack_zone**: `{"side": "A"|"B", "zone": 1-9}` — the spiker's 3x3 zone on
+    their own half. Each half is numbered 1-9 left-to-right as seen standing
+    at the net facing that side's OWN baseline (rows: 1-3 at the net, 4-6
+    middle, 7-9 back). In the standard camera view (A near/bottom) A's zone 1
+    is image-right at the net, B's zone 1 is image-left.
+  - **outcome**: `kill` (landed in court, no opponent touch), `out`, `dug`, `blocked`
+  - **landing_zone**: `{"side", "zone"}` for kills — where the ball landed
 
 ### Court
 - **corners**: 4 court corners in pixel coordinates, clockwise from top-left

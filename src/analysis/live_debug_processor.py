@@ -94,14 +94,36 @@ class LiveDebugProcessor:
     # Shared helpers
     # ------------------------------------------------------------------ #
 
+    def _ingest_typed_spikes(self, plan: overlay.LabelPlan) -> None:
+        """Re-ingest spike labels with their FINAL touch/hard type.
+
+        A hard spike's type is only decidable once its outcome resolves (a
+        touch locks early from its arc, hard is the complement), so at
+        emission time the plain "spike" label goes up. After the analyzer has
+        flushed, this upgrades the label; LabelPlan.add replaces same-contact
+        entries, so frames still to be rendered show the typed label.
+        """
+        for rec in self.frame_processor.spike_analyzer.spike_records():
+            if rec["spike_type"] in ("hard", "touch") and rec["track_id"] is not None:
+                plan.add(rec["track_id"], rec["frame"], f"spike {rec['spike_type']}")
+
     def _ingest_actions(self, actions: List[Dict[str, Any]], plan: overlay.LabelPlan) -> None:
         """Feed emitted actions into the label plan at their true contact frame."""
         for action in actions:
             tid = action.get("track_id")
             if tid is None:
                 continue
-            plan.add(tid, action.get("frame_number"),
-                     action.get("action", "?"), action.get("confidence", 0.0))
+            name = action.get("action", "?")
+            if name == "spike":
+                # Typed spike label ("spike hard"/"spike touch") when the
+                # analyzer already has enough post-contact sightings.
+                stype = self.frame_processor.spike_analyzer.spike_type_for(
+                    action.get("frame_number")
+                )
+                if stype in ("hard", "touch"):
+                    name = f"spike {stype}"
+            plan.add(tid, action.get("frame_number"), name,
+                     action.get("confidence", 0.0))
             self.logger.info(
                 "Action: contact frame %s player %s -> %s (%.2f)",
                 action.get("frame_number"), tid,
@@ -137,6 +159,16 @@ class LiveDebugProcessor:
             if ball is not None:
                 bx, by, pred = ball
                 overlay.draw_ball(out, bx, by, predicted=pred)
+
+            # Spike flights: red fading trail + KILL marker at the landing.
+            # Render-only reads of the pipeline's SpikeAnalyzer (the analyzer
+            # itself is wired inside FrameProcessor, so live debug stays
+            # byte-identical to the shared pipeline).
+            analyzer = self.frame_processor.spike_analyzer
+            overlay.draw_ball_trail(out, analyzer.trail_points(frame_idx))
+            kill = analyzer.kill_annotation(frame_idx)
+            if kill is not None:
+                overlay.draw_kill_marker(out, kill[0], kill[1], kill[2])
 
             for track_id, bbox in players:
                 lab = plan.active(track_id, frame_idx)
@@ -191,6 +223,7 @@ class LiveDebugProcessor:
             frame_idx += 1
         # Finalise the last contact held back for its look-ahead.
         self._ingest_actions(self.frame_processor.flush_actions(), plan)
+        self._ingest_typed_spikes(plan)
         cap.release()
 
         if not save_video:
@@ -255,6 +288,7 @@ class LiveDebugProcessor:
                     source_done = True
                     # Input over: finalise the last held-back contact, then drain.
                     self._ingest_actions(self.frame_processor.flush_actions(), plan)
+                    self._ingest_typed_spikes(plan)
 
             # 2. Release one frame once the buffer is a full delay deep (or draining).
             if not paused and buffer and (len(buffer) > delay_frames or source_done):

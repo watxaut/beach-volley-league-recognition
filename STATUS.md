@@ -5,9 +5,67 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-08-29
+**Last updated:** 2026-08-30
 
 ## Where we are
+
+**Spike analytics shipped (2026-08-30): trail, touch/hard type, 9-zone attack
+grid, kill/out/dug outcomes — plus an f297 GT correction that needs one more
+owner pass.** New pure-observer `SpikeAnalyzer` (src/analysis/
+spike_analyzer.py) wired into `FrameProcessor` (constructed/observed/flushed
+there; live debug and the script only READ it — mirrors-pipeline rule holds).
+A/B on entreno_3: the action stream is **byte-identical to HEAD** (0 base-field
+diffs; only additive spike keys on the log's spike entries). Suite 198 → **220
+green** (+22, tests/test_spike_analyzer.py). What was measured/built:
+
+1. **Zone grid** (`CourtCalibration.world_point_to_zone` / `get_court_zone`):
+   9 zones per half, numbered 1-9 left-to-right as seen standing at the net
+   facing that side's OWN baseline — 180°-rotationally symmetric, so in camera
+   view A's zone 1 is image-RIGHT at the net, B's is image-LEFT. NOTE: this is
+   the mirror-swap of the ASCII sketch first drawn in the request; the GT
+   anchors decide (both A attacks come from image-right at the net = "A1",
+   f178's B attack from image-right = "B3"). GT attack zones: **4/4 exact**
+   (B3/A1/B2/A1) after adding a takeoff-window fix — a jumping spiker's feet
+   at contact are airborne and the homography projects them deep (f431 read
+   B5 from airborne feet; the pre-contact stance closest to the net in
+   [c-12, c-2] reads B2 ✓).
+2. **Spike type by POST-CONTACT ASCENT, not exit speed** (TOUCH_RISE_PX=80):
+   diag on the real sightings showed exit speed CANNOT separate the classes —
+   the touches launch at 19-29 px/f (vertically!) while f431's hard ball left
+   near-rest and fell. Ascent separates cleanly: touches rise 146-240 px above
+   contact, hard balls ≤33 px. GT types: **4/4** (touch/touch/hard/hard).
+3. **Outcome machinery**: landing = image-y descent terminating (bounce flip
+   or quiet-loss); kill/out from the landed point's world coords; dug/blocked
+   from a follow contact; **retro-conversion**: a just-committed kill/out
+   whose ball then LOFTS ≥90 px (DIG_LOFT_PX — sand cannot rebound 2-3 m)
+   within ±12f of a follow contact flips to dug. Trails render red fading
+   (`overlay.draw_ball_trail`, TRAIL_MAX_AGE=45) + `KILL <zone>` marker +
+   `spike hard`/`spike touch` labels in live-debug and the script; NO zone
+   grid drawn (owner spec). CSV: `<stem>_spikes.csv` + per-player zone/kills
+   tallies in statistics; evaluate.py scores spike_type/attack_zone/
+   landing_zone/outcome on matched pairs.
+4. **e3 GT**: f297 corrected to **spike A p3 t3** (owner decision — it was
+   p4 B t1; A's f248 set is t2, so A's t3 is the rainbow; cascade recomputed:
+   f332 dig B t1 pre_atk, f379 t2, f433 t3). Team accuracy 14/14 now (the old
+   f294 over-set residual is GONE — open point 3 closed). New GT fields on
+   the 4 spikes (spike_type/attack_zone/outcome/landing_zone), README +
+   verify_action_labels updated.
+
+**OPEN for owner ratification (open point 12): all four e3 "kills" are, per
+the ball tracks AND the contact sheets, DIGS.** Every attack flight ends with
+a 220-340 px loft exactly at the GT's own dig events (f211/f332/f453/f563,
+all pre_atk=True) — e.g. f431's ball comes down to the defender's hands AT
+the net line (f453-455) and pops up high; it never touches sand (sheets:
+output/gt_verify/spike_f*.png). The analyzer therefore reports dug (eval
+outcome/landing accuracy 0/4 as GT stands) — and its **dug zones coincide
+with the annotated "landing" zones 3/4 (A7, B8, A5 exact; B6 vs B8)**,
+suggesting the annotated zones describe where the ball was played. If the
+owner re-reads as kills-with-placement (or relabels to dug), the GT outcome
+fields flip and eval re-scores. Also pending: the f294/f297 pair fails the
+player-spatial gate (pred center above the net lands in the adjacent net
+player's box at the 10f-strided GT frame — same temporal-skew class as e4
+f347; the pred's team/player are right per the corrected GT).
+
 
 **Off-court hold horizon shipped (2026-08-29): e2's wasted roster slot
 recovered.** The owner's e2 tracking report decomposed into: (a) a
@@ -193,17 +251,13 @@ constraint. Side changes need no special handling as long as IDs survive.
    `python scripts/dump_player_tracks.py <match>.mp4 --max-players 4` →
    `python scripts/analyze_tracking.py <json> --max-players 4`, and scrub the
    annotated video through a side change watching each ID.
-3. **[residual from the attribution fix] Over-set crossings without width
-   evidence.** When a set/dig crosses the net but the tracked ball's widths sit
-   in the 26–35px abstain band (entreno_3 f294: widths 29–40 through the gap),
-   possession carries and the next contact is attributed to the wrong team.
-   No counter-signal found that doesn't break a correct contact (above-net
-   contact, gap length, touch index all fail on f539). Levers if it matters:
-   per-video width calibration (e.g. from the serve flight), a proper camera
-   calibration so pinhole size→3D works, or ball-detection recall on near-half
-   approaches (currently often zero — occlusion). Note the new bridge
-   (2026-08-26) recovers contacts whose BALL was invisible but not
-   wrong-TEAM carries like this one.
+3. **[RESOLVED 2026-08-30 by the f297 GT correction] Over-set crossings without
+   width evidence.** The e3 f294 residual was the GT, not the pipeline: the
+   owner corrected f297 to a team-A touch-3 spike, and HEAD's own emission
+   (f294 spike, team A) is now fully correct — e3 team accuracy 14/14. The
+   mechanism note stays for future footage: when a set/dig crosses the net but
+   the tracked ball's widths sit in the 26–35px abstain band, possession
+   carries and the next contact can be attributed to the wrong team.
 4. **[diagnosed 2026-08-17 — deliberate no-change] The gesture path's image-px
    `near_net` is load-bearing; a px→metres switch is GT-refuted.**
    `_build_contact`'s `is_near_net` (px, `NEAR_NET_PX=120`) feeds BOTH
@@ -339,7 +393,65 @@ constraint. Side changes need no special handling as long as IDs survive.
     id/team wobbles (e.g. f277) — dedicated re-verification session (the
     only queue item left).
 
+12. **[owner ratification wanted 2026-08-30] e3's four GT "kills" read as
+    digs on the tracks and the sheets.** See Where-we-are: every attack
+    flight lofts 220-340 px at the GT's own dig events (f211/f332/f453/f563);
+    sheets output/gt_verify/spike_f*.png (f431 visually confirmed: ball into
+    the defender's hands at the net line, popped up, never touched sand).
+    Analyzer says dug; GT says kill+landing. The analyzer's dug zones match
+    the annotated landing zones 3/4 (A7/B8/A5; B6 vs B8) — the zones are
+    right, the outcome word is the question. Owner decides: (a) relabel GT
+    outcomes to dug (eval flips to high accuracy), or (b) keep kills and
+    record the disagreement as a known-class residual, or (c) the GT zones
+    were meant as attack placement (then they may want a target_zone field
+    instead of landing_zone).
+
 ## Log (newest first)
+
+### 2026-08-30 — spike analytics: trail, touch/hard, 9-zone grid, kill/dug outcomes; f297 GT corrected
+- **Diagnose first** (output/diag_spike_exit.py, git-ignored): dumped the real
+  sighting stream around the four GT contacts. Three findings drove the
+  design: (a) exit speed cannot separate touch from hard (touches launch
+  19-29 px/f vertically; f431's hard ball left near-rest and fell under
+  gravity) — post-contact ascent can (146-240 px vs ≤33 px, threshold 80);
+  (b) every attack flight ends in a 220-340 px loft at the GT dig events —
+  sand cannot rebound that high, so all four "kills" read as digs
+  (retro-conversion gate DIG_LOFT_PX=90 built from this; f431 visually
+  confirmed on the sheet); (c) airborne feet at contact project deep through
+  the homography (f431 B5 from airborne feet vs B2 takeoff) — origin zone now
+  uses the pre-contact snapshot closest to the net in [c-12, c-2].
+- **Zone convention pinned by the GT anchors, not the sketch**: each half
+  numbered 1-9 facing its OWN baseline (180°-symmetric; A1 image-right at the
+  net, B1 image-left). The request's ASCII sketch is the 180° flip; the
+  anchors (both A attacks from image-right = A1, f178 from image-right = B3)
+  decide. Documented in world_point_to_zone + ground_truth/README.md.
+- **Shipped** (pure observer; A/B byte-identical stream, 0 base-field diffs):
+  SpikeAnalyzer (observe/flush/reset; records + trail/kill/type render
+  queries) wired in FrameProcessor (+flush_actions feeds it the flushed
+  contacts, reset_trackers resets it); overlay.draw_ball_trail (ROI-blended
+  per-segment alpha, gap-aware) + draw_kill_marker + typed spike label colors;
+  live-debug `_render_frame`/`_ingest_actions` render trail/KILL/spike-type
+  in BOTH modes; test_action_recognition observes + enriches its log +
+  renders pass-2; video_processor exposes results["spike_analysis"];
+  csv_exporter writes `<stem>_spikes.csv`; statistics adds spike tallies;
+  evaluate.py scores spike_type/attack_zone/landing_zone/outcome.
+- **Measured (e3, vs corrected GT)**: spike_type 4/4, attack_zone 4/4, team
+  14/14 (old f294 residual gone), labels: the f294/f297 pair now fails the
+  player-spatial gate (pred center above the net resolves to the adjacent net
+  player's box at the 10f-strided GT frame; pred team/player are right) —
+  spike P/R 0.75 from that single gated pair. outcome/landing 0/4 pending
+  point 12 (dug-vs-kill).
+- Tests: +22 (zone grid incl. 180° symmetry + boundaries, ascent type,
+  kill/out/dug/blocked/unknown, retro-conversion both ways, takeoff window,
+  trail fade/gap, kill marker); suite **220 green**.
+- Files: src/detection/court_calibration.py, src/analysis/spike_analyzer.py
+  (new), src/analysis/{frame_processor,live_debug_processor,video_processor,
+  statistics}.py, src/output_gen/{overlay,csv_exporter}.py,
+  scripts/{test_action_recognition,evaluate,verify_action_labels}.py,
+  ground_truth/video_entreno_3_annotations.json, ground_truth/README.md,
+  tests/test_spike_analyzer.py, CLAUDE.md, STATUS.md. Diagnostics
+  (git-ignored): output/diag_spike_exit.py, output/diag_spike_sheets.py,
+  sheets output/gt_verify/spike_f*.png, runs output/spike_*.
 
 ### 2026-08-29 — off-court hold horizon: e2's out-of-court bystander loses its roster slot
 - **Diagnosis** (output/diag_e2_tracking.py audit + sheets; streak probe

@@ -100,6 +100,7 @@ The system follows a modular computer vision pipeline designed for a **fixed cam
 #### Action Recognition
 - **PoseEstimator** (`pose_estimator.py`): MediaPipe in video mode (temporal smoothing). Outputs body-relative normalized features (wrist_height_ratio, elbow_height_ratio, etc.) instead of raw pixel coordinates.
 - **ActionClassifier** (`action_classifier.py`): Event-driven -- only classifies at ball trajectory inflection points. Team-aware attribution: candidates are filtered by the expected touch team (ball pixel-width near/far regime overriding possession alternation; flip after attack/serve/block, carry after dig/set), then closest by point-to-bbox distance with per-contact foot teams. Two layers: Layer 1 gesture (bump_set/attack/block from ball motion + court + pose), Layer 2 `ActionContextResolver` resolves dig/set/spike/serve/overpass from touch count. Image-plane ball side is NOT a side signal in this camera geometry (airborne near-half balls project above the midcourt line).
+- **SpikeAnalyzer** (`src/analysis/spike_analyzer.py`): Pure observer wired inside `FrameProcessor` (never mutates the action stream) that enriches spikes with `spike_type` (touch/hard, decided by post-contact ASCENT -- exit speed cannot separate them), `attack_zone` (9-zone grid per half via `CourtCalibration.world_point_to_zone`, from the spiker's pre-contact takeoff stance -- airborne contact feet project deep), and `outcome` (kill/out from the landed point's world coords; dug/blocked from follow contacts, with a loft-gated retro-conversion since sand cannot rebound a dig's 2-3m rise). Renderers read `trail_points`/`kill_annotation`/`spike_type_for` for the red fading trail, `KILL <zone>` marker, and `spike hard`/`spike touch` labels (shared `overlay.py` helpers).
 
 #### Pipeline
 - **FrameProcessor** (`frame_processor.py`): Orchestrates detection -> tracking -> recognition per frame.
@@ -133,7 +134,7 @@ The system follows a modular computer vision pipeline designed for a **fixed cam
 
 ## Ground Truth & Evaluation
 
-- Annotations stored in `ground_truth/` as JSON (see `ground_truth/README.md` for format)
+- Annotations stored in `ground_truth/` as JSON (see `ground_truth/README.md` for format). Spike events may carry `spike_type` (touch|hard), `attack_zone`/`landing_zone` `{side, zone 1-9}` (each half numbered 1-9 facing its own baseline) and `outcome` (kill|out|dug|blocked).
 - `scripts/evaluate.py` computes: ball detection rate, player ID consistency, action precision/recall
 - Roboflow recommended for ball detection annotations (export YOLOv8 format for fine-tuning)
 

@@ -416,6 +416,25 @@ def _action_attribution_metrics(
         out["player_accuracy_spatial_lr"] = round(ok_lr / n_pl, 3) if n_pl else None
         out["player_scored_spatial"] = n_pl
 
+    # Spike enrichment fields (spike_type / attack_zone / landing_zone /
+    # outcome), scored on the same matched pairs wherever the GT carries
+    # them. attack_zone/landing_zone are {"side", "zone"} dicts on both sides.
+    for out_key, gt_key in (
+        ("spike_type_accuracy", "spike_type"),
+        ("attack_zone_accuracy", "attack_zone"),
+        ("landing_zone_accuracy", "landing_zone"),
+        ("outcome_accuracy", "outcome"),
+    ):
+        scored = ok = 0
+        for gt, p in pairs:
+            if gt.get(gt_key) is None:
+                continue
+            scored += 1
+            ok += int(p.get(gt_key) == gt.get(gt_key))
+        if scored:
+            out[out_key] = round(ok / scored, 3)
+            out[out_key.replace("_accuracy", "_scored")] = scored
+
     out["matched_pairs"] = len(pairs)
     return out
 

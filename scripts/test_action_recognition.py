@@ -27,6 +27,7 @@ from src.tracking.ball_tracker import BallTracker
 from src.tracking.player_tracker import PlayerTracker
 from src.recognition.pose_estimator import PoseEstimator
 from src.recognition.action_classifier import ActionClassifier
+from src.analysis.spike_analyzer import SpikeAnalyzer
 from src.output_gen import overlay
 
 
@@ -89,6 +90,8 @@ def main():
         court_calibration=court,
         team_aware=(not args.no_team_aware),
     )
+    # Spike outcome/zone enrichment (pure observer, mirrors FrameProcessor).
+    spike_analyzer = SpikeAnalyzer(court)
 
     if court.is_calibrated and court.court_bounds:
         ball_tracker.set_court_bounds(court.court_bounds)
@@ -170,6 +173,11 @@ def main():
         )
         for action in actions:
             record_action(action)
+        # Same emission filter as FrameProcessor before feeding the observer.
+        spike_analyzer.observe(
+            frame_idx, tracked_ball, tracked_players,
+            [a for a in actions if a.get("action", "unknown") != "unknown"],
+        )
 
         ball_draw = None
         if tracked_ball and tracked_ball.get("center") and tracked_ball["center"][0] is not None:
@@ -181,15 +189,35 @@ def main():
         })
 
     # Finalise the last contact still held for its look-ahead (context layer).
-    for action in action_classifier.flush():
+    flushed = action_classifier.flush()
+    for action in flushed:
         record_action(action)
+    visible_flushed = [a for a in flushed if a.get("action", "unknown") != "unknown"]
+    if visible_flushed:
+        spike_analyzer.observe(None, None, None, visible_flushed)
+    spike_analyzer.flush()
 
     cap.release()
+
+    # ---- Attach the resolved spike enrichment to the log's spike entries ----
+    rec_by_frame = {r["frame"]: r for r in spike_analyzer.spike_records()}
+    for e in action_log:
+        if e.get("action") == "spike" and e.get("frame") in rec_by_frame:
+            r = rec_by_frame[e["frame"]]
+            e["spike_type"] = r.get("spike_type")
+            e["attack_zone"] = r.get("attack_zone")
+            e["outcome"] = r.get("outcome")
+            e["landing_zone"] = r.get("landing_zone")
+            e["dug_zone"] = r.get("dug_zone")
+            e["exit_speed_px"] = r.get("exit_speed_px")
 
     # ---- Build a per-track label plan anchored on each action's contact frame ----
     plan = overlay.LabelPlan()
     for e in action_log:
-        plan.add(e["track_id"], e["frame"], e["action"], e["confidence"])
+        name = e["action"]
+        if name == "spike" and e.get("spike_type") in ("hard", "touch"):
+            name = f"spike {e['spike_type']}"
+        plan.add(e["track_id"], e["frame"], name, e["confidence"])
 
     # ---- Pass 2: redraw from cache, labels anchored on the true contact frame ----
     if writer:
@@ -205,6 +233,13 @@ def main():
             if cache["ball"] is not None:
                 bx, by, pred = cache["ball"]
                 overlay.draw_ball(frame, bx, by, predicted=pred)
+
+            # Spike flights: red fading trail + KILL marker (same overlay
+            # helpers the live-debug processor uses).
+            overlay.draw_ball_trail(frame, spike_analyzer.trail_points(frame_idx))
+            kill = spike_analyzer.kill_annotation(frame_idx)
+            if kill is not None:
+                overlay.draw_kill_marker(frame, kill[0], kill[1], kill[2])
 
             for tid, (x1, y1, x2, y2) in cache["players"]:
                 lab = plan.active(tid, frame_idx)
@@ -233,6 +268,21 @@ def main():
     print(f"  Total actions detected: {sum(action_counts.values())}")
     for action, count in sorted(action_counts.items()):
         print(f"    {action:10s}: {count}")
+
+    spikes = [r for r in spike_analyzer.spike_records()]
+    if spikes:
+        print(f"\n  Spike analysis ({len(spikes)}):")
+        for r in spikes:
+            az = r["attack_zone"]
+            az_s = f"{az['side']}{az['zone']}" if az else "?"
+            if r["outcome"] == "kill" and r["landing_zone"]:
+                dest = f"kill -> {r['landing_zone']['side']}{r['landing_zone']['zone']}"
+            elif r["outcome"] == "dug" and r["dug_zone"]:
+                dest = f"dug at {r['dug_zone']['side']}{r['dug_zone']['zone']}"
+            else:
+                dest = r["outcome"]
+            print(f"    f{r['frame']} p{r['player_id']} [{r['team']}] {r['spike_type']:6s} "
+                  f"from {az_s:3s} {dest} (exit {r['exit_speed_px']} px/f)")
 
 
 if __name__ == "__main__":

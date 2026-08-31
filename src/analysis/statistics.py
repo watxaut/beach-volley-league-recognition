@@ -37,10 +37,76 @@ class StatisticsAnalyzer:
             "action_stats": self._analyze_action_statistics(video_results),
             "temporal_stats": self._analyze_temporal_patterns(video_results),
             "ball_stats": self._analyze_ball_statistics(video_results),
-            "game_flow": self._analyze_game_flow(video_results)
+            "game_flow": self._analyze_game_flow(video_results),
+            "spike_stats": self._analyze_spike_statistics(video_results)
         }
 
         return statistics
+
+    def _analyze_spike_statistics(self, video_results: Dict[str, Any]) -> Dict[str, Any]:
+        """Tallies from the spike analyzer records (attack zones, types, outcomes).
+
+        Consumes ``video_results["spike_analysis"]`` -- the pure-observer
+        enrichment (touch/hard type, 3x3 attack zone on the spiker's own half,
+        kill/out/dug outcome with landing/dug zones). Empty when no spikes.
+        """
+        records = video_results.get("spike_analysis", [])
+        if not records:
+            return {}
+
+        def zone_key(z):
+            return f"{z['side']}{z['zone']}" if z else "?"
+
+        overall = {
+            "total_spikes": len(records),
+            "type_counts": dict(Counter(r["spike_type"] for r in records)),
+            "outcome_counts": dict(Counter(r["outcome"] for r in records)),
+            "attack_zone_counts": dict(
+                Counter(zone_key(r["attack_zone"]) for r in records)
+            ),
+            "landing_zone_counts": dict(
+                Counter(
+                    zone_key(r["landing_zone"])
+                    for r in records
+                    if r["outcome"] == "kill" and r["landing_zone"]
+                )
+            ),
+        }
+
+        players = {}
+        for r in records:
+            tid = r.get("track_id")
+            if tid is None:
+                continue
+            p = players.setdefault(
+                tid,
+                {
+                    "attacks": 0,
+                    "kills": 0,
+                    "type_counts": Counter(),
+                    "attack_zones": Counter(),
+                    "landing_zones": Counter(),
+                },
+            )
+            p["attacks"] += 1
+            p["type_counts"][r["spike_type"]] += 1
+            p["attack_zones"][zone_key(r["attack_zone"])] += 1
+            if r["outcome"] == "kill":
+                p["kills"] += 1
+                if r["landing_zone"]:
+                    p["landing_zones"][zone_key(r["landing_zone"])] += 1
+
+        overall["players"] = {
+            tid: {
+                "attacks": p["attacks"],
+                "kills": p["kills"],
+                "type_counts": dict(p["type_counts"]),
+                "attack_zones": dict(p["attack_zones"]),
+                "landing_zones": dict(p["landing_zones"]),
+            }
+            for tid, p in players.items()
+        }
+        return overall
 
     def _analyze_player_statistics(self, video_results: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze statistics for each individual player.

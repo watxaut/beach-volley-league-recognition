@@ -13,6 +13,7 @@ Colours are BGR (OpenCV convention).
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import cv2
+import numpy as np
 
 # One colour per recognised action. While an action is on screen the player box
 # and its label take the action colour; otherwise the box is plain green.
@@ -28,8 +29,18 @@ PLAYER_COLOR = (0, 255, 0)          # green box when no action is active
 BALL_COLOR = (0, 255, 0)            # green when the ball is detected
 BALL_PREDICTED_COLOR = (0, 0, 255)  # red when the position is predicted
 
+# Typed spike labels reuse the spike colour (cv2 text is ASCII-only, hence
+# "spike hard"/"spike touch" rather than a middle dot).
+ACTION_COLORS["spike hard"] = (0, 0, 255)
+ACTION_COLORS["spike touch"] = (0, 0, 255)
+
 # Frames a label stays on screen, counting from its true contact frame.
 LABEL_PERSIST = 30
+
+# Ball trail after a spike: red, fading as each point ages, gone past max age.
+TRAIL_COLOR = (0, 0, 255)
+TRAIL_MAX_AGE = 45
+TRAIL_MAX_GAP_FRAMES = 8  # no connecting line across sighting gaps larger than this
 
 
 class LabelPlan:
@@ -51,10 +62,17 @@ class LabelPlan:
 
     def add(self, track_id: Optional[int], contact_frame: Optional[int],
             action: str, confidence: Optional[float] = None) -> None:
-        """Record an action at its true contact frame (ignored if either is None)."""
+        """Record an action at its true contact frame (ignored if either is None).
+
+        Re-adding the same (track, contact frame) replaces the earlier entry,
+        so late-resolving knowledge (e.g. a spike's touch/hard type, final only
+        after its outcome) can upgrade a label already on screen.
+        """
         if track_id is None or contact_frame is None:
             return
-        self._by_track.setdefault(track_id, []).append((contact_frame, action, confidence))
+        entries = self._by_track.setdefault(track_id, [])
+        entries[:] = [e for e in entries if e[0] != contact_frame]
+        entries.append((contact_frame, action, confidence))
 
     def active(self, track_id: int, frame_idx: int) -> Optional[Tuple[str, Optional[float]]]:
         """Most-recent ``(action, confidence)`` whose window covers ``frame_idx``, else None."""
@@ -69,6 +87,50 @@ def draw_ball(frame, x: float, y: float, predicted: bool = False) -> None:
     """Draw the tracked ball as a single filled circle (in place)."""
     color = BALL_PREDICTED_COLOR if predicted else BALL_COLOR
     cv2.circle(frame, (int(x), int(y)), 8, color, -1)
+
+
+def draw_ball_trail(
+    frame,
+    points: Sequence[Tuple[float, float, int]],
+    max_age: int = TRAIL_MAX_AGE,
+) -> None:
+    """Draw a spike's ball flight as a red trail that faints over frames.
+
+    Args:
+        frame: BGR frame, drawn in place.
+        points: ``(x, y, age_frames)`` flight points (as produced by
+            ``SpikeAnalyzer.trail_points``), in flight order.
+        max_age: age at which a point has fully faded (skipped beyond).
+
+    Each segment is blended into the frame with alpha ``1 - age/max_age`` via
+    a small ROI ``addWeighted`` (OpenCV lines carry no alpha); segments are
+    not drawn across sighting gaps larger than ``TRAIL_MAX_GAP_FRAMES``.
+    """
+    pts = [(int(x), int(y), age) for (x, y, age) in points if 0 <= age < max_age]
+    for (x0, y0, a0), (x1, y1, a1) in zip(pts, pts[1:]):
+        # No connecting line across an occlusion-sized gap in the flight.
+        if abs(a1 - a0) > TRAIL_MAX_GAP_FRAMES:
+            continue
+        alpha = max(0.1, 1.0 - max(a0, a1) / float(max_age))
+        x_min, x_max = min(x0, x1), max(x0, x1)
+        y_min, y_max = min(y0, y1), max(y0, y1)
+        pad = 2
+        rx0, rx1 = max(0, x_min - pad), min(frame.shape[1], x_max + pad + 1)
+        ry0, ry1 = max(0, y_min - pad), min(frame.shape[0], y_max + pad + 1)
+        if rx1 <= rx0 or ry1 <= ry0:
+            continue
+        roi = frame[ry0:ry1, rx0:rx1]
+        scratch = np.zeros_like(roi)
+        cv2.line(scratch, (x0 - rx0, y0 - ry0), (x1 - rx0, y1 - ry0), TRAIL_COLOR, 2)
+        blended = cv2.addWeighted(roi, 1.0 - alpha, scratch, alpha, 0.0)
+        roi[...] = blended
+
+
+def draw_kill_marker(frame, x: float, y: float, text: str) -> None:
+    """Draw a kill annotation at the landing point (red, black underlay)."""
+    org = (int(x) + 12, int(y) - 12)
+    cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 4)
+    cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.7, TRAIL_COLOR, 2)
 
 
 def draw_player(

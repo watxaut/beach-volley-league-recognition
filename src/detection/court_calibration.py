@@ -558,6 +558,64 @@ class CourtCalibration:
         out = cv2.perspectiveTransform(arr, H)[0, 0]
         return (float(out[0]), float(out[1]))
 
+    # Ground-plane margin (metres) around the court within which a foot still
+    # clamps to the nearest edge zone. Attackers take off from just outside the
+    # lines; refusing their origin zone over a few centimetres would drop data.
+    ZONE_MARGIN_M = 1.0
+
+    def world_point_to_zone(self, wx: float, wy: float) -> Optional[Tuple[int, str]]:
+        """Map a ground-plane point (metres) to the 3x3 attack-zone grid of its half.
+
+        Each half is divided into 9 zones numbered 1-9 as seen by a player
+        standing at the net ON THEIR OWN SIDE, FACING THEIR OWN BASELINE:
+        1-3 across the net row left to right, 4-6 the middle row, 7-9 the back
+        row. Both halves apply the same rule facing their own end, so the
+        grid is symmetric under a 180-degree turn of the court, and in camera
+        view (team A near/bottom, team B far/top) the columns run opposite
+        ways (world x=0 is image-LEFT):
+
+            B back row   7 8 9          A back row   9 8 7
+            B mid row    4 5 6          A mid row    6 5 4
+            B net row    1 2 3   (net)  A net row    3 2 1
+
+        Validated on the owner's entreno_3 GT anchors (2026-08-30): both A
+        attacks (f297/f541) come from image-right at the net = A1, the f178 B
+        attack from image-right at the net = B3, landings A7 (image-left
+        deep) / B8 (far middle deep).
+
+        Points up to ZONE_MARGIN_M outside the court clamp to the nearest edge
+        zone; anything further returns None. Whether a LANDING is in or out is
+        a separate decision on the raw world coords (much tighter margin), not
+        this grid.
+
+        Returns (zone 1-9, side 'A'/'B'), or None beyond the margin.
+        """
+        L, W = self.BEACH_COURT_LENGTH_M, self.BEACH_COURT_WIDTH_M
+        m = self.ZONE_MARGIN_M
+        if not (-m <= wx <= W + m and -m <= wy <= L + m):
+            return None
+        col = min(2, max(0, int(wx // (W / 3.0))))
+        if wy >= L / 2.0:
+            side = "A"
+            row = min(2, max(0, int((wy - L / 2.0) // (L / 6.0))))
+            zone = row * 3 + 3 - col
+        else:
+            side = "B"
+            row = min(2, max(0, int((L / 2.0 - wy) // (L / 6.0))))
+            zone = row * 3 + col + 1
+        return zone, side
+
+    def get_court_zone(self, point: Tuple[int, int]) -> Optional[Tuple[int, str]]:
+        """Image pixel (a player's foot, or a landed ball) -> (zone 1-9, side).
+
+        None when the court is not calibrated or the point maps beyond
+        ZONE_MARGIN_M of the court.
+        """
+        world = self.image_to_world(point)
+        if world is None:
+            return None
+        return self.world_point_to_zone(world[0], world[1])
+
     def world_scale_at(self, point: Tuple[int, int]) -> Optional[float]:
         """Local metres-per-pixel at an image point (ground-plane Jacobian).
 

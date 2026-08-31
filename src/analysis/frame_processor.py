@@ -19,6 +19,7 @@ from ..tracking.player_tracker import PlayerTracker
 from ..recognition.pose_estimator import PoseEstimator
 from ..recognition.action_classifier import ActionClassifier
 from .game_state_manager import GameStateManager
+from .spike_analyzer import SpikeAnalyzer
 
 
 class FrameProcessor:
@@ -155,6 +156,9 @@ class FrameProcessor:
                 near_net_exempt_m=self.config.get("attribution_near_net_exempt_m", 2.5),
             )
 
+            # Spike outcome/zone analyzer (pure observer of the stream above)
+            self.spike_analyzer = SpikeAnalyzer(self.court_calibration)
+
             # Game state detection
             self.game_state_manager = GameStateManager(self.config)
 
@@ -171,6 +175,7 @@ class FrameProcessor:
         self.player_detector.set_court_detector(calibration)
         self.player_tracker.set_court_calibration(calibration)
         self.action_classifier.set_court_calibration(calibration)
+        self.spike_analyzer.court = calibration
         if calibration.is_calibrated and calibration.court_bounds:
             self.ball_tracker.set_court_bounds(calibration.court_bounds)
 
@@ -280,6 +285,9 @@ class FrameProcessor:
 
             frame_result["actions"] = actions
 
+            # 5b. Spike enrichment (pure observer -- never mutates the actions)
+            self.spike_analyzer.observe(frame_index, tracked_ball, tracked_players, actions)
+
             # 6. Final game state
             game_state_info = self.game_state_manager.analyze_frame(frame_result, frame_index)
             frame_result["game_state"] = game_state_info.to_dict()
@@ -297,7 +305,21 @@ class FrameProcessor:
         arrives (needed to tell a set from an overpass), so the final contact of
         a video stays pending until flushed. Call once after the last frame.
         """
-        return self.action_classifier.flush()
+        actions = self.action_classifier.flush()
+        if actions:
+            # The flushed contacts never pass through process_frame; feed the
+            # analyzer so a last-video spike/dig still resolves (same emission
+            # filter as process_frame applies).
+            visible = [
+                a
+                for a in actions
+                if a.get("action", "unknown") != "unknown"
+                and a.get("confidence", 0.0) > 0.1
+            ]
+            if visible:
+                self.spike_analyzer.observe(None, None, None, visible)
+        self.spike_analyzer.flush()
+        return actions
 
     def reset_trackers(self) -> None:
         """Reset all tracking state."""
@@ -306,6 +328,7 @@ class FrameProcessor:
         self.ball_tracker.reset()
         self.ball_detector.reset()
         self.action_classifier.reset()
+        self.spike_analyzer.reset()
 
         self.game_state_manager = GameStateManager(self.config)
         self.logger.debug("Trackers and game state reset")

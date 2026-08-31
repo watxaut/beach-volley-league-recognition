@@ -64,10 +64,24 @@ def main() -> None:
         touch_str = str(e.get("touch_number", 0)) + (
             "*" if "touch_number" in overrides else ""
         )
+        spike_str = ""
+        if e.get("spike_type"):
+            az = e.get("attack_zone") or {}
+            lz = e.get("landing_zone") or {}
+            dz = e.get("dug_zone") or {}
+            dest = (
+                f"{lz.get('side', '?')}{lz.get('zone', '?')}" if e.get("outcome") == "kill"
+                else f"{dz.get('side', '?')}{dz.get('zone', '?')}" if e.get("outcome") == "dug"
+                else e.get("outcome", "?")
+            )
+            spike_str = (
+                f"  [{e['spike_type']} from {az.get('side', '?')}{az.get('zone', '?')}"
+                f" -> {dest}]"
+            )
         print(
             f"{e['frame']:>6}  {time_s:>6.1f}s  {e.get('rally_id', 0):>5}  "
             f"{team_str:>4}  {touch_str:>5}  {prev_atk:>7}  "
-            f"{e['final_action']:<8}  {raw:<24}  P{e.get('player_id', '?')}"
+            f"{e['final_action']:<8}  {raw:<24}  P{e.get('player_id', '?')}{spike_str}"
         )
 
     # Counts per final_action

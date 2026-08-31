@@ -3098,7 +3098,7 @@
       }
     },
     "actions": {
-      "description": "Action events with rally-state context. Each event has: frame, player_id, final_action (canonical label), raw_visual_actions (open-vocabulary multi-label), player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides.",
+      "description": "Action events with rally-state context. Each event has: frame, player_id, final_action (canonical label), raw_visual_actions (open-vocabulary multi-label), player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides. Spike events additionally carry spike_type (touch|hard), attack_zone {side, zone 1-9}, outcome (kill|out|dug|blocked), landing_zone {side, zone} for kills. Zones: each half's 3x3 grid numbered 1-9 left-to-right as seen standing at the net facing that side's OWN baseline (A's zone 1 is image-right at the net, B's is image-left).",
       "events": [
         {
           "frame": 29,
@@ -3154,7 +3154,17 @@
           "touch_number": 3,
           "preceded_by_attack": false,
           "rally_id": 1,
-          "overrides": {}
+          "overrides": {},
+          "spike_type": "touch",
+          "attack_zone": {
+            "side": "B",
+            "zone": 3
+          },
+          "outcome": "kill",
+          "landing_zone": {
+            "side": "A",
+            "zone": 7
+          }
         },
         {
           "frame": 211,
@@ -3186,17 +3196,27 @@
         },
         {
           "frame": 297,
-          "player_id": 4,
+          "player_id": 3,
           "final_action": "spike",
           "raw_visual_actions": [
             "spike"
           ],
-          "player_team": "B",
-          "team_in_possession": "B",
-          "touch_number": 1,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 3,
           "preceded_by_attack": false,
           "rally_id": 1,
-          "overrides": {}
+          "overrides": {},
+          "spike_type": "touch",
+          "attack_zone": {
+            "side": "A",
+            "zone": 1
+          },
+          "outcome": "kill",
+          "landing_zone": {
+            "side": "B",
+            "zone": 8
+          }
         },
         {
           "frame": 379,
@@ -3207,7 +3227,7 @@
           ],
           "player_team": "B",
           "team_in_possession": "B",
-          "touch_number": 3,
+          "touch_number": 2,
           "preceded_by_attack": false,
           "rally_id": 1,
           "overrides": {}
@@ -3221,10 +3241,20 @@
           ],
           "player_team": "B",
           "team_in_possession": "B",
-          "touch_number": 4,
+          "touch_number": 3,
           "preceded_by_attack": false,
           "rally_id": 1,
-          "overrides": {}
+          "overrides": {},
+          "spike_type": "hard",
+          "attack_zone": {
+            "side": "B",
+            "zone": 2
+          },
+          "outcome": "kill",
+          "landing_zone": {
+            "side": "A",
+            "zone": 5
+          }
         },
         {
           "frame": 453,
@@ -3266,7 +3296,17 @@
           "touch_number": 3,
           "preceded_by_attack": false,
           "rally_id": 1,
-          "overrides": {}
+          "overrides": {},
+          "spike_type": "hard",
+          "attack_zone": {
+            "side": "A",
+            "zone": 1
+          },
+          "outcome": "kill",
+          "landing_zone": {
+            "side": "B",
+            "zone": 8
+          }
         },
         {
           "frame": 563,
@@ -3291,8 +3331,8 @@
           ],
           "player_team": "B",
           "team_in_possession": "B",
-          "touch_number": 2,
-          "preceded_by_attack": false,
+          "touch_number": 1,
+          "preceded_by_attack": true,
           "rally_id": 1,
           "overrides": {}
         }

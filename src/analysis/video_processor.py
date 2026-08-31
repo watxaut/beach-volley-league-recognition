@@ -171,6 +171,10 @@ class VideoProcessor:
 
         results["player_actions"] = player_actions
 
+        # Spike enrichment records (type / attack zone / outcome), resolved by
+        # the pure-observer analyzer wired inside FrameProcessor.
+        results["spike_analysis"] = self.frame_processor.spike_analyzer.spike_records()
+
         # Generate statistics
         results["statistics"] = self.statistics_analyzer.analyze_video_results(results)
 
