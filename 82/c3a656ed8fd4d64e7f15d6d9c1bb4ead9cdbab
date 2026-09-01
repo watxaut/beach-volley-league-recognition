@@ -1,0 +1,23 @@
+STATUS.md
+  s_9ed08fada71d0a::t_f92bc821104970 418-428
+src/output_gen/overlay.py
+  s_9ed08fada71d0a::t_e1fdb5cb7a46e3 105-109,126-134
+tests/test_spike_analyzer.py
+  s_9ed08fada71d0a::t_64149542d23d90 375-387
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "82c3a656ed8fd4d64e7f15d6d9c1bb4ead9cdbab",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
