@@ -1,0 +1,29 @@
+STATUS.md
+  s_9ed08fada71d0a::t_cb5381819228e0 54-75,404-414,418-444
+ground_truth/README.md
+  s_9ed08fada71d0a::t_a796d578b760dc 78-83,249-254
+ground_truth/video_entreno_3_annotations.json
+  s_9ed08fada71d0a::t_b86cb46b5c90fc 3101,3163-3164,3215-3216,3253-3254
+scripts/evaluate.py
+  s_9ed08fada71d0a::t_af11b6ae444700 420-422,427
+src/analysis/spike_analyzer.py
+  s_9ed08fada71d0a::t_171173212731d6 16-22,96-108,117-119,131,138-159,212,215-216,236-244,286,334-336,398-476,563,600-601
+tests/test_spike_analyzer.py
+  s_9ed08fada71d0a::t_e45c17c5a92abe 266-323
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "0049142665fb412f2bc2449999d8e8e7305c5cb5",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
