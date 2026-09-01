@@ -3098,7 +3098,7 @@
       }
     },
     "actions": {
-      "description": "Action events with rally-state context. Each event has: frame, player_id, final_action (canonical label), raw_visual_actions (open-vocabulary multi-label), player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides. Spike events additionally carry spike_type (touch|hard), attack_zone {side, zone 1-9}, outcome (kill|out|dug|blocked), landing_zone {side, zone} for kills. Zones: each half's 3x3 grid numbered 1-9 left-to-right as seen standing at the net facing that side's OWN baseline (A's zone 1 is image-right at the net, B's is image-left).",
+      "description": "Action events with rally-state context. Each event has: frame, player_id, final_action (canonical label), raw_visual_actions (open-vocabulary multi-label), player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides. Spike events additionally carry spike_type (touch|hard), attack_zone {side, zone 1-9}, outcome (kill|out|dug|blocked), landing_zone {side, zone} for kills and dug_zone for digs. Kill semantics: the ball falls directly, OR is dug and dies without a set (in court or out). Zones: each half's 3x3 grid numbered 1-9 left-to-right as seen standing at the net facing that side's OWN baseline (A's zone 1 is image-right at the net, B's is image-left).",
       "events": [
         {
           "frame": 29,
@@ -3160,8 +3160,8 @@
             "side": "B",
             "zone": 3
           },
-          "outcome": "kill",
-          "landing_zone": {
+          "outcome": "dug",
+          "dug_zone": {
             "side": "A",
             "zone": 7
           }
@@ -3212,8 +3212,8 @@
             "side": "A",
             "zone": 1
           },
-          "outcome": "kill",
-          "landing_zone": {
+          "outcome": "dug",
+          "dug_zone": {
             "side": "B",
             "zone": 8
           }
@@ -3250,8 +3250,8 @@
             "side": "B",
             "zone": 2
           },
-          "outcome": "kill",
-          "landing_zone": {
+          "outcome": "dug",
+          "dug_zone": {
             "side": "A",
             "zone": 5
           }

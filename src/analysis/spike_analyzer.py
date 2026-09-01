@@ -13,11 +13,13 @@ actions) and enriches each spike with:
   convention in ``CourtCalibration.world_point_to_zone``), from the spiker's
   FEET at the contact frame (looked up retro-actively from a ring buffer,
   because the event arrives ~14+ frames late);
-- ``outcome``     -- what happened to the ball: ``kill`` (landed in court
-  with no opponent touch, plus ``landing_zone``), ``out`` (landed outside),
-  ``dug`` (an opponent kept it up, plus ``dug_zone``), ``blocked``,
-  ``kept`` (a same-team touch followed the attack), or ``unknown`` (the
-  outcome horizon expired).
+- ``outcome``     -- what happened to the ball. Owner semantics (2026-08-31):
+  ``kill`` when the ball falls directly (no dig, plus ``landing_zone``) OR is
+  dug and then dies without a set -- falling on the defenders' court or out
+  of bounds (the dug record stays pending until a follow touch keeps it up);
+  ``out`` when the attacked ball lands out untouched (attack error); ``dug``
+  when the defence keeps it up (plus ``dug_zone``); ``blocked``; ``kept`` (a
+  same-team touch followed); ``unknown`` (outcome horizon expired).
 
 It never mutates the emitted actions -- the GT-validated event stream stays
 byte-identical; the enrichment rides a parallel record list consumed by the
@@ -91,6 +93,19 @@ class SpikeAnalyzer:
     # frame, coinciding with the GT dig events.
     RETRO_FOLLOW_FRAMES = 12
     DIG_LOFT_PX = 90.0
+    # Owner's kill semantics (2026-08-31): an attack is a KILL when the ball
+    # falls directly (no dig) OR when it is dug and then dies WITHOUT a set --
+    # falling on the defenders' court or out of bounds. So a dug record stays
+    # pending: any later touch event finalises "dug" (kept up), while the
+    # post-dig ball dying first flips it to "kill" at the fall point.
+    DUG_KEEP_HORIZON = 90
+    # A dug ball's DEATH must be confirmed: the descent terminating at the
+    # setter's hands looks exactly like a landing, and the set EVENT arrives
+    # too late (lookahead emission) to veto it. So a quiet-based death waits
+    # this many frames (set-occlusion gaps are <=14f) and ANY subsequent
+    # loft >= DIG_LOFT_PX rejects the death -- it was a touch. entreno_3:
+    # the real f539 death bounces 12 px; the three set contacts loft 150+.
+    DUG_DEATH_CONFIRM_FRAMES = 16
 
     def __init__(self, court_calibration: CourtCalibration):
         self.court = court_calibration
@@ -99,6 +114,9 @@ class SpikeAnalyzer:
         )
         self._feet: Dict[int, Deque[Tuple[int, Tuple[int, int]]]] = {}
         self._pending: Optional[Dict[str, Any]] = None
+        # A record whose outcome is provisional "dug" while we watch whether
+        # the defenders keep the ball up (set follows) or it dies (-> kill).
+        self._pending_dug: Optional[Dict[str, Any]] = None
         self._records: List[Dict[str, Any]] = []
         self._kill_marks: List[Dict[str, Any]] = []
         self._last_frame: Optional[int] = None
@@ -110,25 +128,35 @@ class SpikeAnalyzer:
         self._ball_hist.clear()
         self._feet.clear()
         self._pending = None
+        self._pending_dug = None
         self._records.clear()
         self._kill_marks.clear()
         self._last_frame = None
 
     def flush(self) -> None:
         """Resolve any pending spike at end of video (best effort)."""
-        if self._pending is None:
-            return
-        self._update_pending()
-        p = self._pending
-        if p is None:
-            return
-        # With the video over, an established descent whose sightings stopped
-        # is a landing (force the quiet rule; there are no future frames).
-        flight = self._flight(p["contact_frame"])
-        forced_now = (flight[-1][0] if flight else p["contact_frame"]) + self.LANDING_QUIET_FRAMES
-        landing = self._detect_landing(flight, forced_now)
-        if landing is None or not self._close_on_landing(*landing):
-            self._close(outcome=OUTCOME_UNKNOWN)
+        if self._pending is not None:
+            self._update_pending()
+            p = self._pending
+            if p is not None:
+                # With the video over, an established descent whose sightings
+                # stopped is a landing (force the quiet rule; no future frames).
+                flight = self._flight(p["contact_frame"])
+                forced_now = (flight[-1][0] if flight else p["contact_frame"]) + self.LANDING_QUIET_FRAMES
+                landing = self._detect_landing(flight, forced_now)
+                if landing is None or not self._close_on_landing(*landing):
+                    self._close(outcome=OUTCOME_UNKNOWN)
+        if self._pending_dug is not None:
+            pd = self._pending_dug
+            after = self._flight(pd["dig_frame"])
+            forced_now = (after[-1][0] if after else pd["dig_frame"]) + max(
+                self.LANDING_QUIET_FRAMES, self.DUG_DEATH_CONFIRM_FRAMES
+            )
+            landing = self._detect_dug_death(after, forced_now)
+            if landing is not None:
+                self._finalize_dug_kill(pd, *landing)
+            else:
+                self._pending_dug = None
 
     # --- per-frame ingestion ----------------------------------------------
 
@@ -181,9 +209,11 @@ class SpikeAnalyzer:
         for ev in actions or []:
             self._handle_event(ev)
 
-        # 4. Pending-spike progress (type + landing).
+        # 4. Pending-spike progress (type + landing), then the dug-keep watch.
         if self._pending is not None:
             self._update_pending()
+        if self._pending_dug is not None:
+            self._update_pending_dug(frame_number)
 
     # --- event handling -----------------------------------------------------
 
@@ -202,6 +232,15 @@ class SpikeAnalyzer:
         # top of the "landing" (the ball was actually dug, occluded at the
         # digger's arms -- see RETRO_FOLLOW_FRAMES).
         self._retro_convert(ev)
+
+        # A touch after a dug attack means the defenders kept the ball up:
+        # the attack's outcome stays "dug" (no kill). Strictly later than the
+        # dig itself (the dig event commonly arrives via retro-conversion).
+        if (
+            self._pending_dug is not None
+            and contact > self._pending_dug["dig_frame"]
+        ):
+            self._pending_dug = None
 
         if action == "spike":
             self._open_pending(ev)
@@ -244,6 +283,7 @@ class SpikeAnalyzer:
             self._close(
                 outcome=outcome,
                 dug_zone={"side": dug_zone[1], "zone": dug_zone[0]} if dug_zone else None,
+                follow_frame=ev["frame_number"] if outcome == OUTCOME_DUG else None,
             )
         else:
             self._close(outcome=OUTCOME_KEPT)
@@ -291,6 +331,9 @@ class SpikeAnalyzer:
             )
             rec["landing_zone"] = None
             self._sync_kill_marks()
+            # A dug attack is only final once the defence shows whether it
+            # keeps the ball up (set follows) or lets it die (-> kill).
+            self._pending_dug = {"rec": rec, "dig_frame": contact}
 
     def _sync_kill_marks(self) -> None:
         """Drop kill marks whose record is no longer a kill (retro-conversion)."""
@@ -351,6 +394,85 @@ class SpikeAnalyzer:
             landing_zone={"side": zone[1], "zone": zone[0]} if zone else None,
         )
         return True
+
+    def _update_pending_dug(self, now: int) -> None:
+        """Watch a dug attack: does the defence keep the ball up or does it die?
+
+        Any later touch event finalises "dug" (handled in _handle_event).
+        Here we watch the ball: a post-dig descent that terminates (bounce or
+        quiet) means the dug ball fell without a set -- the owner's kill
+        semantics flip the outcome to KILL at the fall point.
+        """
+        pd = self._pending_dug
+        if pd is None:
+            return
+        after = self._flight(pd["dig_frame"])
+        landing = self._detect_dug_death(after, now)
+        if landing is not None:
+            self._finalize_dug_kill(pd, *landing)
+        elif now > pd["dig_frame"] + self.DUG_KEEP_HORIZON:
+            self._pending_dug = None  # nothing conclusive; stays "dug"
+
+    def _detect_dug_death(
+        self, flight: List[Tuple[int, float, float]], now: int
+    ) -> Optional[Tuple[int, Tuple[float, float]]]:
+        """A confirmed death of a dug ball (see DUG_DEATH_CONFIRM_FRAMES).
+
+        Wraps _detect_landing with a confirmation window: a candidate landing
+        (bounce or quiet) only commits DUG_DEATH_CONFIRM_FRAMES after the
+        landing frame, and is REJECTED if the ball subsequently lofts like a
+        touch -- a set redirect's toss develops over several frames, so
+        committing at the first 8 px bounce-rise would misread the setter's
+        hands as sand. A kept-up ball reappears rising inside the window and
+        is rejected; a real death settles (entreno_3 f539 bounces 12 px).
+        """
+        landing = self._detect_landing(flight, now)
+        if landing is None:
+            return None
+        f_lp, pt = landing
+        if now < f_lp + self.DUG_DEATH_CONFIRM_FRAMES:
+            return None  # inside the confirmation window: wait
+        later = [(f, x, y) for (f, x, y) in flight if f > f_lp]
+        if any(pt[1] - y >= self.DIG_LOFT_PX for (_f, _x, y) in later):
+            return None  # lofts like a touch -> the defence kept it up
+        return landing
+
+    def _finalize_dug_kill(
+        self, pd: Dict[str, Any], landing_frame: int, landing_pt: Tuple[float, float]
+    ) -> None:
+        """The dug ball died without a set: the attack is a KILL (owner
+        semantics -- in court or out of bounds both count)."""
+        rec = pd["rec"]
+        world = self.court.image_to_world(landing_pt)
+        zone = (
+            self.court.world_point_to_zone(world[0], world[1]) if world else None
+        )
+        rec["outcome"] = OUTCOME_KILL
+        rec["landing_zone"] = (
+            {"side": zone[1], "zone": zone[0]} if zone else None
+        )
+        rec["landing_frame"] = landing_frame
+        rec["resolution_frame"] = self._last_frame
+        # Extend the rendered trail through the dig to the fall.
+        after = self._flight(pd["dig_frame"])
+        rec["flight"] = rec["flight"] + [
+            (f, x, y) for (f, x, y) in after if f <= landing_frame
+        ]
+        rec["flight_frames"] = landing_frame - rec["frame"]
+        if zone is not None:
+            text = "KILL {}{}".format(zone[1], zone[0])
+        else:
+            text = "KILL"  # fell out of bounds -- still the owner's kill
+        self._kill_marks.append(
+            {
+                "frame": landing_frame,
+                "x": landing_pt[0],
+                "y": landing_pt[1],
+                "text": text,
+                "record": rec,
+            }
+        )
+        self._pending_dug = None
 
     def _classify_type(
         self, contact_frame: int, flight: List[Tuple[int, float, float]]
@@ -438,6 +560,7 @@ class SpikeAnalyzer:
         landing_frame: Optional[int] = None,
         landing_zone: Optional[Dict[str, Any]] = None,
         dug_zone: Optional[Dict[str, Any]] = None,
+        follow_frame: Optional[int] = None,
     ) -> None:
         p = self._pending
         flight = self._flight(p["contact_frame"])
@@ -474,6 +597,8 @@ class SpikeAnalyzer:
             "flight": trail,
         }
         self._records.append(record)
+        if outcome == OUTCOME_DUG and follow_frame is not None:
+            self._pending_dug = {"rec": record, "dig_frame": follow_frame}
         if outcome == OUTCOME_KILL and landing_zone:
             lp = next(
                 ((x, y) for (f, x, y) in flight if f == landing_frame), None

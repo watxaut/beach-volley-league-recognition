@@ -417,12 +417,14 @@ def _action_attribution_metrics(
         out["player_scored_spatial"] = n_pl
 
     # Spike enrichment fields (spike_type / attack_zone / landing_zone /
-    # outcome), scored on the same matched pairs wherever the GT carries
-    # them. attack_zone/landing_zone are {"side", "zone"} dicts on both sides.
+    # dug_zone / outcome), scored on the same matched pairs wherever the GT
+    # carries them. attack_zone/landing_zone/dug_zone are {"side", "zone"}
+    # dicts on both sides.
     for out_key, gt_key in (
         ("spike_type_accuracy", "spike_type"),
         ("attack_zone_accuracy", "attack_zone"),
         ("landing_zone_accuracy", "landing_zone"),
+        ("dug_zone_accuracy", "dug_zone"),
         ("outcome_accuracy", "outcome"),
     ):
         scored = ok = 0

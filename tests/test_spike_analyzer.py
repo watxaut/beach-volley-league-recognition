@@ -263,6 +263,64 @@ class TestOutcomes:
         assert rec["outcome"] == "unknown"
         assert rec["spike_type"] == "hard"
 
+    def test_dug_ball_dying_without_set_is_kill(self, analyzer):
+        """Owner semantics: a dig that dies (ball falls, no set) makes the
+        attack a KILL at the fall point."""
+        self._drive_to_kill(analyzer)
+        analyzer.observe(106, _ball(948, 685), [_player(1, 870, 550, "B")], [])
+        analyzer.observe(114, None, [_player(1, 870, 550, "B")],
+                         [_spike_ev(100, cp=(900.0, 520.0))])
+        # Dig loft (retro-converts the bounce-kill to dug)...
+        loft = [(945, 640), (940, 570), (935, 500), (930, 440), (928, 400),
+                (927, 380)]
+        for (i, (x, y)) in enumerate(loft):
+            analyzer.observe(115 + i, _ball(x, y), [_player(2, 960, 780, "A")], [])
+        analyzer.observe(130, None, [_player(2, 960, 780, "A")],
+                         [{"action": "dig", "frame_number": 108, "track_id": 2,
+                           "player_id": 1, "team": "A",
+                           "contact_point": [948.0, 685.0],
+                           "player_center": (948, 685)}])
+        rec = analyzer.spike_records()[0]
+        assert rec["outcome"] == "dug"
+        # ...then the dug ball comes down and dies with NO set following.
+        fall = [(926, 420), (924, 470), (922, 530), (920, 600), (918, 680),
+                (917, 740), (916, 770), (918, 760)]
+        for (i, (x, y)) in enumerate(fall):
+            analyzer.observe(122 + i, _ball(x, y), [_player(2, 960, 780, "A")], [])
+        rec = analyzer.spike_records()[0]
+        assert rec["outcome"] == "dug"  # inside the confirmation window yet
+        # After DUG_DEATH_CONFIRM_FRAMES with no loft and no set: KILL.
+        for f in range(130, 150):
+            analyzer.observe(f, None, [_player(2, 960, 780, "A")], [])
+        rec = analyzer.spike_records()[0]
+        assert rec["outcome"] == "kill"
+        assert rec["landing_zone"]["side"] == "A"
+        assert analyzer.kill_annotation(145) is not None
+        assert analyzer.kill_annotation(145)[2].startswith("KILL A")
+
+    def test_dug_ball_kept_up_by_set_stays_dug(self, analyzer):
+        self._drive_to_kill(analyzer)
+        analyzer.observe(106, _ball(948, 685), [_player(1, 870, 550, "B")], [])
+        analyzer.observe(114, None, [_player(1, 870, 550, "B")],
+                         [_spike_ev(100, cp=(900.0, 520.0))])
+        loft = [(945, 640), (940, 570), (935, 500), (930, 440), (928, 400)]
+        for (i, (x, y)) in enumerate(loft):
+            analyzer.observe(115 + i, _ball(x, y), [_player(2, 960, 780, "A")], [])
+        analyzer.observe(130, None, [_player(2, 960, 780, "A")],
+                         [{"action": "dig", "frame_number": 108, "track_id": 2,
+                           "player_id": 1, "team": "A",
+                           "contact_point": [948.0, 685.0],
+                           "player_center": (948, 685)}])
+        # The defence sets the dug ball: the attack stays a plain dig.
+        analyzer.observe(145, None, [_player(2, 960, 780, "A")],
+                         [{"action": "set", "frame_number": 124, "track_id": 2,
+                           "player_id": 1, "team": "A",
+                           "contact_point": [928.0, 400.0],
+                           "player_center": (960, 730)}])
+        rec = analyzer.spike_records()[0]
+        assert rec["outcome"] == "dug"
+        assert analyzer.kill_annotation(129) is None
+
     def test_flush_resolves_trailing_flight(self, analyzer):
         for f in range(86, 101):
             analyzer.observe(f, _ball(890 - (100 - f), 380 + (100 - f) * 8),

@@ -75,8 +75,12 @@ Annotations are stored as JSON files in this directory. Each video gets one JSON
     at the net facing that side's OWN baseline (rows: 1-3 at the net, 4-6
     middle, 7-9 back). In the standard camera view (A near/bottom) A's zone 1
     is image-right at the net, B's zone 1 is image-left.
-  - **outcome**: `kill` (landed in court, no opponent touch), `out`, `dug`, `blocked`
-  - **landing_zone**: `{"side", "zone"}` for kills — where the ball landed
+  - **outcome**: `kill`, `out`, `dug`, `blocked`. Kill semantics (owner, 2026-08-31):
+    the ball falls directly (no dig), OR is dug and then dies WITHOUT a set —
+    falling on the defenders' court or out of bounds. A dig that is kept up
+    (a set follows) is `dug`.
+  - **landing_zone**: `{"side", "zone"}` for kills — where the ball fell;
+    **dug_zone**: `{"side", "zone"}` for digs — where the defender played it
 
 ### Court
 - **corners**: 4 court corners in pixel coordinates, clockwise from top-left
@@ -242,8 +246,12 @@ Watch → Player 4 digs at frame 145
     at the net facing that side's OWN baseline (rows: 1-3 at the net, 4-6
     middle, 7-9 back). In the standard camera view (A near/bottom) A's zone 1
     is image-right at the net, B's zone 1 is image-left.
-  - **outcome**: `kill` (landed in court, no opponent touch), `out`, `dug`, `blocked`
-  - **landing_zone**: `{"side", "zone"}` for kills — where the ball landed
+  - **outcome**: `kill`, `out`, `dug`, `blocked`. Kill semantics (owner, 2026-08-31):
+    the ball falls directly (no dig), OR is dug and then dies WITHOUT a set —
+    falling on the defenders' court or out of bounds. A dig that is kept up
+    (a set follows) is `dug`.
+  - **landing_zone**: `{"side", "zone"}` for kills — where the ball fell;
+    **dug_zone**: `{"side", "zone"}` for digs — where the defender played it
 
 ### Court
 - **corners**: 4 court corners in pixel coordinates, clockwise from top-left

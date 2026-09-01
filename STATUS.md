@@ -51,20 +51,28 @@ green** (+22, tests/test_spike_analyzer.py). What was measured/built:
    the 4 spikes (spike_type/attack_zone/outcome/landing_zone), README +
    verify_action_labels updated.
 
-**OPEN for owner ratification (open point 12): all four e3 "kills" are, per
-the ball tracks AND the contact sheets, DIGS.** Every attack flight ends with
-a 220-340 px loft exactly at the GT's own dig events (f211/f332/f453/f563,
-all pre_atk=True) — e.g. f431's ball comes down to the defender's hands AT
-the net line (f453-455) and pops up high; it never touches sand (sheets:
-output/gt_verify/spike_f*.png). The analyzer therefore reports dug (eval
-outcome/landing accuracy 0/4 as GT stands) — and its **dug zones coincide
-with the annotated "landing" zones 3/4 (A7, B8, A5 exact; B6 vs B8)**,
-suggesting the annotated zones describe where the ball was played. If the
-owner re-reads as kills-with-placement (or relabels to dug), the GT outcome
-fields flip and eval re-scores. Also pending: the f294/f297 pair fails the
-player-spatial gate (pred center above the net lands in the adjacent net
-player's box at the 10f-strided GT frame — same temporal-skew class as e4
-f347; the pred's team/player are right per the corrected GT).
+**Outcome semantics completed (2026-08-31, owner ratification): kill = direct
+fall OR dug-and-dies-without-a-set.** The owner adjudicated the four e3
+"kills": the whole video is ONE point — f178/f297/f433 were dug AND set
+(outcomes now `dug` with `dug_zone`, the annotated zones reinterpreted as
+where the dig happened), and f541 is the rally-winning KILL (dug at f563, the
+ball falls with no set; the owner's "8 B" annotation stands, measured fall
+B7). Shipped as a pending-dug watch in SpikeAnalyzer: a dug record stays
+provisional until a later touch event (kept up -> `dug`) or a CONFIRMED ball
+death (`kill` at the fall point, in court or out). The confirmation window
+(DUG_DEATH_CONFIRM_FRAMES=16 + loft rejection) is load-bearing: the descent
+into the setter's hands looks exactly like a landing, and the set EVENT
+arrives too late (lookahead emission ~f255 for a f248 set) to veto it — only
+the physical loft test separates them (the real f539 death bounces 12 px; the
+three set contacts loft 150+ px). **Final e3 numbers: outcome 4/4, dug_zone
+3/3, spike_type 4/4, attack_zone 4/4, team 14/14; the single residual is the
+kill's landing zone (measured B7 vs annotated B8 — the fall at world x≈1.9 m
+is one column left of middle).** Suite **223 green** (+2 dug-kill tests).
+Known-class miss unchanged: the f294/f297 pair fails the player-spatial gate
+(pred center above the net resolves to the adjacent net player's box at the
+10f-strided GT frame; the pred's team/player are right per the corrected GT).
+
+
 
 
 **Off-court hold horizon shipped (2026-08-29): e2's wasted roster slot
@@ -393,20 +401,46 @@ constraint. Side changes need no special handling as long as IDs survive.
     id/team wobbles (e.g. f277) — dedicated re-verification session (the
     only queue item left).
 
-12. **[owner ratification wanted 2026-08-30] e3's four GT "kills" read as
-    digs on the tracks and the sheets.** See Where-we-are: every attack
-    flight lofts 220-340 px at the GT's own dig events (f211/f332/f453/f563);
-    sheets output/gt_verify/spike_f*.png (f431 visually confirmed: ball into
-    the defender's hands at the net line, popped up, never touched sand).
-    Analyzer says dug; GT says kill+landing. The analyzer's dug zones match
-    the annotated landing zones 3/4 (A7/B8/A5; B6 vs B8) — the zones are
-    right, the outcome word is the question. Owner decides: (a) relabel GT
-    outcomes to dug (eval flips to high accuracy), or (b) keep kills and
-    record the disagreement as a known-class residual, or (c) the GT zones
-    were meant as attack placement (then they may want a target_zone field
-    instead of landing_zone).
+12. **[RESOLVED 2026-08-31 — owner ratified the semantics] e3's four GT
+    "kills" were three digs + one real kill.** The owner's rule: kill = the
+    ball falls directly, OR is dug and dies without a set (in court or out
+    of bounds); the whole e3 video is one point. GT now: f178/f297/f433
+    `dug` (dug_zone A7/B8/A5 — the originally annotated zones, reinterpreted
+    as the dig locations), f541 `kill` (landing B8 annotated; measured B7 —
+    the one residual). The analyzer implements exactly this
+    (DUG_DEATH_CONFIRM_FRAMES + loft rejection); eval: outcome 4/4,
+    dug_zone 3/3. Small follow-up if the owner wants: a `target_zone` field
+    (attack placement) is NOT yet modelled — the GT zones double as dig
+    locations today.
 
 ## Log (newest first)
+
+### 2026-08-31 — outcome semantics completed: kill = direct fall OR dug-and-dies-without-a-set (owner rule)
+- **Owner adjudication**: the four e3 "kills" are three digs + one kill; the
+  video is ONE point. Kill rule (now in GT README + analyzer docstring): the
+  ball falls directly, OR is dug and dies without a set (on the defenders'
+  court or out of bounds). A dig kept up (set follows) is just `dug`.
+- **Shipped**: pending-dug watch in SpikeAnalyzer — a dug record stays
+  provisional; any later touch event finalises `dug`, a CONFIRMED ball death
+  flips it to `kill` at the fall point (`_detect_dug_death`: candidate
+  landing must survive DUG_DEATH_CONFIRM_FRAMES=16 with no subsequent loft ≥
+  DIG_LOFT_PX). The confirmation is load-bearing — diagnosed on dev5: without
+  it all three kept-up digs read as kills because the descent into the
+  setter's hands terminates like a landing while the set EVENT is still
+  ~40-50f away (lookahead emission). The real f539 death bounces 12 px; set
+  tosses loft 150+ px.
+- **GT**: f178/f297/f433 → `dug` + `dug_zone` (the annotated zones
+  reinterpreted as dig locations); f541 stays `kill` (landing B8 annotated,
+  measured B7 — fall at world x≈1.9 m, one column left). evaluate.py gains
+  dug_zone_accuracy.
+- **Measured (e3)**: outcome 4/4, dug_zone 3/3, spike_type 4/4,
+  attack_zone 4/4, team 14/14; landing_zone 0/1 (B7-vs-B8 residual).
+  A/B stream still byte-identical (pure observer). Suite **223 green** (+2:
+  dug-ball-dies → kill; dug-then-set stays dug).
+- Files: src/analysis/spike_analyzer.py, scripts/evaluate.py,
+  ground_truth/video_entreno_3_annotations.json, ground_truth/README.md,
+  tests/test_spike_analyzer.py, STATUS.md. Runs output/spike_dev{5,6},
+  output/spike_prod3 (git-ignored).
 
 ### 2026-08-30 — spike analytics: trail, touch/hard, 9-zone grid, kill/dug outcomes; f297 GT corrected
 - **Diagnose first** (output/diag_spike_exit.py, git-ignored): dumped the real
