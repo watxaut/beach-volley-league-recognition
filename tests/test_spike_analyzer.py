@@ -372,6 +372,19 @@ class TestTrailRendering:
         assert fresh > old > 0
         assert dropped == 0  # beyond max_age: nothing drawn
 
+    def test_draw_ball_trail_leaves_background_untouched(self):
+        """Regression (2026-09-01): blending must touch the LINE's pixels only
+        -- an unmasked addWeighted darkened the whole ROI rectangle to a
+        visible black box behind each segment."""
+        frame = np.full((200, 200, 3), 200, dtype=np.uint8)
+        overlay.draw_ball_trail(frame, [(50, 50, 0), (90, 50, 2)], max_age=45)
+        # The line itself blends toward red...
+        assert frame[48:53, 55:85, 2].max() > 210
+        assert frame[48:53, 55:85, 0].min() < 190
+        # ...while pixels inside the segment's ROI but off the line stay 200.
+        assert (frame[45:47, 55:85] == 200).all()
+        assert (frame[54:57, 55:85] == 200).all()
+
     def test_draw_ball_trail_skips_big_gaps(self):
         frame = np.zeros((200, 200, 3), dtype=np.uint8)
         pts = [(50, 100, 0), (60, 100, 2), (140, 100, 30)]  # 28f gap to the last

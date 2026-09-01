@@ -102,9 +102,11 @@ def draw_ball_trail(
             ``SpikeAnalyzer.trail_points``), in flight order.
         max_age: age at which a point has fully faded (skipped beyond).
 
-    Each segment is blended into the frame with alpha ``1 - age/max_age`` via
-    a small ROI ``addWeighted`` (OpenCV lines carry no alpha); segments are
-    not drawn across sighting gaps larger than ``TRAIL_MAX_GAP_FRAMES``.
+    Each segment is blended into the frame with alpha ``1 - age/max_age`` on
+    the line's pixels ONLY (a masked blend -- OpenCV lines carry no alpha,
+    and blending a whole addWeighted ROI darkens the rectangle around the
+    line to a visible black box). Segments are not drawn across sighting
+    gaps larger than ``TRAIL_MAX_GAP_FRAMES``.
     """
     pts = [(int(x), int(y), age) for (x, y, age) in points if 0 <= age < max_age]
     for (x0, y0, a0), (x1, y1, a1) in zip(pts, pts[1:]):
@@ -121,9 +123,15 @@ def draw_ball_trail(
             continue
         roi = frame[ry0:ry1, rx0:rx1]
         scratch = np.zeros_like(roi)
-        cv2.line(scratch, (x0 - rx0, y0 - ry0), (x1 - rx0, y1 - ry0), TRAIL_COLOR, 2)
-        blended = cv2.addWeighted(roi, 1.0 - alpha, scratch, alpha, 0.0)
-        roi[...] = blended
+        cv2.line(
+            scratch, (x0 - rx0, y0 - ry0), (x1 - rx0, y1 - ry0),
+            TRAIL_COLOR, 2, lineType=cv2.LINE_AA,
+        )
+        mask = scratch[..., 2] > 0  # pixels the line touched (incl. AA fringe)
+        blended = (
+            roi * (1.0 - alpha) + scratch.astype(np.float32) * alpha
+        ).astype(roi.dtype)
+        roi[mask] = blended[mask]
 
 
 def draw_kill_marker(frame, x: float, y: float, text: str) -> None:

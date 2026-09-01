@@ -415,6 +415,17 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Log (newest first)
 
+### 2026-09-01 — trail render fix: masked blend (owner-reported black boxes behind trail segments)
+- **Owner report**: the red trail carried black rectangles behind its
+  segments. Root cause: `draw_ball_trail` blended each segment's whole ROI
+  via `addWeighted` — every background pixel in the rectangle was scaled by
+  (1-alpha) toward black, not just the line's pixels.
+- **Fix**: masked blend — the line is drawn anti-aliased on a scratch, and
+  only the touched pixels get `roi*(1-a) + line*a`; the ROI's other pixels
+  are untouched. Regression test pins it (uniform-200 background: off-line
+  pixels inside the ROI stay exactly 200). Suite **224 green**; re-rendered
+  production video verified visually (output/spike_prod4, git-ignored).
+
 ### 2026-08-31 — outcome semantics completed: kill = direct fall OR dug-and-dies-without-a-set (owner rule)
 - **Owner adjudication**: the four e3 "kills" are three digs + one kill; the
   video is ONE point. Kill rule (now in GT README + analyzer docstring): the
