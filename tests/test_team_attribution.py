@@ -376,7 +376,7 @@ def test_bridge_fires_on_occluded_contact(clf):
     _bridge_history(clf)
     r = clf._detect_contact(114)
     assert r is not None
-    point, kind, inc, out = r
+    point, kind, inc, out, _ = r
     assert kind == "bounce"
     assert 1013 <= point[0] <= 1018          # x interpolated inside the gap
     assert point[1] > 275                    # bottom sits below both endpoints
@@ -440,7 +440,7 @@ def test_short_gap_bridge_fires_dense_right(clf):
     _short_history(clf, gap=7)
     r = clf._detect_contact(109)
     assert r is not None
-    point, kind, inc, out = r
+    point, kind, inc, out, _ = r
     assert kind == "bounce"
     assert 1013 <= point[0] <= 1018          # x interpolated inside the gap
     assert point[1] > 275                    # bottom sits below both endpoints
@@ -458,7 +458,7 @@ def test_short_gap_bridge_fires_sparse_right_cross_rise(clf):
                 (108, 1018, 131, 24)])
     r = clf._detect_contact(108)
     assert r is not None
-    point, kind, inc, out = r
+    point, kind, inc, out, _ = r
     assert kind == "bounce"
     assert inc[1] > 0 and out[1] < -60       # descending in, rising hard out
 
@@ -509,3 +509,116 @@ def test_classic_band_still_requires_two_right_points(clf):
     vertex = clf._point_at(114)
     assert vertex is not None
     assert clf._bridge_contact(114, vertex) is None
+
+
+# --- Reentry contact (out-of-frame excursion, e6 f308 joust) ---
+
+def _reentry_history(clf, c=288, gap=12, run=None, junk=(34, 118, 30)):
+    """The e6 shape: the set toss exits the frame top, SPARE junk is the last
+    thing in the history before the gap (the tracker adopted it), then the
+    game ball re-enters into a fast horizontal run above the net tape. At
+    x~1150 the e3 calibration's net top is y~308.7, midcourt y~608.
+
+    Default run: f288 (1152,278) -> f291 (1002,278), i.e. -50px/f flat.
+    """
+    if run is None:
+        run = [(c, 1152, 278), (c + 1, 1102, 276), (c + 2, 1051, 276),
+               (c + 3, 1002, 278)]
+    toss = [(248, 1090, 380, 34), (250, 1098, 350, 34), (252, 1106, 316, 34),
+            (254, 1114, 278, 34), (256, 1122, 236, 34), (258, 1130, 190, 34),
+            (260, 1138, 140, 34), (262, 1146, 86, 34), (264, 1154, 28, 34)]
+    jx, jy, jw = junk
+    junk_pts = [(c - gap - 2, jx, jy, jw), (c - gap, jx - 12, jy - 40, jw)]
+    _ball(clf, toss + junk_pts + [(f, x, y, 45) for f, x, y in run])
+
+
+def test_reentry_fires_on_identity_break(clf):
+    """e6 f308: the pre-gap point (spare junk) is 1695px from where the run's
+    own velocity predicts it -- free flight cannot connect, so the joust touch
+    inside the excursion is manufactured, dated at the gap midpoint."""
+    _reentry_history(clf)
+    r = clf._detect_contact(288)
+    assert r is not None
+    point, kind, inc, out, frame = r
+    assert kind == "reentry"
+    assert frame == 282                       # 288 - gap//2 (GT f308 shape)
+    assert point[0] == pytest.approx(1452.0)  # back-extrapolated along the run
+    assert inc[1] > 0 and inc[0] == 0.0       # manufactured vertical-from-above
+    assert out[0] == -150.0                   # the real outgoing drive (net px)
+
+
+def test_reentry_rejects_connectible_gap(clf):
+    """e2 f149 (the refuted instance #2): the tracker bridged the toss apex,
+    so the pre-gap point IS velocity-consistent with the run (34px off) -- no
+    identity break, no manufactured touch."""
+    run = [(288, 1152, 278), (290, 1060, 278), (292, 968, 278)]
+    _reentry_history(clf, c=288, gap=8, run=run, junk=(1152 + 46 * 8, 278, 30))
+    assert clf._detect_contact(288) is None
+
+
+def test_reentry_rejects_vertical_run(clf):
+    """A lob that exits the top re-descends vertically -- that is not an
+    attack impulse and must stay untouched (ordinary flight)."""
+    run = [(288, 1152, 100), (290, 1154, 140), (292, 1156, 180)]
+    _reentry_history(clf, c=288, gap=12, run=run)
+    assert clf._detect_contact(288) is None
+
+
+def test_reentry_rejects_slow_run(clf):
+    _reentry_history(clf, c=288, gap=12,
+                     run=[(288, 1152, 278), (290, 1140, 279), (292, 1128, 280)])
+    assert clf._detect_contact(288) is None
+
+
+def test_reentry_rejects_below_tape_run(clf):
+    """The run must re-enter at/above the net tape; a run already below it is
+    ordinary rally flight, not a joust signature."""
+    run = [(288, 1152, 420), (290, 1100, 424), (292, 1048, 428)]
+    _reentry_history(clf, c=288, gap=12, run=run)
+    assert clf._detect_contact(288) is None
+
+
+def test_reentry_respects_gap_band(clf):
+    _reentry_history(clf, c=288, gap=6)
+    vertex = clf._point_at(288)
+    assert clf._reentry_contact(288, vertex) is None    # short band: bridges' turf
+    _reentry_history(clf, c=318, gap=34)
+    vertex = clf._point_at(318)
+    assert clf._reentry_contact(318, vertex) is None    # dead-ball territory
+
+
+def test_reentry_emits_spike_with_takeoff_team(clf):
+    """End to end: the manufactured contact resolves to a SPIKE dated at the
+    gap midpoint, and the emitted team comes from the GROUNDED takeoff stance
+    (the contact-time snapshot is mid-jump; its airborne feet read the wrong
+    side -- GT A vs the airborne B read)."""
+    _reentry_history(clf)
+    _snap(clf, 3, 282, [1280, 380, 1420, 598], "A")   # contact time: airborne
+    _snap(clf, 3, 279, [1300, 420, 1440, 640], "A")   # takeoff stance: grounded
+    det = {"track_id": 3, "bbox": [1300, 420, 1440, 640], "center": [1370, 530],
+           "team": "A", "predicted": False}
+    events = []
+    for f in range(283, 296):
+        events += clf.classify_actions(None, [det], None, frame_number=f)
+    events += clf.flush()
+    assert len(events) == 1
+    ev = events[0]
+    assert ev["frame_number"] == 282
+    assert ev["action"] == "spike"
+    assert ev["contact_kind"] == "reentry"
+    assert ev["team"] == "A"                  # stance read, not the airborne B
+    assert ev["track_id"] == 3
+
+
+def test_reentry_needs_a_player_in_reach(clf):
+    """No candidate within CONTACT_REACH of the manufactured point: no event
+    (a wrong-court re-entry must not invent a toucher)."""
+    _reentry_history(clf)
+    _snap(clf, 4, 282, [100, 700, 200, 900], "A")
+    det = {"track_id": 4, "bbox": [100, 700, 200, 900], "center": [150, 800],
+           "team": "A", "predicted": False}
+    events = []
+    for f in range(283, 296):
+        events += clf.classify_actions(None, [det], None, frame_number=f)
+    events += clf.flush()
+    assert events == []

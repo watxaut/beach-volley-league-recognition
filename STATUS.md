@@ -5,9 +5,43 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-08-30
+**Last updated:** 2026-09-04
 
 ## Where we are
+
+**Reentry contact shipped (2026-09-04): e6's out-of-frame joust spike
+recovered, f265 overpass→set healed — and point 10's "instance #2" (e2 f167)
+REFUTED by the sighting dump.** New REENTRY band in the classifier's
+_detect_contact (next to the two bridge bands). Diagnosis: across e6's joust
+the ball tracker reset at f289 (10 missing frames) and adopted a bottom-left
+SPARE, so the real re-entry descent (f301–310) never reached _ball_history;
+the tracker re-locked the game ball only at f314, post-joust. What the
+classifier sees is a 12f sighting gap whose endpoints free flight cannot
+connect (spare (34,118) → run start (1152,278): 1695px; the bridged-apex
+shape it must not fire on is velocity-consistent: 34px) followed by a fast
+horizontal run (≥40px/f, horizontally dominated) starting at/above the net
+tape. The touch is manufactured at the gap MIDPOINT (e6 → f308 == GT
+exactly), the point back-extrapolated along the run; attribution runs
+normally at the manufactured frame (1A's clean pre-swap snapshot f308 is
+within reach via the near-net exemption — heeding the owner's "place at/
+before f308" caveat about the f311 tracker swap); gesture ATTACK (bypasses
+the hands-overhead→BLOCK misread on a jumping toucher); the emitted team is
+read from the takeoff stance [c-12, c-2] (SpikeAnalyzer's takeoff-window
+fix, scoped to this contact kind — the contact-time snapshot is mid-jump by
+construction and its airborne feet project deep).
+**Measured (e6)**: +f308 spike t3 rally 1 (track 1 = the GT spiker, team A
+via stance, conf 0.65) and f265 overpass→set: labels-only F1 0.667 →
+**0.923** (P 1.0, R 0.857 — the only FN left is the GT f308 BLOCK, which one
+manufactured contact per ball event cannot also emit), team 6/6. **A/B:
+e1/e2/e3/e4/e5 byte-identical** (the identity-break gate is what keeps e2's
+bridged apex at f149 out); production src.main path emits the same 6-event
+stream. **e2's f167 is NOT a reentry case**: the tracker bridges the toss
+apex (f141→f149) and the spike is a plainly visible bounce at f167 (rises
+148/136px — the normal detector FIRES); the event dies at the reach gate by
+4px (nearest snapshot box top 144px below the ball vs CONTACT_REACH 140),
+and the true toucher (GT p3 B) is airborne and coasted ~200px away mid-jump
+— a reach/ghost-drift residual (folded into point 7), not point 10. Suite
+**232 green** (+8 reentry tests).
 
 **Spike analytics shipped (2026-08-30): trail, touch/hard type, 9-zone attack
 grid, kill/out/dug outcomes — plus an f297 GT correction that needs one more
@@ -294,12 +328,22 @@ constraint. Side changes need no special handling as long as IDs survive.
    pass that re-clusters all track fragments into exactly 4 identities. Only
    build if match validation shows residual swaps/fragmentation that phase 1
    doesn't catch.
-7. **[narrowed 2026-08-27; e2 GT completed 2026-08-28] recall residuals
-   after the short-gap bridge.** The two missed digs (e6 f212, e2 f206) are
-   fixed. e2's remaining misses are all diagnosed: f90 held-ball release
-   (structurally invisible), f167 reentry (point 10), f32 serve mislabel
-   (tracking — see below), f118 set label (91f follow). e6's is the f308
-   joust pair (point 10). e1's far-side player recall lever
+7. **[narrowed 2026-08-27; e2 f167 RE-DIAGNOSED 2026-09-04].** recall
+   residuals after the short-gap bridge. The two missed digs (e6 f212, e2
+   f206) are fixed. e2's remaining misses: f90 held-ball release
+   (structurally invisible), f32 serve mislabel (tracking — see below),
+   f118 overpass-vs-set (its follow is the undetected f167), and f167
+   itself — **NOT a reentry case** (the old point-10 story is refuted): the
+   tracker bridges the set-toss apex (f141→f149, identity kept) and the
+   spike is a plainly visible bounce at f167 (dense sightings, rises
+   148/136px); the event dies at the reach gate by 4px (nearest snapshot's
+   box top 144px from the ball vs CONTACT_REACH 140) — and that nearest
+   snapshot is the WRONG human anyway: the true toucher (GT p3 B) is
+   airborne at f167 and coasted away mid-jump (t1B real sightings stop at
+   f150, resume f192, ~200px off the ball). Fixing it needs jump-aware
+   reach/ghost handling (airborne reach extension, or anti-drift coasting
+   through jumps), not a new contact detector. e6's f265/f308 residuals
+   are RESOLVED (2026-09-04, reentry contact). e1's far-side player recall lever
    (`player_confidence` 0.5→0.35, `player_imgsz` ↑) is unchanged/untried.
    **e2 tracking observation (owner 2026-08-28) — squatter RESOLVED
    2026-08-29** by the off-court hold horizon (see Where we are): the
@@ -329,45 +373,40 @@ constraint. Side changes need no special handling as long as IDs survive.
    (2026-08-27 addendum: e6's f265 now lands here too — with the f212 dig
    recovered it reads touch-2 no-follow overpass while GT says set; the
    follow it needs is the f311 joust, i.e. point 10. Same fix shape.)
+   **(2026-09-04: e6's f265 RESOLVED — the reentry contact supplies the
+   follow and f265 reads set. e1's f113 remains, parked on the crossing
+   signal.)**
    (2026-08-28: owner adopted the vocabulary split — **overpass** for a
    touch-1/2 crossing, **freeball** for a touch-3+ soft cross; e1 f114
    relabeled overpass→freeball in GT. Pipeline emission of freeball stays
    parked here until the crossing signal lands: a touch-3+ no-follow is
    ambiguous between "crossed" (→ freeball) and "detection missed the
    follow" (→ dig, e4 f347) without it.)
-10. **[diagnosed 2026-08-27 — parked by owner decision, one mechanism per
-    session] Reentry contact: touches whose approach is out of frame.** e6's
-    joust pair (GT-corrected 2026-08-28: f308 spike 1A t3 + block 2B t1) is
-    invisible to every existing
-    mechanism: A's set toss exits the frame TOP at f277 [1166,17] still
-    ascending, the contact happens above/entering the frame, and the ball
+10. **[RESOLVED 2026-09-04 for e6 — the reentry contact shipped; "instance
+    #2" refuted.]** The e6 joust spike (f308 1A t3) is manufactured by the
+    REENTRY band in _detect_contact (full story in Where we are): f265
+    overpass→set healed, labels-only F1 0.923, six-video A/B byte-neutral
+    on e1–e5. Two residuals stay open here: (a) the GT f308 BLOCK (2B t1)
+    — one manufactured contact per ball event; emitting the spike+block
+    pair from one impulse needs a joust-split decision (owner); (b) ROOT
+    CAUSE untouched: the BALL tracker's post-reset reseed adopted the left
+    spare (e6 f289), which is why the real re-entry descent (f301–310) is
+    unrecoverable to the classifier — a smarter reseed (prefer in-flight
+    balls over static/spare ones) is a possible future lever, six-video
+    A/B required. **e2 f167 was NOT a reentry case** (see point 7).
+    Evidence history: the toss exited the frame TOP at f277 [1166,17] still
+    ascending; the contact happens above/entering the frame; the ball
     re-enters at f314 [1152,278] — above the net tape (verified via
-    `is_above_net`) — flying left at ~48px/f with dense sightings f314–319.
-    The tracker's f289–302 "ball" there is a bottom-left SPARE handled by
-    1B (free-flight x-physics: the toss exited moving right at 8px/f and
-    cannot re-enter at x=177 moving up-left; sheet-proven). Candidate
-    mechanism ("reentry contact"): first sighting after an UNREACHABLE
-    jump (|Δx| ≫ gap·max-speed) with zero left points within NEIGH, ≥2
-    dense right points, ball above the net tape, fast exit (≥DRIVE_MIN_
-    SPEED), player at net within reach; incoming vector manufactured
-    vertical-from-above; gesture via existing near-net rules (→ spike or
-    block). Pays twice on e6: the joust pair AND f265 overpass→set (it
-    supplies the follow). 2026-08-28 caveat: the owner observed the tracker
-    SWAPS players at f311 (and tracks an out-of-court box) while f308
-    labels are right — `_closest_player_at` picks the snapshot nearest the
-    contact frame, so a reentry event placed at/before f308 can attribute
-    off the clean snapshots, but this needs care. **Second instance found
-    2026-08-28: e2 f167** — B's set f120 sends the ball above the frame,
-    p3's spike contact happens out of frame, and the ball re-enters at
-    f185 descending fast (~16px/f vertical, apex never seen). Note the
-    sub-shapes differ: e6 = horizontal re-entry AT net height (deflection
-    exit), e2 = steep descending re-entry (attack landing flight) — a
-    reentry mechanism must cover both without firing on ordinary
-    frame-entries (serves, balls crossing above frame). Risks: new contact
-    kind, invented incoming
-    vector, serve entries / spare balls need the A/B neutrality proof on
-    e1–e5 like the bridge got. Evidence + trace: output/diag_e6_missed.py,
-    sheets video_entreno_6_f296-322.
+    `is_above_net`) — flying left at ~48px/f with dense sightings f314–319;
+    the tracker's f289–302 "ball" is a bottom-left spare (sheet-proven).
+    Sub-shapes differ across footage: e6 = horizontal re-entry AT net height
+    (deflection exit); e2 = steep descending re-entry (attack landing
+    flight) — the mechanism's horizontal-dominance + identity-break gates
+    cover the first and correctly refuse the second (it is ordinary flight;
+    see point 7). Owner caveat heeded: the tracker swaps players at f311,
+    so the event is placed at/before f308 (gap midpoint) and attributes off
+    the clean snapshots. Original trace: output/diag_e6_missed.py, sheets
+    video_entreno_6_f296-322; new evidence: output/diag_reentry*.py.
 11. **[owner ratification 2026-08-28 — queue nearly empty].**
     FOLDED: (a) e2 +3 events — f32 **serve p1 A t1** (the untracked near-left
     server, owner-marked in white on the sheet; the pred had attributed the
@@ -414,6 +453,58 @@ constraint. Side changes need no special handling as long as IDs survive.
     locations today.
 
 ## Log (newest first)
+
+### 2026-09-04 — reentry contact shipped: e6's out-of-frame joust spike manufactured; point 10's e2 "instance #2" refuted
+- **Diagnosis first** (output/diag_reentry.py raw-sighting dump + annotated
+  sheets output/gt_verify/reentry_e6_f262-320.png / reentry_e2_f160-174.png,
+  git-ignored): (a) e6 — across the f308 joust the BALL tracker reset at f289
+  (10 missing frames after the toss exited the top at f277) and ADOPTED the
+  bottom-left spare, so the game ball's real re-entry descent (f301–310,
+  seen by the raw detector at (1305,34)→(1332,268), ~24px/f, above the tape
+  the whole way) NEVER reached _ball_history; the tracker re-locked the game
+  ball only at f314, post-joust. The classifier's history: spare junk f302
+  (34,118) → 12f gap → run start f314 (1152,278) then -48px/f flat above
+  the tape — the joust impulse (vx +3 → -50) hidden in the gap. Free-flight
+  fit: the toss arc cannot produce the observed re-entry; the impulse is
+  the contact. (b) e2 — **the "instance #2" reentry story is REFUTED**: the
+  tracker bridges the set-toss apex (f141→f149, gap 8, identity kept via
+  the growing-gap tolerance), the GT-corrected spike at f167 is a plainly
+  VISIBLE bounce (dense sightings, rises 148/136px) — the normal detector
+  fires, and the event dies at the reach gate by 4px (nearest snapshot box
+  top 144px from the ball vs CONTACT_REACH 140); the true toucher (GT p3 B)
+  is airborne and coasted ~200px away mid-jump (t1B real f150 → f192).
+  Re-classified under point 7 (reach/ghost-drift), not point 10.
+- **Shipped** (REENTRY_* band in ActionClassifier._detect_contact, beside
+  the bridge bands; gates: gap ∈ [8,30]; ≥2 real points in (c,c+7] moving
+  ≥40px/f horizontally dominated, starting at/above the net tape; IDENTITY
+  BREAK — the pre-gap point ≥200px from the run's backward extrapolation
+  (e6: 1695px; e2 f149: 34px, refused); touch placed at the gap MIDPOINT
+  (e6 → f308 == GT), point back-extrapolated, above the tape; attribution
+  at the manufactured frame (1A's clean pre-swap f308 snapshot within reach
+  via the near-net exemption); gesture ATTACK for kind="reentry" (bypasses
+  the hands-overhead→BLOCK misread on a jumping toucher); emitted team from
+  the takeoff stance [c-12, c-2] — the SpikeAnalyzer takeoff-window fix
+  scoped to this kind, because contact-time airborne feet project deep
+  (would have emitted B, GT is A). _detect_contact now returns a 5-tuple
+  (…, frame) so the reentry can date the event off-c.
+- **Measured (e6)**: +f308 spike t3 r1 (track 1 = the GT spiker, team A,
+  conf 0.65) and f265 overpass→set (follow exists now): labels-only F1
+  0.667 → **0.923** (P 1.0; the only FN is the GT f308 BLOCK — one
+  manufactured contact per ball event; a spike+block joust-split is an
+  owner decision), team 6/6. **A/B (output/diag_reentry_ab.py, identical
+  feeding): e1/e2/e3/e4/e5 BYTE-IDENTICAL event streams**; evals unchanged
+  (e1 0.706, e2 0.571, e3/e4/e5 1.0). Production src.main on e6: same
+  6-event stream (CSV emission-anchored; spike conf 0.65 on player_1).
+- Tests: +8 reentry (fires on identity break incl. midpoint frame +
+  manufactured inc; rejects connectible gap / vertical run / slow run /
+  below-tape run / gap-band edges; end-to-end spike with takeoff-team; no
+  reach → no event); 3 call sites updated for the 5-tuple. Suite 224 →
+  **232 green**.
+- Files: src/recognition/action_classifier.py, tests/test_team_attribution.py,
+  STATUS.md. Diagnostics (git-ignored): output/diag_reentry.py,
+  output/diag_reentry_sheets.py, output/diag_reentry_ab.py, sheets
+  output/gt_verify/reentry_*.png, runs output/reentry_{base,post}_e{1..6},
+  output/reentry_prod_e6.
 
 ### 2026-09-01 — trail render fix: masked blend (owner-reported black boxes behind trail segments)
 - **Owner report**: the red trail carried black rectangles behind its

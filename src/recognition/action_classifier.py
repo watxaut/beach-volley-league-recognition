@@ -79,6 +79,43 @@ class ActionClassifier:
                                  # sighting (a spare ball appearing elsewhere must
                                  # not bridge -- e6 f236/f289, e5 f320/f325)
 
+    # --- Reentry contact (the touch happened where the ball was not visible) ---
+    # A hard contact can happen out of sight: a spiker meets the set toss ABOVE
+    # the frame top and the joust impulse sits behind the net tape while the
+    # ball tracker is lost. The tracker gives up after max_missing_frames and
+    # often adopts a SPARE ball; when it re-locks the game ball, _ball_history
+    # shows a long sighting gap whose endpoints free flight cannot connect,
+    # followed by a fast horizontal run at/above the net tape (e6: spare junk
+    # at f302 (34,118) -> game ball at f314 (1152,278) running -48px/f, the
+    # joust impulse vx +3 -> -50 hidden in between; the real re-entry descent
+    # f301-310 never reached the history). The normal tests cannot fire (the
+    # gap leaves <2 left points within NEIGH) and both bridge bands refuse
+    # (shape/identity gates). This band manufactures the touch:
+    #   * gap in [REENTRY_MIN_GAP, REENTRY_MAX_GAP] -- shorter gaps are the
+    #     bridges' turf, longer ones are dead-ball/serve territory;
+    #   * >=REENTRY_MIN_RUN real points after the gap moving at attack scale
+    #     (>= REENTRY_MIN_SPEED px/f), horizontally dominated, starting at or
+    #     above the net tape (a lob re-descends vertically; a free-driven ball
+    #     keeps its speed and stays connectible);
+    #   * IDENTITY BREAK (load-bearing): the pre-gap point must be UNREACHABLE
+    #     from the run extrapolated backward across the gap (e6: 1695px; the
+    #     bridged apex it must not fire on is velocity-consistent: 34px);
+    #   * the touch sits at the gap MIDPOINT (max-likelihood when the flight
+    #     is unseen on both sides; e6 -> f308 == GT) and the point is back-
+    #     extrapolated along the run; it must be above the net tape;
+    #   * attribution runs normally at the manufactured frame; the emitted
+    #     team is read from the takeoff stance because the contact-time
+    #     snapshot is mid-jump by construction and airborne feet project deep
+    #     (the SpikeAnalyzer takeoff-window lesson, [c-12, c-2]).
+    REENTRY_MIN_GAP = 8       # frames; below this the bridge bands' turf
+    REENTRY_MAX_GAP = 30      # frames; beyond this = dead ball / new rally
+    REENTRY_RUN_WINDOW = 7    # frames after the gap used to measure the run
+    REENTRY_MIN_RUN = 2       # real sightings needed in the run window
+    REENTRY_MIN_SPEED = 40.0  # px/frame; attack-drive scale
+    REENTRY_JUMP_PX = 200.0   # min identity break (px) pre-gap -> run
+    REENTRY_TEAM_BACK = 12    # takeoff-stance window (frames before contact),
+    REENTRY_TEAM_END = 2      # mirroring SpikeAnalyzer's [c-12, c-2]
+
     # --- Drive (attacking hit) detection ---
     # A spike drives the ball down/across: unlike a dig it does not pop the ball
     # back up (so the bounce test misses it) and it need not flip the ball's
@@ -232,7 +269,9 @@ class ActionClassifier:
         if contact is None:
             return []
 
-        contact_point, kind, inc, out = contact
+        # The reentry band manufactures its own contact frame (the gap
+        # midpoint): the event must not carry the re-entry sighting frame.
+        contact_point, kind, inc, out, contact_frame = contact
 
         # Which team may be touching now, read from the ball itself (see
         # _attribution_target): constrains the candidate set below.
@@ -244,6 +283,16 @@ class ActionClassifier:
         pdata, distance, lr_index = chosen
         if distance > self.CONTACT_REACH:
             return []
+
+        if kind == "reentry":
+            # The contact frame is manufactured, so the snapshot AT it is
+            # mid-jump by construction and its airborne feet project deep
+            # (wrong side). Read the emitted team from the last pre-contact
+            # stance instead (SpikeAnalyzer's takeoff-window fix, scoped to
+            # this contact kind).
+            stance = self._takeoff_stance(pdata.get("track_id"), contact_frame)
+            if stance is not None:
+                pdata = stance
 
         self._last_contact_frame = contact_frame
 
@@ -318,6 +367,73 @@ class ActionClassifier:
             if p[0] == f:
                 return p
         return None
+
+    def _takeoff_stance(self, track_id: Optional[int], frame: int) -> Optional[Dict[str, Any]]:
+        """Nearest real snapshot of ``track_id`` in [frame-REENTRY_TEAM_BACK,
+        frame-REENTRY_TEAM_END] -- the last grounded read before a manufactured
+        reentry contact (airborne contact-time feet project deep)."""
+        if track_id is None:
+            return None
+        hist = self._player_pose_history.get(track_id)
+        if not hist:
+            return None
+        lo = frame - self.REENTRY_TEAM_BACK
+        hi = frame - self.REENTRY_TEAM_END
+        window = [h for h in hist
+                  if h.get("center") is not None and lo <= h["frame"] <= hi]
+        if not window:
+            return None
+        snap = dict(min(window, key=lambda h: abs(h["frame"] - hi)))
+        snap["track_id"] = track_id
+        return snap
+
+    def _reentry_contact(self, c: int, vertex: Tuple):
+        """Manufacture a contact across an out-of-frame excursion (see the
+        REENTRY_* constants). Called like :meth:`_bridge_contact` at ``c`` =
+        the first ball sighting after the gap. Returns the contact tuple with
+        the event frame at the gap MIDPOINT -- the touch happened inside the
+        excursion, and carrying ``c`` would misdate it by the whole unseen
+        flight -- or None when the gap/run/geometry does not qualify."""
+        before = [p for p in self._ball_history if p[0] < c]
+        if not before:
+            return None
+        a = before[-1]
+        gap = c - a[0]
+        if not (self.REENTRY_MIN_GAP <= gap <= self.REENTRY_MAX_GAP):
+            return None
+        run = self._real_points(c + 1, c + self.REENTRY_RUN_WINDOW)
+        if len(run) < self.REENTRY_MIN_RUN:
+            return None
+        span = run[-1][0] - c
+        if span <= 0:
+            return None
+        v_run = ((run[-1][1] - vertex[1]) / span,
+                 (run[-1][2] - vertex[2]) / span)
+        speed = float(np.hypot(*v_run))
+        # A lob that exits the top re-descends VERTICALLY and free-flight
+        # connectible; an attack-scale impulse leaves a fast horizontal run.
+        if speed < self.REENTRY_MIN_SPEED or abs(v_run[0]) <= abs(v_run[1]):
+            return None
+        if not self._court_ready():
+            return None
+        if not self.court.is_above_net((int(vertex[1]), int(vertex[2]))):
+            return None
+        # Identity break: where would the run's own velocity have put the ball
+        # back at the pre-gap frame? If that prediction lands on the pre-gap
+        # sighting the flight is connectible (a bridged apex, e2 f149: 34px)
+        # and any touch inside the gap is the bridges' business, not ours.
+        px = vertex[1] - v_run[0] * gap
+        py = vertex[2] - v_run[1] * gap
+        if float(np.hypot(px - a[1], py - a[2])) < self.REENTRY_JUMP_PX:
+            return None
+        back = max(1, gap // 2)
+        cx = vertex[1] - v_run[0] * back
+        cy = vertex[2] - v_run[1] * back
+        if not self.court.is_above_net((int(cx), int(cy))):
+            return None
+        inc = (0.0, speed)          # manufactured: vertical from above
+        out = (run[-1][1] - vertex[1], run[-1][2] - vertex[2])
+        return [cx, cy], "reentry", inc, out, c - back
 
     def _bridge_contact(self, c: int, vertex: Tuple):
         """Bounce whose bottom the detector never saw (ball occluded at the touch).
@@ -426,11 +542,14 @@ class ActionClassifier:
 
     def _detect_contact(
         self, c: int
-    ) -> Optional[Tuple[List[float], str, Tuple[float, float], Tuple[float, float]]]:
+    ) -> Optional[Tuple[List[float], str, Tuple[float, float], Tuple[float, float], int]]:
         """Test whether frame ``c`` is a ball contact.
 
-        Returns (contact_point, kind, incoming_vec, outgoing_vec) or None.
-        ``kind`` is "bounce" (fall-and-rise) or "redirect" (horizontal deflect).
+        Returns (contact_point, kind, incoming_vec, outgoing_vec, frame) or
+        None. ``kind`` is "bounce" (fall-and-rise), "redirect" (horizontal
+        deflect), "drive" (attacking hit), or "reentry" (manufactured across
+        an out-of-frame excursion). ``frame`` is the event's contact frame:
+        ``c`` for the detected kinds, the gap midpoint for a reentry.
         """
         if c <= self.NEIGH:
             return None
@@ -447,7 +566,13 @@ class ActionClassifier:
         # bridge can see the touch that happened inside the gap.
         bridged = self._bridge_contact(c, vertex)
         if bridged is not None:
-            return bridged
+            return bridged[0], bridged[1], bridged[2], bridged[3], c
+        # Reentry band next (see the REENTRY_* constants): an out-of-frame
+        # excursion the tracker never bridged -- the gap endpoints are not
+        # free-flight connectible and the outgoing run is attack-fast.
+        reentry = self._reentry_contact(c, vertex)
+        if reentry is not None:
+            return reentry
         vx, vy = vertex[1], vertex[2]
 
         left = self._real_points(c - self.NEIGH, c - 1)
@@ -466,12 +591,12 @@ class ActionClassifier:
             rise_l = vy - min(p[2] for p in left)
             rise_r = vy - min(p[2] for p in right)
             if rise_l >= self.MIN_PROMINENCE and rise_r >= self.MIN_PROMINENCE:
-                return contact_point, "bounce", inc, out
+                return contact_point, "bounce", inc, out, c
 
         # Horizontal redirect: ball arrives from one side and leaves to the
         # other (block/spike drive) without a clean bounce.
         if inc[0] * out[0] < 0 and abs(inc[0]) > self.XREV_MIN and abs(out[0]) > self.XREV_MIN:
-            return contact_point, "redirect", inc, out
+            return contact_point, "redirect", inc, out, c
 
         # Attacking DRIVE: the ball's motion is checked in a way free flight
         # cannot produce -- its downward speed is sharply cut (a ball hit down
@@ -498,7 +623,7 @@ class ActionClassifier:
             pops_up = vout[1] < -self.DRIVE_RISE_TOL
             if speed >= self.DRIVE_MIN_SPEED and stays_down and not pops_up:
                 if dvy <= -self.DRIVE_DECEL or abs(dvx) >= self.DRIVE_XIMPULSE:
-                    return contact_point, "drive", inc, out
+                    return contact_point, "drive", inc, out, c
 
         return None
 
@@ -755,6 +880,14 @@ class ActionClassifier:
         and pose are used -- never rally position. The bump-set gesture is
         intentionally coarse; the context layer decides dig/set/overpass/serve.
         """
+        # REENTRY -- a manufactured contact across an out-of-frame excursion.
+        # The identity-break + fast-horizontal-run-above-tape gates already
+        # prove an attack-scale impulse; the pose block read is unreliable
+        # here (the toucher is airborne by construction), so the gesture is
+        # ATTACK and the context layer labels the action.
+        if kind == "reentry":
+            return VisualGesture.ATTACK, 0.55
+
         out_x, out_y = out
         horiz = abs(out_x)
         vert = abs(out_y)
