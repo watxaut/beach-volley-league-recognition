@@ -1,0 +1,42 @@
+tests/test_json_exporter.py
+  s_3bcce69204da81::t_e91d1ec090a161 31-37,46,124-127,138,143,145-165
+  s_3bcce69204da81::t_a50a7b0df4f8d0 128-137,139-142,144
+src/db/ingest.py
+  s_3bcce69204da81::t_8b70ce0207ac3d 20-21,27-29,34-39,192-264,276-295,300-302,304,306,328-332,348,353
+  s_3bcce69204da81::t_2746fd1b8817c1 265-275
+  s_3bcce69204da81::t_c994c982c4c2bb 303,305
+tests/test_db.py
+  s_3bcce69204da81::t_ee5fadabb04224 16,353-354
+  s_3bcce69204da81::t_9d51465e549a0d 10-11,278-336,347-352
+  s_3bcce69204da81::t_10721f7853dfa9 337-346
+src/web/templates/video_detail.html
+  s_3bcce69204da81::t_b2f356cdff7309 18,22-28,75,78
+README.md
+  s_3bcce69204da81::t_357ea2e545ebd8 227-230
+src/output_gen/json_exporter.py
+  s_3bcce69204da81::t_37566f9f326641 38-42,118,161-219
+src/web/app.py
+  s_3bcce69204da81::t_314322df7265ee 18,34,38
+  s_3bcce69204da81::t_3a9777c296888d 23,35,84-93,115,145,169-177
+  s_3bcce69204da81::t_8100b88d310b63 178-179
+src/web/static/style.css
+  s_3bcce69204da81::t_bc0cb8407a63dc 243-258
+STATUS.md
+  s_3bcce69204da81::t_cda94108054f0c 586-597
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "405ab0b42c5f1c0faee39bf9f892d2fa30b41c2a",
+  "prompts": {},
+  "sessions": {
+    "s_3bcce69204da81": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a06e15-d1af-7053-aa7a-bd311b37e07b",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
