@@ -1,0 +1,71 @@
+src/web/templates/base.html
+  s_3bcce69204da81::t_f8c9da98dc5036 1-21
+src/web/templates/player_detail.html
+  s_3bcce69204da81::t_9e31949ae07431 1-101
+src/main.py
+  s_3bcce69204da81::t_34cd9d8b3d8d64 16,214-217
+  s_3bcce69204da81::t_f228b1aa001562 218
+tests/test_db.py
+  s_3bcce69204da81::t_164a933b6dae3c 151,154-156
+  s_3bcce69204da81::t_776c0ef39a1c5b 135-138,141,144,146-148
+  s_3bcce69204da81::t_407cd09dd58e31 1-134,139-140,142-143,145,149-150,152-153,157-296
+pyproject.toml
+  s_3bcce69204da81::t_4874912ccd1db9 51-56
+src/db/labels.py
+  s_3bcce69204da81::t_558b0562f418db 1-97
+src/db/__init__.py
+  s_3bcce69204da81::t_f4d8b3c47dfc43 1-7
+Makefile
+  s_3bcce69204da81::t_ced3e66b06a750 16,25,51-73,75,80-83
+src/db/ingest.py
+  s_3bcce69204da81::t_df04e674916bcb 92-94,99-108,121-123
+  s_3bcce69204da81::t_aae455f1cbb055 1-91,95-98,109-120,124-241
+tests/test_json_exporter.py
+  s_3bcce69204da81::t_8adf9a75d6fc28 1-119
+STATUS.md
+  s_3bcce69204da81::t_2fefca374685ff 541-551,554-584
+  s_3bcce69204da81::t_74ee80a5356401 8,12-45
+  s_3bcce69204da81::t_85da22efbc5ba7 46
+  s_3bcce69204da81::t_27639722603da8 585
+src/web/templates/videos.html
+  s_3bcce69204da81::t_3f8187c0248be9 1-52
+src/web/templates/players.html
+  s_3bcce69204da81::t_c14d2ee126343b 1-56
+src/db/metrics.py
+  s_3bcce69204da81::t_bec3de07a6a137 66
+  s_3bcce69204da81::t_6e117d3dd4df28 1-65,67-318
+src/web/templates/video_detail.html
+  s_3bcce69204da81::t_f7129a2d4e0db4 1-124
+src/web/app.py
+  s_3bcce69204da81::t_7d57918dcd444b 1-20,22,24-33,35-206
+  s_3bcce69204da81::t_694733f6fda8b3 21,23,34
+src/web/static/style.css
+  s_3bcce69204da81::t_fc1c1938127d74 1-118
+src/output_gen/json_exporter.py
+  s_3bcce69204da81::t_5c8b670a80f841 1-154
+README.md
+  s_3bcce69204da81::t_afe42b39481d15 192,195-203
+  s_3bcce69204da81::t_66b00569d2d168 205-247
+  s_3bcce69204da81::t_3479fa226b5cde 204
+src/db/schema.py
+  s_3bcce69204da81::t_a013223996570b 1-96,101-103,105-114
+  s_3bcce69204da81::t_872ed8ed1a4d76 97-100,104
+.gitignore
+  s_3bcce69204da81::t_6bf8fbf5902dfe 239-241
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "2911cd8cf21244829e34aa8717be1f53d9b82f67",
+  "prompts": {},
+  "sessions": {
+    "s_3bcce69204da81": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a06e15-d1af-7053-aa7a-bd311b37e07b",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
