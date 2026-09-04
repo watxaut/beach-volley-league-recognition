@@ -583,6 +583,18 @@ constraint. Side changes need no special handling as long as IDs survive.
   blurred header, gradient cards/metric tiles/bars, glow on heat cells,
   dark form controls with focus rings; CSS-only, still zero JS deps;
   breadcrumb links on detail pages).
+- **Later still: player photos for labeling.** `pipeline_output.json` gains
+  `snapshots` — per track up to 3 (frame, bbox) picks from the per-frame
+  tracked_players the pipeline already emits (action-anchored moments
+  first, then a neutral mid-video stance; exporter-only change, zero
+  pipeline divergence). `ingest` materializes them into
+  `data/thumbs/<video>/<track_N>.png` strips (crop with padding +
+  min-aspect 0.45 widening so far-side players stay recognizable; stale
+  strips wiped per video; skips gracefully if the source video moved).
+  The label form shows the strips (click to enlarge) and the action
+  timeline shows small per-track avatars. NOTE: thumbnails need the video
+  file reachable at its recorded path; re-running `make run` regenerates
+  snapshots. Suite 269 green (+7).
 - **Gotchas**: sqlite3 needs `check_same_thread=False` for FastAPI sync
   handlers (threadpool); this venv has no pytest-cov → run
   `venv/bin/python -m pytest tests/ -q -o addopts=""`. Suite **262 green**

@@ -15,10 +15,17 @@
   cross-video metrics. Team is informational; per-action team is authoritative.</p>
   <form method="post" action="/videos/{{ video_key }}/labels">
     <table class="labels">
-      <thead><tr><th>Track</th><th>Suggested team</th><th>Player name</th><th>Team</th></tr></thead>
+      <thead><tr><th>Photo</th><th>Track</th><th>Suggested team</th><th>Player name</th><th>Team</th></tr></thead>
       <tbody>
       {% for t in tracks %}
         <tr>
+          <td class="photo-cell">
+            {% if thumbs[t] %}
+              <a href="{{ thumbs[t] }}" target="_blank"><img class="thumb" src="{{ thumbs[t] }}" alt="track {{ t }}"></a>
+            {% else %}
+              <div class="no-thumb" title="no thumbnail (video file unavailable at ingest?)">?</div>
+            {% endif %}
+          </td>
           <td class="num">{{ t }}</td>
           <td class="num"><span class="pill {{ suggested_team[t]|teamcolor }}">{{ suggested_team[t] or "?" }}</span></td>
           <td>
@@ -65,8 +72,10 @@
         <td><span class="pill {{ a.team|teamcolor }}">{{ a.team or "?" }}</span></td>
         <td>
           {% if a.player_name %}
+            {% if thumbs.get(a.track_id) %}<img class="avatar" src="{{ thumbs[a.track_id] }}" alt="">{% endif %}
             <a href="/players/{{ a.player_id }}">{{ a.player_name }}</a>
           {% else %}
+            {% if thumbs.get(a.track_id) %}<img class="avatar" src="{{ thumbs[a.track_id] }}" alt="">{% endif %}
             <span class="muted">track {{ a.track_id }}</span>
           {% endif %}
         </td>

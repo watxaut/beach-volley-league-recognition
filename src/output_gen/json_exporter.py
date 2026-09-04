@@ -35,6 +35,11 @@ SPIKE_FIELDS = (
     "resolution_frame",
 )
 
+# Player-thumbnail snapshots per track: frames the ingester crops from the
+# video for the labeling UI. Action frames first (identifiable moments),
+# then an evenly-spread frame for a neutral stance.
+SNAPSHOTS_PER_TRACK = 3
+
 
 def git_version() -> Optional[str]:
     """Short git hash of the working tree, or None outside a repo."""
@@ -110,6 +115,7 @@ class JSONExporter:
             "pipeline_version": pipeline_version if pipeline_version is not None else git_version(),
             "actions": actions,
             "spikes": spikes,
+            "snapshots": self.collect_snapshots(analysis_results, actions),
         }
 
     def collect_actions(self, analysis_results: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -152,3 +158,62 @@ class JSONExporter:
             spikes.append(rec)
         spikes.sort(key=lambda s: (s.get("frame") or 0,))
         return spikes
+
+    def collect_snapshots(
+        self, analysis_results: Dict[str, Any], actions: List[Dict[str, Any]]
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """Per-track thumbnail snapshots (frame + bbox) for the labeling UI.
+
+        The UI crops these frames out of the source video so the owner can
+        see WHO each track id is before naming them. Up to
+        SNAPSHOTS_PER_TRACK per track: appearances nearest the track's own
+        action frames first (a dig/spike moment is more identifiable than a
+        blurred coast), then the track's mid-video appearance for a neutral
+        stance. Frame-ordered, deduplicated.
+        """
+        from collections import defaultdict
+
+        # track_id -> ordered [(frame, bbox)] from the per-frame track states
+        appearances: Dict[int, List[tuple]] = defaultdict(list)
+        for frame_result in analysis_results.get("frame_results", []):
+            frame = frame_result.get("frame_index", 0)
+            for p in frame_result.get("tracked_players", []):
+                tid = p.get("track_id")
+                bbox = p.get("bbox")
+                if tid is not None and bbox and len(bbox) == 4:
+                    appearances[tid].append((frame, [round(v, 1) for v in bbox]))
+
+        # track_id -> ordered action frames
+        action_frames: Dict[int, List[int]] = defaultdict(list)
+        for a in actions:
+            tid = a.get("track_id")
+            if tid is not None and a.get("frame_number") is not None:
+                action_frames[tid].append(a["frame_number"])
+
+        snapshots: Dict[str, List[Dict[str, Any]]] = {}
+        for tid, appearances_list in sorted(appearances.items()):
+            chosen: List[tuple] = []
+
+            def nearest_appearance(target: int) -> Optional[tuple]:
+                if not appearances_list:
+                    return None
+                return min(appearances_list, key=lambda fr: abs(fr[0] - target))
+
+            # Action moments first (cap at SNAPSHOTS_PER_TRACK - 1, keep one
+            # slot for the neutral mid-video stance).
+            for af in action_frames.get(tid, [])[: SNAPSHOTS_PER_TRACK - 1]:
+                pick = nearest_appearance(af)
+                if pick and pick not in chosen:
+                    chosen.append(pick)
+            # Neutral stance: the appearance closest to the track's midpoint.
+            if appearances_list:
+                mid_frame = (appearances_list[0][0] + appearances_list[-1][0]) // 2
+                pick = nearest_appearance(mid_frame)
+                if pick and pick not in chosen:
+                    chosen.append(pick)
+
+            chosen.sort(key=lambda fr: fr[0])
+            snapshots[str(tid)] = [
+                {"frame": frame, "bbox": bbox} for frame, bbox in chosen[:SNAPSHOTS_PER_TRACK]
+            ]
+        return snapshots

@@ -224,7 +224,10 @@ make db-reset                                   # delete the DB entirely (labels
 - `players` - real player names (global, survive everything)
 - `video_players` - **the labeling table**: (video, track_id 1-4) -> player.
   Track ids are per-video bootstrap artifacts, NOT stable identities, so a
-  label is always per video. Applied via the UI after ingest.
+  label is always per video. Applied via the UI after ingest - the label
+  form shows a **photo strip of each track** (cropped from the video at
+  the track's action moments, materialized by ingest into `data/thumbs/`)
+  so players are easy to identify.
 - `actions` - every emitted contact (action, gesture, confidence, team,
   touch_number, rally_id, contact_kind, contact point). No per-frame data is stored.
 - `spikes` - attack enrichment (spike_type, attack_zone, outcome, landing/dug zones)

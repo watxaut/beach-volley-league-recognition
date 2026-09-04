@@ -17,14 +17,25 @@ table are never modified here.
 import argparse
 import json
 import logging
+import re
+import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
+import cv2
+import numpy as np
+
 from .schema import DEFAULT_DB_PATH, connect, init_db
 
 SCHEMA_VERSION = 1
+
+# Labeling-UI thumbnails: cropped player snapshots materialized next to the
+# DB (data/thumbs/<video_key>/track_<id>.png) from the payload's snapshots.
+THUMB_HEIGHT_PX = 150
+THUMB_GAP_PX = 4
+BBOX_PAD_FRACTION = 0.15
 
 
 class IngestError(Exception):
@@ -178,11 +189,121 @@ def ingest_payload(conn, payload: Dict) -> Dict[str, int]:
     return {"video_key_len": 1, "actions": len(actions), "spikes": len(spikes)}
 
 
-def ingest_file(conn, json_path: Path) -> Dict[str, int]:
+def _resolve_video_path(raw_path: str) -> Optional[Path]:
+    """Locate the source video (paths are recorded relative to the repo root
+    at extraction time; try as-is, then relative to ./output and ./)."""
+    if not raw_path:
+        return None
+    candidates = [Path(raw_path)]
+    if not Path(raw_path).is_absolute():
+        candidates += [Path("..") / raw_path, Path.cwd().parent / raw_path]
+    for c in candidates:
+        if c.is_file():
+            return c
+    return None
+
+
+def write_thumbnails(payload: Dict, thumbs_root: Path) -> Dict[str, Path]:
+    """Materialize per-track thumbnail strips for the labeling UI.
+
+    Wipes the video's thumbs directory first (stale tracks from previous
+    runs must not survive), then crops each track's snapshot frames out of
+    the source video into one horizontal strip per track. Returns
+    track_id -> written path; empty when the video file is unavailable
+    (the UI then falls back to a placeholder).
+    """
+    video_key = payload.get("video", {}).get("key")
+    snapshots = payload.get("snapshots") or {}
+    video_dir = Path(thumbs_root) / str(video_key)
+
+    if not video_key:
+        return {}
+    shutil.rmtree(video_dir, ignore_errors=True)
+    if not snapshots:
+        return {}
+
+    video_path = _resolve_video_path(payload["video"].get("path", ""))
+    if video_path is None:
+        logging.getLogger(__name__).warning(
+            f"Thumbnails skipped for {video_key}: video file not found "
+            f"({payload['video'].get('path')!r})"
+        )
+        return {}
+
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        logging.getLogger(__name__).warning(
+            f"Thumbnails skipped for {video_key}: cannot open {video_path}"
+        )
+        return {}
+
+    written: Dict[str, Path] = {}
+    try:
+        video_dir.mkdir(parents=True, exist_ok=True)
+        for track_id, snaps in snapshots.items():
+            crops = []
+            for snap in snaps[:3]:
+                frame_idx = int(snap.get("frame", 0))
+                bbox = snap.get("bbox")
+                if not bbox or len(bbox) != 4:
+                    continue
+                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+                ok, frame = cap.read()
+                if not ok or frame is None:
+                    continue
+                h, w = frame.shape[:2]
+                x1, y1, x2, y2 = bbox
+                pad_x = (x2 - x1) * BBOX_PAD_FRACTION
+                pad_y = (y2 - y1) * BBOX_PAD_FRACTION
+                x1 = max(0, int(x1 - pad_x))
+                y1 = max(0, int(y1 - pad_y))
+                x2 = min(w, int(x2 + pad_x))
+                y2 = min(h, int(y2 + pad_y))
+                if x2 - x1 < 8 or y2 - y1 < 8:
+                    continue
+                crop = frame[y1:y2, x1:x2]
+                # Far-side players project as thin boxes; widen very skinny
+                # crops (min aspect 0.45 w/h, centered on the bbox) so faces
+                # stay recognizable in the strip.
+                ch, cw = crop.shape[:2]
+                min_w = int(ch * 0.45)
+                if cw < min_w:
+                    cx = (x1 + x2) // 2
+                    nx1 = max(0, cx - min_w // 2)
+                    nx2 = min(w, nx1 + min_w)
+                    nx1 = max(0, nx2 - min_w)
+                    crop = frame[y1:y2, nx1:nx2]
+                scale = THUMB_HEIGHT_PX / crop.shape[0]
+                crop = cv2.resize(
+                    crop, (max(1, int(crop.shape[1] * scale)), THUMB_HEIGHT_PX)
+                )
+                crops.append(crop)
+            if not crops:
+                continue
+            gap = np.full((THUMB_HEIGHT_PX, THUMB_GAP_PX, 3), 24, dtype=np.uint8)
+            strip = crops[0]
+            for crop in crops[1:]:
+                strip = np.hstack([strip, gap, crop])
+            out_path = video_dir / f"track_{track_id}.png"
+            if cv2.imwrite(str(out_path), strip):
+                written[str(track_id)] = out_path
+    finally:
+        cap.release()
+    return written
+
+
+def ingest_file(conn, json_path: Path, thumbs_root: Optional[Path] = None) -> Dict[str, int]:
     """Load one pipeline_output.json and upsert it."""
     with open(json_path, "r", encoding="utf-8") as f:
         payload = json.load(f)
     counts = ingest_payload(conn, payload)
+    if thumbs_root is not None:
+        thumbs = write_thumbnails(payload, thumbs_root)
+        if thumbs:
+            key = payload.get("video", {}).get("key")
+            logging.getLogger(__name__).info(
+                f"Thumbnails for {key}: {len(thumbs)} track(s)"
+            )
     logging.getLogger(__name__).info(
         f"Ingested {json_path}: +{counts['actions']} actions, "
         f"+{counts['spikes']} spikes"
@@ -204,6 +325,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=str(DEFAULT_DB_PATH),
         help=f"Database path (default: {DEFAULT_DB_PATH})",
     )
+    parser.add_argument(
+        "--no-thumbs",
+        action="store_true",
+        help="Skip writing labeling thumbnails (data/thumbs/)",
+    )
     return parser
 
 
@@ -219,11 +345,12 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     conn = connect(Path(args.db))
     init_db(conn)
+    thumbs_root = None if args.no_thumbs else Path(args.db).parent / "thumbs"
 
     total_actions = total_spikes = 0
     for path in json_paths:
         try:
-            counts = ingest_file(conn, path)
+            counts = ingest_file(conn, path, thumbs_root=thumbs_root)
         except (IngestError, json.JSONDecodeError, KeyError) as e:
             print(f"error: {path}: {e}", file=sys.stderr)
             conn.close()

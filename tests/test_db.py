@@ -7,10 +7,13 @@ output.
 
 import json
 
+import cv2
+import numpy as np
 import pytest
 
 from src.db import labels as L
 from src.db import metrics as M
+from src.db import ingest
 from src.db.ingest import ingest_payload, resolve_json_paths
 from src.db.schema import connect, init_db
 
@@ -270,6 +273,83 @@ class TestMetrics:
         assert serve["player_name"] == "Ana"
         dig = next(a for a in actions if a["action"] == "dig" and a["team"] == "B")
         assert dig["player_name"] == "Bea"
+
+
+class TestThumbnails:
+    @pytest.fixture
+    def video(self, tmp_path):
+        """A 20-frame synthetic video; each frame is a distinct gray level."""
+        path = tmp_path / "v1.mp4"
+        writer = cv2.VideoWriter(
+            str(path), cv2.VideoWriter_fourcc(*"mp4v"), 30.0, (120, 90)
+        )
+        for i in range(20):
+            writer.write(np.full((90, 120, 3), 20 + i * 10, dtype=np.uint8))
+        writer.release()
+        return path
+
+    def _payload_with_snapshots(self, video_path, snapshots):
+        payload = _payload("v1", actions=[_action(1, 1, "serve", "A")])
+        payload["video"]["path"] = str(video_path)
+        payload["snapshots"] = snapshots
+        return payload
+
+    def test_thumbnail_strip_written_per_track(self, tmp_path, video):
+        thumbs = tmp_path / "thumbs"
+        payload = self._payload_with_snapshots(video, {
+            "1": [
+                {"frame": 2, "bbox": [0, 0, 120, 90]},
+                {"frame": 10, "bbox": [0, 0, 120, 90]},
+                {"frame": 18, "bbox": [0, 0, 120, 90]},
+            ]
+        })
+        written = ingest.write_thumbnails(payload, thumbs)
+        assert set(written) == {"1"}
+        img = cv2.imread(str(thumbs / "v1" / "track_1.png"))
+        assert img is not None
+        # 3 crops (full width 120 -> scaled to 150px height: width 200) + 2 gaps
+        crop_w = int(120 * ingest.THUMB_HEIGHT_PX / 90)
+        expected_w = 3 * crop_w + 2 * ingest.THUMB_GAP_PX
+        assert img.shape == (ingest.THUMB_HEIGHT_PX, expected_w, 3)
+        # Distinct gray levels prove three DIFFERENT frames were cropped.
+        thirds = [img[:, :crop_w], img[:, crop_w + 4:2 * crop_w + 4]]
+        assert abs(int(thirds[0].mean()) - int(thirds[1].mean())) >= 10
+
+    def test_stale_thumbnails_wiped_on_reingest(self, tmp_path, video):
+        thumbs = tmp_path / "thumbs"
+        (thumbs / "v1").mkdir(parents=True)
+        stale = thumbs / "v1" / "track_9.png"
+        stale.write_bytes(b"old")
+
+        payload = self._payload_with_snapshots(video, {"1": [{"frame": 5, "bbox": [0, 0, 120, 90]}]})
+        ingest.write_thumbnails(payload, thumbs)
+        assert not stale.exists()
+        assert (thumbs / "v1" / "track_1.png").is_file()
+
+    def test_missing_video_file_skips_gracefully(self, tmp_path):
+        thumbs = tmp_path / "thumbs"
+        payload = self._payload_with_snapshots("nowhere/v1.mp4", {
+            "1": [{"frame": 5, "bbox": [0, 0, 10, 10]}]
+        })
+        assert ingest.write_thumbnails(payload, thumbs) == {}
+        assert not (thumbs / "v1").exists()
+
+    def test_skinny_bbox_widened_for_recognizability(self, tmp_path, video):
+        thumbs = tmp_path / "thumbs"
+        payload = self._payload_with_snapshots(video, {
+            "1": [{"frame": 5, "bbox": [50, 0, 60, 90]}]  # 10px wide, 90 tall
+        })
+        written = ingest.write_thumbnails(payload, thumbs)
+        img = cv2.imread(str(written["1"]))
+        # min aspect 0.45 at 90px tall -> >= 40px wide before scaling to 150px
+        assert img.shape[1] >= int(90 * 0.45 * ingest.THUMB_HEIGHT_PX / 90) - 2
+
+    def test_degenerate_bbox_skipped(self, tmp_path, video):
+        thumbs = tmp_path / "thumbs"
+        payload = self._payload_with_snapshots(video, {
+            "1": [{"frame": 5, "bbox": [10, 10, 11, 11]}]  # too small after clamp
+        })
+        assert ingest.write_thumbnails(payload, thumbs) == {}
 
 
 class TestLabels:

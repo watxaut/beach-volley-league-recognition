@@ -15,11 +15,12 @@ ingestion never runs here: extraction and DB are separate processes.
 
 import argparse
 import logging
+import re
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -30,8 +31,11 @@ from ..db.schema import DEFAULT_DB_PATH, connect, init_db
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
+THUMB_NAME = re.compile(r"^track_\d+\.png$")
+
 app = FastAPI(title="Volleyball Analysis", docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+app.state.db_path = DEFAULT_DB_PATH  # overridden by --db in main()
 logger = logging.getLogger(__name__)
 
 
@@ -77,6 +81,16 @@ def team_color(team: Optional[str]) -> str:
 templates.env.filters["teamcolor"] = team_color
 
 
+def _thumbs_root() -> Path:
+    return Path(app.state.db_path).parent / "thumbs"
+
+
+def _thumb_url(video_key: str, track_id: int) -> Optional[str]:
+    """URL of the track's thumbnail strip, or None when not materialized."""
+    path = _thumbs_root() / video_key / f"track_{track_id}.png"
+    return f"/thumbs/{video_key}/track_{track_id}.png" if path.is_file() else None
+
+
 @app.get("/", response_class=HTMLResponse)
 def videos_page(request: Request):
     conn = request.state.conn
@@ -98,6 +112,7 @@ def video_page(request: Request, video_key: str, saved: Optional[str] = None):
     existing = L.labels_for_video(conn, video_key)
     tracks = L.tracks_in_video(conn, video_key)
     block_class = M.classify_blocks(conn, video_key)
+    thumbs = {t: _thumb_url(video_key, t) for t in tracks}
 
     # Dominant team per track (suggested team for the label form).
     suggested_team = {
@@ -127,6 +142,7 @@ def video_page(request: Request, video_key: str, saved: Optional[str] = None):
         "spikes": spikes,
         "block_class": block_class,
         "actions": actions,
+        "thumbs": thumbs,
         "saved": saved == "1",
     })
 
@@ -148,6 +164,17 @@ async def save_labels(request: Request, video_key: str):
             L.clear_label(conn, video_key, track_id)
 
     return RedirectResponse(f"/videos/{video_key}?saved=1", status_code=303)
+
+
+@app.get("/thumbs/{video_key}/{filename}")
+def thumb_file(video_key: str, filename: str):
+    """Serve labeling thumbnails (strict name check -- no traversal)."""
+    if not THUMB_NAME.match(filename):
+        return HTMLResponse("Bad thumbnail name", status_code=400)
+    path = _thumbs_root() / video_key / filename
+    if not path.is_file():
+        return HTMLResponse("Not found", status_code=404)
+    return FileResponse(path, media_type="image/png")
 
 
 @app.get("/players", response_class=HTMLResponse)

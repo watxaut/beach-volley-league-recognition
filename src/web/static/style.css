@@ -240,6 +240,22 @@ td.warn { color: var(--accent-2); font-weight: 700; }
 /* ---------- forms ---------- */
 
 form table.labels { margin-bottom: 0.9rem; }
+form table.labels td { vertical-align: middle; }
+.photo-cell { width: 1%; }
+.thumb {
+  height: 92px; border-radius: 9px; border: 1px solid var(--line);
+  display: block; transition: border-color 0.15s, transform 0.15s;
+}
+a:hover > .thumb { border-color: var(--accent); transform: translateY(-1px); }
+.no-thumb {
+  height: 92px; width: 70px; border-radius: 9px; border: 1px dashed var(--line);
+  color: var(--muted); display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; font-weight: 800;
+}
+.avatar {
+  height: 24px; width: 42px; object-fit: cover; border-radius: 5px;
+  border: 1px solid var(--line); vertical-align: middle; margin-right: 0.4rem;
+}
 input, select {
   font: inherit; padding: 0.42rem 0.6rem;
   border: 1px solid var(--line); border-radius: 8px;
