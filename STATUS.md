@@ -5,9 +5,25 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-04
+**Last updated:** 2026-09-04 (later session)
 
 ## Where we are
+
+**Joust-split adjudicated + spike log detail shipped (2026-09-04, later
+session): the e6 block was there but did NOT touch the ball** — the owner's
+ruling closes open point 10(a): one manufactured contact IS the complete
+detectable truth of the joust; a no-touch block has no ball-flight impulse,
+so it is outside contact detection by design (the GT f308 BLOCK stays as a
+physical event the pipeline legitimately cannot emit — no eval penalty
+mechanism, no code change). Shipped alongside: the live-debug action log
+now tells spikes' origin and destination — `Action: ... -> spike (0.65)
+from A1` at emission (new `SpikeAnalyzer.spike_zone_for` query, takeoff
+zone is known immediately) and a `Spike resolved: contact frame 308
+player 1 from A1 -> lands B7 (out)` line the moment the outcome closes
+(including re-logging retro-conversions: f173 logged `lands out of bounds
+(out)` then re-logged `dug at A8 (dug)` when the f216 dig landed on the
+"landing"). Verified on the real e6 two-pass run. Suite 232 → **240 green**
+(+1 spike_zone_for, +7 formatter tests).
 
 **Reentry contact shipped (2026-09-04): e6's out-of-frame joust spike
 recovered, f265 overpass→set healed — and point 10's "instance #2" (e2 f167)
@@ -383,17 +399,19 @@ constraint. Side changes need no special handling as long as IDs survive.
    ambiguous between "crossed" (→ freeball) and "detection missed the
    follow" (→ dig, e4 f347) without it.)
 10. **[RESOLVED 2026-09-04 for e6 — the reentry contact shipped; "instance
-    #2" refuted.]** The e6 joust spike (f308 1A t3) is manufactured by the
+    #2" refuted; joust-split adjudicated (later session).]** The e6 joust spike (f308 1A t3) is manufactured by the
     REENTRY band in _detect_contact (full story in Where we are): f265
     overpass→set healed, labels-only F1 0.923, six-video A/B byte-neutral
-    on e1–e5. Two residuals stay open here: (a) the GT f308 BLOCK (2B t1)
-    — one manufactured contact per ball event; emitting the spike+block
-    pair from one impulse needs a joust-split decision (owner); (b) ROOT
-    CAUSE untouched: the BALL tracker's post-reset reseed adopted the left
-    spare (e6 f289), which is why the real re-entry descent (f301–310) is
-    unrecoverable to the classifier — a smarter reseed (prefer in-flight
-    balls over static/spare ones) is a possible future lever, six-video
-    A/B required. **e2 f167 was NOT a reentry case** (see point 7).
+    on e1–e5. (a) **RESOLVED by owner ruling (2026-09-04, later session):
+    the block was present at the joust but did NOT touch the ball** — no
+    joust-split mechanism is wanted or needed; one manufactured contact is
+    the whole detectable truth, and the GT f308 BLOCK (2B t1) records a
+    no-touch block that contact detection cannot and should not emit.
+    (b) ROOT CAUSE untouched — remains open: the
+    BALL tracker's post-reset reseed adopted the left spare (e6 f289), which
+    is why the real re-entry descent (f301–310) is unrecoverable to the
+    classifier — a smarter reseed (prefer in-flight balls over static/spare
+    ones) is a possible future lever, six-video A/B required. **e2 f167 was NOT a reentry case** (see point 7).
     Evidence history: the toss exited the frame TOP at f277 [1166,17] still
     ascending; the contact happens above/entering the frame; the ball
     re-enters at f314 [1152,278] — above the net tape (verified via
@@ -453,6 +471,37 @@ constraint. Side changes need no special handling as long as IDs survive.
     locations today.
 
 ## Log (newest first)
+
+### 2026-09-04 (later session) — joust-split adjudicated (block present, no ball touch); live-debug spike logs gain origin/landing
+- **Owner ruling on open point 10(a)**: at the e6 f308 joust there WAS a
+  spike and the block WAS there, but the block never touched the ball.
+  Therefore one manufactured contact is the complete detectable truth — no
+  joust-split mechanism; a no-touch block has no ball-flight impulse and is
+  outside contact detection by design. The GT f308 BLOCK (2B t1) stays as a
+  physical event the pipeline legitimately cannot emit (same class as e2's
+  held-ball release). No GT/code change from the ruling itself.
+- **Shipped (presentation-only, zero pipeline divergence)**: live-debug
+  spike logging — `_ingest_actions` appends the takeoff zone to spike
+  emission lines (`-> spike (0.65) from A1`, via the new
+  `SpikeAnalyzer.spike_zone_for(contact_frame)` query, which mirrors
+  `spike_type_for` over pending+records); a new
+  `LiveDebugProcessor._log_resolved_spikes()` (called per frame in BOTH
+  render paths, after flush, and reset on 'r') logs `Spike resolved:
+  contact frame 308 player 1 from A1 -> lands B7 (out)` the moment a record
+  closes, re-logging on outcome flips (dug→kill pending-dug, kill/out→dug
+  retro-conversion — the (frame, outcome) signature gates it). Formatting
+  lives in the module-level pure `describe_spike_record()`
+  (tests/test_live_debug_logs.py, no processor construction needed).
+- **Verified on the real e6 two-pass run** (output/spike_log_e6, git-ignored):
+  f173 `spike (0.50) from B3` → resolved `lands out of bounds (out)` →
+  re-logged `dug at A8 (dug)` after the f216 dig; f308 `spike (0.65) from
+  A1` → `lands B7 (out)`. Render/labels byte-identical to before (log-only
+  change + a read-only analyzer query).
+- Tests: +8 (spike_zone_for pending/after-close/miss; 7 formatter cases).
+  Suite 232 → **240 green**.
+- Files: src/analysis/spike_analyzer.py, src/analysis/live_debug_processor.py,
+  tests/test_spike_analyzer.py, tests/test_live_debug_logs.py (new),
+  STATUS.md.
 
 ### 2026-09-04 — reentry contact shipped: e6's out-of-frame joust spike manufactured; point 10's e2 "instance #2" refuted
 - **Diagnosis first** (output/diag_reentry.py raw-sighting dump + annotated

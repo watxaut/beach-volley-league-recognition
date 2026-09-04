@@ -34,6 +34,34 @@ BallOverlay = Optional[Tuple[int, int, bool]]           # (x, y, is_predicted)
 PlayerOverlay = List[Tuple[int, List[int]]]             # [(track_id, [x1,y1,x2,y2]), ...]
 
 
+def _zone_str(zone: Optional[Dict[str, Any]]) -> Optional[str]:
+    """'A1'/'B7'-style zone label from a side/zone dict."""
+    if not zone or zone.get("side") is None or zone.get("zone") is None:
+        return None
+    return "{}{}".format(zone["side"], zone["zone"])
+
+
+def describe_spike_record(rec: Dict[str, Any]) -> str:
+    """Compact origin/destination summary for a spike record, e.g.
+    ``from B2 -> lands A7 (kill)`` / ``from A1 -> dug at B8 (dug)``.
+    Used by the live-debug resolution log lines."""
+    origin = _zone_str(rec.get("attack_zone")) or "?"
+    outcome = rec.get("outcome") or "unknown"
+    landing = _zone_str(rec.get("landing_zone"))
+    dug = _zone_str(rec.get("dug_zone"))
+    if outcome in ("kill", "out"):
+        dest = "lands {}".format(landing) if landing else "lands out of bounds"
+    elif outcome == "dug":
+        dest = "dug at {}".format(dug) if dug else "dug (zone unknown)"
+    elif outcome == "blocked":
+        dest = "blocked"
+    elif outcome == "kept":
+        dest = "kept up by the attack team"
+    else:
+        dest = "no landing within horizon"
+    return "from {} -> {} ({})".format(origin, dest, outcome)
+
+
 class LiveDebugProcessor:
     """Processor that draws a clean, contact-anchored action overlay onto each frame.
 
@@ -64,6 +92,9 @@ class LiveDebugProcessor:
 
         # Shared frame processor (live mode - use enhanced ball tracker)
         self.frame_processor = FrameProcessor(config, use_enhanced_ball_tracker=True)
+
+        # (contact_frame, outcome) already logged per resolved spike record.
+        self._spike_log_state: List[Tuple[int, str]] = []
 
         # Court calibration, used to draw the court boundary each frame.
         self.court_detector = self.frame_processor.get_court_detector()
@@ -124,11 +155,37 @@ class LiveDebugProcessor:
                     name = f"spike {stype}"
             plan.add(tid, action.get("frame_number"), name,
                      action.get("confidence", 0.0))
+            detail = ""
+            if action.get("action") == "spike":
+                # Where the spike comes from (takeoff zone, known at emission).
+                origin = _zone_str(self.frame_processor.spike_analyzer.spike_zone_for(
+                    action.get("frame_number")))
+                if origin:
+                    detail = " from " + origin
             self.logger.info(
-                "Action: contact frame %s player %s -> %s (%.2f)",
+                "Action: contact frame %s player %s -> %s (%.2f)%s",
                 action.get("frame_number"), tid,
-                action.get("action"), action.get("confidence", 0.0),
+                action.get("action"), action.get("confidence", 0.0), detail,
             )
+
+    def _log_resolved_spikes(self) -> None:
+        """Log each spike record once its outcome resolves -- origin zone plus
+        where the ball ended up. A pending-dug record that later flips to
+        kill (the defenders fail the set) is re-logged with its final outcome.
+        """
+        records = self.frame_processor.spike_analyzer.spike_records()
+        for i, rec in enumerate(records):
+            sig = (rec.get("frame"), rec.get("outcome"))
+            if i >= len(self._spike_log_state) or self._spike_log_state[i] != sig:
+                self.logger.info(
+                    "Spike resolved: contact frame %s player %s %s",
+                    rec.get("frame"), rec.get("track_id"),
+                    describe_spike_record(rec),
+                )
+                if i >= len(self._spike_log_state):
+                    self._spike_log_state.append(sig)
+                else:
+                    self._spike_log_state[i] = sig
 
     @staticmethod
     def _overlay_data(frame_result: Dict[str, Any]) -> Tuple[BallOverlay, PlayerOverlay]:
@@ -219,10 +276,12 @@ class LiveDebugProcessor:
                 break
             result = self.frame_processor.process_frame(frame, frame_idx, enable_court_redetection=True)
             self._ingest_actions(result.get("actions", []), plan)
+            self._log_resolved_spikes()
             cache.append(self._overlay_data(result))
             frame_idx += 1
         # Finalise the last contact held back for its look-ahead.
         self._ingest_actions(self.frame_processor.flush_actions(), plan)
+        self._log_resolved_spikes()
         self._ingest_typed_spikes(plan)
         cap.release()
 
@@ -281,6 +340,7 @@ class LiveDebugProcessor:
                 if ret:
                     result = self.frame_processor.process_frame(frame, frame_idx, enable_court_redetection=True)
                     self._ingest_actions(result.get("actions", []), plan)
+                    self._log_resolved_spikes()
                     ball, players = self._overlay_data(result)
                     buffer.append((frame, frame_idx, ball, players))
                     frame_idx += 1
@@ -288,6 +348,7 @@ class LiveDebugProcessor:
                     source_done = True
                     # Input over: finalise the last held-back contact, then drain.
                     self._ingest_actions(self.frame_processor.flush_actions(), plan)
+                    self._log_resolved_spikes()
                     self._ingest_typed_spikes(plan)
 
             # 2. Release one frame once the buffer is a full delay deep (or draining).
@@ -314,6 +375,7 @@ class LiveDebugProcessor:
                     shown = None
                     plan = overlay.LabelPlan()
                     self.frame_processor.reset_trackers()
+                    self._spike_log_state = []
                     self.logger.info("Video restarted")
 
             # 4. Done once the source is exhausted and the buffer has drained.

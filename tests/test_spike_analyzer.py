@@ -151,6 +151,30 @@ class TestSpikeType:
         assert analyzer.spike_type_for(100) == "touch"
 
 
+class TestSpikeZoneFor:
+    def test_zone_while_pending_and_after_close(self, analyzer):
+        """spike_zone_for mirrors spike_type_for: the takeoff zone is
+        available at emission (pending) and on the closed record."""
+        arc = [(900, 380), (905, 330), (910, 280), (915, 220), (920, 170),
+               (925, 150), (930, 180), (935, 240), (940, 320), (945, 420),
+               (948, 520), (950, 610), (952, 700)]
+        _feed_flight(analyzer, 100, arc, spike_cp=(900.0, 400.0))
+        # Right after emission the record is still pending (quiet window not
+        # up) -> the takeoff zone is already answerable.
+        assert analyzer._pending is not None
+        assert _zone(analyzer.spike_zone_for(100)) is not None
+        for f in range(116, 130):
+            analyzer.observe(f, None, [_player(1, 870, 550, "B")], [])
+        rec = analyzer.spike_records()[0]
+        assert _zone(analyzer.spike_zone_for(100)) == _zone(rec["attack_zone"])
+        assert analyzer.spike_zone_for(999) is None
+        assert analyzer.spike_zone_for(None) is None
+
+
+def _zone(z):
+    return "{}{}".format(z["side"], z["zone"]) if z else None
+
+
 # --------------------------------------------------------------------- #
 # Outcome resolution
 # --------------------------------------------------------------------- #

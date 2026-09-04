@@ -632,6 +632,19 @@ class SpikeAnalyzer:
                 return r["spike_type"]
         return None
 
+    def spike_zone_for(self, contact_frame: Optional[int]) -> Optional[Dict[str, Any]]:
+        """Origin (takeoff) zone for the spike with this contact frame, if
+        open or resolved. Mirrors :meth:`spike_type_for`; returns the
+        ``{"side", "zone"}`` dict or None."""
+        if contact_frame is None:
+            return None
+        if self._pending and self._pending["contact_frame"] == contact_frame:
+            return self._pending["attack_zone"]
+        for r in self._records:
+            if r["frame"] == contact_frame:
+                return r["attack_zone"]
+        return None
+
     def trail_points(self, frame_idx: int) -> List[Tuple[float, float, int]]:
         """Ball trail for rendering: ``(x, y, age_frames)`` for every flight
         point at or before ``frame_idx``. The renderer fades by age and drops
