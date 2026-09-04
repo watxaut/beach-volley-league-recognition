@@ -26,7 +26,7 @@
             "visible": true
           },
           {
-            "id": 2,
+            "id": 3,
             "team": "B",
             "bbox": [
               870,
@@ -37,7 +37,7 @@
             "visible": true
           },
           {
-            "id": 3,
+            "id": 2,
             "team": "A",
             "bbox": [
               1144,
@@ -1166,7 +1166,7 @@
           },
           {
             "id": 1,
-            "team": "B",
+            "team": "A",
             "bbox": [
               494,
               288,
@@ -2033,7 +2033,7 @@
       "events": [
         {
           "frame": 36,
-          "player_id": 3,
+          "player_id": 2,
           "final_action": "dig",
           "raw_visual_actions": [
             "dig"
@@ -2047,7 +2047,7 @@
         },
         {
           "frame": 89,
-          "player_id": 2,
+          "player_id": 1,
           "final_action": "set",
           "raw_visual_actions": [
             "set"
@@ -2075,7 +2075,7 @@
         },
         {
           "frame": 206,
-          "player_id": 2,
+          "player_id": 4,
           "final_action": "set",
           "raw_visual_actions": [
             "set"
@@ -2117,7 +2117,7 @@
         },
         {
           "frame": 277,
-          "player_id": 3,
+          "player_id": 2,
           "final_action": "dig",
           "raw_visual_actions": [
             "dig"
@@ -2131,7 +2131,7 @@
         },
         {
           "frame": 329,
-          "player_id": 2,
+          "player_id": 1,
           "final_action": "set",
           "raw_visual_actions": [
             "set"
@@ -2145,7 +2145,7 @@
         },
         {
           "frame": 371,
-          "player_id": 1,
+          "player_id": 2,
           "final_action": "spike",
           "raw_visual_actions": [
             "spike"

@@ -5,9 +5,30 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-04 (later session)
+**Last updated:** 2026-09-04 (third session)
 
 ## Where we are
+
+**e1 GT re-verification folded (2026-09-04, third session): the ratification
+queue is now EMPTY.** Diagnosis (output/diag_e1_gt_reverify.py, sheets
+output/gt_verify/e1_reverify_*) found the "id/team wobbles" were THREE mixed
+player_id conventions in one file: 4 events in dominant-canonical ids, 2 in
+L-R indices, and 3 (f36/f206/f277) in the F0-FLIPPED numbering — the f0 box
+frame numbers ids 2↔3 opposite to the other 43 frames (positionally
+continuous persons, only the numbers swap), and those three events follow
+it. Owner ratified all corrections from the sheets: the 9 events re-expressed
+under dominant canonical (f36→p2, f89→p1, f206→p4, f277→p2, f329→p1,
+f371→p2 — the spiker is id2/LR3 A; f114/f257/f258 unchanged), f0 boxes
+renumbered, f260's id1 B→A one-off typo fixed (it sat in the joust's nearest
+box frame). **f258's block ruled NO-TOUCH** (e6 precedent extends: the GT
+keeps the physical event; the pipeline legitimately emits one ball contact
+per joust). Measured after the fold (same predictions):
+player_accuracy_spatial **0.125 → 0.875** (L-R mirror-drops to 0.125 —
+single-convention proof), labels-only F1 0.706 and team 7/8 unchanged (the
+miss is the joust pair: pred's one emission is the block-A side while the
+ball touch is the spike-B side). Every e1 residual is now known-class:
+f114 freeball (pt 9 crossing signal), f206 set (pt 5 overhand-reception
+pose), f257 joust one-emission. Suite 240 green (no code changed).
 
 **Joust-split adjudicated + spike log detail shipped (2026-09-04, later
 session): the e6 block was there but did NOT touch the ball** — the owner's
@@ -425,7 +446,17 @@ constraint. Side changes need no special handling as long as IDs survive.
     so the event is placed at/before f308 (gap midpoint) and attributes off
     the clean snapshots. Original trace: output/diag_e6_missed.py, sheets
     video_entreno_6_f296-322; new evidence: output/diag_reentry*.py.
-11. **[owner ratification 2026-08-28 — queue nearly empty].**
+11. **[RESOLVED 2026-09-04 (third session) — ratification queue EMPTY].**
+    History: the 2026-08-28 round folded e2's complete 8-event rally, e6's
+    joust re-correction, e1's joust arbitration, and the freeball vocabulary;
+    the 08-28 later rounds dropped e2 f79 and completed e2's rally. The last
+    item — e1's residual id/team wobbles — was resolved by the 2026-09-04
+    re-verification session: the wobbles were three mixed player_id
+    conventions (see Where we are); all 9 events now use dominant canonical
+    ids, the f0/f260 box wobbles are fixed, and the owner ruled f258's block
+    no-touch (kept in GT as a physical event). e1's player spatial accuracy
+    is 0.875 (was 0.125); remaining e1 residuals are known-class label
+    issues, not identity.
     FOLDED: (a) e2 +3 events — f32 **serve p1 A t1** (the untracked near-left
     server, owner-marked in white on the sheet; the pred had attributed the
     contact to nearby tracked 2A → dig), f118 set p4 B t2, f327 dig p4 B t1.
@@ -455,8 +486,10 @@ constraint. Side changes need no special handling as long as IDs survive.
     release — static hold f78–82 then play, no descent signature,
     structurally invisible), f118 overpass-vs-set (91f follow), f167
     undetected (reentry, point 10's SECOND instance). (f) e1's residual
-    id/team wobbles (e.g. f277) — dedicated re-verification session (the
-    only queue item left).
+    id/team wobbles — RESOLVED 2026-09-04 (third session): three mixed
+    player_id conventions diagnosed, all events re-expressed canonical,
+    f0/f260 box wobbles fixed, f258 block ruled no-touch (see Where we are
+    and the resolution note above).
 
 12. **[RESOLVED 2026-08-31 — owner ratified the semantics] e3's four GT
     "kills" were three digs + one real kill.** The owner's rule: kill = the
@@ -471,6 +504,35 @@ constraint. Side changes need no special handling as long as IDs survive.
     locations today.
 
 ## Log (newest first)
+
+### 2026-09-04 (third session) — e1 GT re-verified + folded: three mixed id conventions unified; ratification queue empty
+- **Diagnosis before design** (output/diag_e1_gt_reverify.py, git-ignored):
+  a consistency audit of the GT itself (team-per-id across the 44 box
+  frames) + a per-event spatial table (which GT box the pipeline's
+  attributed toucher lands in) + contact sheets (full-frame row + zoom-on-
+  contact row, GT boxes/GT label/pred crosshair) + a per-id montage.
+  Findings: (a) f0 numbers ids 2↔3 opposite to the other 43 frames —
+  positionally continuous persons, only numbers swapped (this also explains
+  the montage's "flipped" first cell the owner spotted — a person swap, not
+  a rendering bug); (b) f260 id1 B is a one-off typo in the joust's nearest
+  box frame; (c) the 9 events use THREE conventions — canonical (f114/f257/
+  f258/f371), L-R (f89/f329), and f0-flipped (f36/f206/f277, where the
+  dominant reading names a player on the wrong TEAM).
+- **Owner ratification** (sheets output/gt_verify/e1_reverify_*): all
+  proposals accepted; f371's spiker confirmed id2/LR3 A; f258's block ruled
+  NO-TOUCH (e6 precedent). Fold (output/fold_e1_gt.py): events → canonical
+  (f36→p2, f89→p1, f206→p4, f277→p2, f329→p1, f371→p2), f0 renumber, f260
+  id1→A. id4 stays unannotated at f0 (never ratified).
+- **Measured** (same predictions, no pipeline change): player_accuracy_
+  spatial 0.125 → **0.875**, spatial_lr 0.5 → 0.125 (the mirror flip proves
+  single-conversion), labels-only F1 0.706 / team 7/8 unchanged — every e1
+  residual now known-class (f114 freeball pt 9, f206 overhand set pt 5,
+  f257 joust one-emission: the pred's single emission is the block-A side
+  while the ball touch is the spike-B side).
+- Files: ground_truth/video_entreno_1_annotations.json, STATUS.md.
+  Diagnostics (git-ignored): output/diag_e1_gt_reverify.py,
+  output/fold_e1_gt.py, output/e1_reverify/ (fresh HEAD action log),
+  sheets output/gt_verify/e1_reverify_*.
 
 ### 2026-09-04 (later session) — joust-split adjudicated (block present, no ball touch); live-debug spike logs gain origin/landing
 - **Owner ruling on open point 10(a)**: at the e6 f308 joust there WAS a
