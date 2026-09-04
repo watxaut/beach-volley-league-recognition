@@ -1,0 +1,27 @@
+src/web/templates/player_detail.html
+  s_3bcce69204da81::t_95365e7e333919 4
+src/web/static/style.css
+  s_3bcce69204da81::t_80a6b4657098a0 98-100
+  s_3bcce69204da81::t_31318e5b7e34b8 2-22,27-28,31-35,38-39,42-43,45-47,51-54,58-78,80,82-91,97,101-126,128-221,224-225,227-230,234,237-269
+  s_3bcce69204da81::t_60cf3d90448dba 231-233,235-236
+src/web/templates/video_detail.html
+  s_3bcce69204da81::t_acb52e873e067a 4
+STATUS.md
+  s_3bcce69204da81::t_84c7d782930317 581-585
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "239490c6b048944b8da6315d8013f8474c8bd3b9",
+  "prompts": {},
+  "sessions": {
+    "s_3bcce69204da81": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a06e15-d1af-7053-aa7a-bd311b37e07b",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
