@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Videos · Volleyball Analysis{% endblock %}
+{% block content %}
+<h1>Videos</h1>
+
+{% if videos %}
+<table class="list">
+  <thead>
+    <tr>
+      <th>Video</th><th>Frames</th><th>Actions</th><th>Spikes</th>
+      <th>Tracks</th><th>Labeled</th><th>Pipeline</th><th>Processed</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for v in videos %}
+    <tr>
+      <td><a href="/videos/{{ v.video_key }}">{{ v.video_key }}</a></td>
+      <td class="num">{{ v.total_frames or "—" }}</td>
+      <td class="num">{{ v.n_actions }}</td>
+      <td class="num">{{ v.n_spikes }}</td>
+      <td class="num">{{ v.n_tracks }}</td>
+      <td class="num {% if v.n_tracks and v.n_labels < v.n_tracks %}warn{% endif %}">
+        {{ v.n_labels }}/{{ v.n_tracks or 0 }}</td>
+      <td class="mono">{{ v.pipeline_version or "?" }}</td>
+      <td class="mono">{{ (v.processed_at or "")[:16] }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">
+  No videos ingested yet. Run <code>make run VIDEO=...</code> then
+  <code>make ingest VIDEO=...</code>.
+</p>
+{% endif %}
+
+{% if unlabeled %}
+<h2>Unlabeled tracks</h2>
+<table class="list">
+  <thead><tr><th>Video</th><th>Track</th><th>Actions</th></tr></thead>
+  <tbody>
+  {% for u in unlabeled %}
+    <tr>
+      <td><a href="/videos/{{ u.video_key }}">{{ u.video_key }}</a></td>
+      <td class="num">{{ u.track_id }}</td>
+      <td class="num">{{ u.n_actions }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

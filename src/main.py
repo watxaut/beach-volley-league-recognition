@@ -13,6 +13,7 @@ from pathlib import Path
 from src.analysis.video_processor import VideoProcessor
 from src.detection.base_detector import resolve_device
 from src.output_gen.csv_exporter import CSVExporter
+from src.output_gen.json_exporter import JSONExporter
 from src.output_gen.visualization import VisualizationGenerator
 from src.utils.config import Config
 from src.utils.logger import setup_logging
@@ -209,6 +210,11 @@ def main() -> int:
         csv_exporter = CSVExporter()
         csv_path = output_dir / "results.csv"
         csv_exporter.export(analysis_results, csv_path)
+
+        # Canonical machine-readable output (contract for the DB ingester).
+        logger.info("Exporting canonical JSON...")
+        json_exporter = JSONExporter()
+        json_exporter.export(analysis_results, output_dir / "pipeline_output.json")
 
         # Generate visualizations (unless skipped)
         if not args.skip_visualization:

@@ -5,9 +5,44 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-04 (third session)
+**Last updated:** 2026-09-04 (fourth session)
 
 ## Where we are
+
+**Analysis database + player labeling + local UI shipped (2026-09-04,
+fourth session): extraction and DB are separate processes joined by a
+lossless file contract.** Extraction (`make run`) now also writes
+`output/<stem>/pipeline_output.json` — the canonical machine-readable
+export (every emitted action keeps team/touch_number/rally_id/contact_kind/
+contact_point, which the human CSVs drop; spikes minus flight arrays;
+pipeline_version = git hash). A new `src/db/` package upserts that JSON
+into SQLite (`data/volley.db`, WAL): `videos` (key = video stem),
+`players` (names), `video_players` ((video, track_id) → player — track
+ids are per-video bootstrap artifacts, NOT cross-video identities),
+`actions`, `spikes`. **Overwrite semantics ratified:** re-ingest replaces
+only that video's actions/spikes rows in one transaction; labels and
+players survive (the ingester UPSERTs the videos row — never DELETE, which
+would cascade-wipe video_players). No per-frame data stored (owner
+decision). `src/db/metrics.py` computes the metric glossary at query time:
+kill%/error%/dug% (denominator = attacks), hard/touch%, attack-zone
+distribution, attack_zone×landing_zone placement heatmap, dig%
+(denominator = opponent attacks via the player's dominant team per
+video), blocks = ball-touching only with kill-block (rally ends with the
+block) vs soft-block (play continues) derived from rally continuation —
+no-touch blocks are never counted (owner rule; the pipeline cannot emit
+them anyway). Aces PARKED (open point 13). Local web UI (`src/web/`,
+`make ui`, FastAPI+Jinja, CSS-only charts — fully offline): video list,
+per-video rally-grouped timeline + spike table, **labeling form**
+(track→player dropdown/free-text), players overview, player detail with
+metric cards/zone bars/placement heatmap/per-video splits. Gotchas
+recorded: sqlite connections need `check_same_thread=False` under
+FastAPI (sync handlers run in a threadpool); suite runs 262 green
+(240 + 22 new: json exporter parity, ingest idempotency/label-survival/
+cascade isolation, hand-computed metric fixtures, path resolution);
+venv lacks pytest-cov so run `pytest -o addopts=""`. Seeded all seven
+entreno videos — DB counts match the CSVs and recorded baselines (e3
+14 actions/4 spikes, e6 6/2, e5 7/2). The DB is left UNLABELED for the
+owner's real player names.
 
 **e1 GT re-verification folded (2026-09-04, third session): the ratification
 queue is now EMPTY.** Diagnosis (output/diag_e1_gt_reverify.py, sheets
@@ -503,7 +538,50 @@ constraint. Side changes need no special handling as long as IDs survive.
     (attack placement) is NOT yet modelled — the GT zones double as dig
     locations today.
 
+13. **[PARKED 2026-09-04 — no point-outcome detection] Ace metric.** The
+    DB/metrics layer (fourth session) deliberately ships without aces:
+    an ace needs "point won directly off the serve", which needs rally
+    outcome/score detection the pipeline does not have. Two unblock paths
+    when wanted: (a) ratify a derived heuristic in the metrics layer — a
+    serve whose `rally_id` contains no opposing-team touch after it ≈
+    likely ace (flagged as derived; zero pipeline change); or (b) real
+    point-outcome detection (score machinery exists in
+    `src/analysis/game_state_manager.py` but is unvalidated). Assist proxy
+    (set → same-team kill) is parked with it — same dependency.
+
 ## Log (newest first)
+
+### 2026-09-04 (fourth session) — analysis DB, player labeling, local web UI; extraction/DB split by file contract
+- **Shipped**: `src/output_gen/json_exporter.py` — `src.main` now writes
+  `output/<stem>/pipeline_output.json` beside the CSVs (lossless action
+  fields + spike records minus flights + video metadata + git-hash
+  pipeline_version; presentation-only, action stream untouched).
+- **Shipped**: `src/db/` — schema.py (SQLite `data/volley.db`, WAL,
+  videos/players/video_players/actions/spikes), ingest.py
+  (`python -m src.db.ingest <stem|dir|json>`; transactional overwrite of
+  ONE video's rows via videos-UPSERT + actions/spikes DELETE — labels
+  survive; caught in review that a videos-row DELETE would cascade-wipe
+  video_players), labels.py (per-(video, track_id) labeling; track ids
+  are per-video bootstrap artifacts), metrics.py (glossary in the module
+  docstring: kill%/error%/dug%/hard%/touch%, zone distribution,
+  attack_zone×landing_zone heatmap, dig%/digs, kill-block vs soft-block
+  from rally continuation — ball-touching blocks only, aces parked).
+- **Shipped**: `src/web/` — FastAPI+Jinja local UI (`make ui`): videos,
+  video detail (rally-grouped timeline, spike table, label form with
+  known-player datalist), players overview, player detail (metric cards,
+  CSS bar/heatmap charts — zero JS deps). Makefile: ingest / ingest-all /
+  db-reset / ui. pyproject: `[web]` extras. README §"Analysis Database &
+  Local UI". .gitignore: data/.
+- **Validated**: re-ran all seven entreno videos through `make run`
+  (pipeline_output.json emitted everywhere), `ingest-all` — DB counts
+  match CSVs + recorded baselines (e3 14/4, e6 6/2, e5 7/2, e1 8/1,
+  e2 7/1, e4 7/2, e7 5/0); cross-video aggregation checked on a throwaway
+  DB copy (real DB left unlabeled for the owner). Web smoke: all pages
+  200, label POST 303→updated, 404s correct.
+- **Gotchas**: sqlite3 needs `check_same_thread=False` for FastAPI sync
+  handlers (threadpool); this venv has no pytest-cov → run
+  `venv/bin/python -m pytest tests/ -q -o addopts=""`. Suite **262 green**
+  (240 + 22: tests/test_json_exporter.py, tests/test_db.py).
 
 ### 2026-09-04 (third session) — e1 GT re-verified + folded: three mixed id conventions unified; ratification queue empty
 - **Diagnosis before design** (output/diag_e1_gt_reverify.py, git-ignored):

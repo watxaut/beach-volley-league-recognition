@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ video_key }} · Volleyball Analysis{% endblock %}
+{% block content %}
+<h1>{{ video_key }}
+  <span class="sub">pipeline {{ video.pipeline_version or "?" }} ·
+  {{ video.total_frames or "?" }} frames @ {{ "%.0f"|format(video.fps or 0) }} fps</span>
+</h1>
+
+{% if saved %}<p class="flash">Labels saved.</p>{% endif %}
+
+<section class="card">
+  <h2>Player labels</h2>
+  <p class="hint">Track ids are per-video (1–4). Map them to real players to get
+  cross-video metrics. Team is informational; per-action team is authoritative.</p>
+  <form method="post" action="/videos/{{ video_key }}/labels">
+    <table class="labels">
+      <thead><tr><th>Track</th><th>Suggested team</th><th>Player name</th><th>Team</th></tr></thead>
+      <tbody>
+      {% for t in tracks %}
+        <tr>
+          <td class="num">{{ t }}</td>
+          <td class="num"><span class="pill {{ suggested_team[t]|teamcolor }}">{{ suggested_team[t] or "?" }}</span></td>
+          <td>
+            <input list="known-players" name="track_{{ t }}_name"
+                   value="{{ labels[t].name if t in labels else '' }}"
+                   placeholder="— unlabeled —">
+          </td>
+          <td>
+            <select name="track_{{ t }}_team">
+              {% set cur = labels[t].team if t in labels else none %}
+              <option value="" {% if not cur %}selected{% endif %}>—</option>
+              <option value="A" {% if cur == 'A' %}selected{% endif %}>A (near)</option>
+              <option value="B" {% if cur == 'B' %}selected{% endif %}>B (far)</option>
+            </select>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4" class="empty">No tracked players in this video.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <datalist id="known-players">
+      {% for name in players %}<option value="{{ name }}"></option>{% endfor %}
+    </datalist>
+    <button type="submit">Save labels</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Actions <span class="sub">{{ actions|length }} total</span></h2>
+  {% for rally_id, rally_actions in rally_rows %}
+  <h3 class="rally">Rally {{ rally_id if rally_id is not none else "—" }}
+    <span class="sub">{{ rally_actions|length }} touches</span></h3>
+  <table class="timeline">
+    <thead>
+      <tr><th>Frame</th><th>Time</th><th>Team</th><th>Player</th><th>Action</th>
+          <th>Gesture</th><th>Conf</th><th>Touch#</th><th>Kind</th></tr>
+    </thead>
+    <tbody>
+    {% for a in rally_actions %}
+      <tr class="action-{{ a.action }}">
+        <td class="num mono">{{ a.frame }}</td>
+        <td class="num mono">{{ "%.1f"|format(a.ts) if a.ts is not none }}s</td>
+        <td><span class="pill {{ a.team|teamcolor }}">{{ a.team or "?" }}</span></td>
+        <td>
+          {% if a.player_name %}
+            <a href="/players/{{ a.player_id }}">{{ a.player_name }}</a>
+          {% else %}
+            <span class="muted">track {{ a.track_id }}</span>
+          {% endif %}
+        </td>
+        <td class="action">{{ a.action }}
+          {% if a.action == "block" %}
+            <span class="tag">{{ "KILL BLOCK" if block_class.get(a.id) == "kill_block" else "soft" }}</span>
+          {% endif %}
+        </td>
+        <td class="muted">{{ a.gesture or "—" }}</td>
+        <td class="num mono">{{ "%.2f"|format(a.confidence) if a.confidence is not none }}</td>
+        <td class="num">{{ a.touch_number if a.touch_number is not none else "—" }}</td>
+        <td class="muted">{{ a.contact_kind or "—" }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No actions detected in this video.</p>
+  {% endfor %}
+</section>
+
+<section class="card">
+  <h2>Spikes <span class="sub">{{ spikes|length }} attacks</span></h2>
+  {% if spikes %}
+  <table class="timeline">
+    <thead>
+      <tr><th>Frame</th><th>Team</th><th>Player</th><th>Type</th><th>Attack zone</th>
+          <th>Outcome</th><th>Landing</th><th>Dug at</th><th>Exit px/f</th></tr>
+    </thead>
+    <tbody>
+    {% for s in spikes %}
+      <tr>
+        <td class="num mono">{{ s.frame }}</td>
+        <td><span class="pill {{ s.team|teamcolor }}">{{ s.team or "?" }}</span></td>
+        <td>
+          {% if s.player_name %}
+            <a href="/players/{{ s.player_id }}">{{ s.player_name }}</a>
+          {% else %}
+            <span class="muted">track {{ s.track_id }}</span>
+          {% endif %}
+        </td>
+        <td>{{ s.spike_type or "—" }}</td>
+        <td class="zone">{{ s.attack_zone or "—" }}</td>
+        <td class="outcome-{{ s.outcome or "none" }}">{{ s.outcome or "—" }}</td>
+        <td class="zone">{{ s.landing_zone or "—" }}</td>
+        <td class="zone">{{ s.dug_zone or "—" }}</td>
+        <td class="num mono">{{ "%.1f"|format(s.exit_speed_px) if s.exit_speed_px is not none else "—" }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No spike records in this video.</p>
+  {% endif %}
+</section>
+{% endblock %}

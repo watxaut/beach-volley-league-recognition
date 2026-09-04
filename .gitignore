@@ -237,3 +237,5 @@ docs/build/
 
 .claude
 archive/
+# Local analysis database
+data/

@@ -189,15 +189,62 @@ Colab → run `finetune_yolo_ball.ipynb` → download `best.pt` → save as `mod
 
 ## Output Files
 
-The system generates three main output files:
+The system generates these output files per video (in `output/<video_name>/`):
 
 1. **results.csv**: Player action summary with counts per player
-2. **results_detailed.csv**: Frame-by-frame action timeline
-3. **summary_graphs.png**: Visualization graphs including:
-    - Total action counts bar chart
-    - Per-player action breakdown
-    - Game activity over time
-    - Action distribution pie chart
+2. **results_detailed.csv**: Frame-by-frame action timeline (human-facing; drops some fields)
+3. **results_spikes.csv**: Per-spike enrichment (type, zones, outcome)
+4. **pipeline_output.json**: **Canonical machine-readable contract** - every
+   emitted action with its full field set (team, touch_number, rally_id,
+   contact_kind, contact_point) plus spike records and video metadata. This
+   is what the database ingester consumes.
+5. **summary_graphs.png** (unless `--skip-visualization`): Visualization graphs
+   including total action counts, per-player breakdown, activity over time,
+   and action distribution.
+
+## Analysis Database & Local UI
+
+Extraction and database storage are **separate processes** by design:
+extraction writes files, the ingester reads them. Videos are identified by
+their file stem (the unique name) - re-ingesting a video **overwrites** that
+video's rows (the point of reprocessing after bug fixes) while **player
+labels survive**.
+
+```bash
+make run VIDEO=resources/video_entreno_3.mp4   # 1. extract -> output/<stem>/ (+ pipeline_output.json)
+make ingest VIDEO=resources/video_entreno_3.mp4 # 2. upsert into data/volley.db
+make ingest-all                                 #    ...or every output/<stem>/ at once
+make ui                                         # 3. local web UI at http://127.0.0.1:8000
+make db-reset                                   # delete the DB entirely (labels too)
+```
+
+### Schema (SQLite, `data/volley.db`)
+
+- `videos` - one row per video stem (fps, dimensions, pipeline_version, processed_at)
+- `players` - real player names (global, survive everything)
+- `video_players` - **the labeling table**: (video, track_id 1-4) -> player.
+  Track ids are per-video bootstrap artifacts, NOT stable identities, so a
+  label is always per video. Applied via the UI after ingest.
+- `actions` - every emitted contact (action, gesture, confidence, team,
+  touch_number, rally_id, contact_kind, contact point). No per-frame data is stored.
+- `spikes` - attack enrichment (spike_type, attack_zone, outcome, landing/dug zones)
+
+### Player metrics
+
+Computed at query time over all videos a player is labeled in:
+
+- **Kill%** = kills/attacks - **attack error%** = outs/attacks - **dug%** = dug/attacks
+- **Hard-hit% / touch%** = spike_type split - attack-zone distribution
+- **Placement heatmap** = attack_zone x landing_zone (kills & outs)
+- **Dig%** = digs/opponent attacks (opponent side derived from the player's
+  dominant team per video)
+- **Blocks** - ball-touching blocks only (owner rule): a **kill block** is a
+  block that ends its rally (last action), a **soft block** is followed by
+  further play. No-touch blocks are never counted (the pipeline cannot emit
+  them by design).
+- Serves, sets. **Aces are parked** (no point-outcome detection yet).
+
+Requires the `web` extras for the UI: `uv pip install -e ".[web]"`.
 
 ## Supported Actions
 

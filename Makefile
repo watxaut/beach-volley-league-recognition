@@ -13,6 +13,7 @@
 PYTHON ?= python
 VIDEO  ?=
 VIZ    ?=
+DB     ?= data/volley.db
 
 # Derive the output folder from the video basename (strip dir + extension).
 VIDEO_NAME := $(basename $(notdir $(VIDEO)))
@@ -21,7 +22,7 @@ OUTPUT_DIR := output/$(VIDEO_NAME)
 # Skip visualization unless VIZ is set.
 VIZ_FLAG := $(if $(VIZ),,--skip-visualization)
 
-.PHONY: run run-video run-live help
+.PHONY: run run-video run-live ingest ingest-all db-reset ui help
 
 run:
 ifeq ($(strip $(VIDEO)),)
@@ -47,9 +48,36 @@ endif
 	@echo ""
 	@echo "Per-player results CSV: $(OUTPUT_DIR)/results.csv"
 
+# Upsert one video's extraction output into the analysis DB (separate process
+# from `run` by design: extraction writes output/<stem>/pipeline_output.json,
+# ingest reads it). Re-ingesting overwrites that video's rows; player labels
+# survive.
+ingest:
+ifeq ($(strip $(VIDEO)),)
+	$(error VIDEO is not set. Usage: make ingest VIDEO=path/to/video.mp4)
+endif
+	$(PYTHON) -m src.db.ingest "$(VIDEO_NAME)" --db "$(DB)"
+
+# Ingest every output/<stem>/pipeline_output.json found.
+ingest-all:
+	$(PYTHON) -m src.db.ingest output --db "$(DB)"
+
+# Delete the analysis database entirely (labels too!).
+db-reset:
+	rm -f "$(DB)" "$(DB)-wal" "$(DB)-shm"
+	@echo "Deleted $(DB)"
+
+# Local web UI over the analysis DB (http://127.0.0.1:8000).
+ui:
+	$(PYTHON) -m src.web.app --db "$(DB)"
+
 help:
-	@echo "make run VIDEO=path/to/video.mp4        Analyze a video -> $(OUTPUT_DIR)/results.csv"
+	@echo "make run VIDEO=path/to/video.mp4        Analyze a video -> $(OUTPUT_DIR)/results.csv + pipeline_output.json"
 	@echo "make run-video VIDEO=path/to/video.mp4  Also save an annotated .mp4 (two-pass, contact-anchored labels)"
 	@echo "make run-live VIDEO=path/to/video.mp4   Play the annotated video live (buffered ~3s so labels land on contact)"
 	@echo "  VIZ=1                                 Also generate summary_graphs.png (run / run-video)"
 	@echo "  PYTHON=...                            Override the python interpreter"
+	@echo "make ingest VIDEO=path/to/video.mp4   Upsert that video's output into the DB"
+	@echo "make ingest-all                       Upsert every output/<stem>/pipeline_output.json"
+	@echo "make db-reset                         Delete the DB (DB=$(DB))"
+	@echo "make ui                               Local web UI at http://127.0.0.1:8000"

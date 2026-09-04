@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Players · Volleyball Analysis{% endblock %}
+{% block content %}
+<h1>Players</h1>
+
+{% if players %}
+<table class="list">
+  <thead>
+    <tr>
+      <th>Player</th><th>Videos</th><th>Attacks</th><th>Kills</th><th>Kill%</th>
+      <th>Digs</th><th>Dig%</th><th>Blocks</th><th>Serves</th><th>Sets</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for p in players %}
+    <tr>
+      <td><a href="/players/{{ p.id }}">{{ p.name }}</a></td>
+      <td class="num">{{ p.n_videos }}</td>
+      <td class="num">{{ p.attacks }}</td>
+      <td class="num">{{ p.kills }}</td>
+      <td class="num">{{ p.kill_pct|pct }}</td>
+      <td class="num">{{ p.digs }}</td>
+      <td class="num">{{ p.dig_pct|pct }}</td>
+      <td class="num">{{ p.blocks }}</td>
+      <td class="num">{{ p.serves }}</td>
+      <td class="num">{{ p.sets }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="hint">Kill% = kills/attacks · Dig% = digs/opponent attacks ·
+Blocks are ball-touching blocks only (kill block = rally ends with the block,
+soft block = play continued). No-touch blocks are not counted.</p>
+{% else %}
+<p class="empty">
+  No labeled players yet. Label tracks on a
+  <a href="/">video page</a> first.
+</p>
+{% endif %}
+
+{% if unlabeled %}
+<h2>Unlabeled tracks</h2>
+<table class="list">
+  <thead><tr><th>Video</th><th>Track</th><th>Actions</th></tr></thead>
+  <tbody>
+  {% for u in unlabeled %}
+    <tr>
+      <td><a href="/videos/{{ u.video_key }}">{{ u.video_key }}</a></td>
+      <td class="num">{{ u.track_id }}</td>
+      <td class="num">{{ u.n_actions }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}{{ m.player.name }} · Volleyball Analysis{% endblock %}
+{% block content %}
+<h1>{{ m.player.name }}
+  <span class="sub">{{ m.n_videos }} video{{ "s" if m.n_videos != 1 }}</span>
+</h1>
+
+<section class="cards">
+  <div class="metric"><div class="v">{{ m.attacks }}</div><div class="k">attacks</div></div>
+  <div class="metric"><div class="v">{{ m.kills }}</div><div class="k">kills</div></div>
+  <div class="metric"><div class="v">{{ m.kill_pct|pct }}</div><div class="k">kill %</div></div>
+  <div class="metric"><div class="v">{{ m.error_pct|pct }}</div><div class="k">attack error %</div></div>
+  <div class="metric"><div class="v">{{ m.dug_pct|pct }}</div><div class="k">attack dug %</div></div>
+  <div class="metric"><div class="v">{{ m.hard_pct|pct }}</div><div class="k">hard-hit %</div></div>
+  <div class="metric"><div class="v">{{ m.touch_pct|pct }}</div><div class="k">touch %</div></div>
+  <div class="metric"><div class="v">{{ m.digs }}</div><div class="k">digs</div></div>
+  <div class="metric"><div class="v">{{ m.dig_pct|pct }}</div><div class="k">dig %
+    <span class="muted">({{ m.digs }}/{{ m.dig_opportunities }})</span></div></div>
+  <div class="metric"><div class="v">{{ m.blocks }}</div>
+    <div class="k">blocks <span class="muted">({{ m.kill_blocks }} kill / {{ m.soft_blocks }} soft)</span></div></div>
+  <div class="metric"><div class="v">{{ m.serves }}</div><div class="k">serves</div></div>
+  <div class="metric"><div class="v">{{ m.sets }}</div><div class="k">sets</div></div>
+</section>
+
+<section class="card">
+  <h2>Attack zones <span class="sub">where attacks come from</span></h2>
+  {% if m.attack_zones %}
+  <div class="bars">
+    {% for zone, count in m.attack_zones.items() %}
+    <div class="bar-row">
+      <span class="bar-label zone">{{ zone }}</span>
+      <div class="bar"><div class="fill" style="width: {{ (100 * count / max_zone)|round(1) }}%"></div></div>
+      <span class="bar-value">{{ count }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty">No attacks recorded.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Placement <span class="sub">attack zone → landing zone (kills &amp; outs)</span></h2>
+  {% if grid %}
+  <table class="heatmap">
+    <thead>
+      <tr><th>from \ lands</th>
+      {% for lz in landing_zones %}<th class="zone">{{ lz }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+    {% for az in attack_zones %}
+      <tr>
+        <th class="zone">{{ az }}</th>
+        {% for lz in landing_zones %}
+          {% set n = grid.get((az, lz), 0) %}
+          <td class="heat {% if n %}h{% endif %}"
+              style="--a: {{ (n / max_count)|round(2) if max_count else 0 }}">{{ n or "" }}</td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No landing data recorded.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Per video</h2>
+  <table class="list">
+    <thead>
+      <tr><th>Video</th><th>Team</th><th>Attacks</th><th>Kills</th><th>Digs</th>
+          <th>Blocks</th><th>Serves</th><th>Sets</th></tr>
+    </thead>
+    <tbody>
+    {% for row in m.per_video %}
+      <tr>
+        <td><a href="/videos/{{ row.video_key }}">{{ row.video_key }}</a></td>
+        <td><span class="pill {{ row.team|teamcolor }}">{{ row.team or "?" }}</span></td>
+        <td class="num">{{ row.attacks }}</td>
+        <td class="num">{{ row.kills }}</td>
+        <td class="num">{{ row.digs }}</td>
+        <td class="num">{{ row.blocks }}</td>
+        <td class="num">{{ row.serves }}</td>
+        <td class="num">{{ row.sets }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h3>Videos</h3>
+  <p>
+    {% for vk in m.video_keys %}
+      <a class="pill-link" href="/videos/{{ vk }}">{{ vk }}</a>
+    {% endfor %}
+  </p>
+</section>
+{% endblock %}
