@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ m.player.name }} · Volleyball Analysis{% endblock %}
 {% block content %}
+<p class="crumbs"><a href="/players">← Players</a></p>
 <h1>{{ m.player.name }}
   <span class="sub">{{ m.n_videos }} video{{ "s" if m.n_videos != 1 }}</span>
 </h1>

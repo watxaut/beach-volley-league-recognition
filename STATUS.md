@@ -578,6 +578,11 @@ constraint. Side changes need no special handling as long as IDs survive.
   e2 7/1, e4 7/2, e7 5/0); cross-video aggregation checked on a throwaway
   DB copy (real DB left unlabeled for the owner). Web smoke: all pages
   200, label POST 303→updated, 404s correct.
+- **Later the same session: UI restyled to a modern dark theme** (owner
+  request): dark palette with orange accent (style.css rewrite — sticky
+  blurred header, gradient cards/metric tiles/bars, glow on heat cells,
+  dark form controls with focus rings; CSS-only, still zero JS deps;
+  breadcrumb links on detail pages).
 - **Gotchas**: sqlite3 needs `check_same_thread=False` for FastAPI sync
   handlers (threadpool); this venv has no pytest-cov → run
   `venv/bin/python -m pytest tests/ -q -o addopts=""`. Suite **262 green**

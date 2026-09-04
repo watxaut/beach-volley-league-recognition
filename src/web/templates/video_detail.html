@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ video_key }} · Volleyball Analysis{% endblock %}
 {% block content %}
+<p class="crumbs"><a href="/">← Videos</a></p>
 <h1>{{ video_key }}
   <span class="sub">pipeline {{ video.pipeline_version or "?" }} ·
   {{ video.total_frames or "?" }} frames @ {{ "%.0f"|format(video.fps or 0) }} fps</span>
