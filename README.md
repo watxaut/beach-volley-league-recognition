@@ -238,10 +238,11 @@ Computed at query time over all videos a player is labeled in:
 
 - **Kill%** = kills/attacks - **attack error%** = outs/attacks - **dug%** = dug/attacks
 - **Hard-hit% / touch%** = spike_type split - attack-zone distribution
-- **Court heatmap** (player page) = drawn court, bottom half = takeoff-zone
-  counts (where the player attacks from), top half = where attacks land
-  (kill/out landing_zone, dug -> dug_zone where the defender kept it up;
-  hover a cell for the kill/out/dug split)
+- **Court heatmap** (player page) = an SVG overhead drawing of the court
+  (boundary, net, faint 3x3 zone grid) with smooth heat hotspots: bottom
+  half = where the player attacks from, top half = where attacks land
+  (kill/out landing_zone, dug -> dug_zone; hover a hotspot for the
+  kill/out/dug split)
 - **Placement matrix** = attack_zone x landing_zone counts (kill/out
   landings; still in the metrics bundle, no longer rendered)
 - **Dig%** = digs/opponent attacks (opponent side derived from the player's

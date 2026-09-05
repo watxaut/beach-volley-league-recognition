@@ -6,8 +6,9 @@ Pages:
 - /                 video list + labeling status
 - /videos/{key}     action timeline (rally-grouped), spike table, label form
 - /players          metrics overview per labeled player
-- /players/{id}     full metric bundle: cards, court heatmap (attack
-                    origins bottom half, landings top half)
+- /players/{id}     full metric bundle: cards, court field heatmap (SVG:
+                    attack-origin hotspots on the bottom half, landing
+                    hotspots on the top half)
 
 Charts are CSS-only (bars via divs, heatmap via colored table cells) -- no
 JS dependency, fully offline. The DB is opened read-write (labeling) but
@@ -187,6 +188,35 @@ def players_page(request: Request):
     })
 
 
+def _court_blobs(counts, half, detail=None):
+    """Zone-digit counts -> hotspot geometry on an 80x160 SVG court viewBox.
+
+    1 unit = 10 cm: the 8m x 16m court fills 0..80 x 0..160 with the net at
+    y=80. Zone centers follow world_point_to_zone's camera-view layout --
+    each side's net row sits next to the net and the columns run opposite
+    ways between the halves (bottom/attack half net row is 3-2-1, top/landing
+    half is 1-2-3). Intensity `a` is the count's share of the half's max.
+    """
+    mx = max(counts.values(), default=0)
+    blobs = []
+    for digit, n in sorted(counts.items()):
+        row, col = divmod(digit - 1, 3)  # row 0 = net row, own-facing columns
+        if half == "attack":
+            x, y = 66.67 - col * 26.67, 93.33 + row * 26.67
+            title = f"{n} attack{'s' if n != 1 else ''} from zone {digit}"
+        else:
+            x, y = 13.33 + col * 26.67, 66.67 - row * 26.67
+            d = (detail or {}).get(digit, {})
+            title = (f"{n} landing{'s' if n != 1 else ''} in zone {digit}: "
+                     f"{d.get('kill', 0)} kill / {d.get('out', 0)} out / "
+                     f"{d.get('dug', 0)} dug")
+        blobs.append({
+            "digit": digit, "x": round(x, 2), "y": round(y, 2), "count": n,
+            "a": round(n / mx, 2) if mx else 0.0, "title": title,
+        })
+    return blobs
+
+
 @app.get("/players/{player_id}", response_class=HTMLResponse)
 def player_page(request: Request, player_id: int):
     conn = request.state.conn
@@ -194,29 +224,18 @@ def player_page(request: Request, player_id: int):
     if bundle is None:
         return HTMLResponse(f"Unknown player: {player_id}", status_code=404)
 
-    # Court heatmap: one 3x3 grid per half, keyed by zone digit 1-9.
-    # Layout top->bottom, as seen from behind the player's own baseline
-    # (matches world_point_to_zone's camera-view diagram):
-    #   landing half   7 8 9 / 4 5 6 / 1 2 3   (net row adjacent to the net)
-    #   attack half    3 2 1 / 6 5 4 / 9 8 7
-    attack_grid = bundle["court_attack"]
-    landing_grid = bundle["court_landing"]
-    landing_detail = bundle["court_landing_outcomes"]
-    max_attack = max(attack_grid.values(), default=0)
-    max_landing = max(landing_grid.values(), default=0)
-    court_rows = [
-        ("landing", [7, 8, 9]), ("landing", [4, 5, 6]), ("landing", [1, 2, 3]),
-        ("attack", [3, 2, 1]), ("attack", [6, 5, 4]), ("attack", [9, 8, 7]),
-    ]
+    # Court field heatmap: smooth hotspots on a drawn court. Bottom half =
+    # takeoff zones (where the player attacks from), top half = where the
+    # attacks land (kill/out landing_zone, dug -> dug_zone).
+    attack_blobs = _court_blobs(bundle["court_attack"], "attack")
+    landing_blobs = _court_blobs(
+        bundle["court_landing"], "landing", bundle["court_landing_outcomes"]
+    )
 
     return templates.TemplateResponse(request, "player_detail.html", {
         "m": bundle,
-        "court_rows": court_rows,
-        "attack_grid": attack_grid,
-        "landing_grid": landing_grid,
-        "landing_detail": landing_detail,
-        "max_attack": max_attack,
-        "max_landing": max_landing,
+        "attack_blobs": attack_blobs,
+        "landing_blobs": landing_blobs,
     })
 
 

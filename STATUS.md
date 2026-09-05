@@ -9,20 +9,25 @@
 
 ## Where we are
 
-**(2026-09-05, fifth session): player page court heatmap shipped** (owner
-request): the player detail page's "Attack zones" count bars and the
-"Placement" count matrix are replaced by ONE drawn-court heatmap — bottom
-half = takeoff zones (where the player attacks from), top half = landing
-zones (where attacks land; kill/out → landing_zone, dug → dug_zone, hover
-for the outcome split). Data side: `player_metrics` gains `court_attack` /
-`court_landing` / `court_landing_outcomes` keyed by zone DIGIT 1-9 (team
-letter stripped — the 9-zone grid is 180°-symmetric so the digit is
-side-independent); rendering keeps the camera-view layout
-(`7 8 9 / 4 5 6 / 1 2 3` top, `3 2 1 / 6 5 4 / 9 8 7` bottom). CSS-only
-(still zero JS), each half intensity-scaled to its own max. The joint
-placement matrix stays in the metrics bundle (tests pin it) but is no
-longer rendered. Screenshot: output/ui_player_court_preview.png (git-
-ignored). Suite 269 green (+2 assertions in tests/test_db.py).
+**(2026-09-05, fifth session): player page court FIELD heatmap shipped**
+(owner request, two rounds): round 1 replaced the count bars/matrix with a
+cell-grid court — the owner rejected it ("I want a visual representation of
+the field"), round 2 rebuilt it as a drawn SVG overhead court: 8m x 16m
+field with sand tint, boundary, net band + posts, faint 3x3 zone grid per
+half, and SMOOTH radial-gradient heat hotspots (blurred circles at zone
+centers) — orange = takeoff zones on the BOTTOM half (where the player
+attacks from), blue = landings on the TOP half (kill/out → landing_zone,
+dug → dug_zone); intensity/opacity scales to each half's max, small count
+labels sit on hotspots with native title tooltips (kill/out/dug split for
+landings). Data side (round 1, unchanged): `player_metrics` gains
+`court_attack` / `court_landing` / `court_landing_outcomes` keyed by zone
+DIGIT 1-9 (team letter stripped — the 9-zone grid is 180°-symmetric so the
+digit is side-independent); geometry (`_court_blobs` in app.py) follows the
+camera-view layout (landing half net row 1-2-3 left-to-right, attack half
+3-2-1). CSS-only, still zero JS. The joint placement matrix stays in the
+metrics bundle (tests pin it) but is no longer rendered. Verified: suite
+269 green, served page XML-valid, geometry unit-checked, headless-Chrome
+screenshot output/ui_player_court_preview.png (git-ignored).
 
 **Analysis database + player labeling + local UI shipped (2026-09-04,
 fourth session): extraction and DB are separate processes joined by a
@@ -566,29 +571,32 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Log (newest first)
 
-### 2026-09-05 (fifth session) — player-page court heatmap (attack origins bottom, landings top)
+### 2026-09-05 (fifth session) — player-page court FIELD heatmap (SVG): two rounds
 - **Owner request**: on the player tab, replace the counts (attack-zone
-  bars + from\lands matrix) with a heatmap of the field — bottom side =
-  where the player attacks from, top side = where the attack lands.
-- **Shipped**: `src/db/metrics.py` `player_metrics` now also returns
-  `court_attack` (takeoff counts by zone digit), `court_landing` (landing
-  counts by zone digit: kill/out → landing_zone, dug → dug_zone), and
-  `court_landing_outcomes` (per-zone kill/out/dug breakdown, rendered as
-  the cell's `title` tooltip). Letter stripped from zone keys because the
-  9-zone grid is 180°-symmetric — the digit alone positions a cell on the
-  player's-own-half drawing.
-- **Shipped**: `src/web/app.py` player route builds the court rows in the
-  camera-view layout (top half rows 7-8-9 / 4-5-6 / 1-2-3 net-adjacent,
-  bottom half mirrored: 3-2-1 / 6-5-4 / 9-8-7); `player_detail.html`
-  renders one "Attack court" card (NET band, per-half max intensity,
-  counts in cells, vertical half labels); `style.css` court styles in the
-  existing dark/orange theme. The "Attack zones" bars and "Placement"
-  matrix sections are GONE from the page (the matrix data survives in
-  metrics + tests).
-- **Verified**: template render on the real DB (18 cells, correct zone
-  order, tooltips), live uvicorn + headless-Chrome screenshot
-  (output/ui_player_court_preview.png, git-ignored), suite **269 green**
-  (test_db: Ana/Bea court-marginal assertions).
+  bars + from\lands matrix) with "a heatmap of the field, a visual
+  representation of the field" — bottom side where the player attacks
+  from, top side where the attack lands.
+- **Round 1 (rejected)**: a CSS-grid court of 18 numbered boxes with
+  counts. Owner: not a field. Lesson: draw the court, not a table.
+- **Round 2 (shipped)**: `player_detail.html` renders an inline SVG —
+  80x160 viewBox (1 unit = 10cm), sand-tinted rect + boundary, faint
+  dashed 3x3 zone grid per half, net band with posts at y=80, rotated
+  half labels ("lands" / "attacks from") in a left gutter, and heat
+  hotspots: blurred radial-gradient circles (r=15) at zone centers —
+  orange gradient = attack origins (bottom), blue = landings (top),
+  opacity = 0.35 + 0.65·count/half-max. Small white count labels on
+  hotspots only; `<title>` tooltips give the landing kill/out/dug split.
+  `src/web/app.py` `_court_blobs()` maps zone digits to court coordinates
+  (attack half columns mirrored: net row 3-2-1; landing half 1-2-3 —
+  world_point_to_zone's camera-view convention, unit-checked).
+- **Data layer unchanged from round 1**: `metrics.player_metrics` returns
+  `court_attack` / `court_landing` / `court_landing_outcomes` keyed by
+  zone digit (team letter stripped, 180°-symmetric grid). The joint
+  placement matrix survives in metrics + tests, unrendered.
+- **Verified**: suite **269 green**; served page's SVG parses as XML;
+  blob geometry asserts (zone 1 bottom-right-at-net, zone 9 top-left-deep);
+  headless-Chrome screenshot output/ui_player_court_preview.png
+  (git-ignored).
 
 ### 2026-09-04 (fourth session) — analysis DB, player labeling, local web UI; extraction/DB split by file contract
 - **Shipped**: `src/output_gen/json_exporter.py` — `src.main` now writes
