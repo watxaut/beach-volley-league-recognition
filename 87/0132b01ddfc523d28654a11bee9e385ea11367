@@ -1,0 +1,48 @@
+tests/test_web_court.py
+  s_aff93d87bcbf98::t_96f674d330187e 1-93,97-101,103-105,107,109-115
+  s_aff93d87bcbf98::t_ba9c087f0c8189 95
+  s_aff93d87bcbf98::t_0995c961f9b42d 94,96,102,106,108
+.pi/prompts/entreno.md
+  s_559da204b0f7a6::t_00ef83241a49ad 1-13
+src/web/app.py
+  s_aff93d87bcbf98::t_117b372f13bf42 9-11,36-40,197-206,213,216
+src/web/static/style.css
+  s_aff93d87bcbf98::t_e0701a6e2517a8 228
+.pi/prompts/status.md
+  s_559da204b0f7a6::t_7e69d0c50dd979 1-13
+src/web/templates/player_detail.html
+  s_aff93d87bcbf98::t_41cc50b171bcfe 27,30-31,48-51,56-61,64,76-81,83-84,87-92,97-102,106-112,118
+.pi/prompts/eval.md
+  s_559da204b0f7a6::t_d5e9f5d88e5a4b 1-9
+src/web/templates/base.html
+  s_aff93d87bcbf98::t_2c674755f7169b 6
+.pi/prompts/gt.md
+  s_559da204b0f7a6::t_c1b75c7f203e29 1-9
+STATUS.md
+  s_aff93d87bcbf98::t_d4777cefee068a 8,12-36,599-613
+  s_aff93d87bcbf98::t_c29b0b2bab9449 614
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "870132b01ddfc523d28654a11bee9e385ea11367",
+  "prompts": {},
+  "sessions": {
+    "s_559da204b0f7a6": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a06863-c376-74b7-9266-25b0606cf76f",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    },
+    "s_aff93d87bcbf98": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a070cb-5d64-7072-b6b6-83ba92c0ede3",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
