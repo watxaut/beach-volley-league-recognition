@@ -5,9 +5,34 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-05 (fifth session)
+**Last updated:** 2026-09-05 (later fifth session)
 
 ## Where we are
+
+**(2026-09-05, later session): player court heatmap rotated to landscape +
+the "no hotspots" report diagnosed as stale server/browser cache** (owner
+report: court "way too big", "does not show where attacks land and where do
+they start from", wants numbers too). Diagnosis first: the data was present
+(Jesus: `court_attack {1:1, 2:1}`, `court_landing {5:2}`), `_court_blobs`
+emitted correct blobs, and a headless-Chrome screenshot of HEAD's served page
+showed blobs + counts at the 340px cap — the owner's view was a STALE `make
+ui` process plus a cached pre-session style.css (their screenshot lacks even
+the CSS-styled white count text, and the court overflows the max-width).
+Shipped so that class of failure cannot recur: (a) the court is now
+LANDSCAPE — 160x80 viewBox (1 unit = 10 cm), net VERTICAL at x=80, player's
+own half LEFT ("ATTACKS FROM"), opponent half RIGHT ("LANDS"), i.e. the old
+portrait drawing rotated 90° clockwise so world_point_to_zone's digit
+semantics are unchanged (zone 1 attack = net-adjacent bottom column; halves
+mirror across net x=80 and mid y=40); sized down to max-width 560px;
+(b) hotspot count numbers + half labels carry INLINE fill/stroke attributes
+in the SVG, so they render even with no/any stale stylesheet (verified with
+the stylesheet stripped from the served HTML); (c) the stylesheet link is
+now cache-busted by file mtime (`/static/style.css?v=…` global set in
+app.py). Tests: +9 (tests/test_web_court.py — zone 1/9 anchors both halves,
+180°-symmetry mirror, intensity normalization, outcome-detail title,
+well-formed landscape SVG render with inline-filled numbers, no-attacks
+branch). Suite **278 green**. NOTE for the owner: restart `make ui` and
+hard-refresh once — the running server predates the fix.
 
 **(2026-09-05, fifth session): player page court FIELD heatmap shipped**
 (owner request, two rounds): round 1 replaced the count bars/matrix with a
@@ -570,6 +595,22 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-05 (later session) — court heatmap landscape rotation; stale-cache diagnosis; CSS-cache busting
+- **Report**: court "way too big", "does not show where attacks land and
+  where they start from", "add a number as well as a heatmap".
+- **Diagnosis before design**: blobs/counts were present and correct on HEAD
+  (DB query + `_court_blobs` probe + headless-Chrome screenshot of the served
+  page). The owner's screenshot showed the pre-session rendering (huge court,
+  no CSS-styled elements) = stale `make ui` process + cached style.css.
+- **Shipped** (src/web/app.py `_court_blobs`, player_detail.html, style.css,
+  base.html): landscape 160x80 court (net vertical; attacks LEFT half →
+  land RIGHT half), max-width 560px; numbers/labels inline-styled in the SVG
+  (stale-CSS-proof); stylesheet link cache-busted by mtime via a new
+  `style_ver` template global.
+- **Verified**: suite 269 → **278 green** (+9 tests/test_web_court.py);
+  served-page screenshots with the theme and with the stylesheet stripped
+  (court + numbers still render); all pages 200 with the new link.
 
 ### 2026-09-05 (fifth session) — player-page court FIELD heatmap (SVG): two rounds
 - **Owner request**: on the player tab, replace the counts (attack-zone

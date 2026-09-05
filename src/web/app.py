@@ -6,9 +6,9 @@ Pages:
 - /                 video list + labeling status
 - /videos/{key}     action timeline (rally-grouped), spike table, label form
 - /players          metrics overview per labeled player
-- /players/{id}     full metric bundle: cards, court field heatmap (SVG:
-                    attack-origin hotspots on the bottom half, landing
-                    hotspots on the top half)
+- /players/{id}     full metric bundle: cards, court field heatmap (landscape
+                    SVG: attack-origin hotspots on the LEFT half, landing
+                    hotspots on the RIGHT half, net drawn vertically)
 
 Charts are CSS-only (bars via divs, heatmap via colored table cells) -- no
 JS dependency, fully offline. The DB is opened read-write (labeling) but
@@ -32,6 +32,11 @@ from ..db.schema import DEFAULT_DB_PATH, connect, init_db
 
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+# Cache-bust the stylesheet on every edit: browsers otherwise keep serving a
+# stale style.css (which once hid the court heatmap's CSS-styled parts).
+_STYLE_PATH = BASE_DIR / "static" / "style.css"
+templates.env.globals["style_ver"] = str(int(_STYLE_PATH.stat().st_mtime))
 
 THUMB_NAME = re.compile(r"^track_\d+\.png$")
 
@@ -189,23 +194,26 @@ def players_page(request: Request):
 
 
 def _court_blobs(counts, half, detail=None):
-    """Zone-digit counts -> hotspot geometry on an 80x160 SVG court viewBox.
+    """Zone-digit counts -> hotspot geometry on a 160x80 landscape SVG court.
 
-    1 unit = 10 cm: the 8m x 16m court fills 0..80 x 0..160 with the net at
-    y=80. Zone centers follow world_point_to_zone's camera-view layout --
-    each side's net row sits next to the net and the columns run opposite
-    ways between the halves (bottom/attack half net row is 3-2-1, top/landing
-    half is 1-2-3). Intensity `a` is the count's share of the half's max.
+    1 unit = 10 cm: the 16m x 8m court fills 0..160 x 0..80 with the net
+    VERTICAL at x=80. The player's own half is on the LEFT (attack takeoffs),
+    the opponent half on the RIGHT (where attacks land). Zone centers follow
+    world_point_to_zone's camera-view layout -- each side's net row (row 0)
+    hugs the net and the columns run opposite ways between the halves; the
+    mapping is exactly the previous portrait drawing rotated 90 degrees
+    clockwise, so the zone-digit semantics are unchanged. Intensity `a` is
+    the count's share of the half's max.
     """
     mx = max(counts.values(), default=0)
     blobs = []
     for digit, n in sorted(counts.items()):
         row, col = divmod(digit - 1, 3)  # row 0 = net row, own-facing columns
         if half == "attack":
-            x, y = 66.67 - col * 26.67, 93.33 + row * 26.67
+            x, y = 66.67 - row * 26.67, 66.67 - col * 26.67
             title = f"{n} attack{'s' if n != 1 else ''} from zone {digit}"
         else:
-            x, y = 13.33 + col * 26.67, 66.67 - row * 26.67
+            x, y = 93.33 + row * 26.67, 13.33 + col * 26.67
             d = (detail or {}).get(digit, {})
             title = (f"{n} landing{'s' if n != 1 else ''} in zone {digit}: "
                      f"{d.get('kill', 0)} kill / {d.get('out', 0)} out / "

@@ -225,7 +225,7 @@ td.warn { color: var(--accent-2); font-weight: 700; }
 
 .court-fig { display: flex; justify-content: center; }
 .court-fig svg {
-  width: 100%; max-width: 340px; height: auto; display: block;
+  width: 100%; max-width: 560px; height: auto; display: block;
   filter: drop-shadow(0 10px 26px rgba(0, 0, 0, 0.35));
 }
 .half-label {

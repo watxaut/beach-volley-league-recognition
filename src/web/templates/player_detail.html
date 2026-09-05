@@ -24,11 +24,11 @@
 </section>
 
 <section class="card">
-  <h2>Attack court <span class="sub">bottom = attacks from · top = where they land</span></h2>
+  <h2>Attack court <span class="sub">left = attacks from · right = where they land</span></h2>
   {% if m.attacks %}
   <div class="court-fig">
-    <svg viewBox="-17 -5 112 170" role="img"
-         aria-label="Court heatmap: attacks start from the bottom half and land in the top half">
+    <svg viewBox="-5 -12 170 100" role="img"
+         aria-label="Court heatmap: attacks start from the left half and land in the right half">
       <defs>
         <radialGradient id="blob-attack">
           <stop offset="0%" stop-color="#ffb454" stop-opacity="0.95"/>
@@ -45,21 +45,23 @@
         </filter>
       </defs>
 
-      <!-- the field: 8m x 16m sand court, net across the middle -->
-      <rect x="0" y="0" width="80" height="160" rx="1.5"
+      <!-- the field: 16m x 8m sand court, net drawn vertically; the attack
+           travels left -> right. The drawing carries its own fills/strokes
+           so the court and its numbers never depend on style.css. -->
+      <rect x="0" y="0" width="160" height="80" rx="1.5"
             fill="rgba(226, 200, 148, 0.08)" stroke="#d9c48f"
             stroke-opacity="0.75" stroke-width="1.4"/>
       <g stroke="#d9c48f" stroke-opacity="0.16" stroke-width="0.35"
          stroke-dasharray="1.4 1.4">
-        <line x1="26.67" y1="0" x2="26.67" y2="160"/>
-        <line x1="53.33" y1="0" x2="53.33" y2="160"/>
-        <line x1="0" y1="26.67" x2="80" y2="26.67"/>
-        <line x1="0" y1="53.33" x2="80" y2="53.33"/>
-        <line x1="0" y1="106.67" x2="80" y2="106.67"/>
-        <line x1="0" y1="133.33" x2="80" y2="133.33"/>
+        <line x1="26.67" y1="0" x2="26.67" y2="80"/>
+        <line x1="53.33" y1="0" x2="53.33" y2="80"/>
+        <line x1="106.67" y1="0" x2="106.67" y2="80"/>
+        <line x1="133.33" y1="0" x2="133.33" y2="80"/>
+        <line x1="0" y1="26.67" x2="160" y2="26.67"/>
+        <line x1="0" y1="53.33" x2="160" y2="53.33"/>
       </g>
 
-      <!-- heat: landings (top) then takeoffs (bottom) -->
+      <!-- heat: landings (right) then takeoffs (left) -->
       <g filter="url(#blob-soften)">
         {% for b in landing_blobs %}
         <circle cx="{{ b.x }}" cy="{{ b.y }}" r="15" fill="url(#blob-landing)"
@@ -71,36 +73,49 @@
         {% endfor %}
       </g>
 
-      <!-- net -->
-      <rect x="-4" y="78.4" width="88" height="3.2" fill="rgba(255, 255, 255, 0.06)"/>
-      <line x1="0" y1="78.7" x2="80" y2="78.7" stroke="#e9dcb8" stroke-opacity="0.9" stroke-width="1"/>
-      <line x1="0" y1="81.3" x2="80" y2="81.3" stroke="#e9dcb8" stroke-opacity="0.5" stroke-width="0.6"/>
-      <circle cx="-2.4" cy="80" r="1.7" fill="#e9dcb8" fill-opacity="0.9"/>
-      <circle cx="82.4" cy="80" r="1.7" fill="#e9dcb8" fill-opacity="0.9"/>
+      <!-- net (vertical) -->
+      <rect x="78.4" y="-4" width="3.2" height="88" fill="rgba(255, 255, 255, 0.06)"/>
+      <line x1="78.7" y1="0" x2="78.7" y2="80" stroke="#e9dcb8" stroke-opacity="0.9" stroke-width="1"/>
+      <line x1="81.3" y1="0" x2="81.3" y2="80" stroke="#e9dcb8" stroke-opacity="0.5" stroke-width="0.6"/>
+      <circle cx="80" cy="-2.4" r="1.7" fill="#e9dcb8" fill-opacity="0.9"/>
+      <circle cx="80" cy="82.4" r="1.7" fill="#e9dcb8" fill-opacity="0.9"/>
 
-      <!-- hotspot counts (tooltips carry the detail) -->
+      <!-- hotspot counts: the number is styled INLINE so it stays visible
+           even if the browser holds a stale stylesheet -->
       {% for b in landing_blobs %}
       <g><title>{{ b.title }}</title>
-        <circle cx="{{ b.x }}" cy="{{ b.y }}" r="8" fill="transparent"/>
-        <text x="{{ b.x }}" y="{{ b.y }}" class="blob-count">{{ b.count }}</text>
+        <circle cx="{{ b.x }}" cy="{{ b.y }}" r="9" fill="transparent"/>
+        <text x="{{ b.x }}" y="{{ b.y }}" class="blob-count"
+              fill="#ffffff" font-size="6.5" font-weight="800"
+              text-anchor="middle" dominant-baseline="central"
+              paint-order="stroke" stroke="rgba(0, 0, 0, 0.55)"
+              stroke-width="1.1" stroke-linejoin="round">{{ b.count }}</text>
       </g>
       {% endfor %}
       {% for b in attack_blobs %}
       <g><title>{{ b.title }}</title>
-        <circle cx="{{ b.x }}" cy="{{ b.y }}" r="8" fill="transparent"/>
-        <text x="{{ b.x }}" y="{{ b.y }}" class="blob-count">{{ b.count }}</text>
+        <circle cx="{{ b.x }}" cy="{{ b.y }}" r="9" fill="transparent"/>
+        <text x="{{ b.x }}" y="{{ b.y }}" class="blob-count"
+              fill="#ffffff" font-size="6.5" font-weight="800"
+              text-anchor="middle" dominant-baseline="central"
+              paint-order="stroke" stroke="rgba(0, 0, 0, 0.55)"
+              stroke-width="1.1" stroke-linejoin="round">{{ b.count }}</text>
       </g>
       {% endfor %}
 
-      <!-- half labels -->
-      <text class="half-label" x="-9" y="40" transform="rotate(-90 -9 40)">lands</text>
-      <text class="half-label" x="-9" y="120" transform="rotate(-90 -9 120)">attacks from</text>
+      <!-- half labels (inline-styled, same reason) -->
+      <text class="half-label" x="40" y="-4.5" fill="#8b93a3" font-size="5"
+            font-weight="800" letter-spacing="1.1"
+            text-anchor="middle">ATTACKS FROM</text>
+      <text class="half-label" x="120" y="-4.5" fill="#8b93a3" font-size="5"
+            font-weight="800" letter-spacing="1.1"
+            text-anchor="middle">LANDS</text>
     </svg>
   </div>
   <div class="court-legend">
     <span><i class="dot dot-attack"></i>attacks from</span>
     <span><i class="dot dot-landing"></i>where they land</span>
-    <span class="muted">hotspot size/opacity = share of that half's max · hover for kill / out / dug · dug attacks land at the dig spot</span>
+    <span class="muted">numbers = attacks / landings · intensity = share of that half's max · hover for kill / out / dug · dug attacks land at the dig spot</span>
   </div>
   {% else %}
   <p class="empty">No attacks recorded.</p>
