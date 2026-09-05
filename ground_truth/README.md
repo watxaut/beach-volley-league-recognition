@@ -2,6 +2,26 @@
 
 Annotations are stored as JSON files in this directory. Each video gets one JSON file.
 
+## Game-State Ground Truth (`gt_point_start_end.txt`)
+
+For the game on/off state machine there is a plain-text format (owner's
+convention, validated on `video_entreno_game_state.mp4`):
+
+```
+00:10 point starts
+00:18 point stops
+
+00:21 point starts
+00:32 point stops
+```
+
+- `MM:SS point starts` marks the SERVE moment of a point; `MM:SS point
+  stops` marks the ball-death moment (landing / held / settled).
+- Whole-second granularity — treat ±15 frames as annotation granularity,
+  not machine error.
+- Score with `scripts/evaluate_game_state.py` against the
+  `game_state.points` key of `pipeline_output.json`.
+
 ## File Naming
 
 `{video_name}_annotations.json` -- e.g., `avp_front_1_annotations.json`

@@ -132,14 +132,27 @@ def ingest_payload(conn, payload: Dict) -> Dict[str, int]:
         # Replace this video's derived rows only (other videos untouched).
         conn.execute("DELETE FROM actions WHERE video_key = ?", (video_key,))
         conn.execute("DELETE FROM spikes WHERE video_key = ?", (video_key,))
+        conn.execute("DELETE FROM points WHERE video_key = ?", (video_key,))
+
+        gs = payload.get("game_state") or {}
+        conn.executemany(
+            """INSERT INTO points (video_key, point_index, start_frame,
+                                   end_frame, n_actions)
+               VALUES (?, ?, ?, ?, ?)""",
+            [
+                (video_key, i, p.get("start_frame", 0), p.get("end_frame", 0),
+                 p.get("n_actions", 0))
+                for i, p in enumerate(gs.get("points", []))
+            ],
+        )
 
         conn.executemany(
             """INSERT INTO actions (video_key, frame, ts, track_id, action,
                                     gesture, confidence, team,
                                     team_in_possession, touch_number,
                                     rally_id, contact_kind,
-                                    contact_x, contact_y)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                    contact_x, contact_y, point_index)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 (
                     video_key,
@@ -156,6 +169,7 @@ def ingest_payload(conn, payload: Dict) -> Dict[str, int]:
                     a.get("contact_kind"),
                     (a.get("contact_point") or [None, None])[0],
                     (a.get("contact_point") or [None, None])[1],
+                    a.get("point_index"),
                 )
                 for a in actions
             ],

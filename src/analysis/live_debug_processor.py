@@ -188,8 +188,8 @@ class LiveDebugProcessor:
                     self._spike_log_state[i] = sig
 
     @staticmethod
-    def _overlay_data(frame_result: Dict[str, Any]) -> Tuple[BallOverlay, PlayerOverlay]:
-        """Extract the lightweight ball + player boxes needed to redraw a frame."""
+    def _overlay_data(frame_result: Dict[str, Any]) -> Tuple[BallOverlay, PlayerOverlay, Optional[Dict[str, Any]]]:
+        """Extract the lightweight ball + player boxes + game state snapshot."""
         ball: BallOverlay = None
         tb = frame_result.get("tracked_ball")
         if tb:
@@ -202,11 +202,13 @@ class LiveDebugProcessor:
             bbox = p.get("bbox", [])
             if len(bbox) == 4:
                 players.append((p.get("track_id", -1), [int(v) for v in bbox]))
-        return ball, players
+        game_state = frame_result.get("game_state") or None
+        return ball, players, game_state
 
     def _render_frame(self, frame: np.ndarray, frame_idx: int, ball: BallOverlay,
                       players: PlayerOverlay, plan: overlay.LabelPlan,
-                      total_frames: Optional[int] = None) -> np.ndarray:
+                      total_frames: Optional[int] = None,
+                      game_state: Optional[Dict[str, Any]] = None) -> np.ndarray:
         """Draw court + ball + player boxes (labels anchored on contact frames)."""
         out = frame
         try:
@@ -236,6 +238,12 @@ class LiveDebugProcessor:
                 )
 
             overlay.draw_frame_counter(out, frame_idx, total_frames)
+            if game_state:
+                overlay.draw_game_state(
+                    out,
+                    game_state.get("current_state", "game_off"),
+                    len(game_state.get("points", [])),
+                )
         except Exception as e:
             self.logger.error(f"Error rendering frame {frame_idx}: {e}")
             cv2.putText(out, f"Render Error: {str(e)[:50]}",
@@ -291,12 +299,12 @@ class LiveDebugProcessor:
         # ---- Pass 2: re-read frames and draw contact-anchored labels.
         cap, *_ = self._open(video_path)
         writer = cv2.VideoWriter(save_video, cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
-        for frame_idx, (ball, players) in enumerate(cache):
+        for frame_idx, (ball, players, gs) in enumerate(cache):
             ret, frame = cap.read()
             if not ret:
                 break
             writer.write(self._render_frame(frame, frame_idx, ball, players, plan,
-                                            total_frames=total))
+                                            total_frames=total, game_state=gs))
         cap.release()
         writer.release()
         self.logger.info(f"Annotated video written: {save_video}")
@@ -341,8 +349,8 @@ class LiveDebugProcessor:
                     result = self.frame_processor.process_frame(frame, frame_idx, enable_court_redetection=True)
                     self._ingest_actions(result.get("actions", []), plan)
                     self._log_resolved_spikes()
-                    ball, players = self._overlay_data(result)
-                    buffer.append((frame, frame_idx, ball, players))
+                    ball, players, gs = self._overlay_data(result)
+                    buffer.append((frame, frame_idx, ball, players, gs))
                     frame_idx += 1
                 else:
                     source_done = True
@@ -353,8 +361,9 @@ class LiveDebugProcessor:
 
             # 2. Release one frame once the buffer is a full delay deep (or draining).
             if not paused and buffer and (len(buffer) > delay_frames or source_done):
-                f, i, ball, players = buffer.popleft()
-                shown = self._render_frame(f, i, ball, players, plan, total_frames=total)
+                f, i, ball, players, gs = buffer.popleft()
+                shown = self._render_frame(f, i, ball, players, plan, total_frames=total,
+                                           game_state=gs)
                 if writer is not None:
                     writer.write(shown)
 

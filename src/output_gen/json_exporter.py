@@ -116,6 +116,7 @@ class JSONExporter:
             "actions": actions,
             "spikes": spikes,
             "snapshots": self.collect_snapshots(analysis_results, actions),
+            "game_state": self.collect_game_state(analysis_results),
         }
 
     def collect_actions(self, analysis_results: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -143,6 +144,20 @@ class JSONExporter:
                     "contact_kind": action.get("contact_kind"),
                 })
         actions.sort(key=lambda a: (a.get("frame_number") or 0,))
+        # Annotate each action with the confirmed point it belongs to (-1 =
+        # outside any point: practice / between points -- consumers use this
+        # to avoid counting actions when no point is on).
+        points = analysis_results.get("game_state", {}).get("points", [])
+        for action in actions:
+            af = action.get("frame_number")
+            action["point_index"] = next(
+                (
+                    i
+                    for i, p in enumerate(points)
+                    if p["start_frame"] <= af <= p["end_frame"]
+                ),
+                -1,
+            )
         return actions
 
     def collect_spikes(self, analysis_results: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -158,6 +173,21 @@ class JSONExporter:
             spikes.append(rec)
         spikes.sort(key=lambda s: (s.get("frame") or 0,))
         return spikes
+
+    def collect_game_state(self, analysis_results: Dict[str, Any]) -> Dict[str, Any]:
+        """Confirmed point segments from the game on/off state machine."""
+        points = analysis_results.get("game_state", {}).get("points", [])
+        return {
+            "point_count": len(points),
+            "points": [
+                {
+                    "start_frame": p["start_frame"],
+                    "end_frame": p["end_frame"],
+                    "n_actions": p.get("n_actions", 0),
+                }
+                for p in points
+            ],
+        }
 
     def collect_snapshots(
         self, analysis_results: Dict[str, Any], actions: List[Dict[str, Any]]

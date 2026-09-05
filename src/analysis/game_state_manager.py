@@ -1,451 +1,325 @@
 """
-Game state manager for volleyball video analysis.
+Game on/off state machine for volleyball video analysis.
 
-This module coordinates multiple analysis modules to detect and track
-game state transitions, providing comprehensive game flow understanding.
+Two layers, both driven only by signals the pipeline already produces
+(conservative ball tracker velocity + the emitted action stream -- pure
+observer, never feeds back into detection/tracking/classification):
+
+**Episode layer (causal, per frame).** The ball is *in flight* when it is
+tracked and moving at >= ``flight_speed_px`` px/frame. A flight burst that
+follows >= ``arm_quiet_frames`` without flight (serve-like onset: quiet
+retrieval/held ball, then the serve toss+hit) arms a candidate episode. The
+candidate is CONFIRMED (state GAME_ON, backdated to the burst start) if it
+accumulates >= ``confirm_flight_frames`` flight frames within
+``confirm_frames`` -- a real rally keeps producing ball flight, while an
+isolated practice hit/serve cannot. Once ON, the state persists while the
+rolling ``density_window_frames`` window holds >= ``density_min_flights``
+flight frames (real rallies contain occlusion gaps of up to ~2 s, so a
+single quiet gap must not end the episode); it ends when the window drains
+(density starvation -- the ball is dead/rolling/retrieved) or when the ball
+is tracked-but-static for ``static_off_frames`` (held ball).
+
+**Point layer (grouping).** Consecutive episodes separated by <=
+``group_gap_frames`` merge into one rally group (a rally whose tracking
+dropped for ~2 s is one point, not two). Each group is then SPLIT at
+contact silences longer than ``contact_chain_frames`` -- two rallies that
+one ball-episode swallowed (practice volleying between points keeps the
+ball flying) separate there, because a real rally's contacts recur quickly
+(<=215 f measured) while the between-points practice produces a long
+contact silence. A piece counts as a POINT when at least
+``point_min_actions`` classifier actions were detected inside it -- this
+is what separates counted points from uncounted practice exchanges, which
+are ball-motion-indistinguishable from rallies (validated on
+resources/video_entreno_game_state.mp4 vs
+ground_truth/gt_point_start_end.txt: 11/13 points, 0 false, 0 merged;
+the two misses are action-recall-limited, not machine logic).
+
+All frame-based parameters assume ~30 fps (the project's videos are 30 fps).
 """
 
-from typing import Dict, Any, List, Optional
 from collections import deque
-import logging
-from datetime import datetime
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
-from .game_state import (
-    GameState, GameStateInfo, StateTransition, ScoreInfo, Team, AnalysisResult
-)
-from .action_sequence_analyzer import ActionSequenceAnalyzer
-from .trajectory_state_analyzer import TrajectoryStateAnalyzer
-from .temporal_activity_analyzer import TemporalActivityAnalyzer
-from .score_tracker import ScoreTracker
+from .game_state import GamePoint, GameState, GameStateInfo
+
+# The action classifier releases a contact only when the NEXT contact
+# arrives (or after its reset gap) -- measured emission lags on the
+# game-state video reach ~400 frames (median 60), so a group must not be
+# finalized before a still-pending action could land in it.
+_ACTION_LOOKAHEAD_FRAMES = 450
 
 
 class GameStateManager:
-    """Central coordinator for game state detection using multiple modalities."""
-    
+    """Game on/off state machine (episode + point layers)."""
+
     def __init__(self, config: Dict[str, Any]):
-        """Initialize the game state manager.
-        
-        Args:
-            config: Configuration dictionary
-        """
-        self.config = config.get("game_state_detection", {})
-        self.logger = logging.getLogger(__name__)
-        
-        # Configuration parameters
-        self.enabled = self.config.get("enabled", True)
-        self.serve_threshold = self.config.get("serve_threshold", 0.7)
-        self.point_end_threshold = self.config.get("point_end_threshold", 0.6)
-        self.min_state_duration_frames = self.config.get("min_state_duration_frames", 10)
-        self.activity_gap_threshold_seconds = self.config.get("activity_gap_threshold_seconds", 3.0)
-        
-        # Current state
-        self.current_state = GameState.GAME_OFF
-        self.state_confidence = 0.0
-        self.state_duration_frames = 0
-        self.state_start_frame = 0
-        
-        # State history
-        self.state_history = deque(maxlen=100)
-        self.transitions = []
-        
-        # Initialize analysis modules
-        if self.enabled:
-            self._initialize_analyzers(config)
-        else:
-            self.logger.info("Game state detection disabled")
-            self.action_analyzer = None
-            self.trajectory_analyzer = None
-            self.temporal_analyzer = None
-            self.score_tracker = None
-        
-        # Frame tracking
-        self.fps = 30.0  # Will be updated from video info
-        self.current_frame = 0
-    
-    def _initialize_analyzers(self, config: Dict[str, Any]) -> None:
-        """Initialize all analysis modules.
-        
-        Args:
-            config: Full configuration dictionary
-        """
-        try:
-            self.action_analyzer = ActionSequenceAnalyzer(config)
-            self.trajectory_analyzer = TrajectoryStateAnalyzer(config)
-            self.temporal_analyzer = TemporalActivityAnalyzer(config)
-            self.score_tracker = ScoreTracker(config)
-            
-            self.logger.info("Game state analysis modules initialized successfully")
-        except Exception as e:
-            self.logger.error(f"Failed to initialize game state analyzers: {e}")
-            raise
-    
+        cfg = config.get("game_state_detection", {})
+        self.enabled = cfg.get("enabled", True)
+        # Episode layer
+        self.flight_speed_px = cfg.get("flight_speed_px", 8.0)
+        self.arm_quiet_frames = cfg.get("arm_quiet_frames", 10)
+        self.serve_burst_frames = cfg.get("serve_burst_frames", 8)
+        self.burst_gap_frames = cfg.get("burst_gap_frames", 6)
+        self.confirm_frames = cfg.get("confirm_frames", 90)
+        self.confirm_flight_frames = cfg.get("confirm_flight_frames", 20)
+        self.density_window_frames = cfg.get("density_window_frames", 90)
+        self.density_min_flights = cfg.get("density_min_flights", 20)
+        self.static_off_frames = cfg.get("static_off_frames", 40)
+        # Point layer
+        self.group_gap_frames = cfg.get("group_gap_frames", 60)
+        self.point_min_actions = cfg.get("point_min_actions", 2)
+        self.contact_chain_frames = cfg.get("contact_chain_frames", 240)
+
+        self._reset_state()
+
+    # ------------------------------------------------------------------
+    # state
+    # ------------------------------------------------------------------
+
+    def _reset_state(self) -> None:
+        self.state = GameState.GAME_OFF
+        self.last_frame_seen: Optional[int] = None
+        # flight bookkeeping
+        self._last_flight_frame: Optional[int] = None
+        self._no_flight_run = 0
+        self._static_run = 0
+        self._burst_start: Optional[int] = None
+        self._burst_quiet = 0
+        # candidate episode (arming/confirming)
+        self._candidate: Optional[int] = None
+        self._candidate_flights = 0
+        # active episode
+        self._episode_start: Optional[int] = None
+        self._density: Deque[bool] = deque(maxlen=self.density_window_frames)
+        # rally group under construction: [start, last_episode_end]
+        self._group: Optional[List[int]] = None
+        # contact frames of every action observed so far (the point layer
+        # counts them at group-finalize time by contact frame -- an action's
+        # emission is delayed by the classifier's look-ahead, so counting at
+        # arrival time would drop a rally's early contacts)
+        self._seen_action_frames: List[int] = []
+        # finalized output
+        self.points: List[GamePoint] = []
+
+    def reset(self) -> None:
+        """Reset all state (live-debug restart)."""
+        self._reset_state()
+
+    # ------------------------------------------------------------------
+    # per-frame update
+    # ------------------------------------------------------------------
+
     def analyze_frame(self, frame_result: Dict[str, Any], frame_number: int) -> GameStateInfo:
-        """Analyze frame for game state and return complete state information.
-        
-        Args:
-            frame_result: Frame processing results from video processor
-            frame_number: Current frame number
-            
-        Returns:
-            Complete game state information
+        """Advance the machine one frame.
+
+        Must be called once per frame, AFTER action classification (the
+        point layer counts the frame's emitted actions).
         """
         if not self.enabled:
-            # Return default state info if disabled
-            return GameStateInfo(
-                current_state=GameState.GAME_OFF,
-                state_confidence=0.0,
-                state_duration_frames=0,
-                transitions=[],
-                analysis_breakdown={},
-                score_info=ScoreInfo()
-            )
-        
-        self.current_frame = frame_number
-        
-        try:
-            # Run all analysis modules
-            analysis_results = self._run_analysis_modules(frame_result, frame_number)
-            
-            # Update game state based on analysis
-            new_state = self._update_game_state(analysis_results)
-            
-            # Handle state transitions
-            transitions = self._handle_state_transitions(new_state, frame_number)
-            
-            # Update score tracking
-            current_game_state_info = {
-                "current_state": self.current_state.value,
-                "analysis_breakdown": {
-                    name: result.confidence_scores 
-                    for name, result in analysis_results.items()
-                }
-            }
-            score_info = self.score_tracker.analyze_frame(
-                frame_result, current_game_state_info, frame_number
-            )
-            
-            # Create complete state information
-            game_state_info = GameStateInfo(
-                current_state=self.current_state,
-                state_confidence=self.state_confidence,
-                state_duration_frames=self.state_duration_frames,
-                transitions=transitions,
-                analysis_breakdown={
-                    name: result.confidence_scores 
-                    for name, result in analysis_results.items()
-                },
-                score_info=score_info
-            )
-            
-            # Update state history
-            self.state_history.append({
-                "frame": frame_number,
-                "state": self.current_state.value,
-                "confidence": self.state_confidence,
-                "timestamp": datetime.now()
-            })
-            
-            return game_state_info
-            
-        except Exception as e:
-            self.logger.error(f"Error in game state analysis at frame {frame_number}: {e}")
-            # Return safe default state
-            return GameStateInfo(
-                current_state=GameState.GAME_OFF,
-                state_confidence=0.0,
-                state_duration_frames=0,
-                transitions=[],
-                analysis_breakdown={},
-                score_info=ScoreInfo()
-            )
-    
-    def _run_analysis_modules(self, frame_result: Dict[str, Any], 
-                            frame_number: int) -> Dict[str, AnalysisResult]:
-        """Run all analysis modules on the current frame.
-        
-        Args:
-            frame_result: Frame processing results
-            frame_number: Current frame number
-            
-        Returns:
-            Dictionary of analysis results from each module
-        """
-        results = {}
-        
-        # Action sequence analysis
-        if self.action_analyzer:
-            results["action_sequence"] = self.action_analyzer.analyze_frame(
-                frame_result, frame_number
-            )
-        
-        # Trajectory analysis
-        if self.trajectory_analyzer:
-            results["trajectory"] = self.trajectory_analyzer.analyze_frame(
-                frame_result, frame_number
-            )
-        
-        # Temporal activity analysis
-        if self.temporal_analyzer:
-            results["temporal"] = self.temporal_analyzer.analyze_frame(
-                frame_result, frame_number
-            )
-        
-        return results
-    
-    def _update_game_state(self, analysis_results: Dict[str, AnalysisResult]) -> GameState:
-        """Update game state based on multi-modal analysis results.
-        
-        Args:
-            analysis_results: Results from all analysis modules
-            
-        Returns:
-            New game state
-        """
-        # Extract confidence scores from each analyzer
-        action_confidence = analysis_results.get("action_sequence", AnalysisResult({}, {})).confidence_scores
-        trajectory_confidence = analysis_results.get("trajectory", AnalysisResult({}, {})).confidence_scores
-        temporal_confidence = analysis_results.get("temporal", AnalysisResult({}, {})).confidence_scores
-        
-        # Apply state transition logic
-        new_state = self.current_state
-        new_confidence = self.state_confidence
-        
-        if self.current_state == GameState.GAME_OFF:
-            # Check for game starting (serve detected)
-            serve_probability = (
-                action_confidence.get("serve_detected", 0.0) * 0.4 +
-                trajectory_confidence.get("serve_trajectory", 0.0) * 0.4 +
-                temporal_confidence.get("activity_resuming", 0.0) * 0.2
-            )
-            
-            if serve_probability > self.serve_threshold:
-                new_state = GameState.GAME_ON
-                new_confidence = serve_probability
-                self.logger.debug(f"State transition to GAME_ON with confidence {serve_probability:.2f}")
-        
-        elif self.current_state == GameState.GAME_ON:
-            # Check for point ending
-            point_end_probability = (
-                action_confidence.get("rally_end_pattern", 0.0) * 0.3 +
-                trajectory_confidence.get("point_ending", 0.0) * 0.5 +
-                temporal_confidence.get("extended_pause", 0.0) * 0.2
-            )
-            
-            if point_end_probability > self.point_end_threshold:
-                new_state = GameState.POINT_SCORED
-                new_confidence = point_end_probability
-                self.logger.debug(f"State transition to POINT_SCORED with confidence {point_end_probability:.2f}")
-            else:
-                # Update confidence for ongoing rally
-                rally_confidence = (
-                    action_confidence.get("rally_active", 0.0) * 0.5 +
-                    trajectory_confidence.get("ball_in_play", 0.0) * 0.3 +
-                    temporal_confidence.get("activity_level", 0.0) * 0.2
-                )
-                new_confidence = max(rally_confidence, 0.3)  # Minimum confidence for active rally
-        
-        elif self.current_state == GameState.POINT_SCORED:
-            # Transition back to GAME_OFF after point
-            new_state = GameState.GAME_OFF
-            new_confidence = 0.8
-            self.logger.debug("State transition to GAME_OFF after point scored")
-        
-        # Apply temporal smoothing to prevent rapid state changes
-        new_state = self._apply_temporal_smoothing(new_state)
-        
-        # Update state tracking
-        if new_state != self.current_state:
-            self.state_start_frame = self.current_frame
-            self.state_duration_frames = 0
+            return GameStateInfo(GameState.GAME_OFF, frame_number, points=list(self.points))
+
+        ball = frame_result.get("tracked_ball")
+        speed = self._ball_speed(ball)
+        tracked = (
+            ball is not None
+            and ball.get("center") is not None
+            and ball["center"][0] is not None
+        )
+        # frames where the tracker reports a position but no velocity (first
+        # frame after re-acquisition) count as tracked-but-not-flight
+        actions = frame_result.get("actions") or []
+        self._step(frame_number, tracked, speed, actions)
+        self.last_frame_seen = frame_number
+
+        return GameStateInfo(
+            current_state=self.state,
+            frame_number=frame_number,
+            episode_start_frame=self._episode_start,
+            episode_frames=(frame_number - self._episode_start + 1)
+            if self._episode_start is not None and self.state == GameState.GAME_ON
+            else 0,
+            points=list(self.points),
+        )
+
+    @staticmethod
+    def _ball_speed(ball: Optional[Dict[str, Any]]) -> Optional[float]:
+        if not ball:
+            return None
+        v = ball.get("velocity")
+        if not v:
+            return None
+        return (v[0] ** 2 + v[1] ** 2) ** 0.5
+
+    # ------------------------------------------------------------------
+    # episode layer
+    # ------------------------------------------------------------------
+
+    def _step(
+        self,
+        f: int,
+        tracked: bool,
+        speed: Optional[float],
+        actions: List[Dict[str, Any]],
+    ) -> None:
+        flight = tracked and speed is not None and speed >= self.flight_speed_px
+        static = tracked and speed is not None and speed < 3.0
+        quiet_before = self._no_flight_run
+
+        if flight:
+            if self._last_flight_frame is None or f - self._last_flight_frame > self.burst_gap_frames:
+                self._burst_start = f
+                self._burst_quiet = quiet_before
+            self._no_flight_run = 0
+            self._static_run = 0
+            self._last_flight_frame = f
         else:
-            self.state_duration_frames = self.current_frame - self.state_start_frame
-        
-        self.state_confidence = new_confidence
-        
-        return new_state
-    
-    def _apply_temporal_smoothing(self, new_state: GameState) -> GameState:
-        """Apply temporal smoothing to prevent rapid state changes.
-        
-        Args:
-            new_state: Proposed new state
-            
-        Returns:
-            Smoothed state (may be current state if change too rapid)
-        """
-        # Require minimum duration before allowing state change
-        if (new_state != self.current_state and 
-            self.state_duration_frames < self.min_state_duration_frames):
-            # Keep current state if minimum duration not met
-            return self.current_state
-        
-        return new_state
-    
-    def _handle_state_transitions(self, new_state: GameState, 
-                                frame_number: int) -> List[StateTransition]:
-        """Handle state transitions and record them.
-        
-        Args:
-            new_state: New game state
-            frame_number: Current frame number
-            
-        Returns:
-            List of state transitions for this frame
-        """
-        transitions = []
-        
-        if new_state != self.current_state:
-            # Create transition record
-            transition = StateTransition(
-                from_state=self.current_state,
-                to_state=new_state,
-                frame_number=frame_number,
-                confidence=self.state_confidence,
-                trigger=self._determine_transition_trigger(self.current_state, new_state),
-                timestamp=datetime.now()
-            )
-            
-            transitions.append(transition)
-            self.transitions.append(transition)
-            
-            self.logger.info(f"Game state transition: {self.current_state.value} → {new_state.value} "
-                           f"(frame {frame_number}, confidence {self.state_confidence:.2f})")
-            
-            # Update current state
-            self.current_state = new_state
-        
-        return transitions
-    
-    def _determine_transition_trigger(self, from_state: GameState, to_state: GameState) -> str:
-        """Determine what triggered a state transition.
-        
-        Args:
-            from_state: Previous state
-            to_state: New state
-            
-        Returns:
-            String describing the trigger
-        """
-        if from_state == GameState.GAME_OFF and to_state == GameState.GAME_ON:
-            return "serve_detected"
-        elif from_state == GameState.GAME_ON and to_state == GameState.POINT_SCORED:
-            return "point_ending_detected"
-        elif from_state == GameState.POINT_SCORED and to_state == GameState.GAME_OFF:
-            return "point_completed"
+            self._no_flight_run += 1
+            self._static_run = self._static_run + 1 if static else 0
+
+        # rolling flight-density window (episode-layer continuation check)
+        self._density.append(flight)
+        while len(self._density) > self.density_window_frames:
+            self._density.popleft()
+
+        if self.state == GameState.GAME_OFF:
+            if flight:
+                if self._candidate is None:
+                    burst_len = f - (self._burst_start or f) + 1
+                    if (
+                        burst_len >= self.serve_burst_frames
+                        and self._burst_quiet >= self.arm_quiet_frames
+                    ):
+                        self._candidate = self._burst_start
+                        self._candidate_flights = 1
+                else:
+                    self._candidate_flights += 1
+            if self._candidate is not None and f - self._candidate >= self.confirm_frames:
+                if self._candidate_flights >= self.confirm_flight_frames:
+                    self._episode_start = self._candidate
+                    self._group_start(self._episode_start)
+                    self.state = GameState.GAME_ON
+                self._candidate = None
+                self._candidate_flights = 0
         else:
-            return "state_machine_logic"
-    
-    def set_video_info(self, fps: float, width: int, height: int) -> None:
-        """Set video information for all analyzers.
-        
-        Args:
-            fps: Video frame rate
-            width: Video width
-            height: Video height
+            end_episode = False
+            if (
+                len(self._density) >= self.density_window_frames
+                and sum(self._density) < self.density_min_flights
+            ):
+                end_episode = True  # density starvation: ball dead/retrieved
+            elif self._static_run >= self.static_off_frames:
+                end_episode = True  # held ball
+            if end_episode:
+                end = (self._last_flight_frame + 1) if self._last_flight_frame is not None else f
+                self._group_episode_end(end)
+                self.state = GameState.GAME_OFF
+                self._episode_start = None
+                self._candidate = None
+                self._candidate_flights = 0
+                self._density.clear()
+
+        # -- point layer bookkeeping (after transitions: same-frame actions
+        # must land in the group the transition opened/extended) --
+        self._group_step(f, actions)
+
+    # ------------------------------------------------------------------
+    # point layer
+    # ------------------------------------------------------------------
+
+    def _group_start(self, episode_start: int) -> None:
+        if self._group is not None:
+            if episode_start - self._group[1] > self.group_gap_frames:
+                # gap too large: the previous rally group is closed
+                self._finalize_group()
+        if self._group is None:
+            self._group = [episode_start, episode_start]
+        else:
+            self._group[1] = max(self._group[1], episode_start)
+
+    def _group_episode_end(self, episode_end: int) -> None:
+        if self._group is not None:
+            self._group[1] = max(self._group[1], episode_end)
+
+    def _group_step(self, f: int, actions: List[Dict[str, Any]]) -> None:
+        """Record action contact frames; finalize stale groups."""
+        for a in actions:
+            af = self._action_frame(a)
+            if af is not None:
+                self._seen_action_frames.append(af)
+        # A group finalizes once neither a new episode can extend it (gap
+        # expired) nor a still-pending classifier action can land in it.
+        if self._group is not None and self.state == GameState.GAME_OFF:
+            finalize_after = max(self.group_gap_frames, _ACTION_LOOKAHEAD_FRAMES)
+            if self._candidate is None and f - self._group[1] > finalize_after:
+                self._finalize_group()
+
+    def _finalize_group(self) -> None:
+        if self._group is None:
+            return
+        start, end = self._group
+        contacts = sorted(
+            af for af in self._seen_action_frames if start <= af <= end
+        )
+        # Split at contact gaps: a rally's contacts recur quickly (measured
+        # <=215f in-rally on the game-state video); two rallies inside one
+        # ball-episode group are separated by a long contact silence (the
+        # between-points practice produces no/few contacts). First piece
+        # keeps the group start, last keeps the group end.
+        pieces = []
+        if len(contacts) >= 2:
+            cuts = [k for k in range(1, len(contacts)) if contacts[k] - contacts[k - 1] > self.contact_chain_frames]
+            starts = [start] + [contacts[k] for k in cuts]
+            ends = [contacts[k - 1] for k in cuts] + [end]
+            pieces = list(zip(starts, ends))
+        else:
+            pieces = [(start, end)]
+        for (p0, p1) in pieces:
+            n = sum(1 for af in contacts if p0 <= af <= p1)
+            if n >= self.point_min_actions:
+                self.points.append(GamePoint(p0, p1, n))
+        # seen-action frames before the group can never matter again
+        self._seen_action_frames = [af for af in self._seen_action_frames if af > end]
+        self._group = None
+
+    def observe_flushed_actions(self, actions: List[Dict[str, Any]]) -> None:
+        """Feed the classifier's flushed (lookahead-released) actions.
+
+        Called once after the last frame; their contact frames join the
+        seen-action list before finish() finalizes the trailing group.
         """
-        self.fps = fps
-        
-        if self.enabled:
-            if self.temporal_analyzer:
-                self.temporal_analyzer.set_fps(fps)
-            
-            if self.trajectory_analyzer:
-                self.trajectory_analyzer.set_frame_dimensions(width, height)
-        
-        self.logger.debug(f"Updated video info: {fps} FPS, {width}x{height}")
-    
-    def set_court_boundaries(self, court_bounds: Dict[str, float]) -> None:
-        """Set court boundary information.
-        
-        Args:
-            court_bounds: Court boundary coordinates
-        """
-        if self.enabled and self.trajectory_analyzer:
-            self.trajectory_analyzer.set_court_boundaries(court_bounds)
-    
-    def reset(self) -> None:
-        """Reset all game state tracking."""
-        self.current_state = GameState.GAME_OFF
-        self.state_confidence = 0.0
-        self.state_duration_frames = 0
-        self.state_start_frame = 0
-        
-        self.state_history.clear()
-        self.transitions.clear()
-        
-        if self.enabled:
-            if self.action_analyzer:
-                self.action_analyzer.reset()
-            if self.trajectory_analyzer:
-                self.trajectory_analyzer.reset()
-            if self.temporal_analyzer:
-                self.temporal_analyzer.reset()
-            if self.score_tracker:
-                self.score_tracker.reset()
-        
-        self.logger.info("Game state manager reset")
-    
+        for a in actions:
+            af = self._action_frame(a)
+            if af is not None:
+                self._seen_action_frames.append(af)
+
+    @staticmethod
+    def _action_frame(a: Dict[str, Any]) -> Optional[int]:
+        """An action's CONTACT frame (``frame_number``; ``frame`` accepted)."""
+        return a.get("frame_number", a.get("frame"))
+
+    def finish(self) -> List[GamePoint]:
+        """Finalize the trailing group. Call once after the last frame."""
+        if self._group is not None:
+            # a video that ends mid-rally: the group extends to the last
+            # flight (mirrors the episode-end convention)
+            if self._last_flight_frame is not None:
+                self._group[1] = max(self._group[1], self._last_flight_frame + 1)
+        self._finalize_group()
+        return list(self.points)
+
+    # ------------------------------------------------------------------
+    # queries
+    # ------------------------------------------------------------------
+
     def get_current_state(self) -> GameState:
-        """Get current game state.
-        
-        Returns:
-            Current game state
-        """
-        return self.current_state
-    
-    def get_score_info(self) -> ScoreInfo:
-        """Get current score information.
-        
-        Returns:
-            Current score information
-        """
-        if self.enabled and self.score_tracker:
-            return self.score_tracker.get_current_score()
-        else:
-            return ScoreInfo()
-    
-    def get_transitions(self) -> List[StateTransition]:
-        """Get all state transitions.
-        
-        Returns:
-            List of state transitions
-        """
-        return self.transitions.copy()
-    
-    def get_statistics(self) -> Dict[str, Any]:
-        """Get comprehensive statistics from all modules.
-        
-        Returns:
-            Statistics dictionary
-        """
-        stats = {
-            "enabled": self.enabled,
-            "current_state": self.current_state.value,
-            "state_confidence": self.state_confidence,
-            "state_duration_frames": self.state_duration_frames,
-            "total_transitions": len(self.transitions)
-        }
-        
-        if self.enabled:
-            # Add module-specific statistics
-            if self.action_analyzer:
-                stats["action_sequence"] = self.action_analyzer.get_statistics()
-            
-            if self.trajectory_analyzer:
-                stats["trajectory"] = self.trajectory_analyzer.get_statistics()
-            
-            if self.temporal_analyzer:
-                stats["temporal"] = self.temporal_analyzer.get_statistics()
-            
-            if self.score_tracker:
-                stats["score_tracking"] = self.score_tracker.get_statistics()
-            
-            # Transition statistics
-            transition_types = {}
-            for transition in self.transitions:
-                trigger = transition.trigger
-                transition_types[trigger] = transition_types.get(trigger, 0) + 1
-            
-            stats["transition_types"] = transition_types
-        
-        return stats
+        return self.state
+
+    def get_points(self) -> List[GamePoint]:
+        return list(self.points)
+
+    def is_point_frame(self, frame_number: int) -> Optional[int]:
+        """Index of the point containing ``frame_number``, else None."""
+        for i, p in enumerate(self.points):
+            if p.start_frame <= frame_number <= p.end_frame:
+                return i
+        return None

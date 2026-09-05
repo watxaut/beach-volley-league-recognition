@@ -5,9 +5,86 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-05 (later fifth session)
+**Last updated:** 2026-09-05 (sixth session — game on/off state machine)
 
 ## Where we are
+
+**(2026-09-05, sixth session): game on/off state machine SHIPPED and GT-validated
+end-to-end on `video_entreno_game_state.mp4`: 11/13 points one-to-one matched,
+0 false, 0 merged, 79.0% frame accuracy (scripts/evaluate_game_state.py).**
+Owner context (ratified this session): the video is the SAME footage/court as
+video_entreno_* (e1's calibration reused, frame-diff verified), GT boundaries
+are ±1 s, it is PRACTICE — **some points start from a coach-fed ball, not a
+serve** (why the machine deliberately arms on any flight burst after quiet,
+not on a serve signature), and a real match is expected to be EASIER (cleaner
+serve→rally→death, no between-point practice volleying).
+
+Diagnosis first (output/diag_gs_*.py, git-ignored, over a full 8167-frame
+signal dump through the REAL FrameProcessor):
+
+- **The legacy GameStateManager + 4 analyzer modules + ScoreTracker were
+  broken/dead** (open point 13's "score machinery"): confidence-voting code
+  that locks GAME_ON once and never turns off (53.3% frame agreement =
+  chance). DELETED (action_sequence/trajectory_state/temporal_activity
+  analyzers + score_tracker; archive/code/debug_action_sequence.py is the only
+  reference and is staged for deletion anyway).
+- **Ball motion alone CANNOT separate points from practice on this footage**:
+  the OFF windows contain real volleyball exchanges (2-2 formations, serve-like
+  bursts, 10s-scale flight budgets, 5-14 net crossings in off09/off10 — NOTE
+  the net ground line is roughly HORIZONTAL at y≈600 in this long-axis camera)
+  that overlap GT rallies on every per-frame signal family tried: speed
+  distributions, flight budgets at every window size, net crossings (x- and
+  y-based), onset context, team composition, formation spread, player motion
+  energy, quiet-gap horizons AND flight-density windows. What separates:
+  GT start = point start (serve OR coach feed — a flight burst at the GT frame,
+  preceded by quiet), GT stop = ball death, and after a REAL point activity
+  SUSTAINS with CONTACTS recurring (≤215f in-rally gaps), while between-point
+  practice produces long contact silences.
+- **Shipped machine** (src/analysis/game_state_manager.py rewrite + game_state.py
+  dataclasses): three layers, pure observers of ball-tracker velocity + the
+  emitted action stream. *Episode layer (causal):* flight = tracked & ≥8px/f;
+  a burst of ≥8 flight frames after ≥10f quiet arms a candidate; confirmed
+  GAME_ON (backdated) iff ≥20 flight frames land within 90f — isolated
+  practice bursts reject; ON persists while the rolling 90f window holds ≥20
+  flights and ends on density starvation or 40f tracked-static (held ball).
+  *Group layer:* episodes within 60f merge into rally groups. *Point layer:*
+  each group SPLITS at contact silences >240f (two rallies swallowed by one
+  ball episode separate there — practice volleying keeps the ball flying but
+  produces no contacts); a piece is a POINT iff ≥2 actions occurred in it.
+  Params live in DEFAULT_CONFIG["game_state_detection"]; grid optimum flat.
+- **Wiring:** FrameProcessor steps the machine ONCE per frame after actions
+  (old code double-stepped); flush_actions() feeds flushed contacts + finish()
+  (trailing group closes at last flight +1). Group finalization waits 450f —
+  measured classifier emission lags reach 399f (median 60; the lookahead
+  chains), so counting is by CONTACT frame at finalize, not arrival.
+  frame_result["game_state"] carries the per-frame dict; results["game_state"]
+  ["points"] the final segments; pipeline_output.json gains game_state.points
+  + per-action point_index (-1 = outside any point — the owner's action
+  gating key; on this video 77/83 actions land inside points);
+  <stem>_game_state.csv rewritten (per-frame state + Point_Index); live-debug
+  draws a GAME ON/OFF + point-count badge (overlay.draw_game_state); DB gains
+  a points table + actions.point_index (idempotent ALTER-TABLE migration;
+  ingest verified on the real DB).
+- **Measured (end-to-end + offline replay agree exactly):** 11/13 matched,
+  0 false, 0 merged; 7/11 starts within ±1 s (the −5 s ones absorb practice
+  lead-ins that chain into the point's contacts); stops mostly ±1-4 s
+  (trailing practice). Misses are action-recall-limited, not machine logic:
+  pt00 = coach-fed point with ONE detected contact (370) — unrecoverable
+  under ≥2-actions; pt03 = pt02's last spike fires 43f AFTER the GT stop and
+  chains pt03's contacts into pt02's group (41% coverage, just under the 50%
+  match bar). Suite **296 green** (+18 tests/test_game_state.py).
+- **A/B neutrality PROVEN:** e3 re-run on the new code = action stream and
+  spikes **byte-identical** to the 2026-09-04 baseline (14/14 actions);
+  the machine is a pure observer and the entreno GT numbers are unaffected.
+- **Gotcha (new instance of the eval-vs-pipeline skew class): the first
+  diagnostic dump silently ran with the COCO yolov8n ball-model fallback**
+  (`DEFAULT_CONFIG["ball_model_path"] = None`) while `src.main` auto-loads
+  `models/volleyball_ball_best.pt` — different detector → different ball
+  track → different action stream (67 vs 83 actions; pt00 had ZERO actions
+  under COCO, 1 under the fine-tuned model). diag_gs_dump.py now mirrors
+  src.main's auto-detection + records `ball_model` provenance
+  (gs_signals_coco_fallback.json kept for reference). Params tuned on the
+  production path; the stack re-verified deterministic run-to-run.
 
 **(2026-09-05, later session): player court heatmap rotated to landscape +
 the "no hotspots" report diagnosed as stale server/browser cache** (owner
@@ -389,6 +466,20 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Open points
 
+14. **[game-state, new] the two missed points are action-recall-limited — and
+    match footage will re-test everything.** pt00 (f300-540) is a coach-fed
+    point (owner: some points start from a coach's ball, not a serve) with
+    ONE detected contact — under point_min_actions=2 it cannot confirm; when
+    a real match arrives, revisit whether serve-started rallies + a serve
+    action trigger can carry short/ace rallies (serve-action recall is 1/13
+    here). pt03 loses to pt02's last spike firing 43f AFTER the GT stop and
+    chaining (41% coverage vs the 50% match bar) — action-boundary recall,
+    not machine logic. Also re-tune on match footage: the contact_chain
+    (240f) margin is thin (in-rally max 215f vs boundary 262f here), and the
+    owner expects matches to be EASIER (cleaner serve→rally→death, no coach
+    feeds, no between-point volleying). The point-count surface for the web
+    UI (points table exists; no UI rendering yet) is a small follow-up.
+
 1. **[diagnosed 2026-08-18 — pre-existing, NOT the serve-zone fix] e1/e3
    tracking baselines are stale.** Old-code (HEAD pre-fix) e1 dump scores id
    0.771 / ghosts 0.193 vs the recorded 0.978/0.133; e3 id 0.952 vs 0.972.
@@ -596,6 +687,36 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Log (newest first)
 
+### 2026-09-05 (sixth session) — game on/off state machine: diagnosis, three-layer design, end-to-end GT validation, wiring into pipeline/CSV/JSON/DB/live-debug
+- **Owner request**: game on/off machine using resources/video_entreno_game_state.mp4
+  + ground_truth/gt_point_start_end.txt (13 points, whole-second MM:SS start/
+  stop, ±1 s), to count points and avoid counting actions between points.
+  Owner context: same footage/court as video_entreno_* (e1 calibration reused);
+  PRACTICE — some points start from a coach-fed ball, not a serve; real
+  matches expected easier.
+- **Diagnosis (output/diag_gs_dump.py + diag_gs_analyze*.py + diag_gs_sim/grid,
+  git-ignored)**: full-pipeline signal dump (8167f, ~100ms/f) → legacy
+  GameStateManager locks GAME_ON forever (53.3%); EVERY ball-motion signal
+  family overlaps between GT points and between-point practice; quiet-gap
+  and flight-density episode rules both cap at 10/13; the separating signals
+  are burst-after-quiet onset, sustained flight, and CONTACT recurrence
+  (≤215f in-rally vs ≥262f across the pt06/pt07 boundary).
+- **Shipped**: game_state_manager.py/game_state.py rewrite (episode → group →
+  contact-chain-split + ≥2-actions point rule; params in
+  DEFAULT_CONFIG["game_state_detection"]); deleted the 4 legacy analyzer
+  modules + score_tracker; FrameProcessor single-step wiring + flush feeding
+  (450f finalize delay — measured emission lags up to 399f); csv_exporter
+  game-state timeline rewrite; json_exporter game_state block + action
+  point_index (77/83 actions gated into points on this video); DB points
+  table + actions.point_index (idempotent migration, ingest verified);
+  live-debug GAME ON/OFF badge; scripts/evaluate_game_state.py;
+  calibrations/video_entreno_game_state.json (copy of e1's — same camera,
+  frame-diff verified); ground_truth/README.md documents the MM:SS format.
+- **Validated end-to-end**: 11/13 one-to-one matched, 0 false, 0 merged,
+  79.0% frame accuracy; 7/11 starts within ±1 s; offline replay through the
+  production class = the pipeline output exactly. Misses action-recall-
+  limited (open point 14). A/B: e3 byte-identical (actions + spikes).
+  Suite **296 green** (+18 tests/test_game_state.py).
 ### 2026-09-05 (later session) — court heatmap landscape rotation; stale-cache diagnosis; CSS-cache busting
 - **Report**: court "way too big", "does not show where attacks land and
   where they start from", "add a number as well as a heatmap".

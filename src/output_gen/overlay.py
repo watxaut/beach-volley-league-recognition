@@ -184,3 +184,19 @@ def draw_frame_counter(frame, frame_idx: int, total: Optional[int] = None) -> No
     org = (frame.shape[1] - tw - 12, 28)
     cv2.putText(frame, label, org, cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 4)
     cv2.putText(frame, label, org, cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
+
+
+def draw_game_state(frame, state: str, points: int = 0) -> None:
+    """Draw the game on/off badge in the top-left corner (in place).
+
+    ``state`` is the game-state machine's value for the frame being drawn
+    ("game_on"/"game_off"); ``points`` is the count of confirmed points so
+    far, so a scrubbing eye can see rallies being counted. Render-only --
+    the machine itself lives in the pipeline.
+    """
+    label = "GAME ON" if state == "game_on" else "GAME OFF"
+    if points:
+        label += f"  P{points}"
+    color = (60, 220, 60) if state == "game_on" else (160, 160, 160)
+    cv2.putText(frame, label, (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 4)
+    cv2.putText(frame, label, (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 1)

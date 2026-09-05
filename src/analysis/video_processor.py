@@ -175,6 +175,14 @@ class VideoProcessor:
         # the pure-observer analyzer wired inside FrameProcessor.
         results["spike_analysis"] = self.frame_processor.spike_analyzer.spike_records()
 
+        # Game state machine output: confirmed point segments (finalized by
+        # flush_actions() before this runs).
+        results["game_state"] = {
+            "points": [
+                p.to_dict() for p in self.frame_processor.game_state_manager.get_points()
+            ]
+        }
+
         # Generate statistics
         results["statistics"] = self.statistics_analyzer.analyze_video_results(results)
 

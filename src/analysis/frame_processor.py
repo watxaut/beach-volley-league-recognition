@@ -262,10 +262,7 @@ class FrameProcessor:
             frame_result["tracked_players"] = tracked_players
             frame_result["tracked_ball"] = tracked_ball
 
-            # 4. Game state analysis (initial pass)
-            initial_game_state = self.game_state_manager.analyze_frame(frame_result, frame_index)
-
-            # 5. Action recognition (event-driven -- only emits at ball contacts)
+            # 4. Action recognition (event-driven -- only emits at ball contacts)
             actions = []
             if tracked_players:
                 actions = self.action_classifier.classify_actions(
@@ -288,7 +285,8 @@ class FrameProcessor:
             # 5b. Spike enrichment (pure observer -- never mutates the actions)
             self.spike_analyzer.observe(frame_index, tracked_ball, tracked_players, actions)
 
-            # 6. Final game state
+            # 6. Game state machine (pure observer: ball velocity + emitted
+            # actions; runs once per frame, after the actions exist)
             game_state_info = self.game_state_manager.analyze_frame(frame_result, frame_index)
             frame_result["game_state"] = game_state_info.to_dict()
 
@@ -306,6 +304,7 @@ class FrameProcessor:
         a video stays pending until flushed. Call once after the last frame.
         """
         actions = self.action_classifier.flush()
+        visible = []
         if actions:
             # The flushed contacts never pass through process_frame; feed the
             # analyzer so a last-video spike/dig still resolves (same emission
@@ -318,6 +317,10 @@ class FrameProcessor:
             ]
             if visible:
                 self.spike_analyzer.observe(None, None, None, visible)
+        # The flushed contacts close the trailing rally group before the
+        # final point decision.
+        self.game_state_manager.observe_flushed_actions(visible)
+        self.game_state_manager.finish()
         self.spike_analyzer.flush()
         return actions
 

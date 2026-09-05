@@ -64,10 +64,23 @@ CREATE TABLE IF NOT EXISTS actions (
     rally_id           INTEGER,
     contact_kind       TEXT,
     contact_x          REAL,
-    contact_y          REAL
+    contact_y          REAL,
+    -- game-state machine: index into points() of the point this action
+    -- belongs to; -1 = outside any point (practice / between points)
+    point_index        INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_actions_video ON actions(video_key, frame);
 CREATE INDEX IF NOT EXISTS idx_actions_rally ON actions(video_key, rally_id);
+
+CREATE TABLE IF NOT EXISTS points (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    video_key     TEXT NOT NULL REFERENCES videos(video_key) ON DELETE CASCADE,
+    point_index   INTEGER NOT NULL,
+    start_frame   INTEGER NOT NULL,
+    end_frame     INTEGER NOT NULL,
+    n_actions     INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_points_video ON points(video_key, point_index);
 CREATE INDEX IF NOT EXISTS idx_actions_track ON actions(video_key, track_id);
 
 CREATE TABLE IF NOT EXISTS spikes (
@@ -109,6 +122,13 @@ def connect(db_path: Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
 
 
 def init_db(conn: sqlite3.Connection) -> None:
-    """Create all tables if they do not exist."""
+    """Create all tables if they do not exist + idempotent migrations."""
     conn.executescript(SCHEMA_SQL)
+    # Migration for DBs created before the game-state feature: actions gains
+    # point_index and a points table appears. ALTER TABLE ... ADD COLUMN is
+    # idempotent-guarded via pragma inspection (older SQLite has no IF NOT
+    # EXISTS for columns).
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(actions)")}
+    if "point_index" not in cols:
+        conn.execute("ALTER TABLE actions ADD COLUMN point_index INTEGER")
     conn.commit()
