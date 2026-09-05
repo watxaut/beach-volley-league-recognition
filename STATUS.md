@@ -5,9 +5,24 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-04 (fourth session)
+**Last updated:** 2026-09-05 (fifth session)
 
 ## Where we are
+
+**(2026-09-05, fifth session): player page court heatmap shipped** (owner
+request): the player detail page's "Attack zones" count bars and the
+"Placement" count matrix are replaced by ONE drawn-court heatmap — bottom
+half = takeoff zones (where the player attacks from), top half = landing
+zones (where attacks land; kill/out → landing_zone, dug → dug_zone, hover
+for the outcome split). Data side: `player_metrics` gains `court_attack` /
+`court_landing` / `court_landing_outcomes` keyed by zone DIGIT 1-9 (team
+letter stripped — the 9-zone grid is 180°-symmetric so the digit is
+side-independent); rendering keeps the camera-view layout
+(`7 8 9 / 4 5 6 / 1 2 3` top, `3 2 1 / 6 5 4 / 9 8 7` bottom). CSS-only
+(still zero JS), each half intensity-scaled to its own max. The joint
+placement matrix stays in the metrics bundle (tests pin it) but is no
+longer rendered. Screenshot: output/ui_player_court_preview.png (git-
+ignored). Suite 269 green (+2 assertions in tests/test_db.py).
 
 **Analysis database + player labeling + local UI shipped (2026-09-04,
 fourth session): extraction and DB are separate processes joined by a
@@ -550,6 +565,30 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-05 (fifth session) — player-page court heatmap (attack origins bottom, landings top)
+- **Owner request**: on the player tab, replace the counts (attack-zone
+  bars + from\lands matrix) with a heatmap of the field — bottom side =
+  where the player attacks from, top side = where the attack lands.
+- **Shipped**: `src/db/metrics.py` `player_metrics` now also returns
+  `court_attack` (takeoff counts by zone digit), `court_landing` (landing
+  counts by zone digit: kill/out → landing_zone, dug → dug_zone), and
+  `court_landing_outcomes` (per-zone kill/out/dug breakdown, rendered as
+  the cell's `title` tooltip). Letter stripped from zone keys because the
+  9-zone grid is 180°-symmetric — the digit alone positions a cell on the
+  player's-own-half drawing.
+- **Shipped**: `src/web/app.py` player route builds the court rows in the
+  camera-view layout (top half rows 7-8-9 / 4-5-6 / 1-2-3 net-adjacent,
+  bottom half mirrored: 3-2-1 / 6-5-4 / 9-8-7); `player_detail.html`
+  renders one "Attack court" card (NET band, per-half max intensity,
+  counts in cells, vertical half labels); `style.css` court styles in the
+  existing dark/orange theme. The "Attack zones" bars and "Placement"
+  matrix sections are GONE from the page (the matrix data survives in
+  metrics + tests).
+- **Verified**: template render on the real DB (18 cells, correct zone
+  order, tooltips), live uvicorn + headless-Chrome screenshot
+  (output/ui_player_court_preview.png, git-ignored), suite **269 green**
+  (test_db: Ana/Bea court-marginal assertions).
 
 ### 2026-09-04 (fourth session) — analysis DB, player labeling, local web UI; extraction/DB split by file contract
 - **Shipped**: `src/output_gen/json_exporter.py` — `src.main` now writes

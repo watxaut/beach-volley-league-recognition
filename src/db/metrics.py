@@ -10,6 +10,13 @@ Metric glossary (ratified 2026-09-05):
 - hard% / touch% ..... spike_type split over attacks
 - attack zones ....... counts of spikes per attack_zone ("B3"-style keys)
 - placement .......... attack_zone x landing_zone counts (kill/out landings)
+- court attack ....... takeoff-zone counts keyed by zone DIGIT 1-9 (team
+                       letter stripped) -- the drawing is per-perspective, so
+                       the side letter carries no extra information
+- court landing ...... where attacks end, keyed by digit 1-9: kill/out ->
+                       landing_zone, dug -> dug_zone (the ball came down on
+                       the defender at that spot); plus a per-zone outcome
+                       breakdown for the UI cell tooltips
 - digs ............... action == dig
 - dig% ............... digs / opponent attacks. Per video, the player's
                        opponent side is derived from the player's dominant
@@ -188,6 +195,20 @@ def player_metrics(conn: sqlite3.Connection, player_id: int) -> Optional[Dict]:
     outs = outcomes.get("out", 0)
     dugs = outcomes.get("dug", 0)
 
+    # Court-heatmap marginals: zone digit only (letter stripped). The 9-zone
+    # grid is 180-degree symmetric, so "digit on the player's own half" is
+    # side-independent and both halves of the drawing use one key space.
+    court_attack: Counter = Counter(
+        {int(zone[-1]): n for zone, n in attack_zones.items()}
+    )
+    court_landing: Counter = Counter()
+    court_landing_outcomes: Dict[int, Counter] = defaultdict(Counter)
+    for s in spikes:
+        zone = s["dug_zone"] if s["outcome"] == "dug" else s["landing_zone"]
+        if zone:
+            court_landing[int(zone[-1])] += 1
+            court_landing_outcomes[int(zone[-1])][s["outcome"] or "unknown"] += 1
+
     # --- touch actions ---
     action_counts: Counter = Counter()
     per_video_actions: Dict[str, Counter] = defaultdict(Counter)
@@ -265,6 +286,11 @@ def player_metrics(conn: sqlite3.Connection, player_id: int) -> Optional[Dict]:
         "hard_pct": _pct(types.get("hard", 0), attacks),
         "touch_pct": _pct(types.get("touch", 0), attacks),
         "attack_zones": dict(sorted(attack_zones.items())),
+        "court_attack": dict(sorted(court_attack.items())),
+        "court_landing": dict(sorted(court_landing.items())),
+        "court_landing_outcomes": {
+            z: dict(sorted(c.items())) for z, c in sorted(court_landing_outcomes.items())
+        },
         "placement": [
             {"attack_zone": az, "landing_zone": lz, "count": n}
             for (az, lz), n in sorted(placement.items())

@@ -197,6 +197,12 @@ class TestMetrics:
         assert m["spike_hard"] == 3 and m["hard_pct"] == 75.0
         assert m["spike_touch"] == 1 and m["touch_pct"] == 25.0
         assert m["attack_zones"] == {"A1": 2, "A2": 1, "A4": 1}
+        # court marginals: team letter stripped, keyed by zone digit
+        assert m["court_attack"] == {1: 2, 2: 1, 4: 1}
+        assert m["court_landing"] == {3: 1, 5: 1, 7: 1, 8: 1}
+        assert m["court_landing_outcomes"] == {
+            3: {"out": 1}, 5: {"dug": 1}, 7: {"kill": 1}, 8: {"kill": 1},
+        }
         assert m["placement"] == [
             {"attack_zone": "A1", "landing_zone": "B3", "count": 1},
             {"attack_zone": "A1", "landing_zone": "B7", "count": 1},
@@ -214,6 +220,8 @@ class TestMetrics:
         assert m["attacks"] == 3
         assert m["kills"] == 1 and m["kill_pct"] == 33.3
         assert m["digs"] == 1
+        assert m["court_attack"] == {2: 1, 3: 2}
+        assert m["court_landing"] == {1: 1, 5: 1, 6: 1}
         # Bea's dominant team B -> opponent attacks = 4 A-team spikes
         assert m["dig_opportunities"] == 4
         assert m["dig_pct"] == 25.0

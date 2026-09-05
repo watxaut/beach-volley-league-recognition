@@ -24,46 +24,40 @@
 </section>
 
 <section class="card">
-  <h2>Attack zones <span class="sub">where attacks come from</span></h2>
-  {% if m.attack_zones %}
-  <div class="bars">
-    {% for zone, count in m.attack_zones.items() %}
-    <div class="bar-row">
-      <span class="bar-label zone">{{ zone }}</span>
-      <div class="bar"><div class="fill" style="width: {{ (100 * count / max_zone)|round(1) }}%"></div></div>
-      <span class="bar-value">{{ count }}</span>
+  <h2>Attack court <span class="sub">bottom = attacks from · top = where they land</span></h2>
+  {% if m.attacks %}
+  <div class="court-wrap">
+    <div class="court">
+      {% for half, zones in court_rows %}
+        {% if loop.index == 4 %}<div class="court-net">NET</div>{% endif %}
+        <div class="court-row">
+          {% for z in zones %}
+            {% if half == 'landing' %}
+              {% set n = landing_grid.get(z, 0) %}
+              {% set mx = max_landing %}
+              {% set det = landing_detail.get(z, {}) %}
+            {% else %}
+              {% set n = attack_grid.get(z, 0) %}
+              {% set mx = max_attack %}
+            {% endif %}
+            <div class="court-cell {{ 'h' if n else '' }}"
+                 style="--a: {{ ((n / mx) if mx else 0)|round(2) }}"
+                 {% if half == 'landing' and n %}title="{{ det.get('kill', 0) }} kill / {{ det.get('out', 0) }} out / {{ det.get('dug', 0) }} dug"{% endif %}>
+              <span class="zn">{{ z }}</span>
+              <span class="n">{{ n if n else '·' }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
     </div>
-    {% endfor %}
+    <div class="court-side">
+      <div class="court-half-label">lands</div>
+      <div class="court-half-label">attacks from</div>
+    </div>
   </div>
+  <p class="hint">Zone counts per half, each scaled to that half's max · hover a top cell for the kill / out / dug split · dug attacks land at the dig spot.</p>
   {% else %}
   <p class="empty">No attacks recorded.</p>
-  {% endif %}
-</section>
-
-<section class="card">
-  <h2>Placement <span class="sub">attack zone → landing zone (kills &amp; outs)</span></h2>
-  {% if grid %}
-  <table class="heatmap">
-    <thead>
-      <tr><th>from \ lands</th>
-      {% for lz in landing_zones %}<th class="zone">{{ lz }}</th>{% endfor %}
-      </tr>
-    </thead>
-    <tbody>
-    {% for az in attack_zones %}
-      <tr>
-        <th class="zone">{{ az }}</th>
-        {% for lz in landing_zones %}
-          {% set n = grid.get((az, lz), 0) %}
-          <td class="heat {% if n %}h{% endif %}"
-              style="--a: {{ (n / max_count)|round(2) if max_count else 0 }}">{{ n or "" }}</td>
-        {% endfor %}
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p class="empty">No landing data recorded.</p>
   {% endif %}
 </section>
 
