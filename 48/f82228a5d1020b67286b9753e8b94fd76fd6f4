@@ -1,0 +1,72 @@
+calibrations/video_entreno_game_state.json
+  s_5024eadb9fee7e::t_119adec0e15220 1-44
+src/analysis/game_state.py
+  s_5024eadb9fee7e::t_8bd171028ecd37 2,4-6,9,11,15,17-22,24-25,29-30,32-40,44-46,52-53,55-64,68-71
+ground_truth/README.md
+  s_5024eadb9fee7e::t_3b926d7d03b7ee 5-24
+src/output_gen/csv_exporter.py
+  s_5024eadb9fee7e::t_69aaa2385f13ac 387-392,396-404,408-411,415-418,420-425
+scripts/evaluate_game_state.py
+  s_5024eadb9fee7e::t_1c0ae90a84db57 1-116
+src/output_gen/json_exporter.py
+  s_5024eadb9fee7e::t_99af00f9860116 119,147-160,177-190
+  s_5024eadb9fee7e::t_a666e21b0a56e3 191
+src/utils/config.py
+  s_5024eadb9fee7e::t_d2ef1ed82cf063 241,244
+  s_5024eadb9fee7e::t_f94789af98fe58 250-251
+  s_5024eadb9fee7e::t_ca5f7e7270fbab 233-235,238-240,242-243,245-249
+src/analysis/video_processor.py
+  s_5024eadb9fee7e::t_8fa0f2335b48c0 178-185
+src/db/schema.py
+  s_5024eadb9fee7e::t_a8bd3939489841 67-70,74-83
+  s_5024eadb9fee7e::t_308d3ecb4ce190 125,127-133
+src/output_gen/overlay.py
+  s_5024eadb9fee7e::t_ded66c0c5cf63d 187-202
+src/analysis/live_debug_processor.py
+  s_5024eadb9fee7e::t_f7b30498b8167e 302,307,352-353,364-366
+  s_5024eadb9fee7e::t_d7c7d110dbdcbf 191-192,205-206,210-211,241-246
+tests/test_game_state.py
+  s_5024eadb9fee7e::t_31d838d492ca73 164,173,179-180
+  s_5024eadb9fee7e::t_1ff43926048e92 108-109
+  s_5024eadb9fee7e::t_329806cd51265a 192,196,207-209,214-226,273
+  s_5024eadb9fee7e::t_4de77ec8bd8dfb 193-195,197-206,210-213
+  s_5024eadb9fee7e::t_5a38edade40f91 48-49,52,132-135,139-142,145,150-151,158
+  s_5024eadb9fee7e::t_cd045bb584dc19 1-47,50-51,53-107,110-131,136-138,143-144,146-149,152-157,159-163,165-172,174-178,181-191,227-272,274
+STATUS.md
+  s_5024eadb9fee7e::t_98ed258f8d5904 690,692-719
+  s_5024eadb9fee7e::t_1f728d86efa9b6 79-88,469-481
+  s_5024eadb9fee7e::t_d11ec362258c27 8,12,21,25-31,43,45,60-62
+  s_5024eadb9fee7e::t_ac9f42ffa0ad8c 13-20,22-24,32-42,44,46-59,63-78
+  s_5024eadb9fee7e::t_242fa6d9277e90 482,691
+src/analysis/game_state_manager.py
+  s_5024eadb9fee7e::t_5072167995c057 96-100,244-245,247-248,259,280-281,287-288,290,292-293,302-306
+  s_5024eadb9fee7e::t_e751a3e28adad0 24-32,34-35
+  s_5024eadb9fee7e::t_21733e779f8c91 45-49
+  s_5024eadb9fee7e::t_7639d559682551 246,291,294-298
+  s_5024eadb9fee7e::t_68bacb082a47c7 179-183
+  s_5024eadb9fee7e::t_2840d8ef8aea6e 71,260-279
+  s_5024eadb9fee7e::t_e48a9e898abd2d 123-126,221-223,230-233
+  s_5024eadb9fee7e::t_58e65852f8560b 61,64
+  s_5024eadb9fee7e::t_7db254d6486392 2,4-23,33,36-37,41-43,53-54,56-60,62-63,65-70,72-95,101-111,113-116,119-122,127-174,176-178,184-202,204-220,224-229,234-235,237-243,249-258,282-286,299-301,307-325
+src/analysis/frame_processor.py
+  s_5024eadb9fee7e::t_6dd3d21077cbe2 265,288-289,320-323
+  s_5024eadb9fee7e::t_963374eb5cef13 307
+src/db/ingest.py
+  s_5024eadb9fee7e::t_d30be69eebb187 135-147,154-155,172
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "48f82228a5d1020b67286b9753e8b94fd76fd6f4",
+  "prompts": {},
+  "sessions": {
+    "s_5024eadb9fee7e": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a070ec-d928-7072-b6b6-83bda82845cc",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
