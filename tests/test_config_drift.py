@@ -115,6 +115,7 @@ CTOR_PARITY = [
     ("player_signature_height_smoothing", PlayerTracker, "signature_height_smoothing"),
     ("player_off_court_grace_frames", PlayerTracker, "off_court_grace_frames"),
     ("player_off_court_hold_frames", PlayerTracker, "off_court_hold_frames"),
+    ("player_off_court_cost_penalty_px", PlayerTracker, "off_court_cost_penalty_px"),
     ("player_squatter_enabled", PlayerTracker, "squatter_enabled"),
     ("player_squatter_review_frames", PlayerTracker, "squatter_review_frames"),
     ("player_squatter_min_fed_frames", PlayerTracker, "squatter_min_fed_frames"),

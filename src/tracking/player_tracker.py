@@ -58,6 +58,7 @@ class PlayerTracker:
         signature_height_smoothing: int = 30,
         off_court_grace_frames: int = 45,
         off_court_hold_frames: int = 90,
+        off_court_cost_penalty_px: float = 300.0,
         squatter_enabled: bool = True,
         squatter_review_frames: int = 120,
         squatter_min_fed_frames: int = 20,
@@ -104,6 +105,23 @@ class PlayerTracker:
                 admission can take the slot. Real players stay far below it:
                 the longest measured out-of-court streak on the GT videos is
                 46 frames (e6 t3); the default matches serve_zone_trial_frames.
+            off_court_cost_penalty_px: Association-cost penalty (px-equivalent)
+                added to OUT-OF-COURT detections in the Hungarian cost matrix.
+                _may_feed_track decides whether an out-of-court feeding is
+                ALLOWED at all; this decides which candidate WINS when the
+                track has a choice: identity is anchored on the court, so a
+                court detection must beat an off-court one even at a longer
+                gate distance. Without it a walkway bystander re-attaches to
+                a coasting track the instant the player's own detection blips
+                (entreno_6 f142: the far-left digger's track was taken at a
+                105 px jump and never returned -- the digger sat detected
+                in court for 200 frames), and the squat then cascades into
+                chain-swaps where several tracks rotate onto bystanders
+                (e6 f305/f311; P1's team vote flipped A->B). Must stay below
+                the 1e6 invalid sentinel so an off-court chain is still
+                preferred over leaving a track unmatched when NO in-court
+                option exists; 0 restores strict distance-only preference;
+                uncalibrated courts are unaffected (in_court is None).
             serve_zone_enabled: Admit a NEW track for a detection whose foot is
                 in a serve zone (just behind a baseline, on the ground plane)
                 when a roster slot is free -- the serving player at video/rally
@@ -212,6 +230,7 @@ class PlayerTracker:
         self.assignment_log: List[Dict[str, Any]] = []
         self.off_court_grace_frames = off_court_grace_frames
         self.off_court_hold_frames = off_court_hold_frames
+        self.off_court_cost_penalty_px = off_court_cost_penalty_px
         self.squatter_enabled = squatter_enabled
         self.squatter_review_frames = squatter_review_frames
         self.squatter_min_fed_frames = squatter_min_fed_frames
@@ -920,6 +939,16 @@ class PlayerTracker:
 
         # Combined cost
         cost = (1.0 - self.appearance_weight) * pred_distance + self.appearance_weight * appearance_cost * self.max_distance
+        # In-court preference (see off_court_cost_penalty_px): an out-of-court
+        # detection may CONTINUE a track (allowance rules live in
+        # _may_feed_track), but it must never WIN a track whose own player is
+        # detected in court the same frame. Only a court detection that is
+        # in-gate for this track outranks the off-court one; with no in-court
+        # option the off-court feeding proceeds exactly as before (the penalty
+        # is far below the 1e6 invalid sentinel, so Hungarian still prefers
+        # any feasible chain over leaving a track unmatched).
+        if self._detection_in_court(detection) is False:
+            cost += self.off_court_cost_penalty_px
         return cost
 
     # --- Appearance features ---

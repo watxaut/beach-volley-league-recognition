@@ -5,9 +5,88 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-06 (eighth session — squatter review)
+**Last updated:** 2026-09-06 (ninth session — in-court preference, open point 16)
 
 ## Where we are
+
+**(2026-09-06, ninth session): OPEN POINT 16 FIXED — identity is anchored in
+court: an out-of-court detection may still CONTINUE a track (grace/hold rules
+untouched) but now loses the assignment to any in-court detection within the
+gate (off_court_cost_penalty_px = 300). e6's far-left digger is tracked from
+f146 to the end under his original id 3, and the f311 chain-swap (P1 onto the
+right-edge bystander, team flip A→B) is gone. e1/e3/e5/e7 tracks byte-
+identical; e2/e4 diffs are the same mechanism firing benignly (e4 now follows
+GT id4 back INTO court at f390); all action streams identical except e6's
+f309 player index (4→3).**
+
+- **Diagnosis (owner style — probe first, then eyes):** dumped every raw
+  detection + assignment decision + per-track state for e6 (output/
+  diag_e6_walker.py) and LOOKED at the frames. The owner's report decomposed
+  into ONE mechanism with four symptoms: a detection BLIP of the tracked
+  player (1 frame) lets a walkway bystander behind the far baseline take the
+  track through the CONTINUOUS-observation branch of _may_feed_track — a
+  105-149 px single-frame jump reads as "no observation gap". Smoking gun
+  f142: track 3 (the digger) fed at [816,462] in-court at f141; f142 the
+  digger's detection blips, a walker at [866,370] grabs the track; the track
+  follows the walkway right (f142-188), coasts frozen at [1010,373] f190-243
+  — and the digger, detected IN COURT every frame from f146, is never
+  re-acquired (215 px from the drifted ghost): untracked f142→end. Same
+  class on track 2 (f214/f244/f256 squats, each seeded by a blip); the
+  squats then CASCADE into Hungarian CHAIN-SWAPS (a full matching with long
+  jumps costs less than leaving a track unmatched at the 1e6 sentinel):
+  f305 track2↔track3 rotate onto each other's persons, f311 P1 jumps to the
+  right-edge bystander [1433,374] at 149.5 px (just inside max_distance=150)
+  and P2/P3 take the abandoned players — the team vote fills B by f314.
+- **Measured rejection of gate-style fixes:** per-frame jump px (legit
+  out-of-court feedings on e1-e5 reach 146.6 px; e6 hijacks start at 105),
+  world-metre displacement (17-25 m "jumps" on LEGIT feedings — the known
+  airborne-foot projection artifact), and signature similarity (legit 0.17-
+  0.53 vs hijack 0.26-0.69) ALL overlap. No per-frame signal separates
+  "same person moving fast" from "different person nearby" → the fix is a
+  PREFERENCE, not a gate: in the Hungarian cost, out-of-court detections
+  carry +300 px-equivalent (below the 1e6 invalid sentinel, so an off-court
+  chain still beats leaving a track unmatched; uncalibrated courts
+  unaffected; 0 disables). Allowance rules (_may_feed_track grace/hold/
+  serve-zone) are UNTOUCHED — e2's hold-horizon bystander and e7's straddler
+  cases keep their mechanisms.
+- **Shipped (src/tracking/player_tracker.py + config player_off_court_cost_
+  penalty_px, drift-guarded, wired through FrameProcessor + dump_player_
+  tracks):** the penalty lives in _compute_assignment_cost — it reorders
+  candidate preference within a track's row; e6 f146 recovery is exactly the
+  intended shape (walker at 3 px + penalty vs digger in-court at 113 px →
+  digger wins back the track after a 4-frame squat).
+- **Measured (clean-room A/B, dump_player_tracks all 7, baselines completed
+  BEFORE any edit):** e1/e3/e5/e7 BYTE-IDENTICAL. e2: 3 frames (f377-383, a
+  track fed off-court at y≈364 now fed in-court; all metrics identical,
+  actions identical). e4: 15 frames (f379-397) — same class and a fix: GT
+  id4 stands behind the baseline at f380 ([948,396], BASE matches), walks
+  back in by f390 (GT [933,456] — POST follows at [936,459]; BASE was
+  stolen at f384 and parked 107 px off GT); every analyze_tracking metric
+  identical (87.2% recall, 93.1% coverage, team 98.9%). e6: 198 frames
+  (f118-342) — digger tracked from f146 (BASE: f142→end), P3 stays the
+  digger, P2 the blue/red player, P1 grey/pink team A through the joust;
+  end state f340 = P1A/P2B/P3B-digger/P4A (BASE: P1B on the bystander).
+- **Actions (test_action_recognition, all 7):** e1/e2/e3/e4/e5/e7 streams
+  IDENTICAL. e6: 7/7 events identical (frames/labels/teams/touch numbers),
+  f309 player_id 4→3 (the candidate set at the manufactured contact is now
+  the real players). e6 eval unchanged: F1 0.933, team 0.857 (6/7).
+  Production src.main e6 emits the identical 7-event post-fix stream.
+- **15b re-check (the point-16 entanglement, resolved as far as the tracker
+  goes):** the f309 team still reads B vs GT 1A — but the cause is now
+  isolated to the CLASSIFIER's stance-window snapshot rule, not tracker
+  contamination: the reentry band's takeoff stance takes the snapshot
+  nearest the contact inside [c-12, c-2]; under the clean tracks that is
+  f307, the FIRST frame whose grounded foot crosses the net ground line
+  (foot y 618→607 between f306/f307) and reads B — f297-306 all read A.
+  Next session's classifier retune (point 15 protocol, sheets first): prefer
+  the window-majority or last-clearly-grounded-A read over the single
+  nearest snapshot.
+- **Suite 355 green** (+7 tests/test_bystander_guard.py TestInCourtPreference:
+  cost-unit preference, update-level pick, f146 recovery shape, continuity-
+  without-alternative preserved, penalty=0 restore, uncalibrated no-op,
+  chain-swap still prefers full matching; +1 config-drift row). Owner
+  evidence sheets: output/p16_sheet_{grab_f115-152,mid_f240-260,joust_
+  f295-320,end_f326-342}.png (BASE | POST side-by-side).
 
 **(2026-09-06, eighth session): squatter review SHIPPED — a track whose
 lifetime in-court FEEDING fraction stays below 0.35 once it is 120 frames old
@@ -706,31 +785,20 @@ constraint. Side changes need no special handling as long as IDs survive.
     built (lifetime is simpler and occlusion-safe) — build only if the
     owner asks.
 
-16. **[NEW 2026-09-06 — e6 player-tracking bug, owner-prioritized:
-    bystander squatting + identity swap at the joust].** Owner report with
-    sheet evidence (e6_ballmatch_joust_f296-320.png): track 2B is wrongly
-    assigned to a person passing by behind the far court; the REAL player
-    on a dig stance at center-left (blue/yellow/black) is never tracked;
-    and track 1A changes to 2B across f310-312. Probe dump (player centers,
-    f285-322): 2B parked at ~(1179,367) = the walker from f286 (before the
-    window), oscillating with the real net player f306-310 (2B/3B swap
-    every 2 frames), then 1 jumps [1322,474] -> [1434,374] at f312 (the
-    right-edge bystander in the light vest) and re-teams 1A -> 1B by f314
-    (15-frame foot vote). Suspected mechanisms: continuous-match feeding
-    lets an established track walk onto the passer-by (off-court hold
-    horizon 90f is long enough to bridge the whole episode); the 150px
-    frame-gate admits the f312 jump; the team vote then follows the box.
-    The untracked digger is slot starvation — 4 slots held by 4A, 1A, and
-    the two walker-contested tracks. e6 has no player-box GT, so measure
-    with contact sheets. Fix belongs to the player-identity stack
-    (admission/hold-horizon/swap), NOT the ball tracker. NOTE (2026-09-06):
-    the squatter review shipped this session is e6-BYTE-IDENTICAL — the
-    walker-squatting tracks keep high lifetime in-court fractions, so this
-    point still needs its own fix (admission/swap side); the review only
-    covers the low-fraction straddler class. NOTE: fixing this
-    likely also fixes open point 15b (the f309 joust team flip reads B
-    through the walker-contaminated candidate set), and would make the
-    joust contact attributable to the real 1A.
+16. **[RESOLVED 2026-09-06 (tracker side) — bystander squat + identity swap
+    at the joust; see the ninth-session entry.]** The mechanism was ONE
+    hijack class, not three: a 1-frame detection blip lets a walkway
+    bystander take a track through the continuous-observation branch (105-
+    149 px jumps), the squat cascades into Hungarian chain-swaps, and the
+    team vote follows the box. Fixed by the in-court preference
+    (off_court_cost_penalty_px): e6's digger tracked f146→end, no f311
+    swap/flip, e1/e3/e5/e7 byte-identical, e2/e4 benign same-mechanism
+    diffs, all action streams unchanged except e6 f309 player 4→3.
+    RESIDUAL (classifier, now unblocked): the f309 team still reads B — the
+    stance-window snapshot rule picks f307, the first frame whose grounded
+    foot crosses the net line; f297-306 read A. Fold the fix into point
+    15's retune session (window-majority or last-grounded-A stance read),
+    sheets first.
 
 15. **[NEW 2026-09-06 — ball-matching follow-ups, ranked].** The tracker
     rework (see Where we are) shifted ball histories slightly; the
@@ -742,14 +810,17 @@ constraint. Side changes need no special handling as long as IDs survive.
     on its DESCENT (f21) and the hit contact's left window holds 2 points
     (before: 4). Lever: classifier left-window tolerance, or a toss-aware
     lock exception — needs sheets. The e6/e7 tosses at 30 px/f lock fine.
-    (b) **e6 joust contact f308→f309 team A→B** (GT: spike 1A t3) — the
-    manufactured frame moved 1 frame with the shifted history and the
-    takeoff-stance window [c-12, c-2] now reads a B player. Owner
-    re-ratified the GT from the sheets (f308 spike 1A stands); the fix is
-    likely ENTANGLED with open point 16 — the candidate set at the joust
-    contains the walker-squatting tracks, so the attribution may self-heal
-    when the player bug is fixed. Re-check after 16 before touching the
-    reentry band's back-extrapolation.
+    (b) **e6 joust contact f308→f309 team A→B** (GT: spike 1A t3) —
+        RE-CHECKED 2026-09-06 after the point-16 fix (see the ninth-session
+        entry): the candidate set is CLEAN now (the attributed toucher is
+        really track 1 = the GT spiker; emitted player_id 4→3), but the
+        team STILL reads B — cause isolated to THIS window's snapshot rule:
+        the stance takes the snapshot nearest the contact, and under the
+        fixed tracks that is f307, the first frame whose grounded foot has
+        crossed the net ground line (618→607 between f306/f307) and reads
+        B; f297-306 all read A. Fix shape: window-majority or last-
+        clearly-grounded stance read — do it in this retune session with
+        sheets; do NOT touch the reentry band's back-extrapolation.
     (c) **e5 f299 spike → f298 block** (GT f300 spike, frame is CLOSER now)
     — the gesture branch flipped with the 1-frame-earlier pose snapshot.
     (d) **e2 +f81 set B FP** near the held-ball release (GT: nothing until
@@ -1006,6 +1077,44 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-06 (ninth session) — open point 16: in-court preference in the association cost
+
+Owner report (e6_ballmatch_joust_f296-320.png): track 2B on a far-court
+passer-by, the real far-left digger never tracked, 1A flips to the right-edge
+bystander across f310-312. Probe (output/diag_e6_walker.py, raw detections +
+assignments + track state, all checked against the frames):
+
+- f142: the digger's (track 3) detection blips 1 frame; a walkway bystander
+  105 px away grabs the track via the CONTINUOUS branch of _may_feed_track
+  (no observation gap). Track follows the walkway right (f142-188), coasts
+  frozen f190-243, and the digger — detected in court every frame from f146
+  — is never re-acquired (215 px from the drifted ghost): untracked to the
+  end of the video. Track 2 squatted the same way at f214/f244/f256. The
+  squats cascade into Hungarian CHAIN-SWAPS (a full matching with long jumps
+  beats one unmatched track at the 1e6 sentinel): f305 track2↔track3 rotate,
+  f311 P1 → right-edge bystander at 149.5 px (gate 150), team vote B by f314.
+- Gate-style fixes measured and REJECTED (overlapping distributions): legit
+  out-of-court feedings on e1-e5 reach 146.6 px jump / sim 0.17; e6 hijacks
+  start at 105 px / sim 0.26; world-metre displacement explodes (17-25 m) on
+  LEGIT feedings via the airborne-foot projection artifact.
+- Shipped: off_court_cost_penalty_px (300) added to the Hungarian cost for
+  out-of-court detections — a PREFERENCE, not a gate. Allowance rules
+  (_may_feed_track grace/hold/serve-zone) untouched; below the 1e6 sentinel;
+  uncalibrated courts unaffected. Config + ctor + FrameProcessor +
+  dump_player_tracks wired, drift-guard row added.
+- A/B (baselines completed before any edit): e1/e3/e5/e7 tracks byte-
+  identical; e2 3 frames, e4 15 frames (same mechanism, benign — e4 now
+  follows GT id4 back into court at f390, all analyze_tracking metrics
+  identical); e6 198 frames healed (digger f146→end under id 3, no f311
+  swap, P1 stays A). Actions: e1-e5/e7 identical; e6 event-identical with
+  f309 player_id 4→3; e6 eval F1 0.933 / team 0.857 unchanged; production
+  src.main e6 emits the identical post-fix stream.
+- Residual: f309 team still B vs GT 1A — isolated to the reentry band's
+  stance-window snapshot rule (nearest snapshot = f307, the first frame
+  whose grounded foot crosses the net line; f297-306 read A). Moved to open
+  point 15b for the classifier retune session.
+- Suite 347 → 355 green (+7 TestInCourtPreference, +1 drift row).
 
 ### 2026-09-06 (eighth session) — squatter review: sideline straddlers lose their roster slot (e7 class)
 - **Owner plan v2 ratified in-session** (goal + mechanism + parameters +

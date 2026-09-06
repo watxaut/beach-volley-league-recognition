@@ -139,6 +139,7 @@ def main():
         signature_height_smoothing=_CFG.get("player_signature_height_smoothing", 30),
         off_court_grace_frames=_CFG.get("player_off_court_grace_frames", 45),
         off_court_hold_frames=_CFG.get("player_off_court_hold_frames", 90),
+        off_court_cost_penalty_px=_CFG.get("player_off_court_cost_penalty_px", 300.0),
         squatter_enabled=_CFG.get("player_squatter_enabled", True),
         squatter_review_frames=_CFG.get("player_squatter_review_frames", 120),
         squatter_min_fed_frames=_CFG.get("player_squatter_min_fed_frames", 20),

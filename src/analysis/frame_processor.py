@@ -133,6 +133,7 @@ class FrameProcessor:
                 signature_height_smoothing=self.config.get("player_signature_height_smoothing", 30),
                 off_court_grace_frames=self.config.get("player_off_court_grace_frames", 45),
                 off_court_hold_frames=self.config.get("player_off_court_hold_frames", 90),
+                off_court_cost_penalty_px=self.config.get("player_off_court_cost_penalty_px", 300.0),
                 squatter_enabled=self.config.get("player_squatter_enabled", True),
                 squatter_review_frames=self.config.get("player_squatter_review_frames", 120),
                 squatter_min_fed_frames=self.config.get("player_squatter_min_fed_frames", 20),

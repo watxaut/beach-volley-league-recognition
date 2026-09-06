@@ -260,3 +260,92 @@ class TestGalleryRestore:
         )
         assert p4 in {o["track_id"] for o in out}
         assert p4 in tracker.tracks
+
+
+class TestInCourtPreference:
+    """Association-cost preference for in-court detections (entreno_6, open
+    point 16). _may_feed_track decides whether an off-court feeding is ALLOWED
+    at all; off_court_cost_penalty_px decides which candidate WINS when the
+    track has a choice: identity is anchored on the court, so a court detection
+    must beat an off-court one even at a longer gate distance. Without it a
+    walkway bystander takes a coasting track the instant the player's own
+    detection blips (e6 f142: the far-left digger's track was grabbed at a
+    105 px jump and never returned -- 200 frames untracked), and the squat
+    cascades into chain-swaps (e6 f305/f311, team vote flip A->B)."""
+
+    def test_cost_unit_prefers_in_court_over_closer_off_court(self):
+        tracker = _make_tracker(max_distance=250.0)
+        (tid,) = _seed_four(tracker, [(500, 400)])
+        track = tracker.tracks[tid]
+        player = _det(620, 400)    # in court, 120 px away
+        walker = _det(390, 400)    # off court (x<400), 110 px away -- closer
+        c_player = tracker._compute_assignment_cost(track, player)
+        c_walker = tracker._compute_assignment_cost(track, walker)
+        assert c_player is not None and c_walker is not None
+        assert c_player < c_walker, (c_player, c_walker)
+
+    def test_update_takes_in_court_player_over_closer_bystander(self):
+        """The e6 f311 shape at one-track scale: the track's player (in court,
+        farther) and a bystander (off court, closer) are both detected; the
+        track must stay on its player."""
+        tracker = _make_tracker(max_distance=250.0)
+        (tid,) = _seed_four(tracker, [(500, 400)])
+        out = tracker.update([_det(390, 400), _det(620, 400)], None, ball_active=True)
+        by_id = {o["track_id"]: o for o in out}
+        assert by_id[tid]["center"] == [620.0, 400.0]
+        # the bystander is not admitted as a new track either
+        assert len(out) == 1
+
+    def test_f146_recovery_track_steps_back_to_returning_player(self):
+        """The e6 f142->f146 sequence: the player's detection blips one frame
+        and a bystander takes the track (no in-court alternative -- allowed);
+        when the player is detected in court again while the bystander is still
+        there, the track must step back onto the player."""
+        tracker = _make_tracker(max_distance=250.0)
+        (tid,) = _seed_four(tracker, [(500, 400)])
+        # player blips; only the nearby off-court walker is detected
+        out = tracker.update([_det(390, 400)], None, ball_active=True)
+        by_id = {o["track_id"]: o for o in out}
+        assert by_id[tid]["center"] == [390.0, 400.0]
+        # player returns while the walker is still detected: court wins
+        out = tracker.update([_det(390, 400), _det(500, 400)], None, ball_active=True)
+        by_id = {o["track_id"]: o for o in out}
+        assert by_id[tid]["center"] == [500.0, 400.0]
+
+    def test_off_court_continuation_still_works_without_in_court_option(self):
+        """The penalty only reorders preferences; with NO in-court detection
+        the off-court continuation proceeds exactly as before (grace/hold
+        rules in _may_feed_track are untouched)."""
+        tracker = _make_tracker(max_distance=250.0)
+        (tid,) = _seed_four(tracker, [(500, 400)])
+        out = tracker.update([_det(390, 400)], None, ball_active=True)
+        by_id = {o["track_id"]: o for o in out}
+        assert by_id[tid]["center"] == [390.0, 400.0]
+        assert not by_id[tid].get("predicted", False)
+
+    def test_zero_penalty_restores_distance_only_preference(self):
+        tracker = _make_tracker(max_distance=250.0, off_court_cost_penalty_px=0.0)
+        (tid,) = _seed_four(tracker, [(500, 400)])
+        out = tracker.update([_det(390, 400), _det(620, 400)], None, ball_active=True)
+        by_id = {o["track_id"]: o for o in out}
+        assert by_id[tid]["center"] == [390.0, 400.0]
+
+    def test_uncalibrated_court_has_no_penalty(self):
+        tracker = _make_tracker(max_distance=250.0, court_calibration=None)
+        (tid,) = _seed_four(tracker, [(500, 400)])
+        out = tracker.update([_det(390, 400), _det(620, 400)], None, ball_active=True)
+        by_id = {o["track_id"]: o for o in out}
+        assert by_id[tid]["center"] == [390.0, 400.0]
+
+    def test_chain_swap_still_prefers_full_matching(self):
+        """The penalty must not break Hungarian's global structure: a second
+        track whose player is gone may still chain onto the off-court
+        detection (that beats leaving it unmatched) -- but the first track
+        keeps its in-court player."""
+        tracker = _make_tracker(max_distance=250.0)
+        ids = _seed_four(tracker, [(500, 400), (300, 400)])
+        tid_a, tid_b = ids[0], ids[1]
+        out = tracker.update([_det(390, 400), _det(620, 400)], None, ball_active=True)
+        by_id = {o["track_id"]: o for o in out}
+        assert by_id[tid_a]["center"] == [620.0, 400.0]   # in-court player
+        assert by_id[tid_b]["center"] == [390.0, 400.0]   # off-court chain
