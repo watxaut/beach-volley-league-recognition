@@ -57,16 +57,29 @@ but also in tournaments").
   1.0/1.0, e4 1.0/1.0 unchanged; e2 0.571 -> 0.533 (+f81 set FP near the
   held-ball release; f118 overpass->spike label; f209->f204 is CLOSER to GT
   f206); e5 1.0 -> 0.857 (f299 spike -> f298 block: frame closer to GT f300,
-  label flipped); e6 0.923 -> 0.857 team 1.0 -> 0.833 — +serve@34 (the
-  owner's ask; GT-unannotated), f262 set A kept, f216 dig A kept, but the
-  manufactured joust contact moved f308->f309 and reads team B (GT 1A) —
-  needs owner eyes; e7 (new dictated GT, see below) 4/9 matched both before
-  and after but the COMPOSITION improved: set f110 now detected (dist 2),
-  serve f25 now missed (the toss rise is 2.6 px/f — deliberately below the
-  motion-lock floor), f160/f244/f300 remain undetected. Production
-  `src.main` on e6 emits the same 7 events incl. the serve (f309 label reads
-  block vs the script's spike under MPS jitter — the known device caveat,
-  script path is the reference).
+  label flipped); e6 — see below; e7 (new dictated GT, see below) 4/9
+  matched both before and after but the COMPOSITION improved: set f110 now
+  detected (dist 2), serve f25 now missed (the toss rise is 2.6 px/f —
+  deliberately below the motion-lock floor), f160/f244/f300 remain
+  undetected. Production `src.main` on e6 emits the same 7 events incl. the
+  serve (f309 label reads block vs the script's spike under MPS jitter —
+  the known device caveat, script path is the reference).
+- **e6 ratifications (owner, sheets e6_ballmatch_*.png) + eval after the
+  fold:** (a) the new serve is REAL — "e6 serve is from 4A" (the teal
+  near-left player); folded into GT as f34 p4 A t1 -> e6 F1 0.857 -> 0.933
+  (P 1.0, R 0.875; the only FN is the no-touch block, unemittable by
+  design) vs before-rework 0.857 — e6 is a net win; (b) joust GT
+  re-confirmed: spike 1A + no-touch block 2B at f308 (the sheet shows 1A
+  airborne at the net on A's f262 set arc; 2B never plays the ball).
+- **NEW owner finding — e6 player-tracking bug (open point 16):** track 2B
+  latches onto a bystander passing behind the far court, the REAL far-left
+  digger (blue/yellow/black, dig stance) is never tracked, and track 1A
+  flips to the right-edge bystander across f310-312 (team flips A->B with
+  it). Probe dump (f285-322): the 2B box sits parked at ~(1179,367) — the
+  walker — from f286, oscillates with the real net player f306-310, and
+  track 1 jumps [1322,474] -> [1434,374] at f312 (right-edge bystander),
+  re-teaming to 1B by f314. Pre-existing (owner first saw the f311 swap on
+  2026-08-28), now prioritized — see open point 16.
 - **e7 GT folded (owner-dictated this session, pending ratification):**
   ground_truth/video_entreno_7_annotations.json — 9 events (serve A f25,
   dig B f55, set B f110, spike touch B f160 "rainbow on line", dig A f200,
@@ -611,6 +624,28 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Open points
 
+16. **[NEW 2026-09-06 — e6 player-tracking bug, owner-prioritized:
+    bystander squatting + identity swap at the joust].** Owner report with
+    sheet evidence (e6_ballmatch_joust_f296-320.png): track 2B is wrongly
+    assigned to a person passing by behind the far court; the REAL player
+    on a dig stance at center-left (blue/yellow/black) is never tracked;
+    and track 1A changes to 2B across f310-312. Probe dump (player centers,
+    f285-322): 2B parked at ~(1179,367) = the walker from f286 (before the
+    window), oscillating with the real net player f306-310 (2B/3B swap
+    every 2 frames), then 1 jumps [1322,474] -> [1434,374] at f312 (the
+    right-edge bystander in the light vest) and re-teams 1A -> 1B by f314
+    (15-frame foot vote). Suspected mechanisms: continuous-match feeding
+    lets an established track walk onto the passer-by (off-court hold
+    horizon 90f is long enough to bridge the whole episode); the 150px
+    frame-gate admits the f312 jump; the team vote then follows the box.
+    The untracked digger is slot starvation — 4 slots held by 4A, 1A, and
+    the two walker-contested tracks. e6 has no player-box GT, so measure
+    with contact sheets. Fix belongs to the player-identity stack
+    (admission/hold-horizon/swap), NOT the ball tracker. NOTE: fixing this
+    likely also fixes open point 15b (the f309 joust team flip reads B
+    through the walker-contaminated candidate set), and would make the
+    joust contact attributable to the real 1A.
+
 15. **[NEW 2026-09-06 — ball-matching follow-ups, ranked].** The tracker
     rework (see Where we are) shifted ball histories slightly; the
     classifier's contact gates were calibrated to the OLD histories. Every
@@ -623,9 +658,12 @@ constraint. Side changes need no special handling as long as IDs survive.
     lock exception — needs sheets. The e6/e7 tosses at 30 px/f lock fine.
     (b) **e6 joust contact f308→f309 team A→B** (GT: spike 1A t3) — the
     manufactured frame moved 1 frame with the shifted history and the
-    takeoff-stance window [c-12, c-2] now reads a B player. Contact sheets
-    + owner ratification; the reentry band's back-extrapolation may need a
-    half-frame guard.
+    takeoff-stance window [c-12, c-2] now reads a B player. Owner
+    re-ratified the GT from the sheets (f308 spike 1A stands); the fix is
+    likely ENTANGLED with open point 16 — the candidate set at the joust
+    contains the walker-squatting tracks, so the attribution may self-heal
+    when the player bug is fixed. Re-check after 16 before touching the
+    reentry band's back-extrapolation.
     (c) **e5 f299 spike → f298 block** (GT f300 spike, frame is CLOSER now)
     — the gesture branch flipped with the 1-frame-earlier pose snapshot.
     (d) **e2 +f81 set B FP** near the held-ball release (GT: nothing until
@@ -903,11 +941,16 @@ constraint. Side changes need no special handling as long as IDs survive.
   broke e3's fast-contact dropouts. The shipped shape keeps the old
   GT-validated admission semantics except where the old path STARVED.
 - **Validated**: suite 325 green; e1/e3/e4 action streams byte-identical;
-  e2 0.571→0.533, e5 1.0→0.857 (one label/frame each), e6 0.923→0.857 with
-  the SERVE newly tracked (+f262 set kept, f308 joust team flipped — open
-  point 15b), e7 4/9 with set f110 newly detected (serve traded — open
-  point 15a); production src.main on e6 confirms the serve end-to-end.
-  e7 GT folded from the owner's dictation (open point 15f: ratify).
+  e2 0.571→0.533, e5 1.0→0.857 (one label/frame each), e7 4/9 with set f110
+  newly detected (serve traded — open point 15a). e6: owner ratified the
+  serve (f34 p4 A, "from 4A") and re-confirmed the joust GT; folded same
+  session -> e6 F1 0.857 → **0.933** (only FN = the unemittable no-touch
+  block). NEW owner finding parked as open point 16: track 2B squats on a
+  bystander behind the far court, the real center-left digger is
+  untracked, and 1A→2B/1B swaps across f310-312 — player-identity stack
+  work, likely also heals 15b. Production src.main on e6 confirms the
+  serve end-to-end. e7 GT folded from the owner's dictation (open point
+  15f: ratify).
 - Files: src/tracking/ball_tracker.py, src/detection/ball_detector.py,
   src/analysis/frame_processor.py, src/utils/config.py,
   tests/test_components.py, tests/test_config_drift.py,
