@@ -1,0 +1,36 @@
+src/utils/config.py
+  s_5024eadb9fee7e::t_cbddeb715bb9e0 251-256
+STATUS.md
+  s_5024eadb9fee7e::t_e6ab68bf708d37 495-513,722-743
+  s_5024eadb9fee7e::t_9bc4ab9d10a1bb 76-104
+src/output_gen/overlay.py
+  s_5024eadb9fee7e::t_60c010543569ac 189,194-196,201-202,204-205
+src/analysis/game_state_manager.py
+  s_5024eadb9fee7e::t_80fb88b1b5134e 141-150,152,154-155,157,201-212,231,253-266
+  s_5024eadb9fee7e::t_e80727e773d572 72-77,87
+  s_5024eadb9fee7e::t_599ce0069a796a 347-350
+tests/test_game_state.py
+  s_5024eadb9fee7e::t_e67ebd9062a5c6 48-49,56,59,293,304-305
+  s_5024eadb9fee7e::t_2bff5a60b04f6a 57-58,297-298
+  s_5024eadb9fee7e::t_faaa34acd6ea24 277-278,280-292,294-296,299-303,306-330
+src/analysis/game_state.py
+  s_5024eadb9fee7e::t_f5c17147fad76f 64-67,76
+src/analysis/live_debug_processor.py
+  s_5024eadb9fee7e::t_2c54228c6496be 246
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "8150694dbae4ef115ff08dc03c6381baf2bb3fad",
+  "prompts": {},
+  "sessions": {
+    "s_5024eadb9fee7e": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a070ec-d928-7072-b6b6-83bda82845cc",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
