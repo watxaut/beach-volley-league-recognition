@@ -69,6 +69,12 @@ class GameStateManager:
         self.group_gap_frames = cfg.get("group_gap_frames", 60)
         self.point_min_actions = cfg.get("point_min_actions", 2)
         self.contact_chain_frames = cfg.get("contact_chain_frames", 240)
+        # Serve-init semantics (owner, 2026-09-05): the LIVE state should turn
+        # ON at the serve (~1s), not after the 90f confirmation window; and a
+        # classifier serve action arms a candidate instantly. Neither affects
+        # point segmentation (that keeps the validated delayed confirm).
+        self.fast_confirm_flights = cfg.get("fast_confirm_flights", 20)
+        self.serve_action_arms = cfg.get("serve_action_arms", True)
 
         self._reset_state()
 
@@ -78,6 +84,7 @@ class GameStateManager:
 
     def _reset_state(self) -> None:
         self.state = GameState.GAME_OFF
+        self.provisional = False   # fast serve-track ON (points unaffected)
         self.last_frame_seen: Optional[int] = None
         # flight bookkeeping
         self._last_flight_frame: Optional[int] = None
@@ -131,14 +138,23 @@ class GameStateManager:
         self._step(frame_number, tracked, speed, actions)
         self.last_frame_seen = frame_number
 
+        effective_state = (
+            GameState.GAME_ON
+            if (self.state == GameState.GAME_ON or self.provisional)
+            else GameState.GAME_OFF
+        )
+        eff_start = (
+            self._episode_start
+            if self.state == GameState.GAME_ON
+            else (self._candidate if self.provisional else None)
+        )
         return GameStateInfo(
-            current_state=self.state,
+            current_state=effective_state,
             frame_number=frame_number,
-            episode_start_frame=self._episode_start,
-            episode_frames=(frame_number - self._episode_start + 1)
-            if self._episode_start is not None and self.state == GameState.GAME_ON
-            else 0,
+            episode_start_frame=eff_start,
+            episode_frames=(frame_number - eff_start + 1) if eff_start is not None else 0,
             points=list(self.points),
+            provisional=(self.provisional and self.state == GameState.GAME_OFF),
         )
 
     @staticmethod
@@ -182,6 +198,18 @@ class GameStateManager:
             self._density.popleft()
 
         if self.state == GameState.GAME_OFF:
+            # -- serve-init semantics: a classifier serve action arms a
+            # candidate instantly (no burst/quiet gate) -- the pipeline's own
+            # serve detection is the strongest point-start signal we have.
+            # Only recent contacts qualify (emission lags reach ~400f).
+            if self.serve_action_arms and self._candidate is None:
+                for a in actions:
+                    if a.get("action") == "serve":
+                        af = self._action_frame(a)
+                        if af is not None and 0 <= f - af <= 45:
+                            self._candidate = af
+                            self._candidate_flights = 1 if flight else 0
+                            break
             if flight:
                 if self._candidate is None:
                     burst_len = f - (self._burst_start or f) + 1
@@ -200,6 +228,7 @@ class GameStateManager:
                     self.state = GameState.GAME_ON
                 self._candidate = None
                 self._candidate_flights = 0
+                self.provisional = False
         else:
             end_episode = False
             if (
@@ -221,6 +250,20 @@ class GameStateManager:
         # -- point layer bookkeeping (after transitions: same-frame actions
         # must land in the group the transition opened/extended) --
         self._group_step(f, actions)
+        # -- provisional fast ON: the candidate already looks like a serve
+        # (sustained flight) -- report GAME_ON in the live view now. Points
+        # still wait for the full confirmation window.
+        if (
+            self.state == GameState.GAME_OFF
+            and self.fast_confirm_flights > 0
+            and self._candidate is not None
+            and self._candidate_flights >= self.fast_confirm_flights
+        ):
+            self.provisional = True
+        elif self.state == GameState.GAME_OFF and (
+            self._candidate is None or self._candidate_flights < self.fast_confirm_flights
+        ):
+            self.provisional = False
 
     # ------------------------------------------------------------------
     # point layer
@@ -301,8 +344,10 @@ class GameStateManager:
         """Finalize the trailing group. Call once after the last frame."""
         if self._group is not None:
             # a video that ends mid-rally: the group extends to the last
-            # flight (mirrors the episode-end convention)
-            if self._last_flight_frame is not None:
+            # flight (mirrors the episode-end convention). Only while the
+            # episode is still ACTIVE -- stray flights after the episode
+            # closed (rolling balls in the tail) must not extend it.
+            if self.state == GameState.GAME_ON and self._last_flight_frame is not None:
                 self._group[1] = max(self._group[1], self._last_flight_frame + 1)
         self._finalize_group()
         return list(self.points)

@@ -248,7 +248,12 @@ class Config:
             # Point layer (episode grouping + action confirmation)
             "group_gap_frames": 60,        # max gap merging episodes into one group
             "point_min_actions": 2,        # actions needed for a group to be a point
-            "contact_chain_frames": 240    # contact silence that splits a group into rallies
+            "contact_chain_frames": 240,   # contact silence that splits a group into rallies
+            # Serve-init semantics: live ON at the serve (~1s) instead of the
+            # 90f confirm window; classifier serve actions arm instantly.
+            # Point segmentation keeps the delayed confirm either way.
+            "fast_confirm_flights": 20,    # candidate flights that show provisional GAME_ON (0=off)
+            "serve_action_arms": True      # a serve action arms a candidate without quiet/burst gates
         }
     }
 

@@ -61,6 +61,10 @@ class GameStateInfo:
     # Confirmed points known SO FAR (finalized groups only; the group that
     # is still open is not listed yet).
     points: List[GamePoint] = field(default_factory=list)
+    # True while GAME_ON comes from the fast serve-track (candidate with
+    # sustained flight) rather than a fully confirmed episode. Points are
+    # unaffected; the live HUD shows it dimmer.
+    provisional: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -69,4 +73,5 @@ class GameStateInfo:
             "episode_start_frame": self.episode_start_frame,
             "episode_frames": self.episode_frames,
             "points": [p.to_dict() for p in self.points],
+            "provisional": self.provisional,
         }

@@ -73,9 +73,35 @@ signal dump through the REAL FrameProcessor):
   under ≥2-actions; pt03 = pt02's last spike fires 43f AFTER the GT stop and
   chains pt03's contacts into pt02's group (41% coverage, just under the 50%
   match bar). Suite **296 green** (+18 tests/test_game_state.py).
-- **A/B neutrality PROVEN:** e3 re-run on the new code = action stream and
-  spikes **byte-identical** to the 2026-09-04 baseline (14/14 actions);
-  the machine is a pure observer and the entreno GT numbers are unaffected.
+- **Serve-init semantics added (owner round 2, same session):** the owner
+  tested live-debug on entreno_3 (point starts f30, GAME ON only at f174)
+  and asked for serve detection as the game's init, noting (a) a far-side
+  pass during game-off should NOT turn the game on, (b) the coach-fed
+  points (0:21 / 1:02) are forgettable, (c) all serves in this practice
+  are from the NEAR field, (d) real matches should be easier. Diagnosis
+  (output/diag_gs_serve.py + probes): NO per-event serve discriminator
+  exists in this ball-track data — burst-start WIDTH fails (the tracker
+  picks up the serve at the TOSS, mid-air, far-regime 23-30px, same as
+  far passes); static-held-ball precedes only 6/13 serves (and 31/90
+  practice bursts — practice servers hold balls too); near→tape→far
+  crossings fire on 17 OFF bursts. Shipped instead: **provisional fast
+  ON** (live GAME ON once a candidate holds ≥20 flight frames —
+  0.9-2.4s after the serve, dimmed "GAME ON ~" badge; points still wait
+  for the validated 90f confirm, segmentation byte-identical), **serve
+  actions arm instantly** (classifier serve = strongest point-start
+  signal; only contacts ≤45f old, emission lags reach ~400f), and a
+  trailing-group finish fix (stray tail flights no longer extend a closed
+  episode — pt12 stop +6.2s → −1.9s). e2e re-validated: 11/13, 0 false,
+  80.6% frame accuracy; e3 A/B byte-identical AGAIN (14/14); e3 live ON
+  f174→f136 (the rest of the gap to f30 is serve-flight tracking recall,
+  not machine latency). Known cost: a sustained far-side pass during
+  game-off shows a brief provisional GAME ON (the point layer still
+  rejects it) — no signal separates it on this footage; revisit with
+  match footage where serves are the only net entries.
+- **A/B neutrality PROVEN (twice):** e3 re-runs on the new code = action
+  stream and spikes **byte-identical** to the 2026-09-04 baseline (14/14
+  actions); the machine is a pure observer and the entreno GT numbers are
+  unaffected.
 - **Gotcha (new instance of the eval-vs-pipeline skew class): the first
   diagnostic dump silently ran with the COCO yolov8n ball-model fallback**
   (`DEFAULT_CONFIG["ball_model_path"] = None`) while `src.main` auto-loads
@@ -466,19 +492,25 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Open points
 
-14. **[game-state, new] the two missed points are action-recall-limited — and
-    match footage will re-test everything.** pt00 (f300-540) is a coach-fed
-    point (owner: some points start from a coach's ball, not a serve) with
-    ONE detected contact — under point_min_actions=2 it cannot confirm; when
-    a real match arrives, revisit whether serve-started rallies + a serve
-    action trigger can carry short/ace rallies (serve-action recall is 1/13
-    here). pt03 loses to pt02's last spike firing 43f AFTER the GT stop and
-    chaining (41% coverage vs the 50% match bar) — action-boundary recall,
-    not machine logic. Also re-tune on match footage: the contact_chain
-    (240f) margin is thin (in-rally max 215f vs boundary 262f here), and the
-    owner expects matches to be EASIER (cleaner serve→rally→death, no coach
-    feeds, no between-point volleying). The point-count surface for the web
-    UI (points table exists; no UI rendering yet) is a small follow-up.
+14. **[game-state] Remaining limits, ranked by next-footage priority.**
+    (a) **No per-event serve detector exists in this ball-track data** —
+    every candidate feature is measured and refuted (burst width: the
+    tracker picks up serves at the toss, far-regime widths; static hold:
+    6/13 serves but 31/90 practice bursts; near→tape→far crossing: 17 OFF
+    bursts fire too). The serve-init semantics is approximated by
+    burst-after-quiet + provisional fast ON + serve-action arming. A
+    sustained far-side pass during game-off still shows a brief provisional
+    GAME ON (point layer rejects it) — on match footage where serves are
+    the only net entries, revisit a directional/side gate (width regimes
+    are the project's validated side signal).
+    (b) **pt00 (game-state video) stays missed** — coach-era point with ONE
+    detected contact; pt03 loses to pt02's last spike firing 43f after the
+    GT stop and contact-chaining (41% coverage vs the 50% bar).
+    (c) **Live ON latency bottoms out at ball-tracking recall at the
+    serve** (e3: ON f136 vs serve f30 — no tracked flight until ~f107).
+    (d) contact_chain_frames=240 margin is thin (in-rally max 215f vs
+    boundary 262f here). (e) Point-count UI surface (points table exists,
+    no web rendering yet).
 
 1. **[diagnosed 2026-08-18 — pre-existing, NOT the serve-zone fix] e1/e3
    tracking baselines are stale.** Old-code (HEAD pre-fix) e1 dump scores id
@@ -687,7 +719,28 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Log (newest first)
 
-### 2026-09-05 (sixth session) — game on/off state machine: diagnosis, three-layer design, end-to-end GT validation, wiring into pipeline/CSV/JSON/DB/live-debug
+### 2026-09-05 (sixth session, round 2) — serve-init semantics: provisional fast ON, serve-action arming, trailing-group fix
+- **Owner feedback**: e3 live-debug shows GAME ON at f174 for a point
+  starting f30 (too late); a far-side pass during game-off should not turn
+  the game on; detect serves and make them the game's init; the coach-fed
+  points (0:21 / 1:02) are forgettable; all serves from the near field in
+  this practice; real matches easier.
+- **Diagnosis**: three serve-discriminator candidates measured on the
+  production-path dump, all refuted (width at burst start / static hold /
+  near→tape→far crossing — see open point 14a). Serve detection from ball
+  signals alone is not available on this footage; practice serves are
+  serves.
+- **Shipped**: provisional fast ON (fast_confirm_flights=20: live GAME ON
+  at serve+0.9-2.4s, dimmed "GAME ON ~" badge + provisional flag in the
+  frame dict/CSV; POINT segmentation untouched and byte-identical);
+  serve_action_arms=True (classifier serve actions arm instantly, contacts
+  ≤45f old only); finish() no longer extends a closed trailing group
+  (pt12 stop +6.2s → −1.9s). Config + drift locks + 4 new tests.
+- **Validated**: e2e 11/13, 0 false, 80.6% frame accuracy; offline replay
+  points byte-identical to the validated list; e3 A/B byte-identical
+  AGAIN; e3 live ON f174 → f136 (rest is serve-flight tracking recall);
+  suite **300 green**.
+
 - **Owner request**: game on/off machine using resources/video_entreno_game_state.mp4
   + ground_truth/gt_point_start_end.txt (13 points, whole-second MM:SS start/
   stop, ±1 s), to count points and avoid counting actions between points.

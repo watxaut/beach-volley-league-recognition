@@ -45,15 +45,18 @@ def drive(mgr, frames, actions_at=None):
 
 def test_quiet_then_sustained_flight_turns_on_backdated():
     mgr = make_manager()
-    # 30 quiet frames, then a rally; confirmation lands at candidate+90
+    # 30 quiet frames, then a rally; provisional ON at burst+26 (serve-track),
+    # full confirmation at candidate+90
     frames = [None] * 30 + [10.0] * 90 + [None] * 30
     infos = drive(mgr, frames)
     assert mgr.get_current_state() == GameState.GAME_ON
     # the episode start is backdated to the burst start
     assert mgr._episode_start == 30
-    # state flips ON exactly at the confirm boundary
     on_frames = [i for i, inf in enumerate(infos) if inf.current_state == GameState.GAME_ON]
-    assert on_frames and on_frames[0] == 30 + 90  # confirmed at f120 reporting ON
+    assert on_frames and on_frames[0] == 30 + 26  # arm at +8, +fast_confirm flights
+    confirmed = [i for i, inf in enumerate(infos)
+                 if inf.current_state == GameState.GAME_ON and not inf.provisional]
+    assert confirmed and confirmed[0] == 30 + 90
 
 
 def test_isolated_practice_burst_stays_off():
@@ -271,4 +274,57 @@ def test_ctor_defaults_match_default_config():
     assert mgr.group_gap_frames == d["group_gap_frames"]
     assert mgr.point_min_actions == d["point_min_actions"]
     assert mgr.contact_chain_frames == d["contact_chain_frames"]
+    assert mgr.fast_confirm_flights == d["fast_confirm_flights"]
+    assert mgr.serve_action_arms == d["serve_action_arms"]
     assert mgr.enabled == d["enabled"]
+
+
+# --- serve-init semantics (live ON at the serve) --------------------
+
+
+def test_provisional_on_before_full_confirmation():
+    """The live state turns GAME_ON ~20 flight frames into the serve burst,
+    long before the 90f confirmation window closes (owner complaint: ON
+    landed ~5s late on entreno_3)."""
+    mgr = make_manager()
+    frames = [None] * 30 + [10.0] * 40 + [None] * 60
+    infos = drive(mgr, frames)
+    on_frames = [i for i, inf in enumerate(infos) if inf.current_state == GameState.GAME_ON]
+    assert on_frames[0] == 30 + 26  # arm (+8) + fast_confirm_flights post-arm
+    # it is flagged provisional until the window confirms
+    assert infos[on_frames[0]].provisional is True
+    # after the confirmation boundary it is a real episode
+    late = [i for i, inf in enumerate(infos)
+            if inf.current_state == GameState.GAME_ON and not inf.provisional][(-1)]
+    assert infos[late].episode_start_frame == 30
+
+
+def test_provisional_on_retracts_if_burst_dies():
+    mgr = make_manager()
+    # 35 flight frames then silence: provisional ON shows briefly, then OFF
+    frames = [None] * 30 + [10.0] * 35 + [None] * 150
+    infos = drive(mgr, frames)
+    assert any(inf.provisional for inf in infos)
+    assert mgr.get_current_state() == GameState.GAME_OFF
+    assert mgr.get_points() == []
+
+
+def test_serve_action_arms_candidate_without_quiet():
+    """A classifier serve action arms instantly -- no quiet/burst gate."""
+    mgr = make_manager()
+    # continuous flight from frame 0 (burst_quiet == 0 -> no normal arm);
+    # a serve action at frame 10 arms the candidate at its contact frame
+    frames = [10.0] * 130
+    infos = drive(mgr, frames, actions_at={10: [{"action": "serve", "frame_number": 10, "confidence": 0.5}]})
+    assert any(inf.current_state == GameState.GAME_ON for inf in infos)
+    assert mgr.get_current_state() == GameState.GAME_ON
+    assert mgr._episode_start == 10
+
+
+def test_stale_serve_action_does_not_arm():
+    """Serve actions whose contact frame is far in the past (emission lag)
+    must not arm a stale candidate."""
+    mgr = make_manager()
+    frames = [10.0] * 130
+    infos = drive(mgr, frames, actions_at={100: [{"action": "serve", "frame_number": 5, "confidence": 0.5}]})
+    assert mgr.get_current_state() == GameState.GAME_OFF

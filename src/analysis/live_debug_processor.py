@@ -243,6 +243,7 @@ class LiveDebugProcessor:
                     out,
                     game_state.get("current_state", "game_off"),
                     len(game_state.get("points", [])),
+                    provisional=bool(game_state.get("provisional", False)),
                 )
         except Exception as e:
             self.logger.error(f"Error rendering frame {frame_idx}: {e}")
