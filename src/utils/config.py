@@ -253,6 +253,7 @@ class Config:
             # 90f confirm window; classifier serve actions arm instantly.
             # Point segmentation keeps the delayed confirm either way.
             "fast_confirm_flights": 20,    # candidate flights that show provisional GAME_ON (0=off)
+            "fast_confirm_window_frames": 90,  # rolling window for the sustained-flight provisional
             "serve_action_arms": True      # a serve action arms a candidate without quiet/burst gates
         }
     }

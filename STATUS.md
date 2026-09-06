@@ -5,9 +5,55 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-05 (sixth session — game on/off state machine)
+**Last updated:** 2026-09-05 (sixth session, round 3 — live GAME-ON latency)
 
 ## Where we are
+
+**(2026-09-05, round 3): live GAME-ON badge latency FIXED — e3 serve at f30,
+badge ON f136 → f53 — and the badge got a black plate on its own line below
+the CALIBRATED sign.** Owner report: in live-debug the serve happens at f30
+and GAME ON appears at ~f140; asked to fix it, check whether it is
+livedebug-only, put a black background on the badge, and stop it
+overprinting the "Court: CALIBRATED" text (screenshot showed GAME OFF on
+top of CALIBRATED).
+
+- **Not a livedebug bug (verified, not assumed):** the badge state is
+  snapshotted per frame (``frame_result["game_state"]``) in BOTH render
+  paths — buffered live and two-pass save — so the badge travels with its
+  frame; the 3 s display delay shifts when a frame is shown, never what
+  state is drawn on it. The machine itself was late. Proven by rendering
+  the annotated e3 video (same ``_render_frame``): badge flips exactly at
+  the machine's provisional frame.
+- **Not ball-tracking recall either (open point 14c's old explanation was
+  WRONG):** the production-path dump (output/diag_gs_live_latency.py,
+  git-ignored) shows the serve flight tracked from f27 through the hit at
+  f31 (55.9 px/f) to the f76 reception. Root cause: the toss produces ONE
+  flight frame at f20 (11 px/f) which resets ``_no_flight_run``, so the
+  burst starting f27 captures ``_burst_quiet = 6 < arm_quiet_frames(10)``
+  and can NEVER arm — the entire 65-flight-frame serve+reception flight
+  armed nothing; the badge waited for the NEXT contact's burst (the set,
+  f107) + 20 flights → f136.
+- **Shipped: rolling sustained-flight provisional** (new config
+  ``fast_confirm_window_frames`` = 90, drift-locked): the live state shows
+  GAME_ON ~ once ≥ ``fast_confirm_flights`` (20) flight frames fall in the
+  rolling 90f window — no candidate required. Badge/CSV state only; the
+  candidate confirm (episode/point layers) is untouched, so segmentation
+  is unaffected by construction. e3: badge ON f53 (0.7 s after the serve
+  hit, during the serve flight itself).
+- **Measured cost (display-only, game-state video):** GT-OFF windows now
+  show the provisional badge 2173 frames (72 s) vs 1832 (61 s) under the
+  old candidate-only rule — any sustained practice exchange lights it by
+  design; on match footage game-off means a dead ball, so no sustained
+  flight. Points/actions byte-identical either way.
+- **Badge rendering:** solid black plate (cv2.rectangle fill) with the
+  colored text on top, moved to its own line (baseline y=62) below
+  CALIBRATED (baseline y=30); locked by tests/test_overlay_game_state.py
+  (plate pure black, plate top below CALIBRATED's ink, state tints).
+- **Validated:** suite **305 green** (+2 toss-regression/retraction tests
+  + overlay tests, timings updated for the earlier window ON); e3 batch
+  A/B actions/spikes/points **byte-identical**; game-state video e2e
+  points + actions **byte-identical**, eval **11/13, 0 false, 80.6%**
+  unchanged.
 
 **(2026-09-05, sixth session): game on/off state machine SHIPPED and GT-validated
 end-to-end on `video_entreno_game_state.mp4`: 11/13 points one-to-one matched,
@@ -498,16 +544,27 @@ constraint. Side changes need no special handling as long as IDs survive.
     tracker picks up serves at the toss, far-regime widths; static hold:
     6/13 serves but 31/90 practice bursts; near→tape→far crossing: 17 OFF
     bursts fire too). The serve-init semantics is approximated by
-    burst-after-quiet + provisional fast ON + serve-action arming. A
-    sustained far-side pass during game-off still shows a brief provisional
-    GAME ON (point layer rejects it) — on match footage where serves are
-    the only net entries, revisit a directional/side gate (width regimes
-    are the project's validated side signal).
+    burst-after-quiet + provisional fast ON + serve-action arming. The
+    provisional badge now fires on ANY sustained flight (rolling 20-in-90
+    window, round 3), so a sustained far-side pass during game-off shows a
+    provisional GAME ON for the length of the exchange (measured: GS-video
+    GT-OFF badge ON 61 s → 72 s; the point layer still rejects it all).
+    On match footage where serves are the only net entries, revisit a
+    directional/side gate (width regimes are the project's validated side
+    signal).
     (b) **pt00 (game-state video) stays missed** — coach-era point with ONE
     detected contact; pt03 loses to pt02's last spike firing 43f after the
     GT stop and contact-chaining (41% coverage vs the 50% bar).
-    (c) **Live ON latency bottoms out at ball-tracking recall at the
-    serve** (e3: ON f136 vs serve f30 — no tracked flight until ~f107).
+    (c) **RESOLVED (round 3) — and the old diagnosis here was wrong.** It
+    said the ON latency "bottoms out at ball-tracking recall at the serve
+    (no tracked flight until ~f107)"; the round-3 dump shows the serve
+    flight IS tracked from f27 (toss split the pre-serve quiet 6 < 10 so
+    the burst gate could not arm — a machine-gate issue, not recall). Fixed
+    by the rolling sustained-flight provisional: e3 live badge ON f136 →
+    f53 for the f30 serve. The CONFIRMED episode still waits for the
+    validated candidate path (e3: f197); closing THAT gap would need an
+    arming-gate change and full point-layer revalidation — not worth it
+    while the badge is correct.
     (d) contact_chain_frames=240 margin is thin (in-rally max 215f vs
     boundary 262f here). (e) Point-count UI surface (points table exists,
     no web rendering yet).
@@ -718,6 +775,29 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-05 (sixth session, round 3) — live GAME-ON badge latency + badge styling
+- **Owner report**: live-debug shows GAME ON at ~f140 for a serve at f30;
+  also asked: is it livedebug-only?; black background behind the game-state
+  badge; do not overprint the "Court: CALIBRATED" sign (screenshot showed
+  GAME OFF on top of it).
+- **Diagnosis**: (1) NOT livedebug-only — the badge state is snapshotted
+  per frame in both render paths, so the machine itself was late (proved
+  via the annotated-save render flipping at the machine's frame). (2) NOT
+  tracking recall (14c's old story refuted): the serve flight is tracked
+  from f27; the toss's single flight frame splits the pre-serve quiet
+  (6 < arm_quiet_frames 10), the burst gate can never arm on the serve,
+  and the candidate-only badge waited for the next contact's burst (f107)
+  → f136.
+- **Shipped**: rolling sustained-flight provisional (20 flight frames in
+  the last ``fast_confirm_window_frames``=90 — new drift-locked config)
+  lights the provisional GAME_ON without a candidate; badge/CSV only,
+  episode/point layers untouched. Badge: solid black plate, own line below
+  CALIBRATED (tests/test_overlay_game_state.py).
+- **Validated**: e3 badge ON f136 → f53; e3 batch A/B actions/spikes/points
+  byte-identical; game-state video points/actions byte-identical, eval
+  11/13, 0 false, 80.6% unchanged; GT-OFF provisional cost 61 s → 72 s
+  (display-only); suite **305 green**.
 
 ### 2026-09-05 (sixth session, round 2) — serve-init semantics: provisional fast ON, serve-action arming, trailing-group fix
 - **Owner feedback**: e3 live-debug shows GAME ON at f174 for a point

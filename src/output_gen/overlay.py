@@ -194,6 +194,10 @@ def draw_game_state(frame, state: str, points: int = 0, provisional: bool = Fals
     far. ``provisional`` dims the badge -- GAME_ON from the fast serve-track
     before the episode is fully confirmed. Render-only -- the machine itself
     lives in the pipeline.
+
+    The badge sits on a solid black plate on its own line BELOW the court
+    overlay's "Court: CALIBRATED" text (which owns the top-left line at
+    y=30), so the two never overprint each other.
     """
     label = "GAME ON" if state == "game_on" else "GAME OFF"
     if points:
@@ -203,5 +207,8 @@ def draw_game_state(frame, state: str, points: int = 0, provisional: bool = Fals
     color = (60, 220, 60) if state == "game_on" else (160, 160, 160)
     if provisional:
         color = (120, 200, 120)
-    cv2.putText(frame, label, (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 4)
-    cv2.putText(frame, label, (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 1)
+    (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+    x, y = 12, 62  # text baseline; keeps clear of CALIBRATED (baseline y=30)
+    cv2.rectangle(frame, (x - 8, y - th - 8), (x + tw + 8, y + 8), (0, 0, 0), -1)
+    cv2.putText(frame, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 4)
+    cv2.putText(frame, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 1)

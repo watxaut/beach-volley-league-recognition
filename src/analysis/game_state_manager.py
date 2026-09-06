@@ -19,6 +19,16 @@ single quiet gap must not end the episode); it ends when the window drains
 (density starvation -- the ball is dead/rolling/retrieved) or when the ball
 is tracked-but-static for ``static_off_frames`` (held ball).
 
+**Live view (provisional, badge only).** The live state reports GAME_ON
+(provisional, drawn dimmed) once the ball has been in sustained flight --
+>= ``fast_confirm_flights`` flight frames in the rolling
+``fast_confirm_window_frames`` window, or via the armed candidate. This
+exists because a tracked serve toss splits the pre-serve quiet (the toss's
+slow apex frames reset the quiet run), so the burst gate can never arm on
+the serve itself and a candidate-only badge waited for the NEXT contact's
+burst (~3.5 s after the serve hit on entreno_3). The provisional flag
+never feeds the episode/point layers -- segmentation is unaffected.
+
 **Point layer (grouping).** Consecutive episodes separated by <=
 ``group_gap_frames`` merge into one rally group (a rally whose tracking
 dropped for ~2 s is one point, not two). Each group is then SPLIT at
@@ -73,7 +83,11 @@ class GameStateManager:
         # ON at the serve (~1s), not after the 90f confirmation window; and a
         # classifier serve action arms a candidate instantly. Neither affects
         # point segmentation (that keeps the validated delayed confirm).
+        # fast_confirm_window_frames backs the rolling-flight provisional
+        # (2026-09-05, round 3): the badge must keep up with a tracked-toss
+        # serve even when the burst gate cannot arm (quiet split by the toss).
         self.fast_confirm_flights = cfg.get("fast_confirm_flights", 20)
+        self.fast_confirm_window_frames = cfg.get("fast_confirm_window_frames", 90)
         self.serve_action_arms = cfg.get("serve_action_arms", True)
 
         self._reset_state()
@@ -98,6 +112,9 @@ class GameStateManager:
         # active episode
         self._episode_start: Optional[int] = None
         self._density: Deque[bool] = deque(maxlen=self.density_window_frames)
+        # live-view rolling flight window (provisional badge only -- never
+        # feeds the episode/point layers)
+        self._live_flights: Deque[bool] = deque(maxlen=self.fast_confirm_window_frames)
         # rally group under construction: [start, last_episode_end]
         self._group: Optional[List[int]] = None
         # contact frames of every action observed so far (the point layer
@@ -196,6 +213,10 @@ class GameStateManager:
         self._density.append(flight)
         while len(self._density) > self.density_window_frames:
             self._density.popleft()
+        # rolling flight window for the live-view provisional badge
+        self._live_flights.append(flight)
+        while len(self._live_flights) > self.fast_confirm_window_frames:
+            self._live_flights.popleft()
 
         if self.state == GameState.GAME_OFF:
             # -- serve-init semantics: a classifier serve action arms a
@@ -250,20 +271,23 @@ class GameStateManager:
         # -- point layer bookkeeping (after transitions: same-frame actions
         # must land in the group the transition opened/extended) --
         self._group_step(f, actions)
-        # -- provisional fast ON: the candidate already looks like a serve
-        # (sustained flight) -- report GAME_ON in the live view now. Points
-        # still wait for the full confirmation window.
-        if (
-            self.state == GameState.GAME_OFF
-            and self.fast_confirm_flights > 0
-            and self._candidate is not None
-            and self._candidate_flights >= self.fast_confirm_flights
-        ):
-            self.provisional = True
-        elif self.state == GameState.GAME_OFF and (
-            self._candidate is None or self._candidate_flights < self.fast_confirm_flights
-        ):
-            self.provisional = False
+        # -- provisional fast ON: report GAME_ON in the live view once the
+        # ball has been in sustained flight -- EITHER via the armed candidate
+        # (burst-after-quiet shape) OR via the rolling flight window. The
+        # window is what makes the badge keep up with a serve whose toss is
+        # tracked: the toss's slow apex frames split the pre-serve quiet, the
+        # burst gate can then never arm (measured quiet 6 < 10 on entreno_3)
+        # and the candidate-only badge waited for the NEXT contact's burst
+        # (~3.5s after the serve hit). Points still wait for the validated
+        # candidate confirmation; this flag drives only the live badge/CSV
+        # state, so segmentation is unaffected.
+        if self.fast_confirm_flights > 0 and self.state == GameState.GAME_OFF:
+            sustained = sum(self._live_flights) >= self.fast_confirm_flights
+            armed = (
+                self._candidate is not None
+                and self._candidate_flights >= self.fast_confirm_flights
+            )
+            self.provisional = sustained or armed
 
     # ------------------------------------------------------------------
     # point layer
