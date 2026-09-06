@@ -1,0 +1,35 @@
+STATUS.md
+  s_73bdaa10afa6e7::t_d101cba28d14b6 1081-1118
+  s_73bdaa10afa6e7::t_1701fb257e0bab 89-90
+  s_73bdaa10afa6e7::t_391cf8c62504a0 8,12-88,788-801
+  s_73bdaa10afa6e7::t_f6c172dd6b3bd2 813-823
+tests/test_bystander_guard.py
+  s_73bdaa10afa6e7::t_06588865237c37 263-351
+src/tracking/player_tracker.py
+  s_73bdaa10afa6e7::t_1c4bcc58d80a43 61,108-124
+  s_73bdaa10afa6e7::t_e473ebd417ace8 233,942-951
+src/utils/config.py
+  s_73bdaa10afa6e7::t_3c168768817706 92
+scripts/dump_player_tracks.py
+  s_73bdaa10afa6e7::t_6397e5682bb1a2 142
+tests/test_config_drift.py
+  s_73bdaa10afa6e7::t_d8312c810225af 118
+src/analysis/frame_processor.py
+  s_73bdaa10afa6e7::t_ce02665396e520 136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "0ad2747d89e34ebf34dbe36e10c8b2facdeed0db",
+  "prompts": {},
+  "sessions": {
+    "s_73bdaa10afa6e7": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a077f4-068e-712b-b723-27aee8338e58",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
