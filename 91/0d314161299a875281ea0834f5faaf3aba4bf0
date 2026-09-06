@@ -1,0 +1,65 @@
+src/tracking/ball_tracker.py
+  s_b8f25f306ffd30::t_6892b35679bb71 34
+  s_b8f25f306ffd30::t_44026d8abbc603 325-340,356-357,374-381
+  s_b8f25f306ffd30::t_20fb5fa46002f8 115-119,150-153,201-202,266-288,292-293,423-424
+  s_b8f25f306ffd30::t_f2c4937c659c47 7-23,33,48-52,63-65,67,76,78-83,88,99-101,103-104,106,112-114,135-136,139,141-147,159-161,163-170,173-175,181-184,187-200,203-234,243,246,248,418-419,422,428
+  s_b8f25f306ffd30::t_7602d2e7491e9b 24-32,89-90,171-172,236-242,244,247,249-254,257-263
+  s_b8f25f306ffd30::t_34d50be4528dd4 264
+  s_b8f25f306ffd30::t_f42a384628f382 66,84-87,102,177-178,185-186
+  s_b8f25f306ffd30::t_703500ea9e381e 176,179-180
+  s_b8f25f306ffd30::t_c83f255980226d 245
+  s_b8f25f306ffd30::t_8213ba612a7a37 382
+  s_b8f25f306ffd30::t_20f57d56af9c93 265
+CLAUDE.md
+  s_b8f25f306ffd30::t_a88b261a2d1030 92,97,114
+tests/test_config_drift.py
+  s_b8f25f306ffd30::t_28386d5c69162a 73-75,79
+  s_b8f25f306ffd30::t_692704f7e700d5 76
+  s_b8f25f306ffd30::t_7d952a5273887f 77-78
+src/utils/config.py
+  s_b8f25f306ffd30::t_da1b3ec265bf94 49-53
+  s_b8f25f306ffd30::t_f19ebff9f27bc0 48
+  s_b8f25f306ffd30::t_f4b772b50364ea 40-47,54
+tests/test_components.py
+  s_b8f25f306ffd30::t_7dbf64f9dc381f 219-221,225-226,230
+  s_b8f25f306ffd30::t_b34b7438cc5071 124-129,138-144,147-158,166-195,203-205,208-209,211,216-217,224,228-229,231,272-298,302-305,309-320
+  s_b8f25f306ffd30::t_9e3c6eebb5f143 459
+  s_b8f25f306ffd30::t_22f59d4cd8d423 428-458,460-461,463-474
+  s_b8f25f306ffd30::t_875344799abf7f 212-215,218,222-223,227,232-241,243-271
+  s_b8f25f306ffd30::t_fe093abca6f447 242,299-301,306-308
+  s_b8f25f306ffd30::t_3d91f600b9c3f6 159-165
+  s_b8f25f306ffd30::t_ead19ceea14bb5 196-202,206-207,210
+  s_b8f25f306ffd30::t_216776a762cce3 462
+src/analysis/frame_processor.py
+  s_b8f25f306ffd30::t_f61fd991e6d3f3 103
+  s_b8f25f306ffd30::t_1e562512de9a68 100-102,104
+ground_truth/video_entreno_7_annotations.json
+  s_b8f25f306ffd30::t_4cd1a8be65f420 1-121
+STATUS.md
+  s_b8f25f306ffd30::t_fdcc739bcd4dc0 8
+  s_b8f25f306ffd30::t_7c8ed41f94fd88 793-798
+  s_b8f25f306ffd30::t_080c15ec99740c 882-917
+  s_b8f25f306ffd30::t_4ecb0983211fa6 614-642
+  s_b8f25f306ffd30::t_8f6dd7bc4feb98 12-84
+src/detection/ball_detector.py
+  s_b8f25f306ffd30::t_d0b01e4d71e905 246-251,255,264
+  s_b8f25f306ffd30::t_d8128785d389f8 43,63-68,235-238
+  s_b8f25f306ffd30::t_82088217751db5 49,82-88
+  s_b8f25f306ffd30::t_85fe94651bb1c4 102,218-222,224-231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "910d314161299a875281ea0834f5faaf3aba4bf0",
+  "prompts": {},
+  "sessions": {
+    "s_b8f25f306ffd30": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a07616-9e24-7072-b6b6-83c1ab3dcfc3",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
