@@ -1,0 +1,35 @@
+STATUS.md
+  s_7f89f3d93703bf::t_38561b5480ab8d 547-554,558-567
+  s_7f89f3d93703bf::t_0be3453d5a8758 779-801
+  s_7f89f3d93703bf::t_1aa5141817de00 8,12-56
+  s_7f89f3d93703bf::t_9aaeea4e81a948 57
+src/utils/config.py
+  s_7f89f3d93703bf::t_ba3aa27fc4f37a 256
+tests/test_game_state.py
+  s_7f89f3d93703bf::t_7591f2c8dd2b3a 48-49,56,64-66,70-71,76-78,82-105,111-112,316
+  s_7f89f3d93703bf::t_9ffaae07677e3e 106-110,113-115
+  s_7f89f3d93703bf::t_b4216ae8339349 332
+src/analysis/game_state_manager.py
+  s_7f89f3d93703bf::t_3c8047f5fd6291 90,115-117,216-219,274-290
+  s_7f89f3d93703bf::t_731f9f05d169dd 22-31,86-88
+tests/test_overlay_game_state.py
+  s_7f89f3d93703bf::t_f7b8bfa6299994 1-70
+src/output_gen/overlay.py
+  s_7f89f3d93703bf::t_97b2a59404a7ee 197-200,210-214
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "32da8a4a559f377f54ab48e6c8c168cb3f14add4",
+  "prompts": {},
+  "sessions": {
+    "s_7f89f3d93703bf": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a075cb-47cf-7072-b6b6-83be85d2060b",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
