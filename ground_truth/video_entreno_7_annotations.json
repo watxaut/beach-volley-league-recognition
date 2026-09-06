@@ -1,0 +1,121 @@
+{
+ "video": "resources/video_entreno_7.mp4",
+ "fps": 30.0,
+ "resolution": [1920, 1080],
+ "annotated_frames": {
+  "ball": {
+   "description": "Ball center position every 5 frames",
+   "frames": {}
+  },
+  "players": {
+   "description": "Player bounding boxes + IDs every 10 frames",
+   "frames": {}
+  },
+  "actions": {
+   "description": "Action events with rally-state context. Each event has: frame, player_id, final_action (canonical label), raw_visual_actions (open-vocabulary multi-label), player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides. Owner-dictated 2026-09-06 (teams/frames only; player_id pending -- no player boxes annotated yet).",
+   "events": [
+    {
+     "frame": 25,
+     "final_action": "serve",
+     "raw_visual_actions": ["serve"],
+     "player_team": "A",
+     "team_in_possession": "A",
+     "touch_number": 1,
+     "preceded_by_attack": false,
+     "rally_id": 1,
+     "overrides": {}
+    },
+    {
+     "frame": 55,
+     "final_action": "dig",
+     "raw_visual_actions": ["dig"],
+     "player_team": "B",
+     "team_in_possession": "B",
+     "touch_number": 1,
+     "preceded_by_attack": false,
+     "rally_id": 1,
+     "overrides": {}
+    },
+    {
+     "frame": 110,
+     "final_action": "set",
+     "raw_visual_actions": ["set"],
+     "player_team": "B",
+     "team_in_possession": "B",
+     "touch_number": 2,
+     "preceded_by_attack": false,
+     "rally_id": 1,
+     "overrides": {}
+    },
+    {
+     "frame": 160,
+     "final_action": "spike",
+     "raw_visual_actions": ["spike", "touch", "rainbow", "on the line"],
+     "player_team": "B",
+     "team_in_possession": "B",
+     "touch_number": 3,
+     "preceded_by_attack": false,
+     "rally_id": 1,
+     "spike_type": "touch",
+     "overrides": {}
+    },
+    {
+     "frame": 200,
+     "final_action": "dig",
+     "raw_visual_actions": ["dig"],
+     "player_team": "A",
+     "team_in_possession": "A",
+     "touch_number": 1,
+     "preceded_by_attack": true,
+     "rally_id": 1,
+     "overrides": {}
+    },
+    {
+     "frame": 244,
+     "final_action": "set",
+     "raw_visual_actions": ["set"],
+     "player_team": "A",
+     "team_in_possession": "A",
+     "touch_number": 2,
+     "preceded_by_attack": false,
+     "rally_id": 1,
+     "overrides": {}
+    },
+    {
+     "frame": 300,
+     "final_action": "spike",
+     "raw_visual_actions": ["spike", "hard driven", "with block"],
+     "player_team": "A",
+     "team_in_possession": "A",
+     "touch_number": 3,
+     "preceded_by_attack": false,
+     "rally_id": 1,
+     "spike_type": "hard",
+     "overrides": {}
+    },
+    {
+     "frame": 330,
+     "final_action": "dig",
+     "raw_visual_actions": ["dig"],
+     "player_team": "B",
+     "team_in_possession": "B",
+     "touch_number": 1,
+     "preceded_by_attack": true,
+     "rally_id": 1,
+     "overrides": {}
+    },
+    {
+     "frame": 360,
+     "final_action": "set",
+     "raw_visual_actions": ["set", "slipped off the hands", "point ends"],
+     "player_team": "B",
+     "team_in_possession": "B",
+     "touch_number": 2,
+     "preceded_by_attack": false,
+     "rally_id": 1,
+     "overrides": {}
+    }
+   ]
+  }
+ }
+}

@@ -37,6 +37,21 @@ class Config:
         # values here let the tracker chase noise and break contact detection.
         "ball_max_missing": 10,
         "trajectory_smoothing": 5,
+        # Ball-matching (2026-09-06): the tracker owns identity via trajectory
+        # gates; the detector returns ALL candidates (no top-1 cull). A lock
+        # (bootstrap or re-lock) requires demonstrated motion so static spares
+        # (sand/rack balls) can never own the track; while coasting the gate
+        # follows the velocity prediction.
+        "ball_lock_min_speed": 8.0,        # px/f of demonstrated motion to (re)lock
+        "ball_lock_motion_window": 5,      # frames of sightings consulted for motion
+        "ball_lock_max_jump": 90.0,        # px: two sightings this close may be one ball
+        "ball_lock_max_pair_gap": 2,       # frames: motion pair must be near-consecutive
+        "ball_selection_conf_window": 10.0,  # px: confidence breaks ties only within this
+        # Detector-side stationarity: surviving detections at/above this
+        # windowed persistence are flagged stationary_suspect for the tracker
+        # (full suppression still happens at ball_static_persist above it).
+        "ball_static_suspect_frac": 0.30,
+        "ball_selection_conf_window": 10.0,  # px: confidence breaks ties only within this
         # player_max_disappeared / tracking_max_distance: PlayerTracker ctor defaults
         # (what every validated script path runs: test_action_recognition,
         # dump_player_tracks). The old 30/100 diverged production/live-debug

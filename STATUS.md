@@ -5,9 +5,82 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-05 (sixth session, round 3 — live GAME-ON latency)
+**Last updated:** 2026-09-06 (seventh session — ball-matching rework)
 
 ## Where we are
+
+**(2026-09-06, seventh session): ball-matching rework shipped — the tracker now
+owns ball identity via trajectory + motion, never confidence alone. The e6
+serve is tracked for the first time (f34, production path confirmed), e7's
+f110 set is newly detected, and static spares can no longer bootstrap, steal,
+or starve the track. e1/e3/e4 action streams are byte-identical to HEAD.**
+Owner report: most missed actions trace to tracking the WRONG ball — e6's
+serve lost to a bottom-right spare ball, e7's rally events lost to rack/
+drill balls ("in volley practices it is bound there will be a lot of balls,
+but also in tournaments").
+
+- **Diagnosis first (output/diag_ball_match*.py, git-ignored, raw-detection
+  dumps + tracker-decision traces over e6/e7 full videos):** four failure
+  mechanisms, all confidence-driven: (1) bootstrap locks the highest-conf
+  first detection — in practice videos that is a foreground spare (e6 f0
+  locks the bottom-right ball; the serve toss is then rejected by the
+  trajectory gate for 70 frames); (2) the detector's top-1 confidence cull
+  HIDES the real ball whenever a spare out-scores it (e7 f241-244: a static
+  rack ball at 0.90 starves the f244 set whose real ball reads 0.79-0.88);
+  (3) after a reset the tracker re-locks the next top-1 blindly (e6 f17
+  re-locks the same spare; e7 f245 re-locks the rack ball); (4) the growing
+  coast gate admits slow-moving distractor balls when fed all candidates
+  (e1 f77: a far-side drill ball 21px from the prediction — not rejectable
+  by any local rule; only the old cull protected against it).
+- **Shipped (src/tracking/ball_tracker.py selection rework +
+  src/detection/ball_detector.py cull removal + suspect flag):** (a) the
+  detector returns all surviving candidates, each tagged
+  `stationary_suspect` at persist >= 0.30 of the rolling window (full
+  removal still happens at 0.55 — player-side `ball_position` = max-conf
+  over the same list, so the validated player-side behavior is untouched);
+  (b) UNLOCKED bootstrap/re-lock requires demonstrated motion (>= 8 px/f
+  over a pair <= 2 frames apart — detection-sparse spares show apparent
+  speed across gaps and must not qualify): the e6/e7 serve toss locks
+  within 1-2 frames of appearing; (c) LOCKED admission keeps the old
+  GT-validated rule (top-confidence candidate inside the growing gate
+  around the last position) with ONE divergence: a `stationary_suspect`
+  top candidate that fails the gate cannot starve the track — the best
+  in-gate plausible candidate is taken instead (recovers e7's f244 set); a
+  MOVING top candidate that merely left the gate is trusted and the track
+  coasts exactly as before (protects e1 f82's grown-gate recovery);
+  (d) when the coast prediction leaves court bounds (ball provably out of
+  view, e.g. a lob over the camera), a re-entry window holds the track near
+  the exit point for 2x max_missing instead of resetting (recovers e6's
+  f262 set across the f225-236 out-of-frame lob).
+- **Measured (scripts/test_action_recognition.py = the GT-validated path,
+  7 videos, before/after):** e1/e3/e4 action streams BYTE-IDENTICAL; e3
+  1.0/1.0, e4 1.0/1.0 unchanged; e2 0.571 -> 0.533 (+f81 set FP near the
+  held-ball release; f118 overpass->spike label; f209->f204 is CLOSER to GT
+  f206); e5 1.0 -> 0.857 (f299 spike -> f298 block: frame closer to GT f300,
+  label flipped); e6 0.923 -> 0.857 team 1.0 -> 0.833 — +serve@34 (the
+  owner's ask; GT-unannotated), f262 set A kept, f216 dig A kept, but the
+  manufactured joust contact moved f308->f309 and reads team B (GT 1A) —
+  needs owner eyes; e7 (new dictated GT, see below) 4/9 matched both before
+  and after but the COMPOSITION improved: set f110 now detected (dist 2),
+  serve f25 now missed (the toss rise is 2.6 px/f — deliberately below the
+  motion-lock floor), f160/f244/f300 remain undetected. Production
+  `src.main` on e6 emits the same 7 events incl. the serve (f309 label reads
+  block vs the script's spike under MPS jitter — the known device caveat,
+  script path is the reference).
+- **e7 GT folded (owner-dictated this session, pending ratification):**
+  ground_truth/video_entreno_7_annotations.json — 9 events (serve A f25,
+  dig B f55, set B f110, spike touch B f160 "rainbow on line", dig A f200,
+  set A f244, spike hard A f300 with block, dig B f330, set B f360 slipped
+  point ends). No player ids/boxes yet; evaluate with --ignore-player.
+- **Suite 325 green** (+13: ball-matching behaviors distilled from the e6/e7
+  failures — static-spare bootstrap refusal, toss lock, suspect override,
+  moving-top-1 trust, re-lock-needs-motion, contact reversal in gate,
+  out-of-view re-entry + expiry; +1 detector suspect-frac drift row).
+  Known follow-up class (new open point 15): the classifier's contact gates
+  are calibrated to the OLD tracker's histories; the shifted histories move
+  individual labels/frames (e2 f81/f118, e5 f298, e6 f309 team, e7 serve
+  left-window thin at 2 points) — retune with contact sheets next session,
+  NOT by weakening the tracker rules.
 
 **(2026-09-05, round 3): live GAME-ON badge latency FIXED — e3 serve at f30,
 badge ON f136 → f53 — and the badge got a black plate on its own line below
@@ -538,6 +611,35 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Open points
 
+15. **[NEW 2026-09-06 — ball-matching follow-ups, ranked].** The tracker
+    rework (see Where we are) shifted ball histories slightly; the
+    classifier's contact gates were calibrated to the OLD histories. Every
+    residual below is a CLASSIFIER-side read of a tracker change — retune
+    with contact sheets, do NOT weaken the tracker rules.
+    (a) **e7 serve f25 undetected** — the toss rise is 2.6 px/f (below the
+    8 px/f motion-lock floor by design), so the track locks the toss only
+    on its DESCENT (f21) and the hit contact's left window holds 2 points
+    (before: 4). Lever: classifier left-window tolerance, or a toss-aware
+    lock exception — needs sheets. The e6/e7 tosses at 30 px/f lock fine.
+    (b) **e6 joust contact f308→f309 team A→B** (GT: spike 1A t3) — the
+    manufactured frame moved 1 frame with the shifted history and the
+    takeoff-stance window [c-12, c-2] now reads a B player. Contact sheets
+    + owner ratification; the reentry band's back-extrapolation may need a
+    half-frame guard.
+    (c) **e5 f299 spike → f298 block** (GT f300 spike, frame is CLOSER now)
+    — the gesture branch flipped with the 1-frame-earlier pose snapshot.
+    (d) **e2 +f81 set B FP** near the held-ball release (GT: nothing until
+    f90) and f118 overpass→spike (GT f120 set).
+    (e) **e7 f160 spike / f244 set / f300 spike still undetected** — the
+    ball IS tracked through them (verified in dumps); the contacts die at
+    classifier gates (reach at f167-class airborne geometry, block-vs-set
+    shapes). Same retune session.
+    (f) e7 GT (owner-dictated) is in the repo UNRATIFIED — owner should
+    confirm frames/labels from the file before it anchors tuning.
+    (g) Multi-court simultaneous play: the motion-lock takes the first
+    mover at bootstrap; if two courts serve at once the wrong one can win.
+    No footage owns this case yet — revisit with tournament footage.
+
 14. **[game-state] Remaining limits, ranked by next-footage priority.**
     (a) **No per-event serve detector exists in this ball-track data** —
     every candidate feature is measured and refuted (burst width: the
@@ -688,11 +790,12 @@ constraint. Side changes need no special handling as long as IDs survive.
     joust-split mechanism is wanted or needed; one manufactured contact is
     the whole detectable truth, and the GT f308 BLOCK (2B t1) records a
     no-touch block that contact detection cannot and should not emit.
-    (b) ROOT CAUSE untouched — remains open: the
-    BALL tracker's post-reset reseed adopted the left spare (e6 f289), which
-    is why the real re-entry descent (f301–310) is unrecoverable to the
-    classifier — a smarter reseed (prefer in-flight balls over static/spare
-    ones) is a possible future lever, six-video A/B required. **e2 f167 was NOT a reentry case** (see point 7).
+    (b) ROOT CAUSE ADDRESSED 2026-09-06 (ball-matching rework): post-reset
+    reseeds now require demonstrated motion (spares cannot re-lock) and
+    out-of-view exits hold a re-entry window — the 2026-09-06 e6 run keeps
+    the rally ball through the joust and emits the manufactured contact at
+    f309 (was f308; team reads B vs GT 1A — open point 15b for the
+    sheet-ratified fix). **e2 f167 was NOT a reentry case** (see point 7).
     Evidence history: the toss exited the frame TOP at f277 [1166,17] still
     ascending; the contact happens above/entering the frame; the ball
     re-enters at f314 [1152,278] — above the net tape (verified via
@@ -775,6 +878,42 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-06 (seventh session) — ball-matching rework: identity by trajectory + motion, never confidence
+- **Owner report**: most missed actions trace to tracking the wrong ball —
+  e6's serve matched a bottom-right spare; e7's rally events lost to
+  rack/drill balls; practices and tournaments both contain many balls.
+- **Diagnosis (output/diag_ball_match*.py dumps)**: four confidence-driven
+  failure mechanisms — spare bootstrap (e6 f0), top-1 cull hiding the real
+  ball (e7 f241-244 rack ball 0.90 over real 0.79-0.92), blind reset
+  re-lock (e6 f17, e7 f245), and — once all candidates are visible — the
+  growing coast gate admitting slow distractors (e1 f77, 21px from the
+  prediction, not rejectable by any local rule).
+- **Shipped**: detector returns all candidates + two-stage stationarity
+  (remove at persist 0.55, flag `stationary_suspect` at 0.30); tracker
+  motion-gated bootstrap/re-lock (8 px/f over a <=2-frame pair); locked
+  admission = old rule + stationary-suspect override; out-of-view re-entry
+  window (2x max_missing at the exit point) replacing reset when the coast
+  prediction leaves court bounds. New config keys `ball_lock_min_speed`,
+  `ball_lock_motion_window`, `ball_lock_max_jump`, `ball_lock_max_pair_gap`,
+  `ball_selection_conf_window`, `ball_static_suspect_frac` (drift-guarded).
+  Intermediate designs measured and REJECTED on A/B: all-candidates +
+  min-dist selection lost e1's f87 set (distractor admission); strict
+  short coast window lost e5's f60 dig cascade; pred-anchored coast gates
+  broke e3's fast-contact dropouts. The shipped shape keeps the old
+  GT-validated admission semantics except where the old path STARVED.
+- **Validated**: suite 325 green; e1/e3/e4 action streams byte-identical;
+  e2 0.571→0.533, e5 1.0→0.857 (one label/frame each), e6 0.923→0.857 with
+  the SERVE newly tracked (+f262 set kept, f308 joust team flipped — open
+  point 15b), e7 4/9 with set f110 newly detected (serve traded — open
+  point 15a); production src.main on e6 confirms the serve end-to-end.
+  e7 GT folded from the owner's dictation (open point 15f: ratify).
+- Files: src/tracking/ball_tracker.py, src/detection/ball_detector.py,
+  src/analysis/frame_processor.py, src/utils/config.py,
+  tests/test_components.py, tests/test_config_drift.py,
+  ground_truth/video_entreno_7_annotations.json, CLAUDE.md, STATUS.md.
+  Diagnostics (git-ignored): output/diag_ball_match*.py + json dumps,
+  output/ballmatch_{before,after*,prod}_e{1..7}, output/ballmatch_eval_*.
 
 ### 2026-09-05 (sixth session, round 3) — live GAME-ON badge latency + badge styling
 - **Owner report**: live-debug shows GAME ON at ~f140 for a serve at f30;

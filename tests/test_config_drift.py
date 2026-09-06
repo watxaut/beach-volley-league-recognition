@@ -70,6 +70,13 @@ CTOR_PARITY = [
     ("trajectory_smoothing", BallTracker, "trajectory_smoothing"),
     ("low_confidence_threshold", BallTracker, "low_confidence_threshold"),
     ("max_trajectory_gap", BallTracker, "max_trajectory_gap"),
+    ("ball_lock_min_speed", BallTracker, "lock_min_speed"),
+    ("ball_lock_motion_window", BallTracker, "lock_motion_window"),
+    ("ball_lock_max_jump", BallTracker, "lock_max_jump"),
+    ("ball_lock_max_pair_gap", BallTracker, "lock_max_pair_gap"),
+    ("ball_selection_conf_window", BallTracker, "selection_conf_window"),
+    ("ball_static_suspect_frac", BallDetector, "static_suspect_frac"),
+    ("ball_selection_conf_window", BallTracker, "selection_conf_window"),
     # PlayerDetector
     ("player_confidence", PlayerDetector, "confidence_threshold"),
     ("player_imgsz", PlayerDetector, "imgsz"),

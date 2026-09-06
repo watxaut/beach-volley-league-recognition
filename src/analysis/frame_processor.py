@@ -97,6 +97,11 @@ class FrameProcessor:
                 velocity_threshold=self.config.get("velocity_threshold", 200.0),
                 low_confidence_threshold=self.config.get("low_confidence_threshold", 0.4),
                 max_trajectory_gap=self.config.get("max_trajectory_gap", 60.0),
+                lock_min_speed=self.config.get("ball_lock_min_speed", 8.0),
+                lock_motion_window=self.config.get("ball_lock_motion_window", 5),
+                lock_max_jump=self.config.get("ball_lock_max_jump", 90.0),
+                lock_max_pair_gap=self.config.get("ball_lock_max_pair_gap", 2),
+                selection_conf_window=self.config.get("ball_selection_conf_window", 10.0),
             )
             # Set court bounds for out-of-bounds rejection
             if self.court_calibration.is_calibrated and self.court_calibration.court_bounds:

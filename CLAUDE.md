@@ -89,12 +89,12 @@ The system follows a modular computer vision pipeline designed for a **fixed cam
 ### Key Components
 
 #### Detection System
-- **BallDetector** (`ball_detector.py`): YOLO-based. Loads either COCO `yolov8n.pt` (filters to sports ball class 32 + frisbee class 29) or a custom fine-tuned model via `model_path` (e.g., `models/volleyball_ball_best.pt`, no class filter needed). Auto-scales input resolution for high-res video. Size filtering rejects too-large detections. The `keep_all` flag (default `False`) returns every passing detection instead of the top-1 cull the tracker relies on -- used by `test_ball_detection.py` for validation.
+- **BallDetector** (`ball_detector.py`): YOLO-based. Loads either COCO `yolov8n.pt` (filters to sports ball class 32 + frisbee class 29) or a custom fine-tuned model via `model_path` (e.g., `models/volleyball_ball_best.pt`, no class filter needed). Auto-scales input resolution for high-res video. Size filtering rejects too-large detections. Returns EVERY surviving detection (no top-1 cull since 2026-09-06: the cull let a high-confidence courtside/rack ball hide the ball in play); the `keep_all` flag is accepted but ignored. Static-ball handling is two-stage: detections persisting across the rolling window at `static_persist_frac` (0.55) are removed outright (sand/rack balls), and weaker persistence at `static_suspect_frac` (0.30) is only flagged `stationary_suspect` for the tracker to distrust.
 - **PlayerDetector** (`player_detector.py`): YOLO person detection with court-boundary filtering (foot position inside court polygon). Aspect-ratio floor lowered to 0.6 so diving/crouching and close-to-camera players are not rejected.
 - **CourtCalibration** (`court_calibration.py`): One-time interactive calibration -- user clicks 4 court corners + 2 midcourt ground-line points (where the net tape meets the sand at each sideline) + 2 net-top points (where the net tape meets each post/antenna). Saves to JSON for reuse. Provides court polygon, midcourt/net lines, team zones, and spatial queries (`is_near_net`, `is_behind_baseline`, `get_team`, `is_above_net`).
 
 #### Tracking System
-- **BallTracker** (`ball_tracker.py`): Conservative tracker. Returns None when ball is lost (no hallucinated positions). Court-bounds rejection. Settings: max_missing_frames=10, low_confidence_threshold=0.4, max_trajectory_gap=60px.
+- **BallTracker** (`ball_tracker.py`): Conservative single-ball tracker; owns ball IDENTITY (2026-09-06 rework). When the ball is lost, returns None instead of hallucinating. Identity rules: only a MOVING candidate can bootstrap or re-lock the track (`lock_min_speed` 8 px/f over a near-consecutive sighting pair -- static spares can never own the track, and a serve toss locks within ~1-2 frames); while locked, the highest-confidence candidate is accepted inside a trajectory gate around the last position (growing with missing frames), and a candidate flagged `stationary_suspect` that fails the gate is overridden by the best in-gate plausible candidate instead of starving the track (entreno_7 f244 rack ball); when the coast prediction leaves the court bounds (ball provably out of view), a re-entry window holds the track near the exit point for 2x max_missing frames instead of resetting into whatever moves next (entreno_6 f225 lob). Settings: max_missing_frames=10, low_confidence_threshold=0.4, max_trajectory_gap=60px.
 - **PlayerTracker** (`player_tracker.py`): Locks to exactly 4 players after initialization. K-means clustering from first N frames, Hungarian algorithm assignment, color histogram appearance features. IDs 1-4, never creates 5th track. Team assignment via court calibration.
 
 #### Action Recognition
@@ -111,7 +111,7 @@ The system follows a modular computer vision pipeline designed for a **fixed cam
 1. Court calibration (one-time, saved to JSON)
 2. Ball + player detection using YOLO
 3. 4-player locked tracking with appearance features
-4. Conservative ball tracking (returns None when lost)
+4. Conservative ball tracking (returns None when lost; identity by trajectory + motion, never by confidence alone)
 5. Pose estimation with body-relative features
 6. Event-driven action classification at ball contact points
 7. Statistical aggregation and result export

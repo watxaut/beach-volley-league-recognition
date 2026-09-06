@@ -40,12 +40,13 @@ class BallDetector(BaseDetector):
         device: str = "auto",
         max_ball_size: int = 80,
         imgsz: Optional[int] = None,
-        keep_all: bool = False,
+        keep_all: bool = True,  # deprecated: accepted, ignored (always all)
         suppress_static: bool = True,
         static_radius: float = 25.0,
         static_window: int = 40,
         static_min_frames: int = 8,
         static_persist_frac: float = 0.55,
+        static_suspect_frac: float = 0.30,
         # Legacy params accepted but ignored for backward compatibility
         **kwargs,
     ):
@@ -59,10 +60,12 @@ class BallDetector(BaseDetector):
             max_ball_size: Max width/height in pixels for a valid ball detection.
             imgsz: YOLO input resolution. If None, auto-computed from frame size
                 to ensure ~20px ball visibility (capped at 1920).
-            keep_all: If True, return every detection passing the confidence and
-                size filters instead of culling to the single highest-confidence
-                one. Intended for validation/diagnostic use -- production callers
-                should leave this False since there is only one ball in play.
+            keep_all: Deprecated. Accepted for backward compatibility and
+                ignored: the detector always returns every detection passing
+                the confidence and size filters. Candidate SELECTION belongs
+                to the BallTracker (trajectory gates), not to confidence --
+                the old top-1 cull let a high-confidence courtside/rack ball
+                hide the ball in play (entreno_6 serve, entreno_7 f244 set).
             suppress_static: If True, drop detections that stay near-stationary
                 across a rolling window of recent frames. Beach practice courts
                 often have spare balls sitting on the sand or in a ball cart; a
@@ -76,7 +79,13 @@ class BallDetector(BaseDetector):
             static_min_frames: Minimum frames of history required before
                 suppression activates (warmup).
             static_persist_frac: Fraction of windowed frames a location must be
-                present in to be judged static (0-1).
+                present in to be judged static and REMOVED (0-1).
+            static_suspect_frac: Lower threshold: surviving detections at or
+                above this persistence are kept but flagged
+                ``stationary_suspect`` -- possibly-parked balls the BallTracker
+                may distrust for identity decisions (it must never re-lock
+                onto a ball that is not in play) without the removal cost of
+                full suppression.
         """
         super().__init__(confidence_threshold, device)
         self.model_path = model_path or "yolov8n.pt"
@@ -90,6 +99,7 @@ class BallDetector(BaseDetector):
         self.static_radius = static_radius
         self.static_min_frames = static_min_frames
         self.static_persist_frac = static_persist_frac
+        self.static_suspect_frac = static_suspect_frac
         # Rolling history of per-frame detection centers (all passing detections,
         # pre-suppression) used to detect stationary courtside balls.
         self._recent_centers: deque = deque(maxlen=static_window)
@@ -205,21 +215,27 @@ class BallDetector(BaseDetector):
                         "class_name": "sports_ball",
                     })
 
-            # Drop stationary courtside balls before culling (see __init__).
-            # The full pre-suppression center list is what we remember, so a
-            # phantom keeps being counted even on frames where it's suppressed.
+            # Stationary courtside balls: removed entirely at the suppression
+            # threshold; weaker stationarity is only FLAGGED so the tracker
+            # can distrust those candidates (see __init__). The full
+            # pre-suppression center list is what we remember, so a phantom
+            # keeps being counted even on frames where it's suppressed.
             if self.suppress_static:
-                survivors = [d for d in detections if not self._is_static(d["center"])]
+                survivors = []
+                for d in detections:
+                    persist = self._static_persist(d["center"])
+                    if persist >= self.static_persist_frac:
+                        continue
+                    if persist >= self.static_suspect_frac:
+                        d["stationary_suspect"] = True
+                    survivors.append(d)
                 self._recent_centers.append([d["center"] for d in detections])
                 detections = survivors
 
-            # Keep only the highest confidence detection (there's only one ball).
-            # Skipped when keep_all=True so validation tooling can see every
-            # confident detection, including false positives.
-            if len(detections) > 1 and not self.keep_all:
-                detections.sort(key=lambda d: d["confidence"], reverse=True)
-                detections = detections[:1]
-
+            # NO top-1 cull: every surviving candidate goes to the tracker,
+            # which owns identity via trajectory gates. Culling by confidence
+            # here once let a static rack ball (conf 0.9) hide the real ball
+            # (conf 0.79-0.92) for the entreno_7 f244 set.
             self.logger.debug(f"Ball detection: {len(detections)} balls")
             return detections
 
@@ -227,18 +243,16 @@ class BallDetector(BaseDetector):
             self.logger.error(f"Ball detection failed: {e}")
             return []
 
-    def _is_static(self, center: List[float]) -> bool:
-        """Return True if ``center`` matches a near-stationary courtside ball.
-
-        A location is judged static when a detection within ``static_radius``
-        pixels of it appears in at least ``static_persist_frac`` of the frames
-        currently in the rolling history. A ball in play moves every frame, so
-        its neighbourhood count stays low; a ball resting on the sand stays put
-        and accumulates hits across the whole window.
+    def _static_persist(self, center: List[float]) -> float:
+        """Return how stationary ``center`` is: the fraction of the rolling
+        window's frames that contain a detection within ``static_radius`` of
+        it. A ball in play moves every frame, so its neighbourhood count stays
+        low; a ball resting on the sand stays put and accumulates hits across
+        the whole window.
         """
         n = len(self._recent_centers)
         if n < self.static_min_frames:
-            return False
+            return 0.0
         r2 = self.static_radius ** 2
         cx, cy = center
         hits = 0
@@ -247,7 +261,7 @@ class BallDetector(BaseDetector):
                 if (ox - cx) ** 2 + (oy - cy) ** 2 <= r2:
                     hits += 1
                     break
-        return hits / n >= self.static_persist_frac
+        return hits / n
 
     def reset(self) -> None:
         """Clear rolling static-suppression history (call between videos)."""
