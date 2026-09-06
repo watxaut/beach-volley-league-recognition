@@ -5,9 +5,74 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-06 (seventh session — ball-matching rework)
+**Last updated:** 2026-09-06 (eighth session — squatter review)
 
 ## Where we are
+
+**(2026-09-06, eighth session): squatter review SHIPPED — a track whose
+lifetime in-court FEEDING fraction stays below 0.35 once it is 120 frames old
+is expired as a sideline straddler: flagged in the gallery (id preserved as a
+fail-safe, every restore path blocked, immediately evictable), its sampled
+foot positions blocking re-admission nearby. e2's freed slot is taken by a
+real player at f127 (was ~f188), e7's at f166 (was f262); e1/e3/e4/e5/e6
+byte-identical; action streams event-identical on e2/e7.**
+
+- **Diagnosis recap (session plan v2, owner-ratified):** the e7-class
+  bystander seeds a track while STRADDLING the sideline and reads "in court"
+  for a dense early run (f47-79 at 7.87-7.99 m), so strict admission cannot
+  refuse the seed. Narrative correction folded: the off-court hold horizon
+  DOES fire (~f172 on e7, last in-court f82 + 90) — the 2026-08-29 story
+  understated it — but the track then coasts as a ghost for max_disappeared
+  (90f) and the gallery re-acquires the id onto whoever stands near the old
+  position: measured on the clean-HEAD dump, the real 4th player colonizes
+  id4 at f262-263 (position restore on the coasted box). So the slot is only
+  truly usable from f262 — the reset/re-acquire loophole stretched the squat.
+- **Shipped (src/tracking/player_tracker.py):** per-track counters
+  `fed_frames` / `in_court_fed_frames` incremented ONLY in `_update_track`
+  (ghost/coast frames never dilute the fraction; bootstrap seeds start at 0);
+  `_expire_squatters()` beside `_expire_serve_zone_trials()` — fire when age
+  ≥ 120 AND fed ≥ 20 AND in_court_fed/fed < 0.35 (lifetime fraction, not
+  rolling; occluded real players keep theirs frozen at 100%); expiry is to
+  the GALLERY with `squatter: True` — NOT hard-remove (hard-remove stays
+  reserved for never-in-court seeds, e5 precedent). Flag interlocks: both
+  gallery restore passes skip flagged entries; flagged entries bypass
+  gallery_evict_min_hold_frames and are preferred by `_evict_stalest_dormant`
+  (the real 4th player gets the slot the same frame); `_restore_track`
+  reloads counters + created_frame (no fresh review amnesty after a legit
+  restore). Cooldown: world foot sampled every 10th fed frame (maxlen 12 ≈
+  the review window); at expiry the samples go on `_squatter_cooldown` and
+  `_track_admission_ok` refuses new tracks within 0.5 m of any sample —
+  including in-court candidates (re-admission attempts read 7.84-7.99 m);
+  existing tracks are never affected. Uncalibrated court → no-op.
+  Config: `player_squatter_enabled/review_frames/min_fed_frames/
+  min_in_court_frac/cooldown_radius_m` (drift-guarded); wired through
+  FrameProcessor + dump_player_tracks (bare ctor sites inherit parity).
+- **Measured (clean-room A/B, dump_player_tracks all 7 videos):** e1/e3/e4/
+  e5/e6 byte-identical (e6 watched for the 46f-streak track — no diff). e2:
+  127 frames differ, f127-253 — id2 passes from the coasting bystander ghost
+  to a real in-court player at f127; analyze_tracking: ID2 missing 60 → 0
+  frames, its resurrection gone, tracked coverage 71.4% → 80.0%, drop rate
+  85.5% → 69.0%. e7: 106 frames differ, f166-283 — id4 is the real 4th
+  player from f166, zero real emissions in the bystander region (x>1500)
+  after it, runs re-converge at f284; coverage 83.7% → 89.5%, drop rate
+  56.3% → 38.2%. Action streams (test_action_recognition): e2 and e7
+  EVENT-IDENTICAL (same frames/labels/teams/track_ids/touch numbers); eval
+  vs GT unchanged (e2 F1 0.533 = its current baseline — the plan's 0.571 bar
+  predates the 7th-session ball-matching shift, see that entry; e7 4/9 →
+  4/9, direction check only, no tuning); teams 1.0 everywhere.
+- **Process gotcha (recorded the hard way):** NEVER generate A/B baselines
+  while editing the code — each dump process imports at start, so my first
+  e5/e6/e7 "baselines" ran partially-edited code and the A/B falsely read
+  e7-neutral; a second race compared e7 while the post file was still being
+  written. Protocol: edit NOTHING until the baseline run prints ALL_DONE,
+  then edit, then post-run, then compare (git stash → run → pop for HEAD
+  baselines).
+- **Suite 347 green** (+17 tests/test_squatter_review.py: tick/floor/real-
+  player/server-path/ghost-no-dilute/uncalibrated/disable-flag, both restore-
+  pass skips, immediate eviction + preference over protected entries, counter
+  reload on legit restore, cooldown blocks-in-court/admits-far/never-touches-
+  existing, bootstrap seed counters + created_frame at lock; +5 config-drift
+  rows).
 
 **(2026-09-06, seventh session): ball-matching rework shipped — the tracker now
 owns ball identity via trajectory + motion, never confidence alone. The e6
@@ -624,6 +689,23 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Open points
 
+18. **[NEW 2026-09-06 — squatter-review known limits; ranked revisit
+    triggers.]** (a) **Match-footage dead time:** a real player off-court
+    between points can look squatter-like (long out-of-court stretches); the
+    flagged gallery keeps their id fail-safe, but expect expiry/restore
+    churn. Re-tune when match footage arrives — the natural lever is pausing
+    the review while the game-state machine says GAME OFF (the machine now
+    exists and is per-frame). (b) **Front end unaddressed:** e7's f47-~f145
+    of bystander tracking is irreducible without admission erosion (the
+    seed's early feedings genuinely read in-court); that lever stays parked
+    until a real-player line-margin is measured on GT videos. (c) The
+    cooldown may block a real player planted within 0.5 m of where a
+    squatter was expelled (a line defender next to the spot); rare, and it
+    only affects NEW-track admission, never existing tracks. (d) A
+    rolling-window fraction would fire ~27f earlier on e7; deliberately NOT
+    built (lifetime is simpler and occlusion-safe) — build only if the
+    owner asks.
+
 16. **[NEW 2026-09-06 — e6 player-tracking bug, owner-prioritized:
     bystander squatting + identity swap at the joust].** Owner report with
     sheet evidence (e6_ballmatch_joust_f296-320.png): track 2B is wrongly
@@ -641,7 +723,11 @@ constraint. Side changes need no special handling as long as IDs survive.
     The untracked digger is slot starvation — 4 slots held by 4A, 1A, and
     the two walker-contested tracks. e6 has no player-box GT, so measure
     with contact sheets. Fix belongs to the player-identity stack
-    (admission/hold-horizon/swap), NOT the ball tracker. NOTE: fixing this
+    (admission/hold-horizon/swap), NOT the ball tracker. NOTE (2026-09-06):
+    the squatter review shipped this session is e6-BYTE-IDENTICAL — the
+    walker-squatting tracks keep high lifetime in-court fractions, so this
+    point still needs its own fix (admission/swap side); the review only
+    covers the low-fraction straddler class. NOTE: fixing this
     likely also fixes open point 15b (the f309 joust team flip reads B
     through the walker-contaminated candidate set), and would make the
     joust contact attributable to the real 1A.
@@ -785,7 +871,11 @@ constraint. Side changes need no special handling as long as IDs survive.
    **e2 tracking observation (owner 2026-08-28) — squatter RESOLVED
    2026-08-29** by the off-court hold horizon (see Where we are): the
    out-of-court bystander no longer holds a slot (coasts from f104, id
-   reused by an in-court player from ~f188). Still open on e2: the server
+   reused by an in-court player from ~f188). **2026-09-06: the squatter
+   review now frees the slot at f127** (id2 real in-court from that frame;
+   ID2 missing frames 60 → 0, tracked coverage 71.4 → 80.0%) — the f32
+   serve misattribution is unaffected (the server is inadmissible before
+   f28 either way). Still open on e2: the server
    is inadmissible before f28 (out-of-zone at video start) so the f32 serve
    stays mis-attributed; and "p3 untracked at f90" did NOT reproduce as a
    tracking gap (t3 is real on the far receiver f80–94 in the audit —
@@ -916,6 +1006,33 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-06 (eighth session) — squatter review: sideline straddlers lose their roster slot (e7 class)
+- **Owner plan v2 ratified in-session** (goal + mechanism + parameters +
+  acceptance criteria, all measured beforehand on the e7 diagnostic dump
+  output/diag_e7_bystander.json): stop an off-court bystander who straddles
+  the sideline from holding a roster slot and poisoning identity downstream.
+- **Shipped**: squatter review by lifetime in-court fed fraction — see the
+  Where-we-are entry above for the full mechanism. One mechanism; no
+  classifier/tracker-history retuning; admission erosion untouched (open
+  point 18's front-end lever is separate); GT edits none.
+- **Validated** (clean-room A/B, separate processes): e1/e3/e4/e5/e6
+  byte-identical; e2 changed from f127 exactly as the plan predicted (slot
+  to a real player 61f earlier than the 08-29 hold-horizon reuse at ~f188);
+  e7 changed f166-283 (slot at f166 vs the f262 colonization; no ghost tail;
+  no re-admission; re-converge f284); action streams event-identical on
+  e2/e7; eval unchanged both; suite 347 green. Rollback:
+  `player_squatter_enabled: False` restores HEAD behavior exactly.
+- **New open point 18** records the known limits (match-footage dead-time
+  churn + the GAME OFF re-tune trigger, the irreducible f47-145 front end /
+  admission-erosion lever, the 0.5 m cooldown vs a line defender, the
+  not-built rolling-window variant).
+- Files: src/tracking/player_tracker.py, src/utils/config.py,
+  src/analysis/frame_processor.py, scripts/dump_player_tracks.py,
+  tests/test_squatter_review.py (new), tests/test_config_drift.py,
+  CLAUDE.md, STATUS.md. Artifacts (git-ignored): output/squatter_base2/,
+  output/squatter_post/, output/squatter_actions_{base,post}_{e2,e7}/,
+  output/squatter_ab_logs/ (incl. eval JSONs + the run scripts).
 
 ### 2026-09-06 (seventh session) — ball-matching rework: identity by trajectory + motion, never confidence
 - **Owner report**: most missed actions trace to tracking the wrong ball —

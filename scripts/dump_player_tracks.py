@@ -139,6 +139,11 @@ def main():
         signature_height_smoothing=_CFG.get("player_signature_height_smoothing", 30),
         off_court_grace_frames=_CFG.get("player_off_court_grace_frames", 45),
         off_court_hold_frames=_CFG.get("player_off_court_hold_frames", 90),
+        squatter_enabled=_CFG.get("player_squatter_enabled", True),
+        squatter_review_frames=_CFG.get("player_squatter_review_frames", 120),
+        squatter_min_fed_frames=_CFG.get("player_squatter_min_fed_frames", 20),
+        squatter_min_in_court_frac=_CFG.get("player_squatter_min_in_court_frac", 0.35),
+        squatter_cooldown_radius_m=_CFG.get("player_squatter_cooldown_radius_m", 0.5),
         serve_zone_enabled=(not args.no_serve_zone),
         serve_zone_depth_m=(args.serve_zone_depth if args.serve_zone_depth is not None
                             else _CFG.get("player_serve_zone_depth_m", 3.0)),

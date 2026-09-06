@@ -89,7 +89,12 @@ class Config:
         "player_gallery_reacquire_appearance_min": 0.5,  # ensemble similarity bar for appearance-only re-acquire (moved player / side change)
         "player_off_court_grace_frames": 45,   # how long an off-court detection may continue a track after its last in-court sighting (server step-out); blocks bystander hijack
         "player_off_court_hold_frames": 90,    # horizon on CONTINUOUS out-of-court feeding: a track not seen in court for this long stops feeding (retires, slot freed for in-court admission). Real players max out at 46f (e6); kills e2's sideline-straddling bystander that held a slot for 415f
-        "player_gallery_evict_min_hold_frames": 60,  # protect a freshly-retired id for this long before it's reclaimable
+        "player_gallery_evict_min_hold_frames": 60,  # protect a freshly-retired id for this long before it's reclaimable (a squatter-flagged entry bypasses this -- evictable immediately)
+        "player_squatter_enabled": True,        # expire a track whose lifetime in-court FEEDING fraction stays under min_in_court_frac past review_frames (sideline straddler, e7): expired to the gallery with a squatter flag that blocks restore, and its sampled foot positions block re-admission nearby
+        "player_squatter_review_frames": 120,   # track age at which the squatter review first fires (e7 straddler: 34/120 = 28% in-court fed at its own tick; its dense f47-63 in-court run forbids earlier)
+        "player_squatter_min_fed_frames": 20,   # noise floor on real feedings before the fraction may expire a track (barely-fed tracks coast toward normal retirement)
+        "player_squatter_min_in_court_frac": 0.35,  # lifetime in-court-fed / fed below this = squatter. Worst real case measured ~0.62 (e6 46f off-court streak); e7 straddler sits at 0.28
+        "player_squatter_cooldown_radius_m": 0.5,   # new-track admission refused within this ground radius of an expired squatter's foot samples (in-court re-admission attempts read 7.84-7.99 m)
         "player_bootstrap_min_window": 8,       # consecutive ball-active frames with a stable 4-roster to lock
         "player_bootstrap_ball_required": True,  # skip the warmup opening (only lock once the ball is live)
         "player_signature_color_weight": 0.4,   # torso HSV histogram (existing)

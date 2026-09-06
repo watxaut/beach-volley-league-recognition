@@ -25,6 +25,13 @@ class PlayerTracker:
     - High max_velocity (150 px/frame) to handle diving.
     """
 
+    # Squatter review samples a track's world foot position every 10th fed
+    # frame into a deque of this length -- 12 samples span the 120-frame
+    # review window, so the expulsion cooldown covers the straddler's whole
+    # drift path, not just the expulsion point.
+    _SQUATTER_SAMPLE_MAXLEN = 12
+    _SQUATTER_SAMPLE_EVERY = 10
+
     def __init__(
         self,
         max_disappeared: int = 90,
@@ -51,6 +58,11 @@ class PlayerTracker:
         signature_height_smoothing: int = 30,
         off_court_grace_frames: int = 45,
         off_court_hold_frames: int = 90,
+        squatter_enabled: bool = True,
+        squatter_review_frames: int = 120,
+        squatter_min_fed_frames: int = 20,
+        squatter_min_in_court_frac: float = 0.35,
+        squatter_cooldown_radius_m: float = 0.5,
         serve_zone_enabled: bool = True,
         serve_zone_depth_m: float = 3.0,
         serve_zone_side_margin_m: float = 1.0,
@@ -112,6 +124,33 @@ class PlayerTracker:
                 candidate as the server. A sand-level spare ball beside a
                 bystander never enters their column; a held/tossed serve ball
                 stays in the server's column frame after frame.
+            squatter_enabled: Review each track's LIFETIME in-court feeding
+                fraction once it is old enough, and expire the persistent
+                sideline straddler: a bystander who seeds a track while
+                straddling the sideline reads "in court" for a dense early run
+                (e7: f47-79 at 7.87-7.99 m), so neither strict admission nor
+                the hold horizon can touch them while they squat a roster slot
+                forever. Expiry is to the GALLERY with a squatter flag (a real
+                player off-court between points on match footage stays
+                fail-safe recoverable) -- hard-remove stays reserved for
+                never-in-court seeds (e5 precedent).
+            squatter_review_frames: Track age (frames since creation) at which
+                the review may first fire. 120 = the e7 straddler's own tick
+                (34/120 = 28% in-court fed); their dense early in-court run
+                forbids anything earlier.
+            squatter_min_fed_frames: Noise floor on real feedings before the
+                fraction may expire a track; barely-fed tracks coast toward
+                normal retirement instead.
+            squatter_min_in_court_frac: Expire when in_court_fed / fed stays
+                below this at/after the review tick (lifetime fraction, not
+                rolling -- occluded real players keep their fraction frozen at
+                100%). Worst real case measured is ~0.62 (e6, 46f off-court
+                streak); the e7 straddler sits at 0.28.
+            squatter_cooldown_radius_m: After an expiry, the expelled track's
+                sampled world foot positions block NEW-track admission within
+                this ground radius -- including in-court candidates (the
+                straddler's re-admission attempts read 7.84-7.99 m). Never
+                affects existing tracks.
             coast_vertical_damping: Extra per-step multiplier on the UPWARD
                 coast velocity. A track lost mid-jump would otherwise ride its
                 upward velocity for the whole coast window, drifting the ghost
@@ -173,6 +212,11 @@ class PlayerTracker:
         self.assignment_log: List[Dict[str, Any]] = []
         self.off_court_grace_frames = off_court_grace_frames
         self.off_court_hold_frames = off_court_hold_frames
+        self.squatter_enabled = squatter_enabled
+        self.squatter_review_frames = squatter_review_frames
+        self.squatter_min_fed_frames = squatter_min_fed_frames
+        self.squatter_min_in_court_frac = squatter_min_in_court_frac
+        self.squatter_cooldown_radius_m = squatter_cooldown_radius_m
         self.serve_zone_enabled = serve_zone_enabled
         self.serve_zone_depth_m = serve_zone_depth_m
         self.serve_zone_side_margin_m = serve_zone_side_margin_m
@@ -184,6 +228,12 @@ class PlayerTracker:
         # zone right after removal (in-court admission is never blocked -- if
         # they ever step in, they are tracked like anyone else).
         self._serve_zone_cooldown: deque = deque(maxlen=8)
+        # Squatter-expiry cooldown: world foot points sampled from expired
+        # sideline straddlers (a POINT CLOUD per expulsion -- the e7 straddler
+        # drifted 7.87->8.9 m, so a single expulsion point would be missed and
+        # the track would oscillate back). Blocks NEW-track admission near the
+        # expulsion site; existing tracks are never affected.
+        self._squatter_cooldown: deque = deque(maxlen=96)
         self._last_ball_position: Optional[List[float]] = None
         # Recent ball sightings (x, y), for the server vote -- see
         # _filter_serve_zone_candidates.
@@ -236,11 +286,43 @@ class PlayerTracker:
             side_margin_m=self.serve_zone_side_margin_m,
         ) is not None
 
+    def _detection_world_foot(self, detection: Dict[str, Any]) -> Optional[Tuple[float, float]]:
+        """World (ground-plane, metres) position of a detection's foot.
+        None when the court offers no ground homography (uncalibrated or a
+        test double without image_to_world)."""
+        court = self.court_calibration
+        fn = getattr(court, "image_to_world", None)
+        if court is None or not getattr(court, "is_calibrated", False) or fn is None:
+            return None
+        return fn(court.foot_point(detection["bbox"]))
+
+    def _in_squatter_cooldown(self, detection: Dict[str, Any]) -> bool:
+        """True when the detection's world foot sits within
+        squatter_cooldown_radius_m of a sampled position from an expired
+        squatter. Blocks NEW-track admission -- deliberately INCLUDING
+        strictly in-court candidates: the straddler's re-admission attempts
+        read 7.84-7.99 m, just inside the sideline. Existing tracks never hit
+        this path (they associate, not admit)."""
+        if not self._squatter_cooldown:
+            return False
+        world = self._detection_world_foot(detection)
+        if world is None:
+            return False
+        r2 = self.squatter_cooldown_radius_m ** 2
+        return any(
+            (world[0] - cx) ** 2 + (world[1] - cy) ** 2 <= r2
+            for cx, cy in self._squatter_cooldown
+        )
+
     def _track_admission_ok(self, detection: Dict[str, Any]) -> bool:
         """May this detection ever become a NEW track? Foot strictly in court,
-        or (server admission) in a serve zone. Established tracks never hit this
-        path -- they associate via Hungarian/IoU/gallery, which have their own
-        (stricter for off-court) rules."""
+        or (server admission) in a serve zone -- but never within the squatter
+        cooldown radius of an expired sideline straddler's sampled positions.
+        Established tracks never hit this path -- they associate via
+        Hungarian/IoU/gallery, which have their own (stricter for off-court)
+        rules."""
+        if self._in_squatter_cooldown(detection):
+            return False
         if self._detection_in_court(detection) is not False:
             return True
         return bool(self.serve_zone_enabled and self._detection_in_serve_zone(detection))
@@ -531,6 +613,7 @@ class PlayerTracker:
         """Associate detections with existing tracks using Hungarian algorithm."""
         detections = self._deduplicate_detections(detections)
         self._expire_serve_zone_trials()
+        self._expire_squatters()
         track_ids = list(self.tracks.keys())
         n_tracks = len(track_ids)
         n_dets = len(detections)
@@ -986,6 +1069,12 @@ class PlayerTracker:
             "last_in_court_frame": None if serve_zone_seed else self.frame_count,
             "last_matched_frame": self.frame_count,
             "created_frame": self.frame_count,
+            # Squatter-review counters (real feedings only, incremented in
+            # _update_track -- ghost/coast frames never dilute the in-court
+            # fraction). Bootstrap seeds start at zero.
+            "fed_frames": 0,
+            "in_court_fed_frames": 0,
+            "foot_world_samples": deque(maxlen=self._SQUATTER_SAMPLE_MAXLEN),
         }
         self.disappeared[tid] = 0
         self.logger.debug(f"Created track {tid}")
@@ -1020,6 +1109,71 @@ class PlayerTracker:
                 f"frames, slot freed"
             )
 
+    def _expire_squatters(self) -> None:
+        """Expire sideline straddlers: tracks whose LIFETIME feeding has mostly
+        happened out of court, once they are old enough for the fraction to be
+        meaningful (entreno_7: a bystander seeds a track while straddling the
+        sideline, reads "in court" for a dense early run at 7.87-7.99 m, then
+        squats a roster slot for 400+ frames while the real 4th player waits).
+
+        Strict admission cannot refuse them (the seed reads in court); the
+        off-court hold horizon only stops CONTINUOUS feeding and its expiry is
+        a normal retire -- which the gallery then undoes by re-acquiring the
+        same id onto whoever stands near the old position (e7 f263: the real
+        4th player colonizes the squatter's id). The review is the local
+        signal that fires where the others cannot.
+
+        Conditions (all required): age >= squatter_review_frames,
+        fed_frames >= squatter_min_fed_frames, and lifetime
+        in_court_fed/fed < squatter_min_in_court_frac. Counters count REAL
+        feedings only (ghost/coast frames never dilute the fraction). No-op
+        without a calibrated court. Expiry is to the gallery with a
+        `squatter` flag -- NOT a hard-remove: on match footage a real player
+        off-court between points can look squatter-like, and the flagged
+        entry keeps their id as a fail-safe; the flag blocks every restore
+        path and makes the entry immediately evictable for a real candidate.
+        The expelled track's sampled world foot positions go on the admission
+        cooldown so the same straddler cannot re-seed nearby.
+        """
+        if not self.squatter_enabled:
+            return
+        if self.court_calibration is None or not getattr(
+            self.court_calibration, "is_calibrated", False
+        ):
+            return  # no ground plane -> no in-court fraction -> no-op
+        expired = []
+        for tid, tr in self.tracks.items():
+            fed = tr.get("fed_frames", 0)
+            if fed < self.squatter_min_fed_frames:
+                continue
+            if (
+                self.frame_count - tr.get("created_frame", self.frame_count)
+                < self.squatter_review_frames
+            ):
+                continue
+            in_court = tr.get("in_court_fed_frames", 0)
+            if in_court / fed >= self.squatter_min_in_court_frac:
+                continue
+            expired.append(tid)
+        for tid in expired:
+            self._expire_squatter(tid)
+
+    def _expire_squatter(self, tid: int) -> None:
+        """Expire one squatter track to the flagged gallery + admission cooldown."""
+        track = self.tracks.pop(tid, None)
+        if track is None:
+            return
+        self.disappeared.pop(tid, None)
+        samples = track.get("foot_world_samples") or []
+        self._squatter_cooldown.extend(samples)
+        self._retire_track_from(track, tid, squatter=True)
+        self.logger.info(
+            f"Squatter review expired track {tid}: in-court fed "
+            f"{track.get('in_court_fed_frames', 0)}/{track.get('fed_frames', 0)} "
+            f"after {self.frame_count - track.get('created_frame', self.frame_count)} "
+            f"frames; id flagged in gallery, {len(samples)} foot samples on cooldown"
+        )
+
     def _update_track(self, tid: int, detection: Dict[str, Any]) -> None:
         """Update an existing track with a new detection."""
         track = self.tracks[tid]
@@ -1042,10 +1196,20 @@ class PlayerTracker:
 
         # Bystander-hijack guard bookkeeping: remember when this track was last
         # fed by a detection (continuity) and last genuinely on the court (the
-        # off-court grace window).
+        # off-court grace window). Squatter-review counters count the same real
+        # feedings -- ghost/coast frames never reach this method, so they
+        # cannot dilute the lifetime in-court fraction.
         track["last_matched_frame"] = self.frame_count
+        track["fed_frames"] = track.get("fed_frames", 0) + 1
         if self._detection_in_court(detection) is not False:
             track["last_in_court_frame"] = self.frame_count
+            track["in_court_fed_frames"] = track.get("in_court_fed_frames", 0) + 1
+        if track["fed_frames"] % self._SQUATTER_SAMPLE_EVERY == 0:
+            world = self._detection_world_foot(detection)
+            if world is not None:
+                track.setdefault(
+                    "foot_world_samples", deque(maxlen=self._SQUATTER_SAMPLE_MAXLEN)
+                ).append((float(world[0]), float(world[1])))
 
         # Re-evaluate team from the new foot position and add it to the smoothing
         # window (majority vote read via _get_smoothed_team).
@@ -1125,17 +1289,27 @@ class PlayerTracker:
         track["velocity"] = [vx * self.coast_velocity_decay, vy * self.coast_velocity_decay]
         return nb, [ncx, ncy]
 
-    def _retire_track(self, tid: int) -> None:
+    def _retire_track(self, tid: int, squatter: bool = False) -> None:
         """Retire a track to the dormant gallery (match-long) instead of deleting.
 
         The id is NEVER freed -- it stays reserved so a later re-acquisition
         restores the original id rather than recycling it onto a new player. The
         hard cap (_create_track) counts active + dormant, so a dormant id cannot
-        be stolen by a bystander-driven new track either.
+        be stolen by a bystander-driven new track either. `squatter=True` marks
+        a squatter-review expiry: the entry keeps the id fail-safe but is
+        skipped by every restore path and is immediately evictable.
         """
         track = self.tracks.pop(tid, None)
         self.disappeared.pop(tid, None)
-        if self.gallery_enabled and track is not None:
+        if track is not None:
+            self._retire_track_from(track, tid, squatter=squatter)
+
+    def _retire_track_from(
+        self, track: Dict[str, Any], tid: int, squatter: bool = False
+    ) -> None:
+        """Build the gallery entry for an already-popped track (shared by normal
+        retirement and squatter expiry)."""
+        if self.gallery_enabled:
             self.gallery[tid] = {
                 "bbox": track.get("bbox"),
                 "center": track.get("center"),
@@ -1146,6 +1320,14 @@ class PlayerTracker:
                 "world_width_samples": track.get("world_width_samples"),
                 "team_votes": track.get("team_votes"),
                 "retired_frame": self.frame_count,
+                # Squatter-review bookkeeping rides along so a legitimate
+                # restore resumes the lifetime counters (no fresh review
+                # window) and age keeps accruing (no fresh amnesty).
+                "created_frame": track.get("created_frame", self.frame_count),
+                "fed_frames": track.get("fed_frames", 0),
+                "in_court_fed_frames": track.get("in_court_fed_frames", 0),
+                "foot_world_samples": track.get("foot_world_samples"),
+                "squatter": squatter,
             }
             self.logger.debug(
                 f"Retired track {tid} to gallery (size={len(self.gallery)})"
@@ -1154,28 +1336,36 @@ class PlayerTracker:
             self.logger.debug(f"Removed track {tid}")
 
     def _evict_stalest_dormant(self) -> bool:
-        """Reclaim the dormant id that has been gone longest (and is past its
-        min-hold) to free a slot for an on-court detection that would otherwise
-        be dropped. Returns True if a slot was freed.
+        """Reclaim a dormant id to free a slot for an on-court detection that
+        would otherwise be dropped. Returns True if a slot was freed.
 
-        Recent retirements (within gallery_evict_min_hold_frames) are protected
-        -- they may still be re-acquired by position, so a new detection must not
-        steal them. Only the stalest eligible dormant id is reclaimed, and only
-        when the create-loop is actually forced (a detection needs the slot).
+        Squatter-flagged entries go FIRST and bypass the min-hold entirely:
+        their id must never block a real player (e7: the flagged straddler
+        entry would otherwise keep slot 4 closed for gallery_evict_min_hold
+        frames past the review tick). Normal entries stay protected for
+        gallery_evict_min_hold_frames (they may still be re-acquired by
+        position), then the stalest retirement is reclaimed -- least likely
+        to re-acquire. Only ever called when the create-loop is actually
+        forced (a detection needs the slot).
         """
         if not self.gallery:
             return False
-        candidates = [
+        flagged = [
+            (gid, g) for gid, g in self.gallery.items() if g.get("squatter")
+        ]
+        normal = [
             (gid, g)
             for gid, g in self.gallery.items()
-            if self.frame_count - g.get("retired_frame", self.frame_count)
+            if not g.get("squatter")
+            and self.frame_count - g.get("retired_frame", self.frame_count)
             >= self.gallery_evict_min_hold_frames
         ]
-        if not candidates:
+        if not (flagged or normal):
             return False
-        # Oldest retirement first = least likely to re-acquire.
-        candidates.sort(key=lambda kv: kv[1].get("retired_frame", 0))
-        gid = candidates[0][0]
+        pool = sorted(flagged, key=lambda kv: kv[1].get("retired_frame", 0)) + sorted(
+            normal, key=lambda kv: kv[1].get("retired_frame", 0)
+        )
+        gid = pool[0][0]
         self.gallery.pop(gid, None)
         self.logger.debug(
             f"Evicted stale dormant id {gid} to free a slot for a new detection"
@@ -1211,6 +1401,8 @@ class PlayerTracker:
                 continue
             dc = np.array(detections[j]["center"])
             for gid, g in self.gallery.items():
+                if g.get("squatter"):
+                    continue  # a squatter flag blocks every restore path
                 dormant = max(0, self.frame_count - g.get("retired_frame", self.frame_count))
                 base = np.array(g.get("center", [0.0, 0.0]))
                 # Trust motion only over short gaps; clamp the extrapolation so a
@@ -1262,8 +1454,8 @@ class PlayerTracker:
                     continue
                 best_gid, best_sim = None, self.gallery_reacquire_appearance_min
                 for gid in list(self.gallery.keys()):
-                    if gid in used_gids:
-                        continue
+                    if gid in used_gids or self.gallery[gid].get("squatter"):
+                        continue  # a squatter flag blocks every restore path
                     sim = self._signature_similarity(self.gallery[gid], detections[j])
                     if sim > best_sim:
                         best_sim, best_gid = sim, gid
@@ -1312,6 +1504,16 @@ class PlayerTracker:
                 maxlen=self.signature_height_smoothing,
             ),
             "team_votes": gallery_entry.get("team_votes") or deque(maxlen=self.team_vote_window),
+            # Squatter-review bookkeeping reloads with the track: a legitimate
+            # restore resumes the lifetime counters and the age clock -- no
+            # fresh review window, no fresh amnesty.
+            "created_frame": gallery_entry.get("created_frame", self.frame_count),
+            "fed_frames": gallery_entry.get("fed_frames", 0),
+            "in_court_fed_frames": gallery_entry.get("in_court_fed_frames", 0),
+            "foot_world_samples": deque(
+                gallery_entry.get("foot_world_samples") or [],
+                maxlen=self._SQUATTER_SAMPLE_MAXLEN,
+            ),
             # Restores are gated to in-court detections (bystander-hijack
             # guard), so the restored track counts as freshly on-court.
             "last_in_court_frame": self.frame_count,
@@ -1472,6 +1674,7 @@ class PlayerTracker:
         self.tracks = {}
         self.disappeared = {}
         self.gallery = {}
+        self._squatter_cooldown.clear()
         self.frame_count = 0
         self._initialized = False
         self._bootstrap_buffer = []
