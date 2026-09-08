@@ -75,6 +75,16 @@ e6 team accuracy 0.857 → 1.0 (point 15b closed); suite 364 green (+9).**
   1/2 preservation; analyzer poke-touch + narrow-exit-stays-hard + constants
   parity; classifier poke gate + NEIGH normalization, stance majority beats
   landing drift, tie fallback, and the full e6-shape drive→spike/team-A e2e).
+- **Same session, later: e7 GT RATIFIED (point 15f closed).** Owner
+  corrected against the OpenCV-stamped sheets: f55→f61 (digger untracked —
+  their screenshot), f110→f112 P1B, f160 confirmed (rainbow touch, toucher
+  untracked until f166), f200→f197 P2A, f244→f243 P3A, f300 confirmed P4A
+  hard + no-touch B block ADDED (10 events), f330→f315 team B→A (P1A),
+  f360→f370 P4B; player ids = per-video track ids where named. The current
+  stream vs the ratified GT: f59/f112/f195/f239/f316 emitted — frame F1
+  0.533 (P 0.8, R 0.4); f239 is the f243 set misread as block, f316 has the
+  wrong team (B vs P1A), f25/f160/f243/f300/f370 die at classifier gates.
+  That is the concrete target list for the 15(a)/(e) retune.
 
 **(2026-09-06, ninth session): OPEN POINT 16 FIXED — identity is anchored in
 court: an out-of-court detection may still CONTINUE a track (grace/hold rules
@@ -865,11 +875,11 @@ constraint. Side changes need no special handling as long as IDs survive.
     team A, spike touch, F1 0.933 / team 1.0.
 
 15. **[NEW 2026-09-06 — ball-matching follow-ups; (b)/(c) RESOLVED
-    2026-09-08, see the tenth-session entry.]** The tracker
-    rework (see Where we are) shifted ball histories slightly; the
-    classifier's contact gates were calibrated to the OLD histories. Every
-    residual below is a CLASSIFIER-side read of a tracker change — retune
-    with contact sheets, do NOT weaken the tracker rules.
+    2026-09-08, (f) RESOLVED 2026-09-08 — GT RATIFIED with corrections.]**
+    The tracker rework (see Where we are) shifted ball histories slightly;
+    the classifier's contact gates were calibrated to the OLD histories.
+    Every residual below is a CLASSIFIER-side read of a tracker change —
+    retune with contact sheets, do NOT weaken the tracker rules.
     (a) **e7 serve f25 undetected** — the toss rise is 2.6 px/f (below the
     8 px/f motion-lock floor by design), so the track locks the toss only
     on its DESCENT (f21) and the hit contact's left window holds 2 points
@@ -882,12 +892,19 @@ constraint. Side changes need no special handling as long as IDs survive.
     turns e5's f298 block back into a spike; e5 F1 1.0.
     (d) **e2 +f81 set B FP** near the held-ball release (GT: nothing until
     f90) and f118 overpass→spike (GT f120 set).
-    (e) **e7 f160 spike / f244 set / f300 spike still undetected** — the
-    ball IS tracked through them (verified in dumps); the contacts die at
-    classifier gates (reach at f167-class airborne geometry, block-vs-set
-    shapes). Same retune session.
-    (f) e7 GT (owner-dictated) is in the repo UNRATIFIED — owner should
-    confirm frames/labels from the file before it anchors tuning.
+    (e) **e7 f160 spike / f243 set / f300 spike still undetected; f239
+    block FP is the f243 set misread (frame-match, wrong label); f316 dig
+    attributed to B vs ratified P1A (wrong team); f370 set undetected.**
+    The ball IS tracked through f160/f243/f300 (verified in dumps); the
+    contacts die at classifier gates. Same retune session. Pre-retune
+    baseline vs the ratified GT: F1 0.533 (P 0.8, R 0.4).
+    (f) **RESOLVED 2026-09-08 — e7 GT RATIFIED with corrections:** f55→f61
+    (digger UNTRACKED, owner screenshot), f110→f112 P1B, f160 confirmed
+    (rainbow, toucher untracked until f166), f200→f197 P2A, f244→f243 P3A,
+    f300 confirmed P4A hard + no-touch block by B ADDED (10 events now),
+    f330→f315 team B→A (P1A), f360→f370 P4B. player_id = per-video track
+    id where the owner named it, None = untracked. Frame-index caveat
+    resolved: owner anchored on the OpenCV stamps.
     (g) Multi-court simultaneous play: the motion-lock takes the first
     mover at bootstrap; if two courts serve at once the wrong one can win.
     No footage owns this case yet — revisit with tournament footage.

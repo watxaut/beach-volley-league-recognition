@@ -1,7 +1,10 @@
 {
  "video": "resources/video_entreno_7.mp4",
  "fps": 30.0,
- "resolution": [1920, 1080],
+ "resolution": [
+  1920,
+  1080
+ ],
  "annotated_frames": {
   "ball": {
    "description": "Ball center position every 5 frames",
@@ -12,12 +15,14 @@
    "frames": {}
   },
   "actions": {
-   "description": "Action events with rally-state context. Each event has: frame, player_id, final_action (canonical label), raw_visual_actions (open-vocabulary multi-label), player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides. Owner-dictated 2026-09-06 (teams/frames only; player_id pending -- no player boxes annotated yet).",
+   "description": "Action events with rally-state context. Each event has: frame, player_id, final_action, raw_visual_actions, player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides. Owner-dictated 2026-09-06 (9 events, no player ids); RATIFIED with corrections 2026-09-08 from the ratification sheets (output/e7_ratify/*.png, frame numbers are OpenCV indices, first frame f0): f55->f61 (digger UNTRACKED, owner screenshot), f110->f112 P1B, f160 confirmed (rainbow line shot, toucher untracked until f166), f200->f197 P2A, f244->f243 P3A, f300 confirmed P4A hard + no-touch block by B (added as a physical event, e6/e1 precedent), f330->f315 and team B->A (P1A), f360->f370 P4B. player_id = the pipeline's per-video track id where the owner named it; None = untracked at the contact.",
    "events": [
     {
      "frame": 25,
      "final_action": "serve",
-     "raw_visual_actions": ["serve"],
+     "raw_visual_actions": [
+      "serve"
+     ],
      "player_team": "A",
      "team_in_possession": "A",
      "touch_number": 1,
@@ -26,94 +31,146 @@
      "overrides": {}
     },
     {
-     "frame": 55,
+     "frame": 61,
      "final_action": "dig",
-     "raw_visual_actions": ["dig"],
+     "raw_visual_actions": [
+      "dig"
+     ],
      "player_team": "B",
      "team_in_possession": "B",
      "touch_number": 1,
      "preceded_by_attack": false,
      "rally_id": 1,
-     "overrides": {}
+     "overrides": {
+      "note": "Digger is an UNTRACKED player at the net, field B (owner screenshot 2026-09-08; the 4th slot is held by the sideline straddler until ~f166, see squatter review)."
+     }
     },
     {
-     "frame": 110,
+     "frame": 112,
      "final_action": "set",
-     "raw_visual_actions": ["set"],
+     "raw_visual_actions": [
+      "set"
+     ],
      "player_team": "B",
      "team_in_possession": "B",
      "touch_number": 2,
      "preceded_by_attack": false,
      "rally_id": 1,
-     "overrides": {}
+     "overrides": {},
+     "player_id": 1
     },
     {
      "frame": 160,
      "final_action": "spike",
-     "raw_visual_actions": ["spike", "touch", "rainbow", "on the line"],
+     "raw_visual_actions": [
+      "spike",
+      "touch",
+      "rainbow",
+      "on the line"
+     ],
      "player_team": "B",
      "team_in_possession": "B",
      "touch_number": 3,
      "preceded_by_attack": false,
      "rally_id": 1,
      "spike_type": "touch",
-     "overrides": {}
+     "overrides": {
+      "spike_type": "touch",
+      "note": "Rainbow line shot; toucher is UNTRACKED at the contact (gets tracked at f166 once the squatter review frees the slot)."
+     }
     },
     {
-     "frame": 200,
+     "frame": 197,
      "final_action": "dig",
-     "raw_visual_actions": ["dig"],
+     "raw_visual_actions": [
+      "dig"
+     ],
      "player_team": "A",
      "team_in_possession": "A",
      "touch_number": 1,
      "preceded_by_attack": true,
      "rally_id": 1,
-     "overrides": {}
+     "overrides": {},
+     "player_id": 2
     },
     {
-     "frame": 244,
+     "frame": 243,
      "final_action": "set",
-     "raw_visual_actions": ["set"],
+     "raw_visual_actions": [
+      "set"
+     ],
      "player_team": "A",
      "team_in_possession": "A",
      "touch_number": 2,
      "preceded_by_attack": false,
      "rally_id": 1,
-     "overrides": {}
+     "overrides": {},
+     "player_id": 3
     },
     {
      "frame": 300,
      "final_action": "spike",
-     "raw_visual_actions": ["spike", "hard driven", "with block"],
+     "raw_visual_actions": [
+      "spike",
+      "hard driven",
+      "with block"
+     ],
      "player_team": "A",
      "team_in_possession": "A",
      "touch_number": 3,
      "preceded_by_attack": false,
      "rally_id": 1,
      "spike_type": "hard",
-     "overrides": {}
+     "overrides": {
+      "spike_type": "hard"
+     },
+     "player_id": 4
     },
     {
-     "frame": 330,
-     "final_action": "dig",
-     "raw_visual_actions": ["dig"],
+     "frame": 300,
+     "player_id": null,
+     "final_action": "block",
+     "raw_visual_actions": [
+      "block"
+     ],
      "player_team": "B",
      "team_in_possession": "B",
      "touch_number": 1,
      "preceded_by_attack": true,
      "rally_id": 1,
-     "overrides": {}
+     "overrides": {
+      "note": "No-touch block (owner 2026-09-08): B goes up but never plays the ball -- physical event the pipeline legitimately cannot emit (e6/e1 precedent)."
+     }
     },
     {
-     "frame": 360,
+     "frame": 315,
+     "final_action": "dig",
+     "raw_visual_actions": [
+      "dig"
+     ],
+     "player_team": "A",
+     "team_in_possession": "A",
+     "touch_number": 1,
+     "preceded_by_attack": true,
+     "rally_id": 1,
+     "overrides": {},
+     "player_id": 1
+    },
+    {
+     "frame": 370,
      "final_action": "set",
-     "raw_visual_actions": ["set", "slipped off the hands", "point ends"],
+     "raw_visual_actions": [
+      "set",
+      "slipped off the hands",
+      "point ends"
+     ],
      "player_team": "B",
      "team_in_possession": "B",
      "touch_number": 2,
      "preceded_by_attack": false,
      "rally_id": 1,
-     "overrides": {}
+     "overrides": {},
+     "player_id": 4
     }
    ]
   }
