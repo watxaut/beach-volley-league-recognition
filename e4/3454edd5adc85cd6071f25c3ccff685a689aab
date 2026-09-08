@@ -1,0 +1,40 @@
+STATUS.md
+  s_9c29ebf7c08ece::t_06df621b4a3816 8-9,13-78,855-868,878-882
+tests/test_action_context.py
+  s_9c29ebf7c08ece::t_4dc89b1a376c18 75-95
+src/analysis/spike_analyzer.py
+  s_9c29ebf7c08ece::t_80ba7928fb54a9 77-86,507-514,517-530
+  s_9c29ebf7c08ece::t_3ac8333ab903ad 531
+ground_truth/video_entreno_6_annotations.json
+  s_9c29ebf7c08ece::t_0bc9cea345c246 18,109-110,117-120
+src/recognition/action_context.py
+  s_9c29ebf7c08ece::t_eeb6abee01e5a8 124-133
+src/recognition/action_classifier.py
+  s_9c29ebf7c08ece::t_61c50b9c7370c3 119-132,301-306
+  s_9c29ebf7c08ece::t_48844e351c18dc 387-390,393
+  s_9c29ebf7c08ece::t_6f3021e0e6f11a 385-386,391-392,394-396
+  s_9c29ebf7c08ece::t_c44e9160ceb2a4 398-406,418-440
+tests/test_spike_analyzer.py
+  s_9c29ebf7c08ece::t_44fe5cda126537 450-459,463,466,468-485
+  s_9c29ebf7c08ece::t_8b7e07faac9d4f 460-462,464-465,467
+tests/test_team_attribution.py
+  s_9c29ebf7c08ece::t_3eda8794c8ae87 691
+  s_9c29ebf7c08ece::t_9c567ec1bec9d8 625-686,697-706
+  s_9c29ebf7c08ece::t_f500329f711311 687-690,692-696
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "e43454edd5adc85cd6071f25c3ccff685a689aab",
+  "prompts": {},
+  "sessions": {
+    "s_9c29ebf7c08ece": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a07ad9-ec92-712b-b723-27b1f41676cd",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
