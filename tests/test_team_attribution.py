@@ -622,3 +622,85 @@ def test_reentry_needs_a_player_in_reach(clf):
         events += clf.classify_actions(None, [det], None, frame_number=f)
     events += clf.flush()
     assert events == []
+
+
+# --- Poke-class drive: level-horizontal exit reads the takeoff stance -----
+
+def test_poke_signature_gate(clf):
+    """_is_poke_drive keys on the PER-FRAME level-horizontal exit. ``out`` is
+    the NEIGH-window SUM, so the gate divides by NEIGH (conservative): the
+    measured e6 f309 poke is (-279, 39.5) -> (-39.9, +5.6)/frame. Driven
+    balls exit downward or nearly straight and must not qualify."""
+    assert clf._is_poke_drive("drive", (-279.0, 39.5)) is True   # the e6 poke
+    assert clf._is_poke_drive("drive", (-7 * 30.0, 7 * 20.0)) is False  # vy too big
+    assert clf._is_poke_drive("drive", (-7 * 10.0, 7 * 5.0)) is False   # vx too small
+    assert clf._is_poke_drive("bounce", (-7 * 47.0, 0.0)) is False      # wrong band
+
+
+def test_poke_constants_mirror_spike_analyzer():
+    """The classifier's attribution gate and the analyzer's type rule are ONE
+    measured discriminator (probe over all GT spikes, 2026-09-06); they must
+    not drift apart."""
+    from src.analysis.spike_analyzer import SpikeAnalyzer
+    assert ActionClassifier.POKE_EXIT_VX_PX == SpikeAnalyzer.POKE_EXIT_VX_PX
+    assert ActionClassifier.POKE_EXIT_VY_PX == SpikeAnalyzer.POKE_EXIT_VY_PX
+
+
+def test_takeoff_stance_majority_beats_landing_drift(clf):
+    """The nearest-to-contact stance can be the FIRST frame whose grounded
+    foot has drifted across the net ground line (e6 f307 reads B off the
+    GT-A spiker; f297-306 all read A): the window majority outvotes it and
+    picks the nearest MAJORITY-team snapshot."""
+    for f in range(297, 307):
+        _snap(clf, 1, f, [1300, 420, 1440, 640], "A")
+    _snap(clf, 1, 307, [1290, 380, 1430, 598], "B")   # nearest c-2, minority
+    stance = clf._takeoff_stance(1, 309)
+    assert stance["frame"] == 306
+    assert clf.court.get_team_for_bbox(stance["bbox"]) == "A"
+
+
+def test_takeoff_stance_tie_falls_back_to_nearest(clf):
+    """No strict majority (or no team reads): the old nearest-to-contact
+    behavior."""
+    _snap(clf, 1, 300, [1300, 420, 1440, 640], "A")
+    _snap(clf, 1, 307, [1290, 380, 1430, 598], "B")
+    assert clf._takeoff_stance(1, 309)["frame"] == 307
+
+
+def test_poke_drive_emits_spike_with_takeoff_team(clf):
+    """End to end (the e6 f309 shape through the DRIVE band): a fast descent
+    checked level into a strongly horizontal run at the net. The contact-time
+    toucher is airborne (feet project deep, court team reads B); the emitted
+    team must come from the grounded takeoff stance (A) and the resolver must
+    land SPIKE even though the pose reads hands-overhead (BLOCK gesture at
+    touch 3 = the poke fall-through)."""
+    descent = [(f, 1330 + 2 * (309 - f), 19 + 28 * (f - 302), 30)
+               for f in range(302, 310)]          # fast descent into the vertex
+    run = [(310, 1332, 268, 45), (312, 1262, 286, 55), (314, 1152, 278, 51),
+           (315, 1098, 276, 47), (316, 1051, 276, 46)]   # level, -40..46 px/f
+    _ball(clf, descent + run)
+    _snap(clf, 1, 309, [1280, 380, 1420, 598], "A")   # contact time: airborne
+    for f in range(300, 308):
+        _snap(clf, 1, f, [1300, 420, 1440, 640], "A")  # takeoff stance: grounded
+    det = {"track_id": 1, "bbox": [1280, 380, 1420, 598], "center": [1350, 490],
+           "team": "A", "predicted": False}
+    # Rally context: the poke is the THIRD touch of A's continuing
+    # possession (serve/dig ... set f262 ... poke) -- that touch number is
+    # what makes the BLOCK-gesture fall-through land on spike.
+    from src.recognition.volleyball_actions import VisualGesture
+    clf._resolver.resolve({"frame": 240, "gesture": VisualGesture.BUMP_SET,
+                           "near_net": False, "behind_baseline": False,
+                           "team": "A"}, None)
+    clf._resolver.resolve({"frame": 262, "gesture": VisualGesture.BUMP_SET,
+                           "near_net": True, "behind_baseline": False,
+                           "team": "A"}, None)
+    events = []
+    for f in range(310, 322):
+        events += clf.classify_actions(None, [det], None, frame_number=f)
+    events += clf.flush()
+    assert len(events) == 1
+    ev = events[0]
+    assert ev["contact_kind"] == "drive"
+    assert ev["action"] == "spike"
+    assert ev["team"] == "A"                  # stance read, not the airborne B
+    assert ev["track_id"] == 1

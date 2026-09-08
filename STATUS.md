@@ -5,9 +5,76 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-06 (ninth session — in-court preference, open point 16)
+**Last updated:** 2026-09-08 (tenth session — the e6 poke: spike-touch read,
+blocks of the 15(b)/15(c) residuals)
 
 ## Where we are
+
+**(2026-09-08, tenth session): the e6 joust contact is a POKE — owner
+dictated "spike touch, not a block" — and the whole read chain now agrees:
+the production path emits spike (not the jittery block), team A (was B),
+spike_type touch (was hard). e5's f298 block misread healed to spike as a
+corollary (F1 0.857 → 1.0, point 15c closed); e1/e2/e3/e4/e7 byte-identical;
+e6 team accuracy 0.857 → 1.0 (point 15b closed); suite 364 green (+9).**
+
+- **Diagnosis first (probe over the REAL path, output/diag_poke_probe.py =
+  byte-copy of the GT script + a _classify_type capture wrapper):** the raw
+  ball flight is unambiguous — A's f262 set exits the frame top f278,
+  re-enters descending f299 at x≈1300 over the jumping 1A, KINKS at the net
+  plane at f311 (sighting gap), then floats flat-left ~45 px/f and dies deep
+  near the far-left corner f342 (sheet output/diag_e6_poke_sheet.png). One
+  contact after the set; the owner's "poke to the back of the field" = this
+  kink. Measured over ALL GT spikes: the poke arrives descending (+29 px/f)
+  and leaves LEVEL and strongly HORIZONTAL (vy_out +1.5, vx −47) with zero
+  ascent — overlapping the two e3 hard spikes (f431/f539) on every vertical
+  feature; the ONLY separator is the horizontal exit (poke |vx| 47 vs hard
+  max 14). Critically, in the script path the contact fires via the DRIVE
+  band (kind=drive: the post-rework tracker bridges the f311 gap to 2
+  frames, so the reentry band never engages) — the ninth session's
+  reentry-only team fix was aiming at a dead branch, and the team still read
+  B off the airborne contact-time box.
+- **Shipped (three mechanisms, each measured):** (1) *resolver poke rule*
+  (src/recognition/action_context.py): a BLOCK gesture at touch 3 of a
+  continuing possession is self-contradictory (a block is definitionally
+  touch 1 after an attack) → falls through to the existing touch-3-at-net
+  spike rule. This makes the owner's production MPS-jitter path (pose reads
+  hands-overhead → BLOCK) structurally unable to emit block on the poke;
+  touch 1 keeps block, touch 2 keeps block (e1's joust emission sits there;
+  no cascade — spike and block both reset possession).
+  (2) *analyzer poke type* (src/analysis/spike_analyzer.py POKE_EXIT_VX_PX
+  25 / POKE_EXIT_VY_PX 12): no ascent + |mean exit vx| ≥ 25 + |exit vy| ≤ 12
+  → "touch". Thresholds in the wide measured gap (poke 47 vs hard max 14);
+  e3's types stay 4/4 (f431 vx 5, f539 vx 14 → hard), e6 f173 touch
+  unchanged. (3) *poke-class stance team* (action_classifier.py
+  _is_poke_drive + _takeoff_stance majority): for drive contacts with the
+  SAME level-horizontal signature, the toucher is airborne by construction,
+  so the emitted team reads the takeoff-stance window [c-12, c-2] by
+  MAJORITY court team (nearest-to-contact had landed on f307, the first
+  frame whose grounded foot drifted across the net line; f297-306 read A →
+  majority A). Ties/uncalibrated → old nearest behavior. Classifier/analyzer
+  constants equality is drift-pinned by test.
+- **Measured (clean A/B, output/poke/post_actions vs the p16 HEAD
+  baselines):** e1/e2/e3/e4/e7 BYTE-IDENTICAL (e1's touch-2 block and e7's
+  touch-1 block preserved; e3 spike types 4/4 unchanged). e5 f298 block →
+  spike (team B unchanged, touch 3): labels F1 0.857 → **1.0** — point 15(c)
+  closed. e6 f309: team B → **A**, spike_type hard → **touch**, label spike
+  unchanged; eval F1 0.933 (the FN is still the GT's no-touch 2B block,
+  unemittable), team **0.857 → 1.0** — point 15(b) closed. Production
+  src.main rerun on e6: spikes CSV row `309,3,1,A,touch,A1,out` and the
+  emitted action reads spike/team A even when that run's gesture read block
+  — the owner's exact complaint path is closed.
+- **GT fold (owner-dictated, sheet output/diag_e6_poke_sheet.png):** the f308
+  spike event carries spike_type "touch" + raw "poke" + an overrides note;
+  OPEN QUESTION for the next ratification pass: the owner counted the poke
+  at f298, the sheet-measured contact (trajectory kink at the net plane) is
+  f311 OpenCV-indexed, the pipeline emits f309, GT sits at f308 — all four
+  within eval tolerance of each other, but the offset should be confirmed
+  once. The GT's no-touch 2B block event was NOT touched (owner-ratified
+  twice as physical); confirm whether "not a block" also revokes it.
+- **Suite 364 green** (+9: resolver block-at-touch-3 fall-through + touch
+  1/2 preservation; analyzer poke-touch + narrow-exit-stays-hard + constants
+  parity; classifier poke gate + NEIGH normalization, stance majority beats
+  landing drift, tie fallback, and the full e6-shape drive→spike/team-A e2e).
 
 **(2026-09-06, ninth session): OPEN POINT 16 FIXED — identity is anchored in
 court: an out-of-court detection may still CONTINUE a track (grace/hold rules
@@ -785,22 +852,20 @@ constraint. Side changes need no special handling as long as IDs survive.
     built (lifetime is simpler and occlusion-safe) — build only if the
     owner asks.
 
-16. **[RESOLVED 2026-09-06 (tracker side) — bystander squat + identity swap
-    at the joust; see the ninth-session entry.]** The mechanism was ONE
-    hijack class, not three: a 1-frame detection blip lets a walkway
-    bystander take a track through the continuous-observation branch (105-
-    149 px jumps), the squat cascades into Hungarian chain-swaps, and the
-    team vote follows the box. Fixed by the in-court preference
-    (off_court_cost_penalty_px): e6's digger tracked f146→end, no f311
-    swap/flip, e1/e3/e5/e7 byte-identical, e2/e4 benign same-mechanism
-    diffs, all action streams unchanged except e6 f309 player 4→3.
-    RESIDUAL (classifier, now unblocked): the f309 team still reads B — the
-    stance-window snapshot rule picks f307, the first frame whose grounded
-    foot crosses the net line; f297-306 read A. Fold the fix into point
-    15's retune session (window-majority or last-grounded-A stance read),
-    sheets first.
+16. **[RESOLVED 2026-09-06 (tracker side) + 2026-09-08 (classifier side) —
+    bystander squat + identity swap at the joust; see the ninth/tenth
+    session entries.]** The mechanism was ONE hijack class, not three: a
+    1-frame detection blip lets a walkway bystander take a track through
+    the continuous-observation branch (105-149 px jumps), the squat
+    cascades into Hungarian chain-swaps, and the team vote follows the box.
+    Fixed by the in-court preference (off_court_cost_penalty_px): e6's
+    digger tracked f146→end, no f311 swap/flip, e1/e3/e5/e7 byte-identical,
+    e2/e4 benign same-mechanism diffs. The classifier residual (f309 team
+    B) is closed by the tenth session's poke-class stance-majority read:
+    team A, spike touch, F1 0.933 / team 1.0.
 
-15. **[NEW 2026-09-06 — ball-matching follow-ups, ranked].** The tracker
+15. **[NEW 2026-09-06 — ball-matching follow-ups; (b)/(c) RESOLVED
+    2026-09-08, see the tenth-session entry.]** The tracker
     rework (see Where we are) shifted ball histories slightly; the
     classifier's contact gates were calibrated to the OLD histories. Every
     residual below is a CLASSIFIER-side read of a tracker change — retune
@@ -810,19 +875,11 @@ constraint. Side changes need no special handling as long as IDs survive.
     on its DESCENT (f21) and the hit contact's left window holds 2 points
     (before: 4). Lever: classifier left-window tolerance, or a toss-aware
     lock exception — needs sheets. The e6/e7 tosses at 30 px/f lock fine.
-    (b) **e6 joust contact f308→f309 team A→B** (GT: spike 1A t3) —
-        RE-CHECKED 2026-09-06 after the point-16 fix (see the ninth-session
-        entry): the candidate set is CLEAN now (the attributed toucher is
-        really track 1 = the GT spiker; emitted player_id 4→3), but the
-        team STILL reads B — cause isolated to THIS window's snapshot rule:
-        the stance takes the snapshot nearest the contact, and under the
-        fixed tracks that is f307, the first frame whose grounded foot has
-        crossed the net ground line (618→607 between f306/f307) and reads
-        B; f297-306 all read A. Fix shape: window-majority or last-
-        clearly-grounded stance read — do it in this retune session with
-        sheets; do NOT touch the reentry band's back-extrapolation.
-    (c) **e5 f299 spike → f298 block** (GT f300 spike, frame is CLOSER now)
-    — the gesture branch flipped with the 1-frame-earlier pose snapshot.
+    (b) **RESOLVED 2026-09-08:** the poke-class stance-majority team read
+    (with the drive-band scope correction — the reentry band never fires on
+    the current tracker) gives e6 f309 team A; e6 team 7/7.
+    (c) **RESOLVED 2026-09-08:** the block-at-touch-3 poke fall-through
+    turns e5's f298 block back into a spike; e5 F1 1.0.
     (d) **e2 +f81 set B FP** near the held-ball release (GT: nothing until
     f90) and f118 overpass→spike (GT f120 set).
     (e) **e7 f160 spike / f244 set / f300 spike still undetected** — the

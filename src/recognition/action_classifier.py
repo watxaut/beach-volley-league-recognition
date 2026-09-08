@@ -116,6 +116,20 @@ class ActionClassifier:
     REENTRY_TEAM_BACK = 12    # takeoff-stance window (frames before contact),
     REENTRY_TEAM_END = 2      # mirroring SpikeAnalyzer's [c-12, c-2]
 
+    # Poke-class drive: the outgoing ball is LEVEL and strongly HORIZONTAL
+    # -- the beach poke/tip over the block (e6 f309: exit vx -47 px/f,
+    # vy +1.5; owner: "poke to the back of the field"). The toucher is
+    # airborne by construction -- redirecting a fast descent level across
+    # the court takes a jump -- so the contact-time feet project deep and
+    # the court team read flips sides; the emitted team comes from the
+    # takeoff-stance majority instead. Measured separator vs driven balls
+    # (probe over all GT spikes, 2026-09-06): the hards exit downward and
+    # nearly straight (e3 f431 vx 5, f539 vx 14) while the poke reaches
+    # |vx| 47 -- and every vertical feature overlaps. Thresholds mirror
+    # SpikeAnalyzer's POKE_EXIT_* (equality drift-pinned by test).
+    POKE_EXIT_VX_PX = 25.0    # |mean exit vx| at/above this ...
+    POKE_EXIT_VY_PX = 12.0    # ... with |exit vy| at/below this = poke
+
     # --- Drive (attacking hit) detection ---
     # A spike drives the ball down/across: unlike a dig it does not pop the ball
     # back up (so the bounce test misses it) and it need not flip the ball's
@@ -284,12 +298,12 @@ class ActionClassifier:
         if distance > self.CONTACT_REACH:
             return []
 
-        if kind == "reentry":
-            # The contact frame is manufactured, so the snapshot AT it is
-            # mid-jump by construction and its airborne feet project deep
-            # (wrong side). Read the emitted team from the last pre-contact
-            # stance instead (SpikeAnalyzer's takeoff-window fix, scoped to
-            # this contact kind).
+        if kind == "reentry" or self._is_poke_drive(kind, out):
+            # The contact-time snapshot is mid-jump by construction (a
+            # manufactured reentry contact, or a poke-class drive: level
+            # horizontal redirect of a fast descent) and its airborne feet
+            # project deep (wrong side). Read the emitted team from the
+            # takeoff stance instead (SpikeAnalyzer's takeoff-window fix).
             stance = self._takeoff_stance(pdata.get("track_id"), contact_frame)
             if stance is not None:
                 pdata = stance
@@ -368,10 +382,28 @@ class ActionClassifier:
                 return p
         return None
 
+    def _is_poke_drive(self, kind: str, out: Tuple[float, float]) -> bool:
+        """True for a drive-band contact whose outgoing ball is LEVEL and
+        strongly HORIZONTAL per frame -- the poke/tip signature (see
+        POKE_EXIT_*). ``out`` is the net outgoing vector summed over the
+        vertex's NEIGH window; dividing by NEIGH is the conservative
+        (lower-bound) per-frame rate."""
+        if kind != "drive":
+            return False
+        vx, vy = out[0] / self.NEIGH, out[1] / self.NEIGH
+        return (abs(vx) >= self.POKE_EXIT_VX_PX
+                and abs(vy) <= self.POKE_EXIT_VY_PX)
+
     def _takeoff_stance(self, track_id: Optional[int], frame: int) -> Optional[Dict[str, Any]]:
-        """Nearest real snapshot of ``track_id`` in [frame-REENTRY_TEAM_BACK,
-        frame-REENTRY_TEAM_END] -- the last grounded read before a manufactured
-        reentry contact (airborne contact-time feet project deep)."""
+        """Nearest snapshot of the window's MAJORITY court team in
+        [frame-REENTRY_TEAM_BACK, frame-REENTRY_TEAM_END] -- the last grounded
+        read before a manufactured reentry contact (airborne contact-time feet
+        project deep). The plain nearest-to-contact pick lands on the FIRST
+        frame whose grounded foot has drifted across the net ground line (e6
+        f307 reads B off the GT-A spiker whose f297-306 stances all read A);
+        the majority over the window outvotes that 1-frame landing drift.
+        Ties, an uncalibrated court, or no team reads: nearest snapshot (the
+        old behavior)."""
         if track_id is None:
             return None
         hist = self._player_pose_history.get(track_id)
@@ -383,9 +415,29 @@ class ActionClassifier:
                   if h.get("center") is not None and lo <= h["frame"] <= hi]
         if not window:
             return None
-        snap = dict(min(window, key=lambda h: abs(h["frame"] - hi)))
-        snap["track_id"] = track_id
-        return snap
+        pick = None
+        if self.court is not None and getattr(self.court, "is_calibrated", False):
+            team_snaps = []
+            for h in window:
+                bbox = h.get("bbox")
+                if not bbox:
+                    continue
+                team = self.court.get_team_for_bbox(bbox)
+                if team:
+                    team_snaps.append((team, h))
+            counts: Dict[str, int] = {}
+            for team, _h in team_snaps:
+                counts[team] = counts.get(team, 0) + 1
+            ordered = sorted(counts.items(), key=lambda kv: -kv[1])
+            if ordered and (len(ordered) == 1
+                            or ordered[0][1] > ordered[1][1]):
+                majority = ordered[0][0]
+                pool = [h for team, h in team_snaps if team == majority]
+                pick = dict(min(pool, key=lambda h: abs(h["frame"] - hi)))
+        if pick is None:
+            pick = dict(min(window, key=lambda h: abs(h["frame"] - hi)))
+        pick["track_id"] = track_id
+        return pick
 
     def _reentry_contact(self, c: int, vertex: Tuple):
         """Manufacture a contact across an out-of-frame excursion (see the

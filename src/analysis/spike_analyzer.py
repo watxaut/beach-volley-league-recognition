@@ -74,6 +74,16 @@ class SpikeAnalyzer:
     # only (up to outcome resolution, so a dig's own loft does not count).
     TOUCH_RISE_PX = 80.0
     TYPE_WINDOW = 5           # sightings still used for the audit exit speed
+    # Poke/tip: a soft attacking touch (the beach "poke"/"cobra") does not
+    # loft -- it absorbs a fast DESCENDING arrival into a LEVEL, strongly
+    # HORIZONTAL push that floats to the deep corner (owner, e6 f309/311:
+    # vy_in +29 px/f, exit vx -47 px/f, vy_out +1.5, rise -30). The driven
+    # attacks it must not absorb exit DOWNWARD and nearly straight (e3
+    # f431 vx 5, f539 vx 14); all GT spikes overlap on every vertical
+    # feature, the horizontal exit is the separator (probe over all GT
+    # spikes, 2026-09-06: poke |vx| 46.9 vs hard max 13.9).
+    POKE_EXIT_VX_PX = 25.0    # |mean exit vx| at/above this ...
+    POKE_EXIT_VY_PX = 12.0    # ... with |exit vy| at/below this = poke touch
     # Outcome resolution.
     OUTCOME_HORIZON = 90      # frames after contact without resolution -> unknown
     DESCENT_MIN_PX = 4.0      # per-frame image-y gain that counts as descending
@@ -494,7 +504,30 @@ class SpikeAnalyzer:
             rise = base_y - min((y for (_f, _x, y) in flight), default=base_y)
             if rise >= self.TOUCH_RISE_PX:
                 return "touch", self._exit_speed(contact_frame, flight)
+            # Poke: no ascent, but the ball leaves LEVEL and strongly
+            # HORIZONTAL (see POKE_EXIT_* above) -- a soft attacking touch,
+            # not a driven ball.
+            if len(flight) >= 2:
+                vx, vy = self._exit_velocity(contact_frame, flight)
+                if (vx is not None and abs(vx) >= self.POKE_EXIT_VX_PX
+                        and vy is not None and abs(vy) <= self.POKE_EXIT_VY_PX):
+                    return "touch", self._exit_speed(contact_frame, flight)
         return None, self._exit_speed(contact_frame, flight)
+
+    def _exit_velocity(
+        self, contact_frame: int, flight: List[Tuple[int, float, float]]
+    ) -> Tuple[Optional[float], Optional[float]]:
+        """Mean per-frame (vx, vy) over the first TYPE_WINDOW sightings."""
+        window = flight[: self.TYPE_WINDOW]
+        if len(window) < 2:
+            return None, None
+        dt = window[-1][0] - window[0][0]
+        if dt <= 0:
+            return None, None
+        return (
+            (window[-1][1] - window[0][1]) / dt,
+            (window[-1][2] - window[0][2]) / dt,
+        )
 
     def _exit_speed(
         self, contact_frame: int, flight: List[Tuple[int, float, float]]

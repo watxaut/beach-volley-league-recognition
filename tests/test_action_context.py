@@ -72,6 +72,27 @@ def test_block_gesture_is_block():
     assert _labels(contacts) == ["block"]
 
 
+def test_block_gesture_at_touch3_is_a_poke_spike():
+    """A block is definitionally the FIRST touch after an attack: at the 3rd
+    touch of a CONTINUING possession nothing exists to block, so a
+    hands-overhead horizontal redirect there is the beach poke over the block
+    (owner, e6 f309/311: soft tip deep to the back corner). The pose jitter
+    that read the poke as BLOCK on the production path must not flip the
+    label. Touch 1 keeps the block; touch 2 keeps it too (e1's joust
+    emission sits there and must not cascade)."""
+    dig_set_poke = [
+        _contact(10, VisualGesture.BUMP_SET, near_net=False),  # dig
+        _contact(40, VisualGesture.BUMP_SET),                  # set
+        _contact(65, VisualGesture.BLOCK),                     # poke -> spike
+    ]
+    assert _labels(dig_set_poke) == ["dig", "set", "spike"]
+    assert _labels([_contact(100, VisualGesture.BLOCK)]) == ["block"]  # touch 1
+    assert _labels([
+        _contact(10, VisualGesture.BUMP_SET),
+        _contact(40, VisualGesture.BLOCK),                     # touch 2: keep
+    ]) == ["dig", "block"]
+
+
 def test_serve_behind_baseline_at_rally_start():
     """A contact behind the baseline that opens a rally is a serve, whether the
     gesture is a bump (underhand) or an attack (jump serve)."""

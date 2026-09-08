@@ -15,7 +15,7 @@
    "frames": {}
   },
   "actions": {
-   "description": "Action events with rally-state context. Each event has: frame, player_id, final_action (canonical label), raw_visual_actions (open-vocabulary multi-label), player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides. Owner ratifications 2026-09-06: serve f34 p4 A added (sheet e6_ballmatch_serve_f20-50.png); joust GT re-confirmed (spike 1A + no-touch block 2B); NEW tracking bug filed: track 2B latches onto a bystander passing behind, the real center-left digger (blue/yellow/black) is untracked, and 1A flips to 2B across f310-312.",
+   "description": "Action events with rally-state context. Each event has: frame, player_id, final_action (canonical label), raw_visual_actions (open-vocabulary multi-label), player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides. Owner ratifications 2026-09-06: serve f34 p4 A added (sheet e6_ballmatch_serve_f20-50.png); joust GT re-confirmed (spike 1A + no-touch block 2B); NEW tracking bug filed: track 2B latches onto a bystander passing behind, the real center-left digger (blue/yellow/black) is untracked, and 1A flips to 2B across f310-312. Owner dictation 2026-09-08: the f308 spike is a POKE -- a soft tip sent to the back of the field -- spike_type touch, NOT a block and NOT a hard driven ball (sheet output/diag_e6_poke_sheet.png: the ball descends from the out-of-frame set apex f299-310, kinks at the net plane at f311, floats flat-left and dies deep near the far-left corner f342). The owner's frame count f298 vs the measured contact f311 (OpenCV indexing) is an open offset question for the next ratification pass; the event stays at GT f308 (the pipeline emits f309, within tolerance).",
    "events": [
     {
      "frame": 34,
@@ -106,14 +106,18 @@
      "player_id": 1,
      "final_action": "spike",
      "raw_visual_actions": [
-      "spike"
+      "spike",
+      "poke"
      ],
      "player_team": "A",
      "team_in_possession": "A",
      "touch_number": 3,
      "preceded_by_attack": false,
      "rally_id": 1,
-     "overrides": {}
+     "overrides": {
+      "spike_type": "touch",
+      "note": "Owner 2026-09-08: a POKE to the back of the field -- soft tip over the block, not a driven ball. Ball kinks at the net plane f311 (sighting gap), floats flat-left, dies deep far-left f342."
+     }
     },
     {
      "frame": 308,

@@ -447,3 +447,39 @@ class TestTrailRendering:
         assert len(early) <= 4
         late = analyzer.trail_points(103)
         assert len(late) == len(early) + 1
+
+
+class TestPokeType:
+    """The poke/tip: a soft attacking touch that does NOT loft -- it absorbs a
+    fast descent into a LEVEL, strongly HORIZONTAL push (owner, e6 f309/311:
+    "poke to the back of the field"). Driven balls exit downward and nearly
+    straight (e3 f431 vx 5, f539 vx 14); all GT spikes overlap on every
+    vertical feature, the horizontal exit is the separator."""
+
+    def test_level_horizontal_exit_is_touch(self, analyzer):
+        # Never rises (rise ~0) but leaves at ~30 px/f horizontally, then
+        # drifts down into the sand (the type is decided during the level
+        # stretch and must survive the closing descent).
+        poke = [(930, 402), (960, 404), (990, 403), (1020, 405),
+                (1050, 404), (1080, 406), (1110, 405), (1140, 430),
+                (1165, 465), (1185, 510), (1200, 560), (1210, 615)]
+        _feed_flight(analyzer, 100, poke, spike_cp=(900.0, 400.0))
+        for f in range(113, 130):
+            analyzer.observe(f, None, [_player(1, 870, 550, "B")], [])
+        rec = analyzer.spike_records()[0]
+        assert rec["spike_type"] == "touch"
+
+    def test_level_but_narrow_exit_stays_hard(self, analyzer):
+        # The f431 shape: no rise and the exit nearly straight down.
+        drive = [(905, 545), (915, 575), (925, 610), (935, 650), (945, 695),
+                 (952, 745), (956, 790)]
+        _feed_flight(analyzer, 100, drive, spike_cp=(900.0, 520.0))
+        for f in range(108, 122):
+            analyzer.observe(f, None, [_player(1, 870, 550, "B")], [])
+        rec = analyzer.spike_records()[0]
+        assert rec["spike_type"] == "hard"
+
+    def test_poke_constants_mirror_classifier(self):
+        from src.recognition.action_classifier import ActionClassifier
+        assert SpikeAnalyzer.POKE_EXIT_VX_PX == ActionClassifier.POKE_EXIT_VX_PX
+        assert SpikeAnalyzer.POKE_EXIT_VY_PX == ActionClassifier.POKE_EXIT_VY_PX

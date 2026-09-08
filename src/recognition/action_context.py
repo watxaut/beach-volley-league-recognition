@@ -121,7 +121,16 @@ class ActionContextResolver:
                 return VolleyballAction.SERVE, 0.8
             return VolleyballAction.SPIKE, 0.65 if touch >= 3 else 0.55
         if gesture == VisualGesture.BLOCK:
-            return VolleyballAction.BLOCK, 0.7
+            # A block is definitionally the FIRST touch after an attack. At
+            # the third touch of a continuing possession there is nothing to
+            # block: a hands-overhead horizontal redirect there is the beach
+            # POKE over the block (owner, e6 f309/311 -- soft tip floating
+            # deep to the back corner), so let it fall through to the
+            # touch-3 attack rule below. Touch 1 keeps the block; touch 2
+            # keeps it too (no counterevidence; e1's joust emission sits
+            # there and must not cascade).
+            if touch < 3:
+                return VolleyballAction.BLOCK, 0.7
 
         # A bump-set: resolve by where we are in the possession.
         if behind_baseline and rally_start:
