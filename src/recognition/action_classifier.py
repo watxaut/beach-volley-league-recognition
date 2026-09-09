@@ -147,6 +147,14 @@ class ActionClassifier:
     # --- Classification tuning ---
     NEAR_NET_PX = 120        # |y - midcourt| under this counts as "near the net"
     DRIVE_MIN_PX = 55.0      # min outgoing horizontal speed for an attack drive
+    # Rally-opening serve gate: the ascent must be FED -- the incoming ±3f
+    # slope beats the preceding ±6f slope by this margin (gravity only
+    # decays an ascent). Measured: e7 f25 +29; e4's gravity arc never
+    # reaches +10 (its best is -5.8, i.e. decelerating).
+    SERVE_ACCEL_MARGIN_PX = 10.0
+    # Toss-apex reach allowance for the rally-opening serve (see the reach
+    # gate in classify_actions): e7 f25 measured 147.5px ball-to-box.
+    SERVE_REACH_PX = 160.0
     RISE_MIN_PX = 30.0       # outgoing vertical speed treated as "ball rising"
     HANDS_OVERHEAD = 1.0     # avg_wrist_height_ratio above this = hands overhead
     RALLY_RESET_GAP = 90     # frames of no contact after which a new rally starts
@@ -295,7 +303,17 @@ class ActionClassifier:
         if chosen is None:
             return []
         pdata, distance, lr_index = chosen
-        if distance > self.CONTACT_REACH:
+        # Rally-opening serve reach: the server meets the ball at the top of
+        # an extended toss -- arms overhead, box lagging below the hands --
+        # so the ball-to-box distance overshoots the dig/spike reach (e7 f25:
+        # 147.5 vs 140). Scoped to the rally-opening drive (the serve branch's
+        # own gate); mid-rally reach rules are untouched (e2 f167's deliberate
+        # 4px refusal sits there).
+        reach = self.CONTACT_REACH
+        if (kind == "drive"
+                and contact_frame - self._last_contact_frame > self.RALLY_RESET_GAP):
+            reach = self.SERVE_REACH_PX
+        if distance > reach:
             return []
 
         if kind == "reentry" or self._is_poke_drive(kind, out):
@@ -647,8 +665,22 @@ class ActionClassifier:
 
         # Horizontal redirect: ball arrives from one side and leaves to the
         # other (block/spike drive) without a clean bounce.
+        #
+        # left3/right3 (±3f of the vertex) are shared with the drive test
+        # below. LOCALITY (e7 f239, ratified-retune session): the reversal
+        # must be visible in the vertex's OWN ±3f window -- a flip measured
+        # only over the full NEIGH window can be a NEIGHBOR contact's
+        # impulse leaking in (there: the f243 set's rightward drive, 6f
+        # ahead, stole a mid-descent vertex and mislabeled it block).
+        left3 = [p for p in left if p[0] >= c - 3]
+        right3 = [p for p in right if p[0] <= c + 3]
         if inc[0] * out[0] < 0 and abs(inc[0]) > self.XREV_MIN and abs(out[0]) > self.XREV_MIN:
-            return contact_point, "redirect", inc, out, c
+            # Fewer than 2 sightings within ±3f: locality is unprovable --
+            # fall through (the drive test still gets its say).
+            if len(right3) >= 2:
+                out_local = self._mean_velocity([vertex] + right3)
+                if inc[0] * out_local[0] <= 0:
+                    return contact_point, "redirect", inc, out, c
 
         # Attacking DRIVE: the ball's motion is checked in a way free flight
         # cannot produce -- its downward speed is sharply cut (a ball hit down
@@ -659,8 +691,6 @@ class ActionClassifier:
         # Estimate the velocity from points within +/-3 frames of the vertex: a
         # bounce/apex further out (or one pulled close by a run of undetected
         # ball frames) would otherwise fake a deceleration on a dig's approach.
-        left3 = [p for p in left if p[0] >= c - 3]
-        right3 = [p for p in right if p[0] <= c + 3]
         if left3 and right3:
             vin = self._mean_velocity(left3 + [vertex])
             vout = self._mean_velocity([vertex] + right3)
@@ -676,6 +706,25 @@ class ActionClassifier:
             if speed >= self.DRIVE_MIN_SPEED and stays_down and not pops_up:
                 if dvy <= -self.DRIVE_DECEL or abs(dvx) >= self.DRIVE_XIMPULSE:
                     return contact_point, "drive", inc, out, c
+            # Rally-opening SERVE hit (e7 f25, ratified-retune session): an
+            # overhand toss flows THROUGH the contact -- ascent into ascent --
+            # so the bounce test has no descent and the drive test above
+            # refuses a pop-up (a dig's signature). The serve's own signature:
+            # the ascent is FED -- the incoming slope exceeds the preceding
+            # window's, which free flight (gravity) can only decay. Measured
+            # openings: e7 f25 vin3 -42 vs vin6 -13 (fires); e4's pure gravity
+            # arc decelerates 25->1 px/f (vin3 < vin6, refuses everywhere);
+            # e2's slow arc and e1's fed descent never qualify. Fires only
+            # before ANY contact (c - last > rally gap); the resolver's
+            # behind-baseline + rally-start rule does the labeling.
+            vin6 = self._mean_velocity(
+                [p for p in left if p[0] >= c - 6] + [vertex]) \
+                if any(p[0] >= c - 6 for p in left) else None
+            if (pops_up and speed >= self.DRIVE_MIN_SPEED
+                    and vin6 is not None
+                    and abs(vin[1]) >= abs(vin6[1]) + self.SERVE_ACCEL_MARGIN_PX
+                    and c - self._last_contact_frame > self.RALLY_RESET_GAP):
+                return contact_point, "drive", inc, out, c
 
         return None
 

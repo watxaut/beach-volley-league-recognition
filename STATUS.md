@@ -5,8 +5,8 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-08 (tenth session — the e6 poke: spike-touch read,
-blocks of the 15(b)/15(c) residuals)
+**Last updated:** 2026-09-09 (tenth session — e6 poke spike-touch; e7 GT
+ratified; rally-opening serve gate + redirect locality retune)
 
 ## Where we are
 
@@ -75,6 +75,53 @@ e6 team accuracy 0.857 → 1.0 (point 15b closed); suite 364 green (+9).**
   1/2 preservation; analyzer poke-touch + narrow-exit-stays-hard + constants
   parity; classifier poke gate + NEIGH normalization, stance majority beats
   landing drift, tie fallback, and the full e6-shape drive→spike/team-A e2e).
+- **Same session, later: e7 GT RATIFIED (point 15f closed).** Owner
+  corrected against the OpenCV-stamped sheets: f55→f61 (digger untracked —
+  their screenshot), f110→f112 P1B, f160 confirmed (rainbow touch, toucher
+  untracked until f166), f200→f197 P2A, f244→f243 P3A, f300 confirmed P4A
+  hard + no-touch B block ADDED (10 events), f330→f315 team B→A (P1A),
+  f360→f370 P4B; player ids = per-video track ids where named. The current
+  stream vs the ratified GT: f59/f112/f195/f239/f316 emitted — frame F1
+  0.533 (P 0.8, R 0.4); f239 is the f243 set misread as block, f316 has the
+  wrong team (B vs P1A), f25/f160/f243/f300/f370 die at classifier gates.
+  That is the concrete target list for the 15(a)/(e) retune.
+- **Same session, end: the ratified-e7 retune SHIPPED (points 15a + 15d
+  closed, 15e partly).** Gate-probe diagnosis (output/diag_e7_gates.py) on
+  the real path reframed the misses: f160 IS detected (bounce@162) and dies
+  at the reach gate because the rainbow toucher is UNTRACKED (attribution
+  by design — GT says so); f300's ball was NEVER tracked there (only stray
+  far-left junk points — a ball-recall gap, tracker-side, not classifier);
+  f370's set sits in a 6f sighting gap and re-appears already descending
+  toward the teammate (no ascent-out — the bridge signature is absent;
+  parked); f25's serve toss flows THROUGH the hit (ascent into ascent — no
+  band applies) and f243's set was stolen by a FALSE redirect vertex at
+  f239 whose flip evidence lived 6f ahead. Shipped: (1) *rally-opening
+  serve gate* — inside the drive test, a pop-up whose incoming ±3f slope
+  beats the preceding ±6f slope by SERVE_ACCEL_MARGIN_PX=10 (gravity can
+  only decay an ascent) fires before ANY contact; measured openings: e7
+  f25 vin3 −42 vs vin6 −13 fires, e4's pure gravity arc (25→1 px/f
+  decelerating) refuses everywhere, e2's slow arc and e1's fed descent
+  never qualify; plus a serve-scoped reach (SERVE_REACH_PX=160 — the
+  toss-apex arm extension measured 147.5 vs the 140 dig/spike reach;
+  scoped to the rally-opening drive so e2 f167's deliberate 4px refusal
+  is untouched); the resolver's behind-baseline + rally-start rule labels
+  it. (2) *redirect locality* — the horizontal-flip test must pass in the
+  vertex's own ±3f window; a flip measured only over the full NEIGH window
+  is a neighbor contact's impulse leaking in; locality-unprovable (<2
+  points in ±3f) falls through. Measured A/B (stash-regenerated HEAD
+  baselines): e6 byte-identical; e7 +f25 serve A (EXACT vs GT — F1 0.533
+  → 0.625, team 0.8 → 0.833) and the false f239 vertex is gone (the real
+  set contact now fires at f242 via the drive band — 1f from GT f243 —
+  still labeled block pending the upstream cascade fix); e2's f81 FP is
+  KILLED and f118 now reads set (GT ✓) — F1 0.533 → 0.571 (15d closed;
+  the cascade shift moves f256's set to read dig — CSV-context, labels
+  net-positive); e1's joust block re-attributed to B (GT's spike side —
+  team 0.875 → 1.0) with a 1f vertex shift; e3/e4/e5 1-frame vertex
+  shifts toward GT (e5 f248 now exact), F1 1.0 unchanged; production
+  src.main e7 confirms the identical f25-serve stream. Suite 370 green
+  (+6: fed-ascent fires / gravity-arc refuses / rally-start required /
+  redirect locality refuses+fals-through / local redirect fires /
+  serve-reach e2e).
 - **Same session, later: e7 GT RATIFIED (point 15f closed).** Owner
   corrected against the OpenCV-stamped sheets: f55→f61 (digger untracked —
   their screenshot), f110→f112 P1B, f160 confirmed (rainbow touch, toucher
@@ -880,24 +927,31 @@ constraint. Side changes need no special handling as long as IDs survive.
     the classifier's contact gates were calibrated to the OLD histories.
     Every residual below is a CLASSIFIER-side read of a tracker change —
     retune with contact sheets, do NOT weaken the tracker rules.
-    (a) **e7 serve f25 undetected** — the toss rise is 2.6 px/f (below the
-    8 px/f motion-lock floor by design), so the track locks the toss only
-    on its DESCENT (f21) and the hit contact's left window holds 2 points
-    (before: 4). Lever: classifier left-window tolerance, or a toss-aware
-    lock exception — needs sheets. The e6/e7 tosses at 30 px/f lock fine.
+    (a) **RESOLVED 2026-09-09 — the rally-opening serve gate** (fed ascent
+    + rally-start + serve-scoped reach): e7 f25 serve A detected EXACT
+    (F1 0.625, team 0.833); e4's gravity-arc opening refuses, e6
+    byte-identical.
     (b) **RESOLVED 2026-09-08:** the poke-class stance-majority team read
     (with the drive-band scope correction — the reentry band never fires on
     the current tracker) gives e6 f309 team A; e6 team 7/7.
     (c) **RESOLVED 2026-09-08:** the block-at-touch-3 poke fall-through
     turns e5's f298 block back into a spike; e5 F1 1.0.
-    (d) **e2 +f81 set B FP** near the held-ball release (GT: nothing until
-    f90) and f118 overpass→spike (GT f120 set).
-    (e) **e7 f160 spike / f243 set / f300 spike still undetected; f239
-    block FP is the f243 set misread (frame-match, wrong label); f316 dig
-    attributed to B vs ratified P1A (wrong team); f370 set undetected.**
-    The ball IS tracked through f160/f243/f300 (verified in dumps); the
-    contacts die at classifier gates. Same retune session. Pre-retune
-    baseline vs the ratified GT: F1 0.533 (P 0.8, R 0.4).
+    (d) **RESOLVED 2026-09-09 — the redirect locality gate killed the f81
+    FP and f118 now reads set (GT ✓); e2 F1 0.533 → 0.571.** Residual:
+    the cascade shift makes f256's GT set read dig (CSV-context only;
+    labels net-positive).
+    (e) **PARTLY RESOLVED 2026-09-09; the rest is TRACKING-side, reowned:**
+    the false f239 vertex is gone and the real f243 set fires at f242
+    (dist 1) — still labeled block pending the upstream cascade fix (the
+    missing f160 starves the touch count; the block-vs-set label also
+    needs an attack-before condition). REFRAMED as not classifier-side:
+    f160's contact IS detected (bounce@162) and dies at the reach gate —
+    the rainbow toucher is UNTRACKED (attribution by design; GT agrees);
+    f300's spike ball was never tracked there (ball-recall gap — fold into
+    point 1's tracking diagnosis); f370's set sits in a 6f sighting gap
+    and re-appears descending (no bridge signature — parked, needs a
+    set-arc-in-gap manufacture if ever wanted). f316's team (B vs ratified
+    P1A) stays open as an attribution item. e7 now F1 0.625, team 0.833.
     (f) **RESOLVED 2026-09-08 — e7 GT RATIFIED with corrections:** f55→f61
     (digger UNTRACKED, owner screenshot), f110→f112 P1B, f160 confirmed
     (rainbow, toucher untracked until f166), f200→f197 P2A, f244→f243 P3A,

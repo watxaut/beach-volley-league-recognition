@@ -704,3 +704,84 @@ def test_poke_drive_emits_spike_with_takeoff_team(clf):
     assert ev["action"] == "spike"
     assert ev["team"] == "A"                  # stance read, not the airborne B
     assert ev["track_id"] == 1
+
+
+# --- Rally-opening serve gate + redirect locality (e7 ratified retune) ---
+
+def _serve_history(clf):
+    """e7 f25 shape: a short dip, then a FED ascent through the contact --
+    the incoming +/-3f slope (-42 px/f) beats the preceding +/-6f slope."""
+    _ball(clf, [(21, 904, 394, 30), (22, 904, 413, 30), (23, 908, 372, 30),
+                (24, 912, 334, 30), (25, 915, 286, 30), (26, 916, 254, 30),
+                (27, 919, 224, 30), (28, 922, 200, 30)])
+
+
+def test_serve_gate_fires_on_fed_ascent(clf):
+    _serve_history(clf)
+    r = clf._detect_contact(25)
+    assert r is not None and r[1] == "drive" and r[4] == 25
+
+
+def test_serve_gate_refuses_gravity_arc(clf):
+    """e4's opening: a pure free arc -- the ascent DECELERATES into every
+    candidate vertex (gravity can only decay an ascent); no contact."""
+    _ball(clf, [(12, 834, 600, 24), (13, 836, 572, 24), (14, 836, 538, 24),
+                (15, 835, 504, 24), (16, 832, 475, 24), (17, 832, 449, 24),
+                (18, 830, 426, 24), (19, 828, 404, 24), (20, 826, 386, 24),
+                (21, 824, 370, 24), (22, 822, 358, 24), (23, 820, 347, 24),
+                (24, 818, 340, 24), (25, 816, 335, 24), (26, 814, 332, 24),
+                (27, 813, 332, 24), (28, 810, 334, 24), (29, 808, 340, 24)])
+    for c in (14, 15, 20, 25, 27):
+        assert clf._detect_contact(c) is None
+
+
+def test_serve_gate_needs_rally_start(clf):
+    _serve_history(clf)
+    clf._last_contact_frame = 20          # a recent contact: no rally opening
+    assert clf._detect_contact(25) is None
+
+
+def test_redirect_flip_must_be_local(clf):
+    """e7 f239: a mid-descent vertex whose only flip evidence lives 6f ahead
+    (the f243 set's rightward impulse) must refuse -- and the REAL set
+    contact fires at f242 via the drive band's downward-speed cut."""
+    pts = [(231, 928, 82, 24), (232, 919, 106, 24), (237, 880, 248, 24),
+           (238, 872, 279, 24), (239, 864, 316, 24), (240, 860, 346, 24),
+           (241, 852, 380, 24), (242, 844, 419, 24), (245, 936, 466, 30),
+           (246, 936, 465, 30), (250, 940, 380, 30), (253, 944, 300, 30)]
+    _ball(clf, pts)
+    assert clf._detect_contact(239) is None
+    r = clf._detect_contact(242)
+    assert r is not None and r[1] == "drive" and r[4] == 242
+
+
+def test_local_redirect_still_fires(clf):
+    """A genuine block/redirect: the reversal is visible inside the vertex's
+    own +/-3f window."""
+    _ball(clf, [(50, 760, 300, 24), (52, 800, 300, 24), (54, 840, 300, 24),
+                (55, 860, 300, 24), (56, 880, 300, 24), (58, 840, 300, 24),
+                (60, 800, 300, 24), (62, 760, 300, 24)])
+    r = clf._detect_contact(55)
+    assert r is not None and r[1] == "redirect"
+
+
+def test_serve_reach_allows_toss_apex(clf):
+    """End to end (the e7 f25 shape): the server meets the ball at the top of
+    an extended toss -- ball-to-box 147.5px, over the 140 dig/spike reach but
+    inside the serve-scoped 160 -- and the resolver labels SERVE off the
+    grounded behind-baseline stance."""
+    _serve_history(clf)
+    for f in (23, 24, 25, 26, 27):
+        _snap(clf, 3, f, [788, 434, 939, 966], "A")   # real f25 server box
+    det = {"track_id": 3, "bbox": [788, 434, 939, 966], "center": [863, 700],
+           "team": "A", "predicted": False}
+    events = []
+    for f in range(26, 40):
+        events += clf.classify_actions(None, [det], None, frame_number=f)
+    events += clf.flush()
+    assert len(events) == 1
+    ev = events[0]
+    assert ev["frame_number"] == 25
+    assert ev["action"] == "serve"
+    assert ev["team"] == "A"
+    assert ev["track_id"] == 3
