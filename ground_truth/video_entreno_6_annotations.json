@@ -15,7 +15,7 @@
    "frames": {}
   },
   "actions": {
-   "description": "Action events with rally-state context. Each event has: frame, player_id, final_action (canonical label), raw_visual_actions (open-vocabulary multi-label), player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides. Owner ratifications 2026-09-06: serve f34 p4 A added (sheet e6_ballmatch_serve_f20-50.png); joust GT re-confirmed (spike 1A + no-touch block 2B); NEW tracking bug filed: track 2B latches onto a bystander passing behind, the real center-left digger (blue/yellow/black) is untracked, and 1A flips to 2B across f310-312. Owner dictation 2026-09-08: the f308 spike is a POKE -- a soft tip sent to the back of the field -- spike_type touch, NOT a block and NOT a hard driven ball (sheet output/diag_e6_poke_sheet.png: the ball descends from the out-of-frame set apex f299-310, kinks at the net plane at f311, floats flat-left and dies deep near the far-left corner f342). The owner's frame count f298 vs the measured contact f311 (OpenCV indexing) is an open offset question for the next ratification pass; the event stays at GT f308 (the pipeline emits f309, within tolerance).",
+   "description": "Action events with rally-state context. Each event has: frame, player_id, final_action (canonical label), raw_visual_actions (open-vocabulary multi-label), player_team, team_in_possession, touch_number, preceded_by_attack, rally_id, overrides. Owner ratifications 2026-09-06: serve f34 p4 A added (sheet e6_ballmatch_serve_f20-50.png); joust GT re-confirmed (spike 1A + no-touch block 2B); NEW tracking bug filed: track 2B latches onto a bystander passing behind, the real center-left digger (blue/yellow/black) is untracked, and 1A flips to 2B across f310-312. Owner correction 2026-09-09 (ratification sheet output/diag_e6_poke_ratify_sheet.png): the joust contact is a HARD spike at f310 -- the 2026-09-08 poke dictation actually belonged to video_entreno_5 f300 -- and the no-touch 2B block is anchored at f314. Trajectory: ball descends f301-310 (OpenCV index), kinks at the net plane inside the f310-312 tracker bridge, floats flat-left ~45 px/f, dies deep far-left f342. The pipeline emits f309 spike touch (drive band + poke-exit rule); the touch-vs-hard read is the owned retune.",
    "events": [
     {
      "frame": 34,
@@ -102,12 +102,11 @@
      "overrides": {}
     },
     {
-     "frame": 308,
+     "frame": 310,
      "player_id": 1,
      "final_action": "spike",
      "raw_visual_actions": [
-      "spike",
-      "poke"
+      "spike"
      ],
      "player_team": "A",
      "team_in_possession": "A",
@@ -115,12 +114,12 @@
      "preceded_by_attack": false,
      "rally_id": 1,
      "overrides": {
-      "spike_type": "touch",
-      "note": "Owner 2026-09-08: a POKE to the back of the field -- soft tip over the block, not a driven ball. Ball kinks at the net plane f311 (sighting gap), floats flat-left, dies deep far-left f342."
+      "spike_type": "hard",
+      "note": "Owner 2026-09-09: HARD spike at f310 (not a poke -- the 2026-09-08 poke dictation belonged to video_entreno_5 f300 and was misattributed to this event). Ball descends f301-310, kinks at the net plane in the f310-312 tracker bridge, floats flat-left ~45 px/f, dies deep far-left f342; the owner calls this driven ball hard."
      }
     },
     {
-     "frame": 308,
+     "frame": 314,
      "player_id": 2,
      "final_action": "block",
      "raw_visual_actions": [
@@ -131,7 +130,9 @@
      "touch_number": 1,
      "preceded_by_attack": true,
      "rally_id": 1,
-     "overrides": {}
+     "overrides": {
+      "note": "No-touch block by 2B, owner-anchored f314 (2026-09-09; was f308). Physically ratified: P2B jumps with hands up (box y1 433->341->309 across f300-311) while the ball leaves flat-left from f312; the pipeline legitimately emits one ball contact per joust, so this stays unemittable."
+     }
     }
    ]
   }

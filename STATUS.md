@@ -5,15 +5,62 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-09 (tenth session — e6 poke spike-touch; e7 GT
-ratified; rally-opening serve gate + redirect locality retune)
+**Last updated:** 2026-09-09 (eleventh session — poke GT ratified and
+REATTRIBUTED to e5 f300; e6 f310 is hard; inverted poke rule owned as point
+19)
 
 ## Where we are
 
-**(2026-09-08, tenth session): the e6 joust contact is a POKE — owner
-dictated "spike touch, not a block" — and the whole read chain now agrees:
-the production path emits spike (not the jittery block), team A (was B),
-spike_type touch (was hard). e5's f298 block misread healed to spike as a
+**(2026-09-09, eleventh session): the poke GT RATIFIED — and the 09-08
+dictation was misattributed: THE poke is e5's f300 spike (pid 2 B, now
+spike_type touch); e6's joust contact is a HARD spike at f310 (1A) and the
+no-touch 2B block sits at f314. Both GTs folded. The shipped poke machinery
+measures INVERTED and is the owned retune (new open point 19). Labels and
+teams are unaffected: e5 F1 1.0 / team 7/7, e6 F1 0.933 / team 7/7 (the only
+FN is the unemittable no-touch block) — the fold costs exactly the two
+spike_type pairs (e5 f298 emitted hard vs GT touch; e6 f309 emitted touch vs
+GT hard).**
+
+- **Ratification sheet (output/diag_e6_poke_ratify_sheet.py → .png,
+  git-ignored):** dense f294-318 step-1 strip + 2x joust zoom, OpenCV
+  stamps, detector candidates AND the tracked-ball trail drawn from a
+  FrameProcessor-identical BallTracker reconstruction (its f310→f312 bridge
+  matches the pipeline's exactly). The owner ruled off the sheet: poke =
+  e5 f300; e6 = hard f310; no-touch block = f314.
+- **GT folds:** e6 spike f308→f310 (raw drops 'poke', overrides
+  spike_type 'hard', correction note), e6 block f308→f314 (note updated);
+  e5 f300 spike gains raw 'poke' + spike_type 'touch' (frame/pid/team were
+  already ratified); both description strings record the correction
+  provenance.
+- **Retune diagnosis (output/diag_poke_true_probe.py):** e5's true poke:
+  descent vy ≈ +29 into f300, vertical reversal f300→f301 (+28 → −2), then
+  ASCENDS 124 px by f315 with exit vx +20..+27, vy −20..−8 — a soft tip
+  arcs to the back of the field. e6 f310 (pipeline-consistent history =
+  the sheet run): exit vx −49, vy ≈ +1, dead LEVEL, no ascent. The
+  analyzer's poke rule (no ascent + |vx| ≥ 25 + |vy| ≤ 12) fires on exactly
+  the wrong one. CAVEAT: a late-bootstrap e6 tracker run (window from
+  f280) locks the far-left corner and loses the ball — the f265-window
+  reconstruction is the pipeline-consistent one; cite that for e6.
+- **Survivors:** the resolver's block-at-touch-3 fall-through is
+  gesture-vs-possession logic, poke-independent — e5's spike label stays
+  correct. The stance-majority team rule is scoped to the level-exit
+  signature e6 f309 still matches — team A stays correct today, but
+  re-typing e6 hard without moving that scope regresses e6 team (point 19
+  records the coupling).
+- **Eval gotcha re-confirmed:** player-box agreement GATES label matching —
+  e5 reads F1 0.857 without --ignore-player (6/7 player-spatial,
+  pre-existing, GT boxes untouched by the fold); the recorded "labels F1"
+  convention = --ignore-player.
+
+**(2026-09-08, tenth session): [CORRECTED 2026-09-09 — the poke dictation
+below belonged to e5 f300; e6's joust contact is a HARD spike at f310 and
+the no-touch block sits at f314; see the eleventh-session entry and open
+point 19. The e5 block→spike label heal and the e6 team-A outcome SURVIVE;
+the poke-type rule and the "poke" reading of e6's level exit do not.]**
+The e6 joust contact was read as a POKE — owner dictated "spike touch, not a
+block" — and the whole read chain then agreed: the production path emits
+spike (not the jittery block), team A (was B), spike_type touch (was hard).
+e5's f298 block misread healed to spike as a
 corollary (F1 0.857 → 1.0, point 15c closed); e1/e2/e3/e4/e7 byte-identical;
 e6 team accuracy 0.857 → 1.0 (point 15b closed); suite 364 green (+9).**
 
@@ -892,6 +939,25 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Open points
 
+19. **[NEW 2026-09-09 — the poke rule is INVERTED; the owned retune, sheets
+    first.]** The eleventh-session ratification moved the poke: e5 f300 IS
+    the poke (touch), e6 f310 is HARD. The shipped machinery encodes the
+    opposite: (a) spike_analyzer's poke rule (no ascent + |exit vx| ≥ 25 +
+    |exit vy| ≤ 12) fires on e6's level exit (vx −49) → touch where GT says
+    hard, and misses e5's true poke, which ASCENDS (+124 px by f315, exit
+    vx +20..+27, vy −20..−8 — a soft tip arcs to the back of the field).
+    Candidate separators to measure: post-contact ascent (delayed ~2f,
+    peaking 7-15f after the pipeline contact f298 — maybe TOUCH_RISE_PX's
+    window is simply too short), exit-vy sign, ascent-vs-level ratio. Must
+    keep put: e3's two hard spikes (vx 5/14, falling), e5 f160's rainbow
+    touch, e6 f173. (b) COUPLING: the classifier's stance-majority team
+    rule (_is_poke_drive) keys on the same level-exit signature; e6 f309
+    team A is correct TODAY (GT A), but re-typing e6 hard without moving
+    that scope regresses e6 team to B. (c) The resolver's
+    block-at-touch-3 fall-through is NOT affected (gesture-vs-possession
+    logic, poke-independent). One mechanism, GT-sheet protocol, e1-e7 A/B
+    + production src.main confirmation; suite drift-rows to update.
+
 18. **[NEW 2026-09-06 — squatter-review known limits; ranked revisit
     triggers.]** (a) **Match-footage dead time:** a real player off-court
     between points can look squatter-like (long out-of-court stretches); the
@@ -931,11 +997,17 @@ constraint. Side changes need no special handling as long as IDs survive.
     + rally-start + serve-scoped reach): e7 f25 serve A detected EXACT
     (F1 0.625, team 0.833); e4's gravity-arc opening refuses, e6
     byte-identical.
-    (b) **RESOLVED 2026-09-08:** the poke-class stance-majority team read
+    (b) **RESOLVED 2026-09-08 [REVISITED 2026-09-09 — see point 19: the
+    poke dictation behind this was misattributed; the e6 team-A OUTCOME
+    survives (GT A), the poke-class reading of the level exit does not —
+    the stance-majority scope is coupled to the point-19 retune]:** the
+    poke-class stance-majority team read
     (with the drive-band scope correction — the reentry band never fires on
     the current tracker) gives e6 f309 team A; e6 team 7/7.
-    (c) **RESOLVED 2026-09-08:** the block-at-touch-3 poke fall-through
-    turns e5's f298 block back into a spike; e5 F1 1.0.
+    (c) **RESOLVED 2026-09-08 [survives 2026-09-09 — the fall-through is
+    poke-independent; GT f300 spike label confirmed]:** the block-at-touch-3
+    poke fall-through turns e5's f298 block back into a spike; e5 labels
+    F1 1.0 (team 7/7).
     (d) **RESOLVED 2026-09-09 — the redirect locality gate killed the f81
     FP and f118 now reads set (GT ✓); e2 F1 0.533 → 0.571.** Residual:
     the cascade shift makes f256's GT set read dig (CSV-context only;
