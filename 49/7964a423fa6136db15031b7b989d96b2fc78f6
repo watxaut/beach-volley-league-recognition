@@ -1,0 +1,25 @@
+tests/test_team_attribution.py
+  s_9c29ebf7c08ece::t_49eab49dfdabc8 707-787
+STATUS.md
+  s_9c29ebf7c08ece::t_cb6614633225cb 88-134,930-933,939-954
+src/recognition/action_classifier.py
+  s_9c29ebf7c08ece::t_431af39a3d985d 155-157,306-316
+  s_9c29ebf7c08ece::t_f2fabffc905030 678-683
+  s_9c29ebf7c08ece::t_e4be0bf5f82be1 150-154,668-676,709-727
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "497964a423fa6136db15031b7b989d96b2fc78f6",
+  "prompts": {},
+  "sessions": {
+    "s_9c29ebf7c08ece": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a07ad9-ec92-712b-b723-27b1f41676cd",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
