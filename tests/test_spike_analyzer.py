@@ -450,24 +450,41 @@ class TestTrailRendering:
 
 
 class TestPokeType:
-    """The poke/tip: a soft attacking touch that does NOT loft -- it absorbs a
-    fast descent into a LEVEL, strongly HORIZONTAL push (owner, e6 f309/311:
-    "poke to the back of the field"). Driven balls exit downward and nearly
-    straight (e3 f431 vx 5, f539 vx 14); all GT spikes overlap on every
-    vertical feature, the horizontal exit is the separator."""
+    """Spike type is ASCENT-ONLY (ratified 2026-09-09, open point 19): a
+    touch is any attack whose ball arcs TOUCH_RISE_PX above the contact
+    point during the attack flight -- the fast rainbow AND the beach poke
+    (e5 f300: a slow 64 px arc, exit vx only 18-22). Every hard stays at or
+    below the contact point (e6 f310's level exit included: -30). The former
+    |exit vx|/|vy| rule fired on exactly the wrong one and is gone."""
 
-    def test_level_horizontal_exit_is_touch(self, analyzer):
-        # Never rises (rise ~0) but leaves at ~30 px/f horizontally, then
-        # drifts down into the sand (the type is decided during the level
-        # stretch and must survive the closing descent).
-        poke = [(930, 402), (960, 404), (990, 403), (1020, 405),
-                (1050, 404), (1080, 406), (1110, 405), (1140, 430),
-                (1165, 465), (1185, 510), (1200, 560), (1210, 615)]
+    def test_moderate_slow_arc_is_a_poke_touch(self, analyzer):
+        # The e5 f298/300 shape: the ball dips ~2 frames (the redirect),
+        # then arcs up 64 px, saturating ~+15f, drifting only ~+20 px/f
+        # across -- below the old |vx| >= 25 bar, so only the ascent can
+        # type it (rise: -30, 0, +28, +46, +58, +64 saturating).
+        poke = [(930, 430), (950, 428), (970, 400), (990, 372),
+                (1010, 354), (1030, 342), (1050, 336), (1070, 336),
+                (1090, 340), (1110, 348), (1128, 362), (1144, 382),
+                (1158, 410), (1170, 448), (1180, 495), (1188, 550)]
         _feed_flight(analyzer, 100, poke, spike_cp=(900.0, 400.0))
-        for f in range(113, 130):
+        for f in range(117, 135):
             analyzer.observe(f, None, [_player(1, 870, 550, "B")], [])
         rec = analyzer.spike_records()[0]
         assert rec["spike_type"] == "touch"
+
+    def test_level_horizontal_exit_is_hard(self, analyzer):
+        # The e6 f310 ratified HARD: never rises above the contact point
+        # (rise -30) but leaves at ~45 px/f horizontally, then drifts down
+        # into the sand. The old rule typed this touch -- the inversion the
+        # ratification removed.
+        drive = [(930, 402), (960, 404), (990, 403), (1020, 405),
+                 (1050, 404), (1080, 406), (1110, 405), (1140, 430),
+                 (1165, 465), (1185, 510), (1200, 560), (1210, 615)]
+        _feed_flight(analyzer, 100, drive, spike_cp=(900.0, 400.0))
+        for f in range(117, 130):
+            analyzer.observe(f, None, [_player(1, 870, 550, "B")], [])
+        rec = analyzer.spike_records()[0]
+        assert rec["spike_type"] == "hard"
 
     def test_level_but_narrow_exit_stays_hard(self, analyzer):
         # The f431 shape: no rise and the exit nearly straight down.
@@ -478,8 +495,3 @@ class TestPokeType:
             analyzer.observe(f, None, [_player(1, 870, 550, "B")], [])
         rec = analyzer.spike_records()[0]
         assert rec["spike_type"] == "hard"
-
-    def test_poke_constants_mirror_classifier(self):
-        from src.recognition.action_classifier import ActionClassifier
-        assert SpikeAnalyzer.POKE_EXIT_VX_PX == ActionClassifier.POKE_EXIT_VX_PX
-        assert SpikeAnalyzer.POKE_EXIT_VY_PX == ActionClassifier.POKE_EXIT_VY_PX

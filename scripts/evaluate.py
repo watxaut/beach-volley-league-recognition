@@ -569,6 +569,14 @@ def run_evaluation(predictions_path: str, ground_truth_path: str, component: Opt
             if isinstance(pred_actions, dict) and "events" in pred_actions:
                 pred_actions = pred_actions["events"]
             gt_actions = gt_annotated["actions"].get("events", gt_annotated["actions"])
+            # Owner-ratified corrections ride the event's "overrides" block
+            # (e.g. e5 f300 / e6 f310 spike_type, 2026-09-09) -- merge them
+            # over the event so the scorer grades the RATIFIED truth, not the
+            # pre-correction annotation.
+            gt_actions = [
+                {**e, **(e.get("overrides") or {})}
+                for e in gt_actions if isinstance(e, dict)
+            ]
             results["actions"] = evaluate_actions(
                 pred_actions, gt_actions, match_player=match_player,
                 gt_players=gt_annotated.get("players", {}).get("frames"))

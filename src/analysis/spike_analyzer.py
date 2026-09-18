@@ -66,24 +66,25 @@ class SpikeAnalyzer:
     # spiker's/digger's feet at a contact frame ~40 frames in the past.
     FOOT_SNAPSHOTS_MAX = 400
     # Spike type: classified by POST-CONTACT ASCENT (image px the ball rises
-    # above the contact point). Measured on entreno_3 GT (2026-08-30 diag):
-    # the touches launch at 19-29 px/f but rise 146-240 px (high arcs), the
-    # hard balls rise <=33 px (flat/downhill; f431 even left near-rest and
-    # fell). Raw exit speed CANNOT separate them -- a rainbow's vertical
-    # launch is as fast as a drive. Rise is computed over the ATTACK flight
-    # only (up to outcome resolution, so a dig's own loft does not count).
-    TOUCH_RISE_PX = 80.0
+    # above the contact point). Raw exit speed CANNOT separate the classes --
+    # a rainbow's vertical launch is as fast as a drive. Rise is computed
+    # over the ATTACK flight only (up to outcome resolution, so a dig's own
+    # loft does not count).
+    # 2026-09-09 ratification (open point 19): ONE ascent threshold covers
+    # both touch classes -- the fast rainbow (GT arcs cross 80 px by
+    # +4..+9f: e3 f174/f294, e5 f157, e6 f173) and the beach poke/tip (e5
+    # f300/pipeline f298: a soft tip arcing 64.5 px above the contact
+    # point, saturating ~+15f, exit vx only 18-22 px/f). The threshold is
+    # the MIDPOINT of the two measured boundary spikes: e5's poke at 64.50
+    # above and e1 f371 (GT-untyped, incumbent hard) at 50.50 below; every
+    # ratified hard stays at/below the contact point through its whole
+    # decision window (e3 f431 -25, e3 f539 -34, e6 f310 -30). The former
+    # second rule (no ascent + |exit vx| >= 25 + |exit vy| <= 12,
+    # 2026-09-06) was built on the poke misattributed to e6: it fired on
+    # e6's level-exit HARD and missed e5's true poke -- removed with the
+    # ratification.
+    TOUCH_RISE_PX = 57.0
     TYPE_WINDOW = 5           # sightings still used for the audit exit speed
-    # Poke/tip: a soft attacking touch (the beach "poke"/"cobra") does not
-    # loft -- it absorbs a fast DESCENDING arrival into a LEVEL, strongly
-    # HORIZONTAL push that floats to the deep corner (owner, e6 f309/311:
-    # vy_in +29 px/f, exit vx -47 px/f, vy_out +1.5, rise -30). The driven
-    # attacks it must not absorb exit DOWNWARD and nearly straight (e3
-    # f431 vx 5, f539 vx 14); all GT spikes overlap on every vertical
-    # feature, the horizontal exit is the separator (probe over all GT
-    # spikes, 2026-09-06: poke |vx| 46.9 vs hard max 13.9).
-    POKE_EXIT_VX_PX = 25.0    # |mean exit vx| at/above this ...
-    POKE_EXIT_VY_PX = 12.0    # ... with |exit vy| at/below this = poke touch
     # Outcome resolution.
     OUTCOME_HORIZON = 90      # frames after contact without resolution -> unknown
     DESCENT_MIN_PX = 4.0      # per-frame image-y gain that counts as descending
@@ -504,30 +505,7 @@ class SpikeAnalyzer:
             rise = base_y - min((y for (_f, _x, y) in flight), default=base_y)
             if rise >= self.TOUCH_RISE_PX:
                 return "touch", self._exit_speed(contact_frame, flight)
-            # Poke: no ascent, but the ball leaves LEVEL and strongly
-            # HORIZONTAL (see POKE_EXIT_* above) -- a soft attacking touch,
-            # not a driven ball.
-            if len(flight) >= 2:
-                vx, vy = self._exit_velocity(contact_frame, flight)
-                if (vx is not None and abs(vx) >= self.POKE_EXIT_VX_PX
-                        and vy is not None and abs(vy) <= self.POKE_EXIT_VY_PX):
-                    return "touch", self._exit_speed(contact_frame, flight)
         return None, self._exit_speed(contact_frame, flight)
-
-    def _exit_velocity(
-        self, contact_frame: int, flight: List[Tuple[int, float, float]]
-    ) -> Tuple[Optional[float], Optional[float]]:
-        """Mean per-frame (vx, vy) over the first TYPE_WINDOW sightings."""
-        window = flight[: self.TYPE_WINDOW]
-        if len(window) < 2:
-            return None, None
-        dt = window[-1][0] - window[0][0]
-        if dt <= 0:
-            return None, None
-        return (
-            (window[-1][1] - window[0][1]) / dt,
-            (window[-1][2] - window[0][2]) / dt,
-        )
 
     def _exit_speed(
         self, contact_frame: int, flight: List[Tuple[int, float, float]]

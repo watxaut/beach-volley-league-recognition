@@ -629,21 +629,27 @@ def test_reentry_needs_a_player_in_reach(clf):
 def test_poke_signature_gate(clf):
     """_is_poke_drive keys on the PER-FRAME level-horizontal exit. ``out`` is
     the NEIGH-window SUM, so the gate divides by NEIGH (conservative): the
-    measured e6 f309 poke is (-279, 39.5) -> (-39.9, +5.6)/frame. Driven
-    balls exit downward or nearly straight and must not qualify."""
-    assert clf._is_poke_drive("drive", (-279.0, 39.5)) is True   # the e6 poke
+    measured e6 f310 level exit is (-279, 39.5) -> (-39.9, +5.6)/frame (the
+    ratified HARD joust spike -- this gate keys its AIRBORNE toucher for the
+    takeoff-stance team read, not the spike type). Driven balls exit
+    downward or nearly straight and must not qualify."""
+    assert clf._is_poke_drive("drive", (-279.0, 39.5)) is True   # e6 f310 exit
     assert clf._is_poke_drive("drive", (-7 * 30.0, 7 * 20.0)) is False  # vy too big
     assert clf._is_poke_drive("drive", (-7 * 10.0, 7 * 5.0)) is False   # vx too small
     assert clf._is_poke_drive("bounce", (-7 * 47.0, 0.0)) is False      # wrong band
 
 
-def test_poke_constants_mirror_spike_analyzer():
-    """The classifier's attribution gate and the analyzer's type rule are ONE
-    measured discriminator (probe over all GT spikes, 2026-09-06); they must
-    not drift apart."""
+def test_spike_typing_is_analyzer_side_ascent():
+    """The 2026-09-09 ratification split the concerns: the spike TYPE is
+    SpikeAnalyzer's ascent rule alone (no POKE_EXIT_* there anymore), while
+    the classifier's POKE_EXIT_* gate only keys the airborne toucher for the
+    takeoff-stance TEAM read. Guard against the old constant-mirror
+    coupling silently returning."""
     from src.analysis.spike_analyzer import SpikeAnalyzer
-    assert ActionClassifier.POKE_EXIT_VX_PX == SpikeAnalyzer.POKE_EXIT_VX_PX
-    assert ActionClassifier.POKE_EXIT_VY_PX == SpikeAnalyzer.POKE_EXIT_VY_PX
+    assert not hasattr(SpikeAnalyzer, "POKE_EXIT_VX_PX")
+    assert not hasattr(SpikeAnalyzer, "POKE_EXIT_VY_PX")
+    assert ActionClassifier.POKE_EXIT_VX_PX == 25.0
+    assert ActionClassifier.POKE_EXIT_VY_PX == 12.0
 
 
 def test_takeoff_stance_majority_beats_landing_drift(clf):

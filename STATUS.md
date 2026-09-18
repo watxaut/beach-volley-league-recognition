@@ -5,11 +5,53 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-09 (eleventh session — poke GT ratified and
-REATTRIBUTED to e5 f300; e6 f310 is hard; inverted poke rule owned as point
-19)
+**Last updated:** 2026-09-09 (twelfth session — open point 19 RESOLVED:
+spike typing is ascent-only at 57 px; e5 f298 → touch, e6 f309 → hard;
+e1-e7 A/B minimal-diff; eval scorer now honors GT overrides)
 
 ## Where we are
+
+**(2026-09-09, twelfth session): the inverted poke rule is RETUNED — spike
+type is now ASCENT-ONLY (TOUCH_RISE_PX 80 → 57) and the level-exit |vx|/|vy|
+type rule is DELETED. Both ratified pairs score: e5 f298 touch / e6 f309
+hard; e3 4/4; teams and every other emitted field byte-identical on all
+seven videos.**
+
+- **Diagnosis first (output/diag_poke_retune_features2.py, byte-copy of the
+  GT-validated script loop):** the probe's decision-time view (per-frame
+  rise above the EVENT contact_point, exit windows, close frames) showed the
+  shipped rule inverted on its own evidence — e6's hard exits at |vx| 47
+  (fired "poke") while e5's true poke exits at |vx| 18-22 (below the 25
+  bar), and e5's arc tops out at 64.5 px above the contact point — under
+  the old 80 px rainbow bar. Every ratified hard stays at/below the contact
+  point through its whole decision window (e3 f431 −25, f539 −34 at its
+  dig-close, e6 f310 −30). Ascent alone separates all three classes; vx
+  added nothing but the false positive.
+- **Boundary discovery (A/B caught it):** a first cut at 50 px flipped e1
+  f371 (GT-untyped, incumbent hard) whose ball rises EXACTLY 50.5 px and
+  floats level — a real boundary spike, not noise. The shipped threshold is
+  the MIDPOINT of the two measured boundary rises: e5's poke 64.50 above,
+  e1 f371 50.50 below → TOUCH_RISE_PX = 57 (6.5 px margin both sides).
+- **Coupling owned (19b):** the classifier's `_is_poke_drive` team gate is
+  UNTOUCHED byte-for-byte — it keys the AIRBORNE toucher for the
+  takeoff-stance team read (e6 f309 team A preserved, production CSV
+  `309,3,1,A,hard,A1,out`); only its comments now say what it is (the
+  ratified e6 f310 is a hard whose toucher is airborne by construction).
+  The type/team concern split is drift-guarded: the old constant-mirror
+  tests are replaced by a guard asserting SpikeAnalyzer has NO POKE_EXIT_*
+  and the classifier keeps its own 25/12.
+- **Eval gap fixed (scripts/evaluate.py):** the scorer ignored the GT
+  `overrides` block, so ratified corrections (e5/e6 spike_type) were
+  invisible to eval — spike_type was simply unscored on e5/e6. GT events
+  are now merged with their overrides before scoring; e3 4/4, e5 1/1,
+  e6 1/1, teams 14/14 + 7/7 + 7/7; labels F1 e3 1.0 / e5 1.0 / e6 0.933
+  (the e6 FN is the unemittable no-touch block) — all equal to the
+  recorded baselines.
+- **Measured:** suite 370 green (TestPokeType rewritten for the ratified
+  physics: moderate slow arc = touch, e6 level exit = hard, narrow drive =
+  hard; both mirror tests replaced). e1/e2/e3/e4/e7 action logs
+  BYTE-IDENTICAL; e5/e6 differ in exactly one field each (the spike_type).
+  Production src.main e5+e6 spikes CSVs confirm the script path.
 
 **(2026-09-09, eleventh session): the poke GT RATIFIED — and the 09-08
 dictation was misattributed: THE poke is e5's f300 spike (pid 2 B, now
@@ -939,25 +981,6 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Open points
 
-19. **[NEW 2026-09-09 — the poke rule is INVERTED; the owned retune, sheets
-    first.]** The eleventh-session ratification moved the poke: e5 f300 IS
-    the poke (touch), e6 f310 is HARD. The shipped machinery encodes the
-    opposite: (a) spike_analyzer's poke rule (no ascent + |exit vx| ≥ 25 +
-    |exit vy| ≤ 12) fires on e6's level exit (vx −49) → touch where GT says
-    hard, and misses e5's true poke, which ASCENDS (+124 px by f315, exit
-    vx +20..+27, vy −20..−8 — a soft tip arcs to the back of the field).
-    Candidate separators to measure: post-contact ascent (delayed ~2f,
-    peaking 7-15f after the pipeline contact f298 — maybe TOUCH_RISE_PX's
-    window is simply too short), exit-vy sign, ascent-vs-level ratio. Must
-    keep put: e3's two hard spikes (vx 5/14, falling), e5 f160's rainbow
-    touch, e6 f173. (b) COUPLING: the classifier's stance-majority team
-    rule (_is_poke_drive) keys on the same level-exit signature; e6 f309
-    team A is correct TODAY (GT A), but re-typing e6 hard without moving
-    that scope regresses e6 team to B. (c) The resolver's
-    block-at-touch-3 fall-through is NOT affected (gesture-vs-possession
-    logic, poke-independent). One mechanism, GT-sheet protocol, e1-e7 A/B
-    + production src.main confirmation; suite drift-rows to update.
-
 18. **[NEW 2026-09-06 — squatter-review known limits; ranked revisit
     triggers.]** (a) **Match-footage dead time:** a real player off-court
     between points can look squatter-like (long out-of-court stretches); the
@@ -1277,6 +1300,49 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-09 (twelfth session) — open point 19: the inverted poke rule retuned (ascent-only typing)
+
+- **Probe (output/diag_poke_retune_features{,2}.py, git-ignored):** v1 had a
+  measurement bug worth recording — SpikeAnalyzer's spike RECORD carries no
+  `contact_point` (only the EVENT does), so rise measured from the first
+  post-contact sighting is the wrong reference. v2 captures the raw events
+  and reproduces the analyzer's exact decision-time view. Measured over the
+  eight pipeline spikes: rainbow touches cross 80 px rise at +4..+9f; the
+  hards never rise (e3 f431 −25, f539 −34 at its dig-close, e6 f309 −30);
+  e5's poke arcs 64.5 px saturating ~+15f with exit vx only 18-22; e6's
+  hard exits level at |vx| 47. The shipped |vx|≥25/|vy|≤12 rule was
+  measured-inverted; ascent alone separates.
+- **Shipped (src/analysis/spike_analyzer.py):** TOUCH_RISE_PX 80 → 57 (the
+  midpoint of the two measured boundary rises — e5's poke 64.50 above, e1
+  f371 50.50 below), the |vx|/|vy| poke test + `_exit_velocity` deleted.
+  The classifier's `_is_poke_drive` (team path) byte-untouched; comments
+  reworded to the ratified reading (airborne-net-contact team gate, not the
+  poke type).
+- **A/B catch:** at threshold 50, e1 f371 (GT spike_type null, incumbent
+  hard) flipped to touch — its ball rises exactly 50.5 px and floats. Not
+  noise; the threshold moved to 57 rather than accepting an unratified
+  change. Final A/B (output/poke19/post57 vs the p16-HEAD baselines in
+  output/poke/post_actions): e1/e2/e3/e4/e7 BYTE-IDENTICAL; e5/e6 differ in
+  exactly one field each (spike_type hard→touch / touch→hard).
+- **Eval scorer fix (scripts/evaluate.py):** GT `overrides` are now merged
+  into events before scoring — ratified corrections (e5 f300 touch, e6 f310
+  hard) are gradable. Result: spike_type e3 4/4, e5 1/1, e6 1/1; teams
+  1.0 everywhere; labels F1 e3 1.0 / e5 1.0 / e6 0.933 (unchanged FN = the
+  unemittable no-touch block).
+- **Tests:** suite 370 green. TestPokeType rewritten (moderate-slow-arc →
+  touch with exit vx below the old bar; e6 level exit → hard; narrow drive
+  → hard); the two POKE_EXIT constant-mirror tests replaced by a guard
+  that the analyzer has NO poke-exit constants and the classifier keeps
+  its own (the type/team concern split, drift-locked).
+- **Production:** src.main e5 `298,1,4,B,touch,A3,out` and e6
+  `309,3,1,A,hard,A1,out` — both flips confirmed end-to-end, e6 team A
+  preserved.
+- Files: src/analysis/spike_analyzer.py, src/recognition/action_classifier.py
+  (comments only), scripts/evaluate.py, tests/test_spike_analyzer.py,
+  tests/test_team_attribution.py, STATUS.md. Artifacts (git-ignored):
+  output/diag_poke_retune_features*.py/.txt, output/diag_e1_f371_probe.py,
+  output/poke19/.
 
 ### 2026-09-06 (ninth session) — open point 16: in-court preference in the association cost
 

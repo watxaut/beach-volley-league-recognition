@@ -116,19 +116,20 @@ class ActionClassifier:
     REENTRY_TEAM_BACK = 12    # takeoff-stance window (frames before contact),
     REENTRY_TEAM_END = 2      # mirroring SpikeAnalyzer's [c-12, c-2]
 
-    # Poke-class drive: the outgoing ball is LEVEL and strongly HORIZONTAL
-    # -- the beach poke/tip over the block (e6 f309: exit vx -47 px/f,
-    # vy +1.5; owner: "poke to the back of the field"). The toucher is
-    # airborne by construction -- redirecting a fast descent level across
+    # Level-horizontal exit gate for the TAKEOFF-STANCE team read. It keys
+    # the AIRBORNE-net-contact shape, not the spike type (typing is
+    # SpikeAnalyzer's ascent rule): the toucher of a level-exit net contact
+    # is airborne by construction -- redirecting a fast descent level across
     # the court takes a jump -- so the contact-time feet project deep and
     # the court team read flips sides; the emitted team comes from the
-    # takeoff-stance majority instead. Measured separator vs driven balls
-    # (probe over all GT spikes, 2026-09-06): the hards exit downward and
-    # nearly straight (e3 f431 vx 5, f539 vx 14) while the poke reaches
-    # |vx| 47 -- and every vertical feature overlaps. Thresholds mirror
-    # SpikeAnalyzer's POKE_EXIT_* (equality drift-pinned by test).
+    # takeoff-stance majority instead. Poster child: e6 f310, the ratified
+    # HARD joust spike (exit vx -47 px/f, vy +1.5) whose team must read A.
+    # Driven balls excluded by the same gates as measured 2026-09-06: they
+    # exit downward and nearly straight (e3 f431 vx 5, f539 vx 14). The
+    # historical "poke" name survives in the identifiers; the 2026-09-09
+    # ratification moved THE poke to e5 f300 (analyzer-side, ascent-based).
     POKE_EXIT_VX_PX = 25.0    # |mean exit vx| at/above this ...
-    POKE_EXIT_VY_PX = 12.0    # ... with |exit vy| at/below this = poke
+    POKE_EXIT_VY_PX = 12.0    # ... with |exit vy| at/below this = airborne
 
     # --- Drive (attacking hit) detection ---
     # A spike drives the ball down/across: unlike a dig it does not pop the ball
@@ -402,10 +403,11 @@ class ActionClassifier:
 
     def _is_poke_drive(self, kind: str, out: Tuple[float, float]) -> bool:
         """True for a drive-band contact whose outgoing ball is LEVEL and
-        strongly HORIZONTAL per frame -- the poke/tip signature (see
-        POKE_EXIT_*). ``out`` is the net outgoing vector summed over the
-        vertex's NEIGH window; dividing by NEIGH is the conservative
-        (lower-bound) per-frame rate."""
+        strongly HORIZONTAL per frame -- the airborne-net-contact shape for
+        the takeoff-stance team read (see POKE_EXIT_*; NOT the spike type,
+        which SpikeAnalyzer decides by post-contact ascent). ``out`` is the
+        net outgoing vector summed over the vertex's NEIGH window; dividing
+        by NEIGH is the conservative (lower-bound) per-frame rate."""
         if kind != "drive":
             return False
         vx, vy = out[0] / self.NEIGH, out[1] / self.NEIGH
