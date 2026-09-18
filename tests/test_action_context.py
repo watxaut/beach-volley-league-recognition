@@ -10,13 +10,16 @@ from src.recognition.volleyball_actions import VisualGesture
 from src.recognition.action_context import resolve_actions, ActionContextResolver
 
 
-def _contact(frame, gesture, near_net=True, behind_baseline=False, team="A"):
+def _contact(frame, gesture, near_net=True, behind_baseline=False, team="A",
+            ball_side=None, contact_kind=None):
     return {
         "frame": frame,
         "gesture": gesture,
         "near_net": near_net,
         "behind_baseline": behind_baseline,
         "team": team,
+        "ball_side": ball_side,
+        "contact_kind": contact_kind,
     }
 
 
@@ -123,6 +126,102 @@ def test_gap_starts_new_rally():
     ]
     labels = _labels(contacts)
     assert labels[0] == "dig" and labels[2] == "dig"
+
+
+def _e7_rally():
+    """The e7 shape the width-confirmed cross fixes (2026-09-12): B's dig+set
+    are emitted, B's 3rd-touch spike (GT f160) is NOT (its toucher is
+    untracked, attribution by design), so A's reception (GT f197) lands on the
+    would-be 3rd count and A's hands-overhead set at the net (GT f243) reads
+    as a 4th-touch wrap -> touch 1 -> kept as a block by the touch-1 block
+    gate. With the ball's width side on A's toucher at both contacts, the
+    possession flips at the reception and the set reads set."""
+    return [
+        _contact(25, VisualGesture.BUMP_SET, near_net=False, behind_baseline=True,
+                 team="A"),
+        _contact(59, VisualGesture.BUMP_SET, team="B", ball_side="B"),
+        _contact(112, VisualGesture.BUMP_SET, team="B", ball_side="B"),
+        _contact(195, VisualGesture.BUMP_SET, near_net=False, team="A",
+                 ball_side="A"),
+        _contact(242, VisualGesture.BLOCK, team="A", ball_side="A",
+                 contact_kind="drive"),
+        _contact(316, VisualGesture.BUMP_SET, team="B", ball_side="B"),
+    ]
+
+
+def test_width_confirmed_cross_flips_possession_at_the_crossing_contact():
+    """e7 f195/f242: the would-be-3rd touch by the other team with the ball's
+    width side on the toucher flips the possession THERE (the wrap fired one
+    contact late), so the reception is t1 and the next touch is t2 -- and the
+    own-side drive-band block read falls through to the touch-2 set rule."""
+    out = resolve_actions(_e7_rally())
+    assert [(e["action"], e["touch_number"]) for e in out] == [
+        ("serve", 1), ("dig", 1), ("set", 2),
+        ("dig", 1), ("set", 2), ("dig", 1),
+    ]
+
+
+def test_cross_flip_needs_width_evidence():
+    """Without ball_side (width abstains / uncalibrated court) the old wrap
+    behavior stands: the would-be-3rd cross stays touch 3 and the next touch
+    wraps to touch 1 -- where the drive-band block read stays a block."""
+    contacts = [dict(c, ball_side=None) for c in _e7_rally()]
+    out = resolve_actions(contacts)
+    assert [(e["action"], e["touch_number"]) for e in out] == [
+        ("serve", 1), ("dig", 1), ("set", 2),
+        ("dig", 3), ("block", 1), ("dig", 1),
+    ]
+
+
+def test_cross_flip_refused_at_would_be_touch_2():
+    """e2 f118 protection: a team change on the would-be 2ND touch does not
+    flip -- the real possession opener (e2's f90 dig) may simply be missing,
+    and the touch-2 set must keep its read."""
+    contacts = [
+        _contact(32, VisualGesture.BUMP_SET, near_net=False, team="A"),
+        _contact(118, VisualGesture.BUMP_SET, team="B", ball_side="B"),
+        _contact(204, VisualGesture.BUMP_SET, near_net=False, team="A",
+                 ball_side="A"),
+    ]
+    out = resolve_actions(contacts)
+    assert [(e["action"], e["touch_number"]) for e in out] == [
+        ("dig", 1), ("set", 2), ("dig", 3),
+    ]
+
+
+def test_cross_flip_needs_team_change():
+    """Same team on the would-be 3rd touch is an ordinary 3rd touch (e6 f309:
+    A digs, A sets, A's touch-3 block gesture still resolves via the
+    touch-3-at-net spike rule)."""
+    contacts = [
+        _contact(10, VisualGesture.BUMP_SET, near_net=False, team="A"),
+        _contact(40, VisualGesture.BUMP_SET, team="A", ball_side="A"),
+        _contact(65, VisualGesture.BLOCK, team="A", ball_side="A",
+                 contact_kind="drive"),
+    ]
+    out = resolve_actions(contacts)
+    assert [e["action"] for e in out] == ["dig", "set", "spike"]
+
+
+def test_own_side_drive_block_falls_through_redirect_band_kept():
+    """The own-side refutation is scoped to the DRIVE band with positive
+    width evidence: a redirect-band block (the stuffed-attack shape, e1's
+    joust) keeps the block even when width commits, and a drive-band block
+    with width abstaining keeps it too (e6 f309 shape at touch 1)."""
+    redirect = [
+        _contact(10, VisualGesture.BUMP_SET, near_net=False, team="A",
+                 ball_side="A"),
+        _contact(58, VisualGesture.BLOCK, team="A", ball_side="A",
+                 contact_kind="redirect"),
+    ]
+    assert [e["action"] for e in resolve_actions(redirect)] == ["dig", "block"]
+
+    abstaining = [
+        _contact(10, VisualGesture.BUMP_SET, near_net=False, team="A"),
+        _contact(58, VisualGesture.BLOCK, team="A", ball_side=None,
+                 contact_kind="drive"),
+    ]
+    assert [e["action"] for e in resolve_actions(abstaining)] == ["dig", "block"]
 
 
 def test_streaming_matches_batch():

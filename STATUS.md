@@ -5,12 +5,73 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-09 (twelfth session — open point 19 RESOLVED:
-spike typing is ascent-only at 57 px; e5 f298 → touch, e6 f309 → hard;
-e1-e7 A/B minimal-diff; eval scorer now honors GT overrides)
+**Last updated:** 2026-09-19 (thirteenth session — open point 15(e) label item
+RESOLVED: the width-confirmed cross + own-side drive-block refutation; e7
+f242 block → set, e7 F1 0.625 → 0.75 with e1-e6 byte-identical; f316's team
+item re-owned as a suspected GT slip, re-ratification sheet built)
 
 ## Where we are
 
+**(2026-09-19, thirteenth session): open point 15(e)'s label item is RESOLVED
+— the resolver now owns a WIDTH-CONFIRMED CROSS and an own-side drive-block
+refutation, both keyed on the ball's width side (the project's validated
+side signal) instead of new constants. e7's f242 reads set A t2 (GT ✓, the
+attribution tid 3 = GT P3A untouched) and e7 eval F1 0.625 → 0.75 / P 0.833
+→ 1.0; e1-e6 action streams BYTE-IDENTICAL; suite 375 green.**
+
+- **Diagnosis first (output/probe_e15e/, git-ignored):** the f242 mislabel
+  decomposed into ONE starvation: B's f160 spike is unemittable (toucher
+  untracked — attribution by design, GT agrees), so the wrap rule reset the
+  possession one contact LATE — A's f195 reception read t3, f242 wrapped to
+  t1, and the touch-1 block gate kept the drive-band hands-overhead read as
+  a block. Measured shapes split the contested contacts cleanly: e1 f256 /
+  e5 f298 (validated blocks/spike) are REDIRECT-band; e7 f242 / e6 f309 are
+  drive-band; width-side evidence (ball_side, already threaded into every
+  contact by team-aware attribution) commits A on e7 f242's own-side toucher
+  and abstains at both jousts.
+- **Shipped (src/recognition/action_context.py only):** (1) WIDTH-CONFIRMED
+  CROSS — a non-attack touch that would be the 3rd+ of the latched
+  possession, by the OTHER team, with ball_side == toucher team, flips the
+  possession AT the crossing contact (the wrap rule with evidence, no longer
+  one contact late). Gates measured against every regression candidate:
+  would-be touch >= 3 (e2 f118's GT set keeps its t2 — its possession opener
+  e2 f90 is structurally invisible; a would-be-2 team change is a missed
+  reception or attribution wobble, not proof of a cross), positive width
+  only (e5 f298's flip is refused — its over-set ball still reads the
+  setter's regime — its GT t1 stays cosmetic), and never past attack/rally
+  resets. (2) OWN-SIDE DRIVE-BLOCK REFUTATION — you cannot block your own
+  side's ball: a drive-band BLOCK gesture with ball_side == team falls
+  through to the touch-position rules (redirect-band blocks keep the block
+  unconditionally — e1's joust emission; abstaining drive reads keep it
+  too — e6 f309). Zero new constants, zero config.
+- **GT semantics discovery:** the GT's touch_number counts per-TEAM
+  possession (any cross restarts the receiver at t1) — proven by the GT's
+  own e4 f329 spike t1 and e5 f300 spike t1 (each preceded by the OTHER
+  team's set, not an attack). The width-confirmed cross implements exactly
+  this; the old attack-based counting matched only because attacks are the
+  usual cross.
+- **Measured:** fresh HEAD baselines FIRST (output/e15e/base_actions, all 7,
+determinism re-verified vs the p16 baselines), then the edit, then A/B:
+  e1-e6 BYTE-IDENTICAL (incl. confidences); e7 differs in exactly two
+  fields — f195 t3→t1 (GT ✓) and f242 block→set t1→t2 (GT ✓). Eval: e7
+  F1 0.625→0.75, P 0.833→1.0, R 0.5→0.6, team 0.833 unchanged; e1-e6 all
+  at their recorded baselines (0.706 / 0.571 / 1.0 / 1.0 / 1.0 / 0.933,
+  teams 1.0). Production src.main e7: player_3 Set_Count 1 (was Block).
+  Suite 375 green (+5: cross flip + width-gate + would-be-2 refusal +
+  same-team refusal + redirect/abstain block preservation).
+- **f316's team re-owned as a suspected GT SLIP (NOT a code item):** the GT
+  reads "f315 dig P1A" but track 1 — the pipeline's toucher AND the GT's
+  own P1B at f112, same rally — is far-side on 351/353 observed frames, the
+  ball's width commits B (23-24px, true far regime) at the contact, and
+  the GT's own t1→t2 pattern (f315 dig t1 → f370 set P4B t2) reads as B's
+  possession. A player cannot change teams mid-rally. Re-ratification
+  sheet: output/e15e/reratify_e7_f315_team.png (f300-320 stamped
+  P<tid><foot-team> + net line + f316 contact). If the owner confirms B,
+  e7 team reads 1.0 with zero code change.
+- **e2's f256 residual now explained:** its dig-vs-set miss needs a
+  would-be-2 flip (possession opener f90 invisible) — deliberately refused
+  (the same gate that protects e2 f118). Not worth chasing without the
+  held-ball-release contact.
 **(2026-09-09, twelfth session): the inverted poke rule is RETUNED — spike
 type is now ASCENT-ONLY (TOUCH_RISE_PX 80 → 57) and the level-exit |vx|/|vy|
 type rule is DELETED. Both ratified pairs score: e5 f298 touch / e6 f309
@@ -1035,18 +1096,22 @@ constraint. Side changes need no special handling as long as IDs survive.
     FP and f118 now reads set (GT ✓); e2 F1 0.533 → 0.571.** Residual:
     the cascade shift makes f256's GT set read dig (CSV-context only;
     labels net-positive).
-    (e) **PARTLY RESOLVED 2026-09-09; the rest is TRACKING-side, reowned:**
-    the false f239 vertex is gone and the real f243 set fires at f242
-    (dist 1) — still labeled block pending the upstream cascade fix (the
-    missing f160 starves the touch count; the block-vs-set label also
-    needs an attack-before condition). REFRAMED as not classifier-side:
-    f160's contact IS detected (bounce@162) and dies at the reach gate —
-    the rainbow toucher is UNTRACKED (attribution by design; GT agrees);
-    f300's spike ball was never tracked there (ball-recall gap — fold into
-    point 1's tracking diagnosis); f370's set sits in a 6f sighting gap
-    and re-appears descending (no bridge signature — parked, needs a
-    set-arc-in-gap manufacture if ever wanted). f316's team (B vs ratified
-    P1A) stays open as an attribution item. e7 now F1 0.625, team 0.833.
+    (e) **PARTLY RESOLVED 2026-09-09; label item RESOLVED 2026-09-19 (the
+    width-confirmed cross + own-side drive-block refutation, see Where we
+    are); the f316 team item re-owned as a suspected GT slip:** the false
+    f239 vertex is gone, the real f243 set fires at f242 (dist 1) and now
+    READS set (the f160 starvation no longer cascades — the wrap fires at
+    the crossing contact with width evidence); e7 F1 0.75, P 1.0. f316's
+    team (B vs GT "A") is NOT a code item: track 1 is the GT's own P1B at
+    f112 (same rally), far-side on 351/353 frames, width commits B at the
+    contact, and the GT's t1→t2 pattern reads as B's possession — sheet
+    output/e15e/reratify_e7_f315_team.png awaits the owner. Still
+    TRACKING-side, reowned: f160's toucher is untracked (attribution by
+    design; GT agrees); f300's spike ball was never tracked there
+    (ball-recall gap — fold into point 1's tracking diagnosis); f370's set
+    sits in a 6f sighting gap and re-appears descending (no bridge
+    signature — parked, needs a set-arc-in-gap manufacture if ever
+    wanted).
     (f) **RESOLVED 2026-09-08 — e7 GT RATIFIED with corrections:** f55→f61
     (digger UNTRACKED, owner screenshot), f110→f112 P1B, f160 confirmed
     (rainbow, toucher untracked until f166), f200→f197 P2A, f244→f243 P3A,
@@ -1300,6 +1365,49 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-19 (thirteenth session) — open point 15(e): width-confirmed cross + own-side drive-block refutation
+
+- **Protocol:** fresh HEAD baselines for all 7 videos FIRST
+  (output/e15e/base_actions; determinism re-verified against the p16
+  baselines before any edit), probe/capture scripts under output/probe_e15e
+  (git-ignored), edit only after ALL_DONE.
+- **Probe (output/diag_e15e_probe.py):** the f242 contact is drive-band,
+  near-net, hands-overhead, width committed A (36px, votes 1) on an A
+  toucher; expected-team A picked track 3 (GT P3A) — attribution was never
+  the problem, the label was. f316: width commits B (23-24px ×3 votes,
+  true far regime), track 1 chosen (GT's named toucher) with contact-foot
+  B.
+- **Offline simulation BEFORE implementation (output/diag_e15e_sim.py +
+  streams/snaps captured for all 7):** naive variants were measured and
+  rejected — the plain team-flip breaks e2 f118 (set→dig: its possession
+  opener e2 f90 is invisible) and e5 f298; the broad stance-window team
+  read breaks e5 f298 (its spiker's approach snapshots read A while GT
+  says B). The shipped gates (would-be≥3 + positive width) were chosen
+  from these measurements; the final rule simulated IDENTICAL on e1-e6
+  and exactly the two designed e7 field changes.
+- **Shipped:** src/recognition/action_context.py (resolver only —
+  cross_flip in resolve(), own_side_drive_block into _decide; docstrings
+  updated; zero new constants/config). No classifier/tracker changes —
+  ball_side was already threaded into every contact by team-aware
+  attribution.
+- **A/B:** e1-e6 BYTE-IDENTICAL (frames/labels/teams/ids/touch/conf);
+  e7: f195 t3→t1, f242 block t1 → set t2. Eval (--ignore-player, actions
+  component): e7 F1 0.625→0.75, P 0.833→1.0, R 0.5→0.6; e1-e6 unchanged
+  at baselines. Production src.main e7: player_3 Set_Count 1 (was
+  Block_Count), serve/set/dig counts match the script path.
+- **Tests:** suite 375 green (+5 in tests/test_action_context.py: the e7
+  chain end-to-end, width-evidence requirement, would-be-2 refusal, 
+  same-team refusal, redirect-band/abstaining block preservation).
+- **f316 GT suspect:** sheet output/e15e/reratify_e7_f315_team.png (f300-320,
+  P<tid><foot-team> stamps, net line, f316 contact marked). The GT's f112
+  "P1B" vs f315 "P1A" for the SAME track in the SAME rally is the
+  primary contradiction; if the owner ratifies B, e7 team reads 1.0 with
+  zero code change (the pipeline already emits team B, toucher track 1).
+- Files: src/recognition/action_context.py, tests/test_action_context.py,
+  STATUS.md. Artifacts (git-ignored): output/e15e/ (baselines, post-run,
+  evals, sheet), output/probe_e15e/ (probe, sim, per-video streams+snaps),
+  output/diag_e15e_*.py.
 
 ### 2026-09-09 (twelfth session) — open point 19: the inverted poke rule retuned (ascent-only typing)
 
