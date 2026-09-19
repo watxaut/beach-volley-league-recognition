@@ -1,0 +1,24 @@
+ground_truth/video_entreno_7_annotations.json
+  s_a85945d4cf97ed::t_2617787088340d 2-11,13-15,17-151,153-177
+  s_a85945d4cf97ed::t_da23d482db7e74 152
+STATUS.md
+  s_a85945d4cf97ed::t_2253e9e89b1d0f 8-12,1380-1392
+  s_a85945d4cf97ed::t_c81376d077eb41 63-82,1116-1119
+  s_a85945d4cf97ed::t_f3461a239f7d44 1393
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "ba3d1b2c6012a2fe1dc8f811ede25a79429375c9",
+  "prompts": {},
+  "sessions": {
+    "s_a85945d4cf97ed": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0b669-7f6a-7780-8188-db96798ecd0d",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
