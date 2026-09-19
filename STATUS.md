@@ -5,10 +5,11 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-19 (thirteenth session — open point 15(e) label item
-RESOLVED: the width-confirmed cross + own-side drive-block refutation; e7
-f242 block → set, e7 F1 0.625 → 0.75 with e1-e6 byte-identical; f316's team
-item re-owned as a suspected GT slip, re-ratification sheet built)
+**Last updated:** 2026-09-19 (thirteenth session — open point 15(e) RESOLVED:
+width-confirmed cross + own-side drive-block refutation shipped, e7 F1
+0.625 → 0.75; f316 team closed as a GT slip after the owner's sheet ruling
+— pipeline was right; e7 team 1.0. Two follow-ups flagged: GT f370's P4B
+id, track-4 airborne foot-team flap)
 
 ## Where we are
 
@@ -59,15 +60,26 @@ determinism re-verified vs the p16 baselines), then the edit, then A/B:
   teams 1.0). Production src.main e7: player_3 Set_Count 1 (was Block).
   Suite 375 green (+5: cross flip + width-gate + would-be-2 refusal +
   same-team refusal + redirect/abstain block preservation).
-- **f316's team re-owned as a suspected GT SLIP (NOT a code item):** the GT
-  reads "f315 dig P1A" but track 1 — the pipeline's toucher AND the GT's
-  own P1B at f112, same rally — is far-side on 351/353 observed frames, the
-  ball's width commits B (23-24px, true far regime) at the contact, and
-  the GT's own t1→t2 pattern (f315 dig t1 → f370 set P4B t2) reads as B's
-  possession. A player cannot change teams mid-rally. Re-ratification
-  sheet: output/e15e/reratify_e7_f315_team.png (f300-320 stamped
-  P<tid><foot-team> + net line + f316 contact). If the owner confirms B,
-  e7 team reads 1.0 with zero code change.
+- **f316 team RESOLVED — the GT letter was the slip (owner ruling
+  2026-09-19, folded):** off the sheet
+  output/e15e/reratify_e7_f315_team.png the owner ruled the contact is on
+  the FAR side, the P2B (yellow) player is far from it, P4 is really a
+  NEAR-team player (its B-flapping stamps are the airborne spiker's feet),
+  the blocker at the net is the far-side player, and the P1/P3 boxes
+  overlap (occlusion — track 1's box bottom y=532 sits inside track 3's
+  y-range) with P1 also very close to the ball. Toucher = track 1 = P1,
+  team B — exactly the pipeline's emission (f316 dig tid 1 team B, never
+  changed). GT f315 folded to P1B (+team_in_possession B) with the ruling
+  as provenance; e7 eval after the fold: F1 0.75, P 1.0, team 1.0 (6/6).
+- **Two follow-ups from the same ruling (flagged, not folded):** (a) GT
+  f370 "set P4B" is now incoherent — the owner's mapping is near = {3,4},
+  far = {1,2}, so B's f370 setter must be P1 or P2 (the far setter is P1,
+  who set at f112); confirm the id at the next ratification pass (the
+  event is unemitted/parked regardless). (b) Track 4's per-contact foot
+  team flaps B while airborne at the net (y≈560-571 mid-jump vs ≈605+
+  grounded) — same airborne-feet artifact class the takeoff-stance reads
+  exist for; only matters if f300's spike ball ever gets tracked (point 1
+  ball-recall), no code change today.
 - **e2's f256 residual now explained:** its dig-vs-set miss needs a
   would-be-2 flip (possession opener f90 invisible) — deliberately refused
   (the same gate that protects e2 f118). Not worth chasing without the
@@ -1101,11 +1113,10 @@ constraint. Side changes need no special handling as long as IDs survive.
     are); the f316 team item re-owned as a suspected GT slip:** the false
     f239 vertex is gone, the real f243 set fires at f242 (dist 1) and now
     READS set (the f160 starvation no longer cascades — the wrap fires at
-    the crossing contact with width evidence); e7 F1 0.75, P 1.0. f316's
-    team (B vs GT "A") is NOT a code item: track 1 is the GT's own P1B at
-    f112 (same rally), far-side on 351/353 frames, width commits B at the
-    contact, and the GT's t1→t2 pattern reads as B's possession — sheet
-    output/e15e/reratify_e7_f315_team.png awaits the owner. Still
+    the crossing contact with width evidence); e7 F1 0.75, P 1.0, team 1.0
+    (GT f315 folded to P1B after the owner's sheet ruling — the pipeline's
+    emission was correct all along; see Where we are). f316's team is
+    closed as a GT slip. Still
     TRACKING-side, reowned: f160's toucher is untracked (attribution by
     design; GT agrees); f300's spike ball was never tracked there
     (ball-recall gap — fold into point 1's tracking diagnosis); f370's set
@@ -1365,6 +1376,20 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-19 (thirteenth session, round 2) — f316 GT slip ruled and folded
+
+- Owner ruling on output/e15e/reratify_e7_f315_team.png: contact on the FAR
+  side; P2B (yellow) far from it; P4 really NEAR team (stamps flap B
+  mid-jump — airborne feet); the net blocker is the FAR-side player; the
+  P1/P3 boxes overlap (occlusion) with P1 also very close to the ball →
+  toucher = P1 (track 1), team B = the pipeline's emission, unchanged.
+- GT fold: f315 dig team A→B, team_in_possession→B, provenance note
+  recorded. e7 eval: F1 0.75, P 1.0, team 1.0 (6/6).
+- Flagged for the next ratification pass: GT f370 "set P4B" id now
+  incoherent under near={3,4}/far={1,2} (B's f370 setter should be P1 or
+  P2); track-4 airborne foot-team flap recorded as an artifact class, no
+  code change (f300 unemitted today).
 
 ### 2026-09-19 (thirteenth session) — open point 15(e): width-confirmed cross + own-side drive-block refutation
 
