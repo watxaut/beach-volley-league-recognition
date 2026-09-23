@@ -1,0 +1,31 @@
+STATUS.md
+  s_b94360a00b4b4b::t_344574034c2ccf 1096-1107
+  s_b94360a00b4b4b::t_ad34d3b2596095 1436-1455
+  s_b94360a00b4b4b::t_1088095e83c10f 1232-1241
+  s_b94360a00b4b4b::t_3f985394f74c89 8-12,16-54
+src/utils/config.py
+  s_b94360a00b4b4b::t_ce495a4168380f 22-27
+src/utils/video_upscale.py
+  s_b94360a00b4b4b::t_0015ea561c53ad 1-159
+src/main.py
+  s_b94360a00b4b4b::t_c16d32fb523554 15,147-156,163-164,167,176
+  s_b94360a00b4b4b::t_989bac4d4a15f5 205
+tests/test_video_upscale.py
+  s_b94360a00b4b4b::t_63e069c03b1fc6 1-84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "1fcc01db2b6c309d8b73912e5f6a1c7d23ce9a8a",
+  "prompts": {},
+  "sessions": {
+    "s_b94360a00b4b4b": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0cb2b-3aac-7575-8f8d-32da72e5c22e",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
