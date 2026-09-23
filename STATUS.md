@@ -5,14 +5,72 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-23 (fourteenth session — new match footage intake:
-20260920 ari vs joan (lost), the first REAL match with side switches — open
-point 2's blocker is gone. Shipped the one-time sub-1080p ingest upscale
-(720p source → 1080p cache) so the px constants keep their tuned geometry.
-Deferred: the file is ~25.7fps effective vs the 30fps tuning.)
+**Last updated:** 2026-09-23 (fifteenth session — FIRST FULL-MATCH RUN on
+20260920: the episode layer finds all ~39 rallies but the point layer
+confirms only 14 — ball-track recall is the bottleneck; the player roster
+holds 4/4 all match with 0 id-number churn, but identities HOP across
+humans (46 resurrections, one visually confirmed mid-rally box jump).
+Open point 20 opened for the ball-recall separation; point 2 needs the GT
+pass before side-change survival can be judged.)
 
 ## Where we are
 
+**(2026-09-23, fifteenth session): FIRST FULL-MATCH RUN — the point layer
+STARVES (14 confirmed vs ≈39 rallies), the player roster HOLDS but identities
+HOP; root cause is BALL-TRACK RECALL on this footage, not the point machine.
+No src changes — diagnosis only, all artifacts in git-ignored
+`output/match20260920/` (pipeline run, tracks dump, ball-only pass, sheets,
+`diag_match_analysis.py`).** Owner score statement: final ~21-15, near team
+of the first point wins → ≈36 rallies.
+
+- **What ran:** (1) full production batch, `python -m src.main`
+  `resources/full_videos/20260920_match_ari_joan_lost.mp4 --output-dir
+  output/match20260920` (38 min MPS, ~11 it/s; calibration auto-detected,
+  verified aligned on 3 spread frames). (2) production-config
+  `scripts/dump_player_tracks.py` on the `_up1080` file (passing
+  `--court calibrations/20260920_match_ari_joan_lost.json` explicitly — its
+  stem auto-detect misses cached files). (3) a production-parity BALL-ONLY
+  pass (`diag_ball_pass.py`, FrameProcessor ctor args mirrored). (4)
+  `scripts/analyze_tracking.py` + `diag_match_analysis.py`.
+- **POINTS — episode layer right, point layer starved.** 39 GAME_ON
+  episodes (per-frame `results_game_state.csv`) ≈ the ≈36 rallies. Only 14
+  confirmed as points (`point_min_actions=2`): 17 episodes emitted 0-1
+  actions; 15 episodes truncated <120f (a real rally here is 10-25s; the
+  longest, ep34, is 769f/30s and got 7 actions). Episodes end when flight
+  density starves — the ball track dies mid-rally. 74 actions total (dig
+  37 / serve 13 / overpass 11 / spike 9 / set 4), 13 serves vs ≈39 rallies;
+  6 of those serves fall OUTSIDE any confirmed point (their rallies
+  unconfirmed). 8 confirmed points have NO serve inside — the confirmed
+  segment is a mid-rally fragment, not the rally.
+- **BALL RECALL IS THE BOTTLENECK: tracked 20.6% of all frames (4049
+  flight frames at ≥8 px/f).** Within episodes 40-60% tracked for healthy
+  rallies vs 5-35% for the truncated ones. Candidate mechanisms NOT yet
+  separated (open point 20): venue detector recall (session-14 round-2
+  already measured sand noise 2.2 det/frame), the 25.7fps tax on the 8 px/f
+  flight/lock gates (open point 19), conservative identity gates. Note the
+  action layer CANNOT be diagnosed before this is fixed — contacts without a
+  tracked ball never reach the classifier.
+- **PLAYERS — the roster held; identities hop.** `analyze_tracking.py` on
+  the 26k-frame dump: distinct ids [1,2,3,4] only, 0 ghost/recycled id
+  NUMBERS, max simultaneous 4, swap-rate 0.00, team accuracy 97.9%. In-play
+  coverage 3.28/4 real players (detection recall 72.2%); dead-time
+  persistence is GOOD (3.05/4 — tracks survive between rallies; ids present
+  70-83% of dead frames). BUT 46 resurrections (13/5/13/15 per id) and a
+  VISUALLY CONFIRMED mid-rally identity hop: `sheet_id3_cross_f1250-1350`
+  (id2's box walks off the receiving woman onto the adjacent man during the
+  serve scramble — both in-court, so the in-court preference cannot separate
+  them; the woman ends untracked; id3 near→far in the same scramble).
+  Per-episode all-4 side-mapping changes 12x — more than the ~5 official
+  switches a 36-rally set should have — consistent with hops corrupting the
+  mapping. The ~50 team flips per id are mostly dead-time wandering across
+  the midcourt line + net-area jitter, NOT switches. The 21-15 score is NOT
+  reconstructable at this recall (would need per-rally point winners).
+- **Next (in order):** (a) ball-recall separation probe (open point 20):
+  raw detector vs tracker gates on a few truncated episodes, px/frame
+  histograms at 25.7fps; (b) GT pass with `annotate_player_gt.py` on a few
+  points around an OFFICIAL side switch (5 expected) to measure hop rate and
+  judge side-change survival; (c) only then re-tune whatever the probe
+  indicts — one mechanism at a time.
 **(2026-09-23, fourteenth session): NEW MATCH FOOTAGE INTAKE + SUB-1080P
 INGEST UPSCALE.** `resources/full_videos/20260920_match_ari_joan_lost.mp4`
 (1280x720, ~25.7fps effective, 26,061 frames, ~17min, points only, side
@@ -1093,6 +1151,26 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Open points
 
+20. **[NEW 2026-09-23 — ball-recall starvation on the 20260920 match; blocks
+    points/actions/serves on real footage.]** The first full-match run
+    confirmed 14 points vs ≈39 rallies (see fifteenth-session block): the
+    ball track covers only 20.6% of frames overall (40-60% inside healthy
+    episodes), 15 episodes truncate <120f, and the point layer's
+    `point_min_actions=2` then rejects them (17 episodes emit 0-1 actions;
+    13 serves vs ≈39 rallies; 8 confirmed points contain no serve — they
+    are mid-rally fragments). NEXT: a separation probe on 3-4 truncated
+    episodes (e.g. ep1 f1414-1592, ep5 f4846-5014, ep11 f9150-9367 — good
+    length yet 0-1 actions): dump RAW detector candidates (the
+    `diag_ball_match.py` pattern) vs the tracker's accepted/rejected
+    decisions, plus px/frame histograms at 25.7fps, to indict one of:
+    (a) venue detector recall, (b) the 8 px/f flight/lock gates under the
+    25.7fps tax (open point 19), (c) the conservative identity gates
+    (re-entry window, stationary-suspect overrides). Do NOT retune before
+    the probe names the mechanism. Provenance caveat: the pipeline does not
+    export per-frame ball data, so every number here came from the
+    production-parity standalone pass (`output/match20260920/diag_ball_pass.py`)
+    + `results_game_state.csv`.
+
 19. **[NEW 2026-09-23 — deliberate deferrals from the 20260920 match
     intake]** (a) **fps:** the recording is ~25.7fps effective (VFR-ish
     phone file; cv2 reads 25.67, container tbr claims 30.12) vs the 30fps
@@ -1232,19 +1310,22 @@ constraint. Side changes need no special handling as long as IDs survive.
    numbers vs the flag-occluded e4/e5 GT denominators also moved for that
    reason: e4 0.949→0.974 detection, e5 ghosts 0.042→0.083 — occluded GT
    boxes leave the denominator and their covering preds now count as ghosts.)
-2. **[UNBLOCKED 2026-09-23 — footage exists] Validate side-change survival on
-   a real match.** The gallery's marquee use case (players swap ends every 7
-   points) is untested — the entreno drills have no side changes. Blocked
-   2026-08-14 for lack of footage; the 2026-09-20 match
-   (`resources/full_videos/20260920_match_ari_joan_lost.mp4`, points only,
-   side switches present) removes the blocker. Remaining: court calibration
-   (6 clicks, run ON the `_up1080` file so the pixel space matches what the
-   pipeline reads — `test_court_calibration.py` now saves under the SOURCE
-   stem so auto-detect finds it), a GT pass on a few points around a side
-   change (`annotate_player_gt.py` is ready), then:
-   `python scripts/dump_player_tracks.py <match>.mp4 --max-players 4` →
-   `python scripts/analyze_tracking.py <json> --max-players 4`, and scrub the
-   annotated video through a side change watching each ID.
+2. **[FIRST MEASUREMENTS 2026-09-23 (fifteenth session) — identity hops
+   found; side-change survival still unjudgeable without the GT pass.**
+   The roster machinery SURVIVED a full real match: ids 1-4 only, 0
+   ghost/recycled id numbers, swap-rate 0.00, team accuracy 97.9%, in-play
+   coverage 3.28/4, dead-time persistence 3.05/4. BUT 46 resurrections and a
+   visually confirmed mid-rally identity hop (id2 woman→man,
+   `output/match20260920/sheet_id3_cross_f1250-1350.png`; both humans
+   in-court, so the in-court preference cannot separate them) and 12
+   per-episode all-4 side-mapping changes vs ~5 expected official switches.
+   Remaining protocol: the GT pass (`annotate_player_gt.py`) on a few points
+   around an official side switch to measure the real hop rate per dead
+   ball / scramble, THEN judge whether the gallery horizon (90f) needs a
+   dead-time mode (pausing review when the game-state machine says GAME OFF
+   is point 18(a)'s ready lever) or whether scramble admission needs the
+   appearance tie-breaker strengthened. Ball starvation (point 20) does not
+   block this item — the tracks dump is ball-independent.
 3. **[RESOLVED 2026-08-30 by the f297 GT correction] Over-set crossings without
    width evidence.** The e3 f294 residual was the GT, not the pipeline: the
    owner corrected f297 to a team-A touch-3 spike, and HEAD's own emission
@@ -1435,6 +1516,32 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-23 (fifteenth session) — first full-match run: points starve 14/≈39, roster holds, identities hop; ball recall indicted (point 20)
+
+Diagnosis-only session on the 20260920 match (26,061f, ~25.7fps), owner GT
+statement "final ~21-15, near team of the first point wins → ≈36 rallies".
+All artifacts in git-ignored `output/match20260920/`: the batch run
+(results CSVs, `pipeline_output.json`, 14 points, 74 actions, 13 serves),
+the production-config tracks dump + `analyze_tracking.py`, a
+production-parity ball-only pass, `diag_match_analysis.py`, and the
+ratification sheets (`sheet_id3_cross_f1250-1350.png` — the confirmed
+identity hop; `footy_timeline.png`, `footy_w*.png` — band
+memberships).
+
+- Episode layer RIGHT: 39 GAME_ON episodes ≈ 36 rallies. Point layer
+  starved: 14 confirmed (needs `point_min_actions=2`; 17 episodes emit 0-1
+  actions), 15 episodes truncate <120f — ball track dies mid-rally. Ball
+  tracked 20.6% of all frames; 40-60% inside healthy episodes. 8 confirmed
+  points contain no serve → fragments. Full numbers in the fifteenth-session
+  Where-we-are block; mechanisms to probe ranked in open point 20.
+- Players: ids 1-4 only, 0 recycled id NUMBERS, swap-rate 0.00, team
+  accuracy 97.9%, 3.28/4 in-play coverage, 3.05/4 dead-time persistence;
+  46 resurrections + visually confirmed mid-rally hop (id2 woman→man, both
+  in-court); 12 per-episode side-mapping changes vs ~5 expected switches.
+- No src/config changes; nothing to A/B. Next session: point 20's separation
+  probe (raw candidates vs tracker decisions on truncated episodes), then
+  point 2's GT pass around an official side switch.
 
 ### 2026-09-23 (fourteenth session, round 2) — ball-width band VALIDATED on the upscaled 20260920 video
 
