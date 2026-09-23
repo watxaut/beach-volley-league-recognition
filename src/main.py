@@ -12,6 +12,7 @@ from pathlib import Path
 
 from src.analysis.video_processor import VideoProcessor
 from src.detection.base_detector import resolve_device
+from src.utils.video_upscale import ensure_1080
 from src.output_gen.csv_exporter import CSVExporter
 from src.output_gen.json_exporter import JSONExporter
 from src.output_gen.visualization import VisualizationGenerator
@@ -143,16 +144,27 @@ def main() -> int:
         # Load configuration
         config = Config.load(args.config) if args.config else Config.default()
 
+        # Sub-1080p sources are upscaled ONCE (cached next to the original)
+        # before anything reads them: the pixel-space constants downstream
+        # (ball width side signal, NEAR_NET_PX, TOUCH_RISE_PX, tracker gates)
+        # were all measured at 1080p. 1080p+ sources pass through untouched.
+        # NOTE: calibration/output naming keeps keying on the SOURCE stem.
+        source_stem = video_file.stem
+        video_file = ensure_1080(
+            video_file, target_height=config.get("upscale_to_height", 1080)
+        )
+
         # Resolve compute device: explicit --device overrides the config value;
         # "auto" picks the best available backend (CUDA > MPS (Apple GPU) > CPU).
         requested_device = args.device or config.get("device", "auto")
         config["device"] = resolve_device(requested_device)
         logger.info(f"Compute device: {config['device']}")
 
-        # Court calibration: explicit --court, else auto-detect calibrations/<stem>.json.
+        # Court calibration: explicit --court, else auto-detect calibrations/<stem>.json
+        # (keyed on the SOURCE video stem, not the cached upscaled file's).
         court_path = args.court
         if not court_path:
-            auto_court = Path("calibrations") / f"{video_file.stem}.json"
+            auto_court = Path("calibrations") / f"{source_stem}.json"
             if auto_court.exists():
                 court_path = str(auto_court)
         if court_path:
@@ -161,7 +173,7 @@ def main() -> int:
         else:
             logger.warning(
                 "No court calibration found (calibrations/%s.json). Serve/net/team "
-                "features will be limited. Pass --court to supply one.", video_file.stem
+                "features will be limited. Pass --court to supply one.", source_stem
             )
 
         # Ball detector: explicit --ball-model, else auto-detect the fine-tuned model.
@@ -190,7 +202,7 @@ def main() -> int:
         if args.debug_live or args.save_video:
             from src.analysis.live_debug_processor import LiveDebugProcessor
             debug_processor = LiveDebugProcessor(config, debug_speed=args.debug_speed)
-            save_path = str(output_dir / f"{video_file.stem}_annotated.mp4") if args.save_video else None
+            save_path = str(output_dir / f"{source_stem}_annotated.mp4") if args.save_video else None
             if args.debug_live:
                 logger.info("Starting live debug mode...")
             if save_path:

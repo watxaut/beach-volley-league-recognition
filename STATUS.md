@@ -5,14 +5,53 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-19 (thirteenth session — open point 15(e) RESOLVED:
-width-confirmed cross + own-side drive-block refutation shipped, e7 F1
-0.625 → 0.75; f316 team closed as a GT slip after the owner's sheet ruling
-— pipeline was right; e7 team 1.0. Two follow-ups flagged: GT f370's P4B
-id, track-4 airborne foot-team flap)
+**Last updated:** 2026-09-23 (fourteenth session — new match footage intake:
+20260920 ari vs joan (lost), the first REAL match with side switches — open
+point 2's blocker is gone. Shipped the one-time sub-1080p ingest upscale
+(720p source → 1080p cache) so the px constants keep their tuned geometry.
+Deferred: the file is ~25.7fps effective vs the 30fps tuning.)
 
 ## Where we are
 
+**(2026-09-23, fourteenth session): NEW MATCH FOOTAGE INTAKE + SUB-1080P
+INGEST UPSCALE.** `resources/full_videos/20260920_match_ari_joan_lost.mp4`
+(1280x720, ~25.7fps effective, 26,061 frames, ~17min, points only, side
+switches present, no GT yet) is the first real match — which unblocks open
+point 2 (side-change survival) for the first time.
+
+- **Diagnosis first:** 720p is NOT a detection problem — both YOLO detectors
+  run a fixed imgsz=1280, so the network sees the ball at the same input
+  scale as from 1080p (a 1080p frame is downscaled to 1280 anyway). What
+  breaks is everything downstream in ORIGINAL-frame pixels: ~20 hardcoded px
+  constants measured at 1080p shrink by 2/3. The killer list:
+  `attribution_width_far_px`/`near_px` 26/35 (validated ball-width ranges
+  14-28 far / 30-55 near become 9-19 / 20-37 — thresholds land INSIDE the
+  near range, so the side signal, team attribution and the width-confirmed
+  cross all break), `TOUCH_RISE_PX` 57 (measured boundary 50.5/64.5 → 34-43;
+  everything reads hard), `NEAR_NET_PX` 120 (load-bearing, becomes ~180),
+  and every px/px-per-frame gate (`DRIVE_MIN_PX`, `lock_min_speed`,
+  `flight_speed_px`, tracker distances).
+- **Shipped (`src/utils/video_upscale.py`, hooked in `src/main.py` before
+  both batch and live-debug — parity rule respected; config
+  `upscale_to_height: 1080`, 0 disables):** `ensure_1080` passes 1080p+
+  sources through untouched (entreno baselines can't move); sub-1080p
+  sources are transcoded ONCE (ffmpeg Lanczos, x264 CRF 18, `-vsync 0` so
+  VFR input keeps every frame exactly once) to `<stem>_up1080.mp4` next to
+  the original, written via atomic rename + decoded-frame-count parity gate
+  (a cache file always implies complete+verified), and reused on every later
+  run (0.01s resolve). Court-calibration auto-detect and output naming key
+  on the SOURCE stem (`calibrations/20260920_match_ari_joan_lost.json`).
+  Suite 379 green (+4 upscale tests).
+- **Measured on the real file:** 1920x1080, 26,061 frames (count verified
+  against the source decode), fps preserved 25.67, 6.5min one-time cost,
+  1.4GB cache (mp4 is git-ignored).
+- **Deferred (open point 19):** the source is ~25.7fps effective vs the
+  30fps entreno tuning — frames-based windows span ~17% more wall-time and
+  px/frame speeds shrink another ~14%. Not fixed on purpose (one mechanism
+  per session); revisit only if contact-window misses show up. Also still
+  owed for this video: court calibration (6 clicks), first full pipeline
+  run, then the GT pass (`annotate_player_gt.py`) to unlock point 2's
+  side-change scrub.
 **(2026-09-19, thirteenth session): open point 15(e)'s label item is RESOLVED
 — the resolver now owns a WIDTH-CONFIRMED CROSS and an own-side drive-block
 refutation, both keyed on the ball's width side (the project's validated
@@ -1054,6 +1093,18 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Open points
 
+19. **[NEW 2026-09-23 — deliberate deferrals from the 20260920 match
+    intake]** (a) **fps:** the recording is ~25.7fps effective (VFR-ish
+    phone file; cv2 reads 25.67, container tbr claims 30.12) vs the 30fps
+    entreno tuning — frames-based windows span ~17% more wall-time and
+    px/frame speeds shrink another ~14% ON TOP of what the upscale fixes.
+    Deferred (one mechanism per session); revisit only if contact-window
+    misses appear. (b) **First full pipeline run on the upscaled cache is
+    unvalidated** — ball-width distribution vs the 26/35 abstain band should
+    be spot-checked on a few rallies before trusting attribution there
+    (interpolation softens ball edges). (c) The upscale is hooked in
+    `src/main.py` only; `scripts/test_*.py` probes still read the raw file.
+
 18. **[NEW 2026-09-06 — squatter-review known limits; ranked revisit
     triggers.]** (a) **Match-footage dead time:** a real player off-court
     between points can look squatter-like (long out-of-court stretches); the
@@ -1178,11 +1229,16 @@ constraint. Side changes need no special handling as long as IDs survive.
    numbers vs the flag-occluded e4/e5 GT denominators also moved for that
    reason: e4 0.949→0.974 detection, e5 ghosts 0.042→0.083 — occluded GT
    boxes leave the denominator and their covering preds now count as ghosts.)
-2. **[BLOCKED — no footage] Validate side-change survival on a real match.** The
-   gallery's marquee use case (players swap ends every 7 points) is untested —
-   the entreno drills have no side changes. Blocked as of 2026-08-14: no video
-   of a full set is available yet. Unblock by recording/obtaining one
-   set-to-21 clip, calibrated, then:
+2. **[UNBLOCKED 2026-09-23 — footage exists] Validate side-change survival on
+   a real match.** The gallery's marquee use case (players swap ends every 7
+   points) is untested — the entreno drills have no side changes. Blocked
+   2026-08-14 for lack of footage; the 2026-09-20 match
+   (`resources/full_videos/20260920_match_ari_joan_lost.mp4`, points only,
+   side switches present) removes the blocker. Remaining: court calibration
+   (6 clicks → `calibrations/20260920_match_ari_joan_lost.json` — the
+   auto-detect keys on the SOURCE stem even though the pipeline reads the
+   `_up1080` cache), a GT pass on a few points around a side change
+   (`annotate_player_gt.py` is ready), then:
    `python scripts/dump_player_tracks.py <match>.mp4 --max-players 4` →
    `python scripts/analyze_tracking.py <json> --max-players 4`, and scrub the
    annotated video through a side change watching each ID.
@@ -1376,6 +1432,26 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-23 (fourteenth session) — 20260920 match intake: one-time sub-1080p ingest upscale
+
+- New footage: `resources/full_videos/20260920_match_ari_joan_lost.mp4`
+  (1280x720, ~25.7fps effective, 26,061 frames, points only, SIDE SWITCHES —
+  first real match; open point 2 unblocked). No GT yet.
+- Diagnosis (see Where we are): 720p breaks ~20 hardcoded 1080p-px constants
+  downstream of detection (YOLO imgsz is fixed, so detection is unaffected);
+  worst is the ball-width side signal (thresholds 26/35 land inside the
+  ×2/3 near-ball range).
+- Shipped: `src/utils/video_upscale.py` (`ensure_1080`: pass-through at/above
+  target; one-time ffmpeg Lanczos x264 CRF 18 `-vsync 0` transcode to
+  `<stem>_up1080.mp4` next to the source; atomic rename + frame-count parity
+  gate; cache-hit reuse), config `upscale_to_height: 1080`, hooked in
+  `src/main.py` before batch AND live-debug (parity rule), calibration/output
+  naming keyed on the source stem. Suite 379 green (+4).
+- Verified on the real file: 1920x1080, 26,061 frames (decode-count parity
+  vs source), fps preserved 25.67, 6.5min one-time, cache hit 0.01s.
+- Deferred → new open point 19 (fps 25.7 vs 30; first full run unvalidated;
+  test scripts bypass the hook).
 
 ### 2026-09-19 (thirteenth session, round 2) — f316 GT slip ruled and folded
 

@@ -19,6 +19,12 @@ class Config:
         # Device settings
         "device": "auto",  # auto-selects CUDA > MPS (Apple GPU) > CPU; force with "cpu"/"cuda"/"mps"
 
+        # Sub-1080p sources are upscaled once (ffmpeg Lanczos, cached as
+        # <stem>_up1080.mp4 next to the original, see src/utils/video_upscale.py):
+        # every px constant downstream (ball width side signal, NEAR_NET_PX,
+        # TOUCH_RISE_PX, tracker gates) was measured at 1080p. 0 disables.
+        "upscale_to_height": 1080,
+
         # Detection settings
         "detection_method": "template",  # Default to Wilson ball template matching
         "ball_confidence": 0.15,  # MUST match scripts/test_action_recognition.py: the fine-tuned model
