@@ -1235,10 +1235,10 @@ constraint. Side changes need no special handling as long as IDs survive.
    2026-08-14 for lack of footage; the 2026-09-20 match
    (`resources/full_videos/20260920_match_ari_joan_lost.mp4`, points only,
    side switches present) removes the blocker. Remaining: court calibration
-   (6 clicks → `calibrations/20260920_match_ari_joan_lost.json` — the
-   auto-detect keys on the SOURCE stem even though the pipeline reads the
-   `_up1080` cache), a GT pass on a few points around a side change
-   (`annotate_player_gt.py` is ready), then:
+   (6 clicks, run ON the `_up1080` file so the pixel space matches what the
+   pipeline reads — `test_court_calibration.py` now saves under the SOURCE
+   stem so auto-detect finds it), a GT pass on a few points around a side
+   change (`annotate_player_gt.py` is ready), then:
    `python scripts/dump_player_tracks.py <match>.mp4 --max-players 4` →
    `python scripts/analyze_tracking.py <json> --max-players 4`, and scrub the
    annotated video through a side change watching each ID.

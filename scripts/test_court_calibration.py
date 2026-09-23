@@ -14,6 +14,7 @@ Usage:
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -28,9 +29,19 @@ CALIBRATIONS_DIR = Path(__file__).resolve().parent.parent / "calibrations"
 
 
 def get_calibration_path(video_path: str) -> Path:
-    """Derive calibration JSON path from video filename."""
-    video_name = Path(video_path).stem  # e.g. "avp_front_1"
-    return CALIBRATIONS_DIR / f"{video_name}.json"
+    """Derive calibration JSON path from video filename.
+
+    Cached upscaled files (see src/utils/video_upscale.py) save under the
+    SOURCE stem: the pipeline's auto-detect keys on the source video name
+    (calibrations/<source_stem>.json), and a calibration is only valid in
+    the pixel space it was clicked in -- i.e. the upscaled file's.
+    """
+    stem = Path(video_path).stem
+    # "<name>_up1080" -> "<name>"
+    match = re.fullmatch(r"(.+)_up(\d+)", stem)
+    if match:
+        stem = match.group(1)
+    return CALIBRATIONS_DIR / f"{stem}.json"
 
 
 def main():
