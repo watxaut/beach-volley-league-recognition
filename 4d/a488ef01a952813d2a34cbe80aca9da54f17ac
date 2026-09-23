@@ -1,0 +1,21 @@
+scripts/test_court_calibration.py
+  s_b94360a00b4b4b::t_4f8d98738db9f5 17,32-44
+STATUS.md
+  s_b94360a00b4b4b::t_642554f5d7c9f1 1238-1241
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "4da488ef01a952813d2a34cbe80aca9da54f17ac",
+  "prompts": {},
+  "sessions": {
+    "s_b94360a00b4b4b": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0cb2b-3aac-7575-8f8d-32da72e5c22e",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
