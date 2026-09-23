@@ -1099,11 +1099,14 @@ constraint. Side changes need no special handling as long as IDs survive.
     entreno tuning — frames-based windows span ~17% more wall-time and
     px/frame speeds shrink another ~14% ON TOP of what the upscale fixes.
     Deferred (one mechanism per session); revisit only if contact-window
-    misses appear. (b) **First full pipeline run on the upscaled cache is
-    unvalidated** — ball-width distribution vs the 26/35 abstain band should
-    be spot-checked on a few rallies before trusting attribution there
-    (interpolation softens ball edges). (c) The upscale is hooked in
+    misses appear. (b) **[width band VALIDATED 2026-09-23, round 2; full
+    pipeline run still owed]** — see log. (c) The upscale is hooked in
     `src/main.py` only; `scripts/test_*.py` probes still read the raw file.
+    (d) NEW from the width probe: this venue's sand fires the detector at
+    conf 0.15 on lines/footprints/shadows at ~2.2 det/frame (entreno-level
+    noise or worse) — production's motion-gated tracker should absorb it
+    (same mechanism as entreno), but if the first full run shows width-side
+    wobbles, look at TRACKED-sample provenance, not the thresholds.
 
 18. **[NEW 2026-09-06 — squatter-review known limits; ranked revisit
     triggers.]** (a) **Match-footage dead time:** a real player off-court
@@ -1432,6 +1435,32 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-23 (fourteenth session, round 2) — ball-width band VALIDATED on the upscaled 20260920 video
+
+- Probe (`output/diag_ball_widths_20260920.py` + `_followup.py`, results in
+  `output/diag_ball_widths_20260920/`): production-path ball detector
+  (fine-tuned model, conf 0.15, auto-imgsz) sampled every 10th frame of the
+  `_up1080` cache, widths labeled by geometry (NEAR: below midcourt-ground
+  line +25px, contamination-free; FAR*: above it −180px, conservative —
+  near-airborne balls leak in with LARGE widths).
+- **First read was a false alarm:** NEAR-labeled widths median 19px looked
+  catastrophic. Conf-stratification + a 24-crop contact sheet resolved it:
+  the sub-0.4-conf detections are NOT balls — this venue's sand fires the
+  model on boundary lines, footprints and shadows. Real balls (conf≥0.5):
+  NEAR med 36, p25–p95 36–55 (validated band 30–55 ✓); FAR med ~22–25 with a
+  physics ceiling at the net-line depth (~24px ball + blur slack ≤ ~30) —
+  far→near misreads impossible, near-net near balls abstain exactly as
+  designed. 41% "FAR* in abstain band" is the near-airborne contamination
+  upper bound, not a real rate.
+- Calibration overlay checked: clicks sit on the playing lines (entreno
+  convention). px/m vs entreno: near 224 vs 238 (−6%), net 114 vs 124 (−8%),
+  far 70 vs 86 (−19%) — implied ball sizes 47/24/15px vs entreno 50/26/18:
+  same regime, marginally more abstain-side at the net. The upscale did its
+  job; no threshold changes made (26/35 stay untouched).
+- Residual (open point 19(d)): sand-noise rate ~2.2 det/frame at conf 0.15 —
+  tracker's motion gates own it as at entreno; full pipeline run still owed
+  before trusting end-to-end attribution.
 
 ### 2026-09-23 (fourteenth session) — 20260920 match intake: one-time sub-1080p ingest upscale
 
