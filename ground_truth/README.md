@@ -2,6 +2,31 @@
 
 Annotations are stored as JSON files in this directory. Each video gets one JSON file.
 
+## Match Points Ground Truth (`<stem>_match_points.json`, match-points-v1)
+
+For full-match videos the owner dictates a plain-text GT
+(e.g. `20260920_match_ari_joan_lost.txt`): one `P<n>: description` line per
+point, then a running score table (`A  B` rows) with `Side switch` markers
+between rows. `scripts/parse_match_gt_text.py` transcribes it mechanically
+into `<stem>_match_points.json` (re-run it after editing the text):
+
+```bash
+python scripts/parse_match_gt_text.py ground_truth/20260920_match_ari_joan_lost.txt \
+    --out ground_truth/20260920_match_points.json
+```
+
+- `winner` is MECHANICAL (which score column incremented) -- descriptions are
+  stored verbatim and never parsed; `P<k>` inside a description refers to a
+  PLAYER (track id), not a point.
+- `side_switch_after: true` on point k means the teams swap halves AFTER that
+  point (the next point is played on switched sides).
+- Conventions: Team A/B are FIXED SQUADS (A played the near side at match
+  start); squads do NOT change at side switches, only their court half does.
+- NO frame anchors exist in this format -- score point COUNT with
+  `scripts/evaluate_match_points.py`; per-point start alignment needs
+  owner-ratified frame anchors first. Winner / side-switch scoring activates
+  once the pipeline emits those layers.
+
 ## Game-State Ground Truth (`gt_point_start_end.txt`)
 
 For the game on/off state machine there is a plain-text format (owner's

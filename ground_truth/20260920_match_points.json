@@ -1,0 +1,354 @@
+{
+  "format": "match-points-v1",
+  "video": "20260920_match_ari_joan_lost",
+  "source_text": "ground_truth/20260920_match_ari_joan_lost.txt",
+  "conventions": {
+    "team_a": "fixed squad; played the NEAR side at match start",
+    "team_b": "fixed squad; played the FAR side at match start",
+    "side_switch_after_point": "teams swap court halves AFTER the flagged point ordinal; the next point is played on switched sides",
+    "winner": "mechanically derived from the running score table",
+    "descriptions": "verbatim owner dictation; 'P<k>' inside a description refers to a PLAYER (track id), not a point"
+  },
+  "final_score": {
+    "A": 21,
+    "B": 12
+  },
+  "side_switch_after_point": [
+    7,
+    14,
+    21,
+    28
+  ],
+  "points": [
+    {
+      "point": 1,
+      "winner": "B",
+      "score_after": {
+        "A": 0,
+        "B": 1
+      },
+      "side_switch_after": false,
+      "description": "Team A fails spike into the net"
+    },
+    {
+      "point": 2,
+      "winner": "A",
+      "score_after": {
+        "A": 1,
+        "B": 1
+      },
+      "side_switch_after": false,
+      "description": "Team B fails serve goes outside bounds"
+    },
+    {
+      "point": 3,
+      "winner": "B",
+      "score_after": {
+        "A": 1,
+        "B": 2
+      },
+      "side_switch_after": false,
+      "description": "Team B bumb passes ball on third contact, touches line court and scores"
+    },
+    {
+      "point": 4,
+      "winner": "A",
+      "score_after": {
+        "A": 2,
+        "B": 2
+      },
+      "side_switch_after": false,
+      "description": "P1 fails serve"
+    },
+    {
+      "point": 5,
+      "winner": "B",
+      "score_after": {
+        "A": 2,
+        "B": 3
+      },
+      "side_switch_after": false,
+      "description": "serve out of bounds"
+    },
+    {
+      "point": 6,
+      "winner": "A",
+      "score_after": {
+        "A": 3,
+        "B": 3
+      },
+      "side_switch_after": false,
+      "description": "player fails hand set"
+    },
+    {
+      "point": 7,
+      "winner": "A",
+      "score_after": {
+        "A": 4,
+        "B": 3
+      },
+      "side_switch_after": true,
+      "description": "poke spike from A team wins the point"
+    },
+    {
+      "point": 8,
+      "winner": "B",
+      "score_after": {
+        "A": 4,
+        "B": 4
+      },
+      "side_switch_after": false,
+      "description": "spike from B team wins the point"
+    },
+    {
+      "point": 9,
+      "winner": "B",
+      "score_after": {
+        "A": 4,
+        "B": 5
+      },
+      "side_switch_after": false,
+      "description": "Team B serves, team A returns the ball on the first contact and goes out of bounds"
+    },
+    {
+      "point": 10,
+      "winner": "B",
+      "score_after": {
+        "A": 4,
+        "B": 6
+      },
+      "side_switch_after": false,
+      "description": "big rally, Team B player soft touches the ball, bounces at the net and scores"
+    },
+    {
+      "point": 11,
+      "winner": "B",
+      "score_after": {
+        "A": 4,
+        "B": 7
+      },
+      "side_switch_after": false,
+      "description": "Team B bumb sets, overpasses and scores"
+    },
+    {
+      "point": 12,
+      "winner": "A",
+      "score_after": {
+        "A": 5,
+        "B": 7
+      },
+      "side_switch_after": false,
+      "description": "Team B serves out of bounds"
+    },
+    {
+      "point": 13,
+      "winner": "A",
+      "score_after": {
+        "A": 6,
+        "B": 7
+      },
+      "side_switch_after": false,
+      "description": "Team B spikes out of bounds"
+    },
+    {
+      "point": 14,
+      "winner": "B",
+      "score_after": {
+        "A": 6,
+        "B": 8
+      },
+      "side_switch_after": true,
+      "description": "Team B soft touches and scores"
+    },
+    {
+      "point": 15,
+      "winner": "A",
+      "score_after": {
+        "A": 7,
+        "B": 8
+      },
+      "side_switch_after": false,
+      "description": "Team A soft touches ball, touches net and scores"
+    },
+    {
+      "point": 16,
+      "winner": "A",
+      "score_after": {
+        "A": 8,
+        "B": 8
+      },
+      "side_switch_after": false,
+      "description": "Team A bumb passes the ball, team B misscontacts and team A scores"
+    },
+    {
+      "point": 17,
+      "winner": "A",
+      "score_after": {
+        "A": 9,
+        "B": 8
+      },
+      "side_switch_after": false,
+      "description": "Team A ace"
+    },
+    {
+      "point": 18,
+      "winner": "A",
+      "score_after": {
+        "A": 10,
+        "B": 8
+      },
+      "side_switch_after": false,
+      "description": "big rally, Team A soft short touch spike and scores"
+    },
+    {
+      "point": 19,
+      "winner": "A",
+      "score_after": {
+        "A": 11,
+        "B": 8
+      },
+      "side_switch_after": false,
+      "description": "rally, Team B spikes into the net, Team A scores"
+    },
+    {
+      "point": 20,
+      "winner": "B",
+      "score_after": {
+        "A": 11,
+        "B": 9
+      },
+      "side_switch_after": false,
+      "description": "Team A serves outside of the court"
+    },
+    {
+      "point": 21,
+      "winner": "A",
+      "score_after": {
+        "A": 12,
+        "B": 9
+      },
+      "side_switch_after": true,
+      "description": "Team A spikes and scores"
+    },
+    {
+      "point": 22,
+      "winner": "A",
+      "score_after": {
+        "A": 13,
+        "B": 9
+      },
+      "side_switch_after": false,
+      "description": "Team A spikes, defense Team B goes wide, set is not good and ball falls to ground"
+    },
+    {
+      "point": 23,
+      "winner": "B",
+      "score_after": {
+        "A": 13,
+        "B": 10
+      },
+      "side_switch_after": false,
+      "description": "bump pass from Team A falls outside court"
+    },
+    {
+      "point": 24,
+      "winner": "A",
+      "score_after": {
+        "A": 14,
+        "B": 10
+      },
+      "side_switch_after": false,
+      "description": "spike touch from Team B falls outside"
+    },
+    {
+      "point": 25,
+      "winner": "A",
+      "score_after": {
+        "A": 15,
+        "B": 10
+      },
+      "side_switch_after": false,
+      "description": "Team B spikes on 2nd touch and falls outside"
+    },
+    {
+      "point": 26,
+      "winner": "A",
+      "score_after": {
+        "A": 16,
+        "B": 10
+      },
+      "side_switch_after": false,
+      "description": "Team A spike rainbow and scores"
+    },
+    {
+      "point": 27,
+      "winner": "A",
+      "score_after": {
+        "A": 17,
+        "B": 10
+      },
+      "side_switch_after": false,
+      "description": "Team B bump passes the ball and falls outside"
+    },
+    {
+      "point": 28,
+      "winner": "A",
+      "score_after": {
+        "A": 18,
+        "B": 10
+      },
+      "side_switch_after": true,
+      "description": "Team B soft touch does not pass the net"
+    },
+    {
+      "point": 29,
+      "winner": "A",
+      "score_after": {
+        "A": 19,
+        "B": 10
+      },
+      "side_switch_after": false,
+      "description": "Team B spike accelerated falls outside of the court"
+    },
+    {
+      "point": 30,
+      "winner": "B",
+      "score_after": {
+        "A": 19,
+        "B": 11
+      },
+      "side_switch_after": false,
+      "description": "big rally, Team B spikes accelerated, Team struggles and ball falls to ground"
+    },
+    {
+      "point": 31,
+      "winner": "B",
+      "score_after": {
+        "A": 19,
+        "B": 12
+      },
+      "side_switch_after": false,
+      "description": "Team A commits fault."
+    },
+    {
+      "point": 32,
+      "winner": "A",
+      "score_after": {
+        "A": 20,
+        "B": 12
+      },
+      "side_switch_after": false,
+      "description": "Team B fails serve against the net."
+    },
+    {
+      "point": 33,
+      "winner": "A",
+      "score_after": {
+        "A": 21,
+        "B": 12
+      },
+      "side_switch_after": false,
+      "description": "Team B spikes outside of the court."
+    }
+  ]
+}

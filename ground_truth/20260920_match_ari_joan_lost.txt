@@ -1,0 +1,77 @@
+Team A is the one that started as the near team
+Team B started as the far team
+
+P1: Team A fails spike into the net
+P2: Team B fails serve goes outside bounds
+P3: Team B bumb passes ball on third contact, touches line court and scores
+P4: P1 fails serve
+P5: serve out of bounds
+P6: player fails hand set
+P7: poke spike from A team wins the point
+P8: spike from B team wins the point
+P9: Team B serves, team A returns the ball on the first contact and goes out of bounds
+P10: big rally, Team B player soft touches the ball, bounces at the net and scores
+P11: Team B bumb sets, overpasses and scores
+P12: Team B serves out of bounds
+P13: Team B spikes out of bounds
+P14: Team B soft touches and scores
+P15: Team A soft touches ball, touches net and scores
+P16: Team A bumb passes the ball, team B misscontacts and team A scores
+P17: Team A ace
+P18: big rally, Team A soft short touch spike and scores
+P19: rally, Team B spikes into the net, Team A scores
+P20: Team A serves outside of the court
+P21: Team A spikes and scores
+P22: Team A spikes, defense Team B goes wide, set is not good and ball falls to ground
+P23: bump pass from Team A falls outside court
+P24: spike touch from Team B falls outside
+P25: Team B spikes on 2nd touch and falls outside
+P26: Team A spike rainbow and scores
+P27: Team B bump passes the ball and falls outside
+P28: Team B soft touch does not pass the net
+P29: Team B spike accelerated falls outside of the court
+P30: big rally, Team B spikes accelerated, Team struggles and ball falls to ground
+P31: Team A commits fault.
+P32: Team B fails serve against the net.
+P33: Team B spikes outside of the court.
+
+
+Points
+A  B
+0  1
+1  1
+1  2
+2  2
+2  3
+3  3
+4  3
+Side switch
+4  4
+4  5
+4  6
+4  7
+5  7
+6  7
+6  8
+Side switch
+7  8
+8  8
+9  8
+10 8
+11 8
+11 9
+12 9
+Side switch
+13 9
+13 10
+14 10
+15 10
+16 10
+17 10
+18 10
+Side switch
+19 10
+19 11
+19 12
+20 12
+21 12
