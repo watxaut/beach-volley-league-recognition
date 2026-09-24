@@ -1,0 +1,29 @@
+.gitignore
+  s_5a0f7b8038809d::t_427bf30caf873c 242-244
+STATUS.md
+  s_5a0f7b8038809d::t_03e3e944444f5b 69-83
+  s_5a0f7b8038809d::t_a72d46a59c00aa 1277-1290
+  s_5a0f7b8038809d::t_4f9b3f1ee361a9 1671-1716
+  s_5a0f7b8038809d::t_d1dc5068ce8f80 8-19,23-68
+tests/test_mine_ball_frames.py
+  s_5a0f7b8038809d::t_112bb6beedbd62 1-105
+scripts/mine_ball_frames.py
+  s_5a0f7b8038809d::t_799450a69b0ea9 1-173,175-189,191-302
+  s_5a0f7b8038809d::t_6ca151dae36e13 174,190
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "57a9b2ab98ee5c32b218e213d0b3f7981ed18629",
+  "prompts": {},
+  "sessions": {
+    "s_5a0f7b8038809d": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0d536-471f-7575-8f8d-32e3fac2673f",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
