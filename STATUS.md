@@ -5,138 +5,82 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-24 (seventeenth session, TWO commits — match GT
-infra + point evaluator, THEN the open-point-20 MECHANISM SHIPPED:
-BallTracker low-confidence floors (`ball_locked_low_conf_floor` /
-`ball_boot_low_conf_floor`, 0.15 default, non-suspect only, zero-high-frames
-scope so the trusted coast stays byte-exact P0). Entreno action evals FULLY
-NEUTRAL (all 7 recorded F1s hold, team 1.0 everywhere; only 1-frame/
-attribution-index shifts inside gates). Match re-run: actions 74→90
-(+22%), serves 13→21, first confirmed point ≈ GT point 4 (was 8), the
-probe's zero-coverage ep12 now CONFIRMED; confirmed-point COUNT flat 13
-vs 14 — the point layer's ≥2-action bar + 30fps-tuned grouping windows are
-now the binding constraint (session D). Game-state video cost, honestly:
-10/13 vs today's floors-off baseline 11/13 (the recorded 80.6% was STALE —
-the floors-off run today gives 73.7% + 1 false, i.e. the video had already
-drifted from the 2026-09-05 numbers before this mechanism); pt00 recovered,
-pt01-03 lost at boundaries. The config-off escape hatch is verified.
-Session A details: owner's match GT transcribed to match-points-v1 (33
-points, 21-12, winners mechanical, switches after 7/14/21/28) +
-evaluate_match_points (baseline 14/33, "P1 ≈ GT point 8" quantified) +
-background-stratified probe confirming the blue-sky report (sky med 0.90
-vs sand 0.20).)
+**Last updated:** 2026-09-25 (eighteenth session — DETECTOR-RETRAIN MINING
+SHIPPED: `scripts/mine_ball_frames.py` stratified the whole match's
+GAME_ON frames with the probe's bg_class and wrote the owner's 500-frame
+Roboflow annotation set to `resources/frames/match20260920/` (250 blind /
+100 low_sand / 50 low_other / 60 sand_noise / 40 sky_control, JPG q95,
+318MB, local pre-labels from the current detector, seeded min-spacing
+sampling; suite +16 → 435 green). Full-match scan verdict: blind = 23%
+of ALL game_on frames (1843/7994) — class (a) is bigger than the probe's
+episode-local share suggested. NEXT: owner annotates in Roboflow → merge
+export into `datasets/ball_detection/` → `prepare_dataset_for_training`
+→ Colab fine-tune → validation gate (entreno A/B drift-lock + match
+re-run + probe re-run to quantify class (a)/(b) shrinkage).)
 
 ## Where we are
 
-**(2026-09-24, seventeenth session): MATCH GT TRANSCRIBED + POINT EVALUATOR
-SHIPPED; BALL-RECALL PROBE RUN BACKGROUND-STRATIFIED — THE "BLUE SKY"
-REPORT CONFIRMED AND THE 0.4 CONF FLOOR INDICTED; OFFLINE COUNTERFACTSUAL
-MEASURES THE RECOVERY. Pipeline src untouched.** The owner reviewed the
-first full-match run with live debug and gave 7 feedback items (game
-on/off good; point count broken — first shown point ≈ GT point 10; player
-numbers change across occlusion/out-of-bounds; ball untracked off the
-blue sky; most actions missing; Team A/B label not following side
-switches; wants per-point and per-action CONFIDENCE, and honest
-uncertainty on net/line-close balls). The executed plan: GT infra →
-ball probe → (next) tracker mechanism → actions → points/winner/side
-switch → identity → landing confidence.
+**(2026-09-25, eighteenth session): RETRAIN-MINING SESSION — the
+detector half of open point 20's second lever is PREPARED: 500
+stratified frames from the 20260920 match await the owner's Roboflow
+annotation. Pipeline src untouched.**
 
-- **GT infrastructure (committed):**
-  `scripts/parse_match_gt_text.py` transcribes the owner's dictated text
-  (`ground_truth/20260920_match_ari_joan_lost.txt`) into
-  `ground_truth/20260920_match_points.json` — 33 points, final 21-12,
-  winners MECHANICAL from the score table
-  (BABABAABBBBAABAAAAABAABAAAAAABBAA), side switches after points
-  7/14/21/28 (every-7-combined beach format), descriptions verbatim (a
-  "P<k>" inside a description = PLAYER/track id, e.g. point 4 "P1 fails
-  serve" credits A the point, so P1 = a team-B player). Conventions
-  pinned: Team A/B are FIXED SQUADS (A near at match start); side switches
-  swap halves, not squads. NO frame anchors exist — per-point alignment
-  needs owner-ratified sheets later. `scripts/evaluate_match_points.py`
-  scores point COUNT/confirmation, prints the per-episode table (the
-  alignment artifact), and reports the first-confirmed ordinal; tests in
-  tests/test_match_points_gt.py (+18, suite 405 green).
-- **Baseline vs the fifteenth-session artifacts:** 33 GT points vs 39
-  GAME_ON episodes vs **14 confirmed (0.424)**; **7 episodes start before
-  the first confirmed point → first confirmed ≈ GT point 8** (owner said
-  "~10" — same phenomenon; episodes ≈ rallies 1:1 with a few fragments).
-  Report: output/match20260920/match_points_eval.json.
-- **PROBE (output/match20260920/diag_ball_probe_bgsky.py +
-  ball_probe_bgsky.json): production-parity chain over 3 starved episodes
-  (ep02 f1414, ep06 f4846, ep12 f9150) + 2 controls (ep08 f6048, ep35
-  f22893), dumping EVERY raw candidate (conf/size/stationary_suspect/
-  background class of the patch behind the ball) + the tracker decision.**
-  Results: (a) detector-BLIND frames (0 candidates @0.15): 10-31% —
-  genuine recall miss, mostly sand/building-backed; (b) candidates PRESENT
-  but none ≥0.4 while lost: **33-68% — the largest class in 4/5 episodes**;
-  (c) ≥0.4 candidate present yet lost: 5-24%. Background split (ep35):
-  sky-backed candidates med 0.90 (92% ≥0.4) vs sand-backed med 0.20 (9%
-  ≥0.4) vs other med 0.22 (21% ≥0.4) — the detector's confidence is
-  background-dependent, and the tracker's low_confidence_threshold=0.4
-  converts that into track death off the sky. The owner's report is
-  literally true.
-- **COUNTERFACTUAL (diag_lowgate_sim.py, offline replay over the dump —
-  directional only):** P1 = locked in-gate admission down to conf 0.15
-  (non-suspect) when no ≥0.4 candidate is in the gate; P2 = P1 + the
-  motion-pair bootstrap floor at 0.15 (worst episodes never LOCK — no ≥0.4
-  pair exists — so a locked-only gate cannot engage). Tracked coverage:
-  ep02 4→22% (P2), ep06 28→36%, ep12 0→16%, ep08 0→19%, ep35 45→51%;
-  flight ~flat. ~60% of the new low-conf picks show next-frame motion
-  support; ~35% stranded-risk (the sand-noise price, bounded by the
-  stationary-suspect exclusion + tight gates). Even P2 leaves starved
-  episodes at 16-36% — class (a) needs the DETECTOR-RETRAINING lever
-  (mine sand/building positives from this match, owner-ratified sheets,
-  existing notebook/Roboflow workflow) to finish the job.
-- **Next (in order):** (1) mechanism session — BallTracker low-conf floor
-  (locked in-gate admission + motion-pair floor, non-suspect only, same
-  geometric gates, config keys + drift locks), entreno A/B + GT eval, then
-  full match re-run scored with evaluate_match_points; (2) mine match
-  frames for ball-model retraining (owner + Roboflow); (3) actions with
-  confidence (plan session C); (4) point winner/score + side-switch layer +
-  per-point confidence (session D); (5) identity persistence (session E);
-  (6) landing/outcome confidence (session F). See open point 21.
+- **`scripts/mine_ball_frames.py` (keeper, tests +16 → suite 435
+green):** scans the GAME_ON ranges of a results_game_state.csv (default:
+the floors-ON rerun) with the production-parity detector
+(`models/volleyball_ball_best.pt`, conf 0.15, `_up1080` file, 30f
+static-suspect warm-up per rally, `det.reset()` between ranges) and
+stratifies every frame with the probe's `bg_class` (kept identical):
+`blind` (0 cands) / `low_sand` / `low_other` (cands but none ≥0.4,
+best non-suspect's bg) / `sand_noise` (suspects only — hard NEGATIVES)
+/ `sky_control` (≥0.4 sky-backed — regression guard). ≥0.4 non-sky
+frames are `high_other`: recorded in the manifest, NOT mined. Sampling
+= seeded shuffle + greedy min-spacing (5f) per class; two decode passes
+(classify all, then write only picks).
+- **Full-match scan (7994 game_on frames, 48 ranges): blind 1843 (23%),
+low_sand 1407, low_other 1541, sand_noise 1100, sky_control 1233,
+high_other 870.** Class (a) at 23% of ALL game_on frames — the
+tracker-side floors could never have fixed this alone; the retrain is
+load-bearing.
+- **The annotation set (`resources/frames/match20260920/`, git-ignored
+like datasets/):** 500 JPG q95 (318MB) named
+`20260920_match_ari_joan_lost_f<idx>` (source-stem via
+`resolve_source_stem`; no collision with the dataset's flat
+`frame_XXXX` namespace) + YOLO pre-labels (all non-suspect cands ≥0.15;
+empty txt for blind/noise = negative unless the owner finds a ball) +
+`manifest.json` audit trail. Pre-label sanity via a ±2-frame
+motion-support proxy: 8/12 on smoke-set low picks — consistent with the
+probe's ~60%; blind picks show nothing at ±2 either (genuinely hard,
+human-only). Picks span f297..f25991.
+- **Owner handoff (the next step is YOURS):** upload
+`images/ + labels/` together to Roboflow → review/correct (pre-labels
+are starting points, not truth) → export YOLOv8 → merge into
+`datasets/ball_detection/` → `python scripts/prepare_dataset_for_training.py
+datasets/ball_detection` → fine-tune `notebooks/finetune_yolo_ball.ipynb`
+(Colab) → hand the new weights back.
+- **Validation gate when weights return (one session):** entreno A/B
+drift-lock (all 7 F1s must hold) → full match re-run +
+`evaluate_match_points` → re-run `diag_ball_probe_bgsky.py` on the same
+5 episodes to quantify class (a)/(b) shrinkage vs the recorded
+baselines.
+- **Still queued after that:** session D (point-layer re-tune — the
+binding constraint for point COUNT), then the rest of open point 21.
 
-**(2026-09-24, seventeenth session, commit 2 — THE MECHANISM SHIPPED):
-BallTracker low-confidence floors, entreno-neutral, match-validated.**
-Design (narrow P3 from the sim — the safe scope): (a)
-`ball_locked_low_conf_floor` 0.15: while LOCKED, ONLY on frames with ZERO
-≥`low_confidence_threshold` candidates, accept the closest non-suspect
-in-gate candidate ≥ the floor (proximity first, the suspect-fallback's
-conf tie-break; grown gate as usual). Frames WITH any high candidate keep
-P0 byte-exact — the trusted coast is never traded (the e1-f77
-distractor class stays closed; the sim's broader P2 recovered ~2-5pt more
-coverage but would have reopened it, so the narrow scope shipped).
-(b) `ball_boot_low_conf_floor` 0.15: UNLOCKED motion-pair evidence may use
-low-tier sightings (same ≥8px/f, ≤90px, gap≤2 gates; suspects excluded;
-static spares still can never lock) when no high pair exists. Re-entry
-waits are never traded for low-conf picks. Drift-locked ctor parity rows;
-new tests/test_ball_low_conf.py (+14; suite 419 green).
-- **Entreno A/B (HEAD baselines regenerated first, cross-checked vs e15e:
-  6/7 byte-identical, e7 == the ratified post-e15e stream): action evals
-  FULLY NEUTRAL on all 7 — e1 0.706, e2 0.571, e3/e4/e5 1.0, e6 0.933,
-  e7 0.75, team 1.0 everywhere. Raw diffs: e1 dig player_id 3→2, e2 set
-  f118→119, e6 set contact_kind bounce→redirect f118→117 + spike exit
-  47.5→53.1, e7 dig f59→60 (TOWARD GT f61) — all inside eval gates.
-- **Match re-run (output/match20260920_lowconf/): actions 74→90 (+22%),
-  serves 13→21, digs 37→42, spike 9→10, block 0→1, overpass 11→12;
-  episodes 39→48; confirmed points 13 (was 14, ratio 0.394) — BUT first
-  confirmed ≈ GT point 4 (was 8; the owner's "P1 around P10" gap closes)
-  and two previously-starved episodes are now confirmed (f3119 ≈ GT pt4,
-  f9150 — the probe's zero-coverage episode). The flat count is the POINT
-  LAYER's turn: the ≥2-action bar + group_gap 60f / contact_chain 240f
-  windows are 30fps entreno numbers on 25.7fps match footage with longer
-  tracked stretches (splits at 6114/6235/6483 around the old f6022 point).
-- **Game-state video (point-layer guard), honestly measured:** floors-ON
-  10/13, 72.1%, 1 false vs a FRESH floors-OFF baseline of 11/13, 73.7%,
-  1 false — the recorded 11/13-0-false-80.6% (2026-09-05) was already
-  stale (predates the session-7 ball rework; the false point sits inside
-  pt00's GT window). Mechanism deltas are marginal-group churn: pt00 (the
-  coach-fed point, previously unmatchable) is now MATCHED; pt01-03 lost
-  boundary coverage. Config-off escape hatch verified working
-  (output/lowconf_gs_off.yaml).
-- **Next:** session D re-tunes the point layer on BOTH videos jointly
-  (emit every rally candidate with confidence — no silent skips; windows
-  fps-aware), then detector retraining (class (a) remains).
+**(2026-09-24, seventeenth session — TWO commits; full detail in the
+log entry): (1) match GT transcribed** (`parse_match_gt_text.py` →
+`ground_truth/20260920_match_points.json`, 33 points, winners mechanical,
+switches after 7/14/21/28) **+ `evaluate_match_points.py`** (baseline 14/33
+confirmed, first-confirmed ≈ GT pt 8) **+ the background-stratified ball
+probe** (sky med 0.90 / sand 0.20 — the "blue sky" report quantified;
+class (a) blind 10-31%, class (b) conf-rejectable 33-68%). **(2) The
+conf-floor mechanism shipped** (`ball_locked_low_conf_floor` /
+`ball_boot_low_conf_floor` 0.15, zero-high-frames scope, drift-locked,
+suite 419): entreno FULLY NEUTRAL (all 7 F1s, team 1.0); match actions
+74→90, serves 13→21, first-confirmed ≈ GT pt 4, ep f9150 confirmed;
+point count flat 13 — the point layer became the binding constraint
+(session D); game-state guard 10/13 vs a FRESH floors-off 11/13 (the old
+80.6% recording was stale). Artifacts: output/match20260920_lowconf/,
+output/lowconf_gs_off.yaml.
 
 **(2026-09-24, sixteenth session): CALIBRATION AUTO-DETECT FIXED FOR CACHED
 _up1080 FILES.** Owner report: live-debug on
@@ -1330,6 +1274,20 @@ constraint. Side changes need no special handling as long as IDs survive.
     (i) detector retraining with sand/building positives (class (a) is
     unreachable by tracker-side gates), (ii) the point-layer window
     re-tune moved to open point 21 item 1.]
+    **[UPDATE 2026-09-25 (eighteenth session) — the retrain half is
+    PREPARED: `scripts/mine_ball_frames.py` scanned all 7994 game_on
+    frames (48 ranges) with production parity and stratified them via
+    the probe's bg_class: blind 23% (1843 frames — bigger than the
+    episode-local probe share), low_sand 1407 / low_other 1541,
+    sand_noise 1100, sky_control 1233, high_other 870 (not mined). The
+    owner's 500-frame Roboflow annotation set (250/100/50/60/40, JPG
+    q95, local pre-labels, manifest audit trail) lives in
+    `resources/frames/match20260920/` (git-ignored). BALL IS NOW IN THE
+    OWNER'S COURT: annotate → export → merge into
+    `datasets/ball_detection/` → prepare zip → Colab fine-tune → hand
+    weights back. Then the validation-gate session: entreno A/B
+    drift-lock + match re-run + evaluate_match_points + probe re-run to
+    quantify class (a)/(b) shrinkage.]**
 21. **[NEW 2026-09-24 — the owner's match-feedback backlog; agreed plan
     order; GT now exists for all of it.]** From the owner's review of the
     first full-match run: (1) **point count** — the ball half is SHIPPED
@@ -1709,6 +1667,52 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-25 (eighteenth session) — retrain-mining shipped: 500 stratified match frames staged for the owner's Roboflow annotation
+
+Open point 20's second half (detector retraining — class (a) is
+unreachable by tracker-side gates). No pipeline src changes; one keeper
+script + tests.
+
+- **`scripts/mine_ball_frames.py`:** scans the GAME_ON ranges of a
+  results_game_state.csv (default: the floors-ON rerun
+  output/match20260920_lowconf/) with the production-parity detector
+  (volleyball_ball_best.pt, conf 0.15, the _up1080 file, 30f
+  static-suspect warm-up per range, det.reset() between ranges) and
+  stratifies every frame with the probe's bg_class (kept byte-identical
+  to diag_ball_probe_bgsky.py): blind / low_sand / low_other (cands but
+  none ≥0.4, best non-suspect's bg) / sand_noise (suspects-only = hard
+  negatives) / sky_control (≥0.4 sky-backed = regression guard);
+  ≥0.4-non-sky frames are high_other — manifest-recorded, not mined.
+  Sampling: seeded shuffle + greedy min-spacing (5f) per class; two
+  decode passes (classify everything, then write only the picks).
+- **Full-match scan (7994 game_on frames, 48 ranges): blind 1843 (23%),
+  low_sand 1407, low_other 1541, sand_noise 1100, sky_control 1233,
+  high_other 870.** Blind at 23% of ALL game_on frames confirms the
+  retrain is load-bearing, not optional polish.
+- **Annotation set (resources/frames/match20260920/, git-ignored like
+  datasets/):** 500 JPG q95 (318MB), names
+  20260920_match_ari_joan_lost_f<idx> (resolve_source_stem — no
+  collision with the dataset's flat frame_XXXX namespace), spanning
+  f297..f25991. Caps: 250 blind / 100 low_sand / 50 low_other / 60
+  sand_noise / 40 sky_control (owner-ratified budget 500). Pre-labels =
+  all non-suspect cands ≥0.15 in YOLO format (empty txt for blind/noise
+  = negative unless the owner finds a ball); manifest.json carries the
+  audit trail + the note that pre-labels are review-required.
+- **Sanity before the full run:** smoke set (f3000-3400) end-to-end + a
+  ±2-frame motion-support proxy on the smoke picks: 8/12 low-class
+  picks supported (consistent with the sim's ~60%); blind picks show
+  nothing at ±2 either — genuinely hard, human-only, as intended.
+- **Tests:** tests/test_mine_ball_frames.py +16 (classify_frame
+  admission order incl. suspect-vs-mover, 0.400 boundary, spacing/cap/
+  determinism of pick_frames, game_on_ranges run extraction, 500-budget
+  contract). Suite **435 green**. resources/frames/ added to .gitignore.
+- **Handoff:** owner uploads images/ + labels/ together to Roboflow →
+  reviews/corrects → exports YOLOv8 → merges into
+  datasets/ball_detection/ → prepare_dataset_for_training → Colab
+  fine-tune (notebooks/finetune_yolo_ball.ipynb) → validation-gate
+  session on the new weights (entreno A/B drift-lock, match re-run +
+  evaluate_match_points, probe re-run for class (a)/(b) shrinkage).
 
 ### 2026-09-24 (seventeenth session) — match GT transcribed + point evaluator; ball-recall probe indicts the 0.4 conf floor (blue-sky report confirmed)
 

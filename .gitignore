@@ -239,3 +239,6 @@ docs/build/
 archive/
 # Local analysis database
 data/
+
+# mined retraining frames (large, regenerable via scripts/mine_ball_frames.py)
+resources/frames/
