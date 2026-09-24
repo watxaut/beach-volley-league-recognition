@@ -1,0 +1,30 @@
+ground_truth/20260920_match_points.json
+  s_45c67f72479ae2::t_8eb139e6bf5098 1-354
+tests/test_match_points_gt.py
+  s_45c67f72479ae2::t_9c50ea19db2f48 87,89
+  s_45c67f72479ae2::t_3602c54ca639b1 1-82,84-86,88,90,92-130,132-198
+  s_45c67f72479ae2::t_d69d2fa7290f90 83,91,131
+scripts/parse_match_gt_text.py
+  s_45c67f72479ae2::t_98692609b2192f 1-154
+scripts/evaluate_match_points.py
+  s_45c67f72479ae2::t_c458046c8eb56e 85,90,98
+  s_45c67f72479ae2::t_6b6173655e788b 1-84,86-89,91-97,99-251
+ground_truth/README.md
+  s_45c67f72479ae2::t_b24d4fe7f7b7ea 5-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "9feeafc042f30ea2e483819c017d030aceab3344",
+  "prompts": {},
+  "sessions": {
+    "s_45c67f72479ae2": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0d2a5-c98a-7575-8f8d-32e1b3d1a0d9",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
