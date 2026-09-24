@@ -1,0 +1,39 @@
+src/main.py
+  s_b04981f68d294b::t_aa7078890a9f64 15,152-155
+scripts/test_ball_tracking.py
+  s_b04981f68d294b::t_a1707aced231ec 25,50
+tests/test_source_stem.py
+  s_b04981f68d294b::t_5e3c6179112bd8 1-64
+scripts/test_court_calibration.py
+  s_b04981f68d294b::t_cb21760530826d 26,39
+scripts/dump_player_tracks.py
+  s_b04981f68d294b::t_7b7c781851910e 40,93,160-162
+STATUS.md
+  s_b04981f68d294b::t_35e9b07239cf18 8-12,22-41,1544-1564
+  s_b04981f68d294b::t_113c9b4d859f50 1565
+scripts/test_action_recognition.py
+  s_b04981f68d294b::t_432643b8d461c2 32,64
+scripts/test_pose_estimation.py
+  s_b04981f68d294b::t_8c75b1952509ad 26,58
+scripts/test_player_tracking.py
+  s_b04981f68d294b::t_b139b5fbd7747f 25,64
+src/utils/video_upscale.py
+  s_b04981f68d294b::t_3150577bef1d1d 30,97-111
+  s_b04981f68d294b::t_69b9dbcc933ea2 112-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "5a3d7cd92ae09e6114f353151e67c68cd107bb67",
+  "prompts": {},
+  "sessions": {
+    "s_b04981f68d294b": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0d299-5488-7575-8f8d-32df16afa5ee",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
