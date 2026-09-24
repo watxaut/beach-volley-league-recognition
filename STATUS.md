@@ -5,19 +5,88 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-24 (sixteenth session — small fix: pointing a
-run directly at a cached `_up1080` file now auto-detects the SOURCE-stem
-court calibration; live-debug on the match `_up1080` no longer reports
-"court not calibrated". Before that, 2026-09-23 fifteenth session — FIRST
-FULL-MATCH RUN on
-20260920: the episode layer finds all ~39 rallies but the point layer
-confirms only 14 — ball-track recall is the bottleneck; the player roster
-holds 4/4 all match with 0 id-number churn, but identities HOP across
-humans (46 resurrections, one visually confirmed mid-rally box jump).
-Open point 20 opened for the ball-recall separation; point 2 needs the GT
-pass before side-change survival can be judged.)
+**Last updated:** 2026-09-24 (seventeenth session — the owner's post-match
+feedback executed as a plan: match GT dictated by the owner transcribed to
+match-points-v1 JSON + point-layer evaluator (baseline 14/33 confirmed,
+first confirmed point ≈ GT point 8 — the "P1 started around P10" report),
+then the open-point-20 ball-recall probe run BACKGROUND-STRATIFIED: the
+"ball only tracked against blue sky" report is CONFIRMED and quantified
+(sky-backed candidates med conf 0.90, 92% ≥0.4; sand-backed med 0.20, 9%
+≥0.4), the largest loss class is the tracker's 0.4 conf floor rejecting
+present candidates (33–68% of frames), and an offline counterfactual shows
+a low-conf in-gate/low-lock mechanism recovering most of it while a full
+fix also needs detector retraining. Before that, the sixteenth session
+fixed cached-`_up1080` calibration auto-detect.)
 
 ## Where we are
+
+**(2026-09-24, seventeenth session): MATCH GT TRANSCRIBED + POINT EVALUATOR
+SHIPPED; BALL-RECALL PROBE RUN BACKGROUND-STRATIFIED — THE "BLUE SKY"
+REPORT CONFIRMED AND THE 0.4 CONF FLOOR INDICTED; OFFLINE COUNTERFACTSUAL
+MEASURES THE RECOVERY. Pipeline src untouched.** The owner reviewed the
+first full-match run with live debug and gave 7 feedback items (game
+on/off good; point count broken — first shown point ≈ GT point 10; player
+numbers change across occlusion/out-of-bounds; ball untracked off the
+blue sky; most actions missing; Team A/B label not following side
+switches; wants per-point and per-action CONFIDENCE, and honest
+uncertainty on net/line-close balls). The executed plan: GT infra →
+ball probe → (next) tracker mechanism → actions → points/winner/side
+switch → identity → landing confidence.
+
+- **GT infrastructure (committed):**
+  `scripts/parse_match_gt_text.py` transcribes the owner's dictated text
+  (`ground_truth/20260920_match_ari_joan_lost.txt`) into
+  `ground_truth/20260920_match_points.json` — 33 points, final 21-12,
+  winners MECHANICAL from the score table
+  (BABABAABBBBAABAAAAABAABAAAAAABBAA), side switches after points
+  7/14/21/28 (every-7-combined beach format), descriptions verbatim (a
+  "P<k>" inside a description = PLAYER/track id, e.g. point 4 "P1 fails
+  serve" credits A the point, so P1 = a team-B player). Conventions
+  pinned: Team A/B are FIXED SQUADS (A near at match start); side switches
+  swap halves, not squads. NO frame anchors exist — per-point alignment
+  needs owner-ratified sheets later. `scripts/evaluate_match_points.py`
+  scores point COUNT/confirmation, prints the per-episode table (the
+  alignment artifact), and reports the first-confirmed ordinal; tests in
+  tests/test_match_points_gt.py (+18, suite 405 green).
+- **Baseline vs the fifteenth-session artifacts:** 33 GT points vs 39
+  GAME_ON episodes vs **14 confirmed (0.424)**; **7 episodes start before
+  the first confirmed point → first confirmed ≈ GT point 8** (owner said
+  "~10" — same phenomenon; episodes ≈ rallies 1:1 with a few fragments).
+  Report: output/match20260920/match_points_eval.json.
+- **PROBE (output/match20260920/diag_ball_probe_bgsky.py +
+  ball_probe_bgsky.json): production-parity chain over 3 starved episodes
+  (ep02 f1414, ep06 f4846, ep12 f9150) + 2 controls (ep08 f6048, ep35
+  f22893), dumping EVERY raw candidate (conf/size/stationary_suspect/
+  background class of the patch behind the ball) + the tracker decision.**
+  Results: (a) detector-BLIND frames (0 candidates @0.15): 10-31% —
+  genuine recall miss, mostly sand/building-backed; (b) candidates PRESENT
+  but none ≥0.4 while lost: **33-68% — the largest class in 4/5 episodes**;
+  (c) ≥0.4 candidate present yet lost: 5-24%. Background split (ep35):
+  sky-backed candidates med 0.90 (92% ≥0.4) vs sand-backed med 0.20 (9%
+  ≥0.4) vs other med 0.22 (21% ≥0.4) — the detector's confidence is
+  background-dependent, and the tracker's low_confidence_threshold=0.4
+  converts that into track death off the sky. The owner's report is
+  literally true.
+- **COUNTERFACTUAL (diag_lowgate_sim.py, offline replay over the dump —
+  directional only):** P1 = locked in-gate admission down to conf 0.15
+  (non-suspect) when no ≥0.4 candidate is in the gate; P2 = P1 + the
+  motion-pair bootstrap floor at 0.15 (worst episodes never LOCK — no ≥0.4
+  pair exists — so a locked-only gate cannot engage). Tracked coverage:
+  ep02 4→22% (P2), ep06 28→36%, ep12 0→16%, ep08 0→19%, ep35 45→51%;
+  flight ~flat. ~60% of the new low-conf picks show next-frame motion
+  support; ~35% stranded-risk (the sand-noise price, bounded by the
+  stationary-suspect exclusion + tight gates). Even P2 leaves starved
+  episodes at 16-36% — class (a) needs the DETECTOR-RETRAINING lever
+  (mine sand/building positives from this match, owner-ratified sheets,
+  existing notebook/Roboflow workflow) to finish the job.
+- **Next (in order):** (1) mechanism session — BallTracker low-conf floor
+  (locked in-gate admission + motion-pair floor, non-suspect only, same
+  geometric gates, config keys + drift locks), entreno A/B + GT eval, then
+  full match re-run scored with evaluate_match_points; (2) mine match
+  frames for ball-model retraining (owner + Roboflow); (3) actions with
+  confidence (plan session C); (4) point winner/score + side-switch layer +
+  per-point confidence (session D); (5) identity persistence (session E);
+  (6) landing/outcome confidence (session F). See open point 21.
 
 **(2026-09-24, sixteenth session): CALIBRATION AUTO-DETECT FIXED FOR CACHED
 _up1080 FILES.** Owner report: live-debug on
@@ -1175,25 +1244,62 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Open points
 
-20. **[NEW 2026-09-23 — ball-recall starvation on the 20260920 match; blocks
-    points/actions/serves on real footage.]** The first full-match run
-    confirmed 14 points vs ≈39 rallies (see fifteenth-session block): the
-    ball track covers only 20.6% of frames overall (40-60% inside healthy
-    episodes), 15 episodes truncate <120f, and the point layer's
-    `point_min_actions=2` then rejects them (17 episodes emit 0-1 actions;
-    13 serves vs ≈39 rallies; 8 confirmed points contain no serve — they
-    are mid-rally fragments). NEXT: a separation probe on 3-4 truncated
-    episodes (e.g. ep1 f1414-1592, ep5 f4846-5014, ep11 f9150-9367 — good
-    length yet 0-1 actions): dump RAW detector candidates (the
-    `diag_ball_match.py` pattern) vs the tracker's accepted/rejected
-    decisions, plus px/frame histograms at 25.7fps, to indict one of:
-    (a) venue detector recall, (b) the 8 px/f flight/lock gates under the
-    25.7fps tax (open point 19), (c) the conservative identity gates
-    (re-entry window, stationary-suspect overrides). Do NOT retune before
-    the probe names the mechanism. Provenance caveat: the pipeline does not
-    export per-frame ball data, so every number here came from the
-    production-parity standalone pass (`output/match20260920/diag_ball_pass.py`)
-    + `results_game_state.csv`.
+20. **[OPEN 2026-09-23; INDICTED 2026-09-24 (seventeenth session) — the
+    separation probe ran background-stratified; mechanism named; the fix is
+    a two-part lever.]** Ball-track starvation on the 20260920 match (14
+    confirmed points vs ≈33 GT rallies — the count is now GT-backed, open
+    point 21's evaluator). Probe findings (output/match20260920/
+    diag_ball_probe_bgsky.py, production-parity, 3 starved + 2 control
+    episodes): **(b) THE 0.4 CONF FLOOR is the largest loss class** —
+    candidates present at 0.15-0.4 while the track is lost on 33-68% of
+    frames; **(a) detector-blind frames (0 candidates @0.15) 10-31%** —
+    genuine recall miss; (c) ≥0.4-present-yet-lost only 5-24%. Root
+    physics: the fine-tuned detector's confidence is background-dependent
+    (sky-backed med 0.90 / 92% ≥0.4 vs sand-backed med 0.20 / 9% ≥0.4),
+    and the tracker's low_confidence_threshold turns that into total track
+    death off the sky (the owner's "ball only tracked against blue sky",
+    literally confirmed). Offline counterfactual (diag_lowgate_sim.py):
+    low-conf in-gate locked admission + 0.15 motion-pair floor (P2,
+    non-suspect only, same geometric gates) recovers tracked coverage
+    ep02 4→22%, ep06 28→36%, ep12 0→16%, ep08 0→19%, ep35 45→51% with
+    flight ~flat; ~60% of new picks have next-frame motion support, ~35%
+    stranded-risk. NEXT MECHANISM (one session): BallTracker low-conf
+    floor (two config keys, drift-locked), entreno A/B + GT eval, full
+    match re-run scored via scripts/evaluate_match_points.py. THEN the
+    second half of the lever: detector retraining with sand/building
+    positives mined from this match (P2 still leaves starved episodes at
+    16-36% — class (a) is unreachable by any tracker-side gate). The
+    25.7fps tax (point 19a) was NOT implicated by the probe (px/frame
+    histograms looked normal where candidates exist); re-examine only
+    after the conf-floor mechanism ships.
+21. **[NEW 2026-09-24 — the owner's match-feedback backlog; agreed plan
+    order; GT now exists for all of it.]** From the owner's review of the
+    first full-match run: (1) **point count** — fixed downstream of point
+    20; every rally candidate should be EMITTED with a confidence (no
+    silent skips; "P1 started around P10"); baseline 14/33 recorded.
+    (2) **per-point + per-action confidence** — actions: composite of
+    gesture × attribution certainty (width votes/abstain) × ball-track
+    continuity at contact; points: n_actions + confidences + tracked
+    fraction + serve presence + observed death; emitted everywhere incl.
+    live badge. (3) **point winner/score layer** — pure observer; rally
+    outcome = ball-death side + last-touch team + SpikeAnalyzer kill/out;
+    validated against all 33 dictated winners (GT JSON ready); feeds aces
+    (point 13). (4) **side-switch layer** — persistent all-player
+    side-flip between points (hop-robust: majority + serve-side
+    evidence), cross-checked vs the score expectation; side→squad mapping
+    from match start; ALL emitted team fields become squad identity; the
+    court overlay's "Team A"/"Team B" labels must swap (the owner's
+    report); validation target: exactly the 4 GT switches after points
+    7/14/21/28. (5) **persistent player numbers** — GT pass first
+    (`annotate_player_gt.py`) around the switches, then GAME_OFF dead-time
+    gallery mode (point 18(a)'s lever) + size/appearance gates on
+    continuous feeds (the sheet f1240 hop shows a near-camera box-scale
+    explosion — size gates must apply there too) + stricter restore gates;
+    Phase 2 global stitch (point 6) only if fragmentation persists.
+    (6) **landing/outcome confidence** — distance-to-line/net in ground
+    metres + abstain band near boundaries; the owner's "hard to call"
+    cases must read LOW confidence. Live-debug parity rule applies to all
+    layers (shared FrameProcessor path).
 
 19. **[NEW 2026-09-23 — deliberate deferrals from the 20260920 match
     intake]** (a) **fps:** the recording is ~25.7fps effective (VFR-ish
@@ -1540,6 +1646,41 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-24 (seventeenth session) — match GT transcribed + point evaluator; ball-recall probe indicts the 0.4 conf floor (blue-sky report confirmed)
+
+Owner feedback on the first full-match run executed as a plan (GT infra →
+ball probe → tracker mechanism → actions → points/winner/side-switch →
+identity → landing confidence). This session: parts 1-2; no pipeline src
+changes.
+
+- **GT (committed):** scripts/parse_match_gt_text.py →
+  ground_truth/20260920_match_points.json (33 points, final 21-12, winners
+  BABABAABBBBAABAAAAABAABAAAAAABBAA, switches after 7/14/21/28; winners
+  mechanical from the score table, descriptions verbatim; Team A/B = fixed
+  squads). scripts/evaluate_match_points.py (count/confirmation/episode
+  table/first-confirmed ordinal; winner+switch scoring declared NOT SCORED
+  until those pipeline layers exist). tests/test_match_points_gt.py +18
+  (suite 405 green). ground_truth/README.md documents match-points-v1.
+- **Baseline:** 33 GT vs 39 episodes vs 14 confirmed (0.424); 7 episodes
+  before the first confirmed → first confirmed ≈ GT point 8 (the owner's
+  "P1 started around P10"). output/match20260920/match_points_eval.json.
+- **Probe (diag_ball_probe_bgsky.py + ball_probe_bgsky.json):** per-candidate
+  conf/size/stationary_suspect/background over ep02/ep06/ep12 (starved) +
+  ep08/ep35 (controls): detector-blind 10-31%; conf-rejectable (cands
+  present, none ≥0.4, lost) 33-68% — largest class; ≥0.4-yet-lost 5-24%.
+  Sky-backed med 0.90 (92% ≥0.4) vs sand 0.20 (9%) vs other 0.22 (21%) —
+  the "blue sky" report quantified. The 25.7fps tax NOT implicated.
+- **Counterfactual (diag_lowgate_sim.py):** P2 (0.15 locked in-gate + 0.15
+  motion-pair floor, non-suspect only) recovers tracked coverage to
+  22/36/16/19/51% on the five episodes with flight ~flat; ~60% pick
+  support, ~35% stranded-risk. Class (a) needs detector retraining — mine
+  sand/building positives from this match next.
+- **STATUS:** open point 20 indicted with next-mechanism spec; new open
+  point 21 = the feedback backlog (emit candidates w/ confidence, action
+  + point confidence, winner/score layer, side-switch layer + squad
+  mapping + overlay label swap, persistent player numbers, landing
+  confidence).
 
 ### 2026-09-24 (sixteenth session) — cached `_up1080` inputs resolve the source-stem calibration
 
