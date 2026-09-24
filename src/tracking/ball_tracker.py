@@ -31,9 +31,32 @@ confidence, as the identity signal:
   starving behind it. A moving top-1 that merely left the gate is trusted:
   the tracker coasts and waits for it, exactly as before.
 - After ``max_missing_frames`` the tracker resets to UNLOCKED (and the
-  re-lock again requires motion -- a drifting spare cannot be re-locked)."""
+  re-lock again requires motion -- a drifting spare cannot be re-locked).
 
-from typing import List, Dict, Any, Optional
+Low-confidence floor (2026-09-24, the 20260920 "blue sky" mechanism):
+
+The match probe showed the detector's confidence is background-dependent --
+sky-backed candidates read med 0.90 (92% >= 0.4) while sand/building-backed
+read med 0.20 (9% >= 0.4) -- so on real match footage the ball routinely
+DROPS below ``low_confidence_threshold`` mid-rally and the track starves
+(the largest measured loss class: 33-68% of frames in starved episodes).
+Two floors (both non-suspect-only, both 0 = off) let the tracker keep the
+ball it still SEES:
+
+- ``locked_low_conf_floor``: while LOCKED, when the frame contains NO
+  candidate at ``low_confidence_threshold``, the best non-suspect candidate
+  >= this floor inside the SAME growing trajectory gate is accepted. Frames
+  with any high-tier candidate keep the P0 semantics untouched -- in
+  particular the trusted coast (a moving top candidate that left the gate
+  is waited for, never traded for an in-gate low-conf maybe).
+- ``boot_low_conf_floor``: while UNLOCKED, if no motion pair exists among
+  high-tier sightings, the same motion-pair gates (>= ``lock_min_speed``,
+  <= ``lock_max_jump``, pair gap <= ``lock_max_pair_gap``) may use
+  sightings >= this floor. Static spares still can never bootstrap
+  (stationary_suspect excluded, motion still required).
+"""
+
+from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
 from collections import deque
 import logging
@@ -65,6 +88,8 @@ class BallTracker:
         lock_max_jump: float = 90.0,
         lock_max_pair_gap: int = 2,
         selection_conf_window: float = 10.0,
+        locked_low_conf_floor: float = 0.15,
+        boot_low_conf_floor: float = 0.15,
     ):
         """Initialize the ball tracker.
 
@@ -88,6 +113,13 @@ class BallTracker:
             selection_conf_window: Distance (px) under which a higher-confidence
                 in-gate candidate beats a marginally closer one when
                 re-acquiring past a stationary-suspect blocker.
+            locked_low_conf_floor: LOCKED admission floor for frames with NO
+                >= ``low_confidence_threshold`` candidate: the best non-suspect
+                candidate >= this floor inside the trajectory gate is accepted
+                (sand/building-backed balls read low-confidence; the 20260920
+                probe). 0 disables.
+            boot_low_conf_floor: UNLOCKED motion-pair floor when no high-tier
+                pair exists (same geometric gates). 0 disables.
         """
         self.max_missing_frames = max_missing_frames
         self.trajectory_smoothing = trajectory_smoothing
@@ -101,6 +133,8 @@ class BallTracker:
         self.lock_max_jump = lock_max_jump
         self.lock_max_pair_gap = lock_max_pair_gap
         self.selection_conf_window = selection_conf_window
+        self.locked_low_conf_floor = locked_low_conf_floor
+        self.boot_low_conf_floor = boot_low_conf_floor
 
         # State
         self.locked = False
@@ -112,6 +146,11 @@ class BallTracker:
         # Per-frame candidate centers while UNLOCKED (motion evidence). One
         # entry per frame, oldest first; empty frames advance the window.
         self._recent_centers: deque = deque(maxlen=max(2, lock_motion_window))
+        # Parallel window at the low floor (superset when
+        # boot_low_conf_floor < low_confidence_threshold): the low-tier motion
+        # pair needs the previous frames' LOW-TIER sightings, which the high
+        # window never saw.
+        self._recent_centers_low: deque = deque(maxlen=max(2, lock_motion_window))
         # Out-of-view re-entry window (see _handle_missing): the ball left the
         # observable court region; wait for it near the exit point instead of
         # resetting into whatever moves next.
@@ -140,11 +179,23 @@ class BallTracker:
         """
         valid = [d for d in detections
                  if d.get("confidence", 0.0) >= self.low_confidence_threshold]
+        boot_low = self._tier(detections, self.boot_low_conf_floor)
+        lock_low = self._tier(detections, self.locked_low_conf_floor)
 
         if not self.locked:
-            return self._try_lock(valid)
+            return self._try_lock(valid, boot_low)
 
         if not valid:
+            # No high-tier candidate this frame: the ball most likely dropped
+            # below ``low_confidence_threshold`` against a sand/building
+            # background. If it is still inside the trajectory gate at the low
+            # floor, keep it; otherwise coast as before. (A re-entry wait is
+            # never traded: while the ball is provably out of view, anything
+            # moving is a distractor by the re-entry rule.)
+            if not self._await_reentry:
+                low = self._select_low_candidate(lock_low)
+                if low is not None:
+                    return self._accept_detection(low)
             return self._handle_missing()
 
         if self._await_reentry:
@@ -156,11 +207,23 @@ class BallTracker:
 
         return self._accept_detection(best)
 
+    def _tier(self, detections: List[Dict[str, Any]],
+              floor: float) -> List[Dict[str, Any]]:
+        """Candidates between ``floor`` and the high threshold (or [] when the
+        mechanism is off / the floors coincide)."""
+        if floor <= 0 or floor >= self.low_confidence_threshold:
+            return []
+        return [d for d in detections
+                if floor <= d.get("confidence", 0.0)
+                < self.low_confidence_threshold]
+
     # ------------------------------------------------------------------
     # Locking (bootstrap / re-lock after a reset)
     # ------------------------------------------------------------------
 
-    def _try_lock(self, candidates: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def _try_lock(self, candidates: List[Dict[str, Any]],
+                  low_candidates: Optional[List[Dict[str, Any]]] = None
+                  ) -> Optional[Dict[str, Any]]:
         """Unlock state: watch for a candidate that demonstrably moves.
 
         A spare ball sitting on the sand or in a rack produces near-static
@@ -173,10 +236,43 @@ class BallTracker:
         history = list(self._recent_centers)  # oldest first, excludes current
         self._recent_centers.append(centers)
 
+        low_scan = (low_candidates is not None and self.boot_low_conf_floor > 0)
+        if low_scan:
+            low_centers = [d["center"] for d in low_candidates
+                           if not d.get("stationary_suspect")]
+            self._recent_centers_low.append(low_centers)
+
         # Highest-confidence plausible candidates first (a possibly-parked
         # ball can never bootstrap the track). The motion pair must be
         # near-consecutive (see lock_max_pair_gap).
         plausible = [d for d in candidates if not d.get("stationary_suspect")]
+        hit = self._scan_motion_pair(plausible, history)
+        if hit is not None:
+            return self._bootstrap_detection(*hit)
+
+        # Low-floor bootstrap: same gates over the low tier's own window (a
+        # superset history -- it contains the high-tier sightings too, so a
+        # high-current x low-previous pair still fires). Off by default-valve
+        # ``boot_low_conf_floor = 0``; a spare still cannot lock (motion
+        # required, suspects excluded).
+        if low_scan and self.boot_low_conf_floor < self.low_confidence_threshold:
+            low_plausible = [d for d in low_candidates
+                             if not d.get("stationary_suspect")]
+            low_history = list(self._recent_centers_low)[:-1]
+            hit = self._scan_motion_pair(low_plausible, low_history)
+            if hit is not None:
+                return self._bootstrap_detection(*hit)
+        return None
+
+    def _scan_motion_pair(
+            self, plausible: List[Dict[str, Any]],
+            history: List[List[List[float]]]
+    ) -> Optional[Tuple[Dict[str, Any], List[float], int]]:
+        """First (det, old_sighting, gap) proving >= lock_min_speed motion.
+
+        Shared by the high-tier and low-floor bootstrap scans; the caller owns
+        the candidate window (``history`` excludes the current frame).
+        """
         for det in sorted(plausible, key=lambda d: d.get("confidence", 0.0),
                           reverse=True):
             c = det["center"]
@@ -189,7 +285,7 @@ class BallTracker:
                     if dist <= self.lock_max_jump:
                         speed = dist / age
                         if speed >= self.lock_min_speed:
-                            return self._bootstrap_detection(det, old, age)
+                            return det, old, age
                     # A jump this large means the oldest matching sighting
                     # does not belong to this candidate; keep scanning older
                     # frames only via the loop above (older = larger age).
@@ -210,6 +306,7 @@ class BallTracker:
         self.trajectory.clear()
         self.velocities.clear()
         self._recent_centers.clear()
+        self._recent_centers_low.clear()
         self.trajectory.append(center)
         self.last_position = center
         self.last_velocity = velocity
@@ -256,6 +353,42 @@ class BallTracker:
 
         plausible = [d for d in detections if not d.get("stationary_suspect")]
         in_gate = [(_dist(d), d) for d in plausible if _dist(d) <= gate]
+        if not in_gate:
+            return None
+        min_dist = min(dist for dist, _ in in_gate)
+        tied = [d for dist, d in in_gate
+                if dist <= min_dist + self.selection_conf_window]
+        return max(tied, key=lambda d: d.get("confidence", 0.0))
+
+    def _select_low_candidate(
+            self, detections: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """LOCKED low-floor admission for frames with NO high-tier candidate.
+
+        The real ball often drops below ``low_confidence_threshold`` against
+        sand/buildings while its GEOMETRY is unchanged (the 20260920 probe:
+        sky-backed candidates med 0.90 vs sand-backed 0.20). When the frame
+        contains no high-tier candidate at all, accept the closest
+        non-suspect candidate >= ``locked_low_conf_floor`` inside the SAME
+        growing gate around the last position -- proximity first, the
+        suspect-blocker fallback's confidence tie-break. Frames WITH a
+        high-tier candidate never reach this method, so the trusted coast and
+        the suspect override keep their P0 semantics exactly.
+        """
+        if (self.locked_low_conf_floor <= 0
+                or self.locked_low_conf_floor >= self.low_confidence_threshold
+                or not detections):
+            return None
+        gate = self.max_trajectory_gap * (1 + self.missing_count * 0.5)
+        ref = self.last_position
+        if ref is None:
+            return None
+
+        def _dist(det):
+            c = det["center"]
+            return float(np.hypot(c[0] - ref[0], c[1] - ref[1]))
+
+        in_gate = [(_dist(d), d) for d in detections
+                   if not d.get("stationary_suspect") and _dist(d) <= gate]
         if not in_gate:
             return None
         min_dist = min(dist for dist, _ in in_gate)
@@ -420,6 +553,7 @@ class BallTracker:
         self.trajectory.clear()
         self.velocities.clear()
         self._recent_centers.clear()
+        self._recent_centers_low.clear()
         self._await_reentry = False
         self._reentry_anchor = None
         self.missing_count = 0

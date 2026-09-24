@@ -52,6 +52,10 @@ class Config:
         "ball_lock_motion_window": 5,      # frames of sightings consulted for motion
         "ball_lock_max_jump": 90.0,        # px: two sightings this close may be one ball
         "ball_lock_max_pair_gap": 2,       # frames: motion pair must be near-consecutive
+        # 20260920 "blue sky" mechanism (probe: sky-backed candidates med 0.90
+        # vs sand-backed 0.20 -- the 0.4 floor starved the track off-sky):
+        "ball_locked_low_conf_floor": 0.15,  # LOCKED, only on frames with NO >=low_confidence_threshold candidate: accept the best non-suspect in-gate candidate >= this floor (0=off)
+        "ball_boot_low_conf_floor": 0.15,    # UNLOCKED: motion-pair evidence may use sightings >= this floor when no high-tier pair exists (0=off)
         "ball_selection_conf_window": 10.0,  # px: confidence breaks ties only within this
         # Detector-side stationarity: surviving detections at/above this
         # windowed persistence are flagged stationary_suspect for the tracker

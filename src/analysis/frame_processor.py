@@ -102,6 +102,8 @@ class FrameProcessor:
                 lock_max_jump=self.config.get("ball_lock_max_jump", 90.0),
                 lock_max_pair_gap=self.config.get("ball_lock_max_pair_gap", 2),
                 selection_conf_window=self.config.get("ball_selection_conf_window", 10.0),
+                locked_low_conf_floor=self.config.get("ball_locked_low_conf_floor", 0.15),
+                boot_low_conf_floor=self.config.get("ball_boot_low_conf_floor", 0.15),
             )
             # Set court bounds for out-of-bounds rejection
             if self.court_calibration.is_calibrated and self.court_calibration.court_bounds:

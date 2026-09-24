@@ -75,6 +75,8 @@ CTOR_PARITY = [
     ("ball_lock_max_jump", BallTracker, "lock_max_jump"),
     ("ball_lock_max_pair_gap", BallTracker, "lock_max_pair_gap"),
     ("ball_selection_conf_window", BallTracker, "selection_conf_window"),
+    ("ball_locked_low_conf_floor", BallTracker, "locked_low_conf_floor"),
+    ("ball_boot_low_conf_floor", BallTracker, "boot_low_conf_floor"),
     ("ball_static_suspect_frac", BallDetector, "static_suspect_frac"),
     ("ball_selection_conf_window", BallTracker, "selection_conf_window"),
     # PlayerDetector

@@ -5,18 +5,26 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-24 (seventeenth session — the owner's post-match
-feedback executed as a plan: match GT dictated by the owner transcribed to
-match-points-v1 JSON + point-layer evaluator (baseline 14/33 confirmed,
-first confirmed point ≈ GT point 8 — the "P1 started around P10" report),
-then the open-point-20 ball-recall probe run BACKGROUND-STRATIFIED: the
-"ball only tracked against blue sky" report is CONFIRMED and quantified
-(sky-backed candidates med conf 0.90, 92% ≥0.4; sand-backed med 0.20, 9%
-≥0.4), the largest loss class is the tracker's 0.4 conf floor rejecting
-present candidates (33–68% of frames), and an offline counterfactual shows
-a low-conf in-gate/low-lock mechanism recovering most of it while a full
-fix also needs detector retraining. Before that, the sixteenth session
-fixed cached-`_up1080` calibration auto-detect.)
+**Last updated:** 2026-09-24 (seventeenth session, TWO commits — match GT
+infra + point evaluator, THEN the open-point-20 MECHANISM SHIPPED:
+BallTracker low-confidence floors (`ball_locked_low_conf_floor` /
+`ball_boot_low_conf_floor`, 0.15 default, non-suspect only, zero-high-frames
+scope so the trusted coast stays byte-exact P0). Entreno action evals FULLY
+NEUTRAL (all 7 recorded F1s hold, team 1.0 everywhere; only 1-frame/
+attribution-index shifts inside gates). Match re-run: actions 74→90
+(+22%), serves 13→21, first confirmed point ≈ GT point 4 (was 8), the
+probe's zero-coverage ep12 now CONFIRMED; confirmed-point COUNT flat 13
+vs 14 — the point layer's ≥2-action bar + 30fps-tuned grouping windows are
+now the binding constraint (session D). Game-state video cost, honestly:
+10/13 vs today's floors-off baseline 11/13 (the recorded 80.6% was STALE —
+the floors-off run today gives 73.7% + 1 false, i.e. the video had already
+drifted from the 2026-09-05 numbers before this mechanism); pt00 recovered,
+pt01-03 lost at boundaries. The config-off escape hatch is verified.
+Session A details: owner's match GT transcribed to match-points-v1 (33
+points, 21-12, winners mechanical, switches after 7/14/21/28) +
+evaluate_match_points (baseline 14/33, "P1 ≈ GT point 8" quantified) +
+background-stratified probe confirming the blue-sky report (sky med 0.90
+vs sand 0.20).)
 
 ## Where we are
 
@@ -87,6 +95,48 @@ switch → identity → landing confidence.
   confidence (plan session C); (4) point winner/score + side-switch layer +
   per-point confidence (session D); (5) identity persistence (session E);
   (6) landing/outcome confidence (session F). See open point 21.
+
+**(2026-09-24, seventeenth session, commit 2 — THE MECHANISM SHIPPED):
+BallTracker low-confidence floors, entreno-neutral, match-validated.**
+Design (narrow P3 from the sim — the safe scope): (a)
+`ball_locked_low_conf_floor` 0.15: while LOCKED, ONLY on frames with ZERO
+≥`low_confidence_threshold` candidates, accept the closest non-suspect
+in-gate candidate ≥ the floor (proximity first, the suspect-fallback's
+conf tie-break; grown gate as usual). Frames WITH any high candidate keep
+P0 byte-exact — the trusted coast is never traded (the e1-f77
+distractor class stays closed; the sim's broader P2 recovered ~2-5pt more
+coverage but would have reopened it, so the narrow scope shipped).
+(b) `ball_boot_low_conf_floor` 0.15: UNLOCKED motion-pair evidence may use
+low-tier sightings (same ≥8px/f, ≤90px, gap≤2 gates; suspects excluded;
+static spares still can never lock) when no high pair exists. Re-entry
+waits are never traded for low-conf picks. Drift-locked ctor parity rows;
+new tests/test_ball_low_conf.py (+14; suite 419 green).
+- **Entreno A/B (HEAD baselines regenerated first, cross-checked vs e15e:
+  6/7 byte-identical, e7 == the ratified post-e15e stream): action evals
+  FULLY NEUTRAL on all 7 — e1 0.706, e2 0.571, e3/e4/e5 1.0, e6 0.933,
+  e7 0.75, team 1.0 everywhere. Raw diffs: e1 dig player_id 3→2, e2 set
+  f118→119, e6 set contact_kind bounce→redirect f118→117 + spike exit
+  47.5→53.1, e7 dig f59→60 (TOWARD GT f61) — all inside eval gates.
+- **Match re-run (output/match20260920_lowconf/): actions 74→90 (+22%),
+  serves 13→21, digs 37→42, spike 9→10, block 0→1, overpass 11→12;
+  episodes 39→48; confirmed points 13 (was 14, ratio 0.394) — BUT first
+  confirmed ≈ GT point 4 (was 8; the owner's "P1 around P10" gap closes)
+  and two previously-starved episodes are now confirmed (f3119 ≈ GT pt4,
+  f9150 — the probe's zero-coverage episode). The flat count is the POINT
+  LAYER's turn: the ≥2-action bar + group_gap 60f / contact_chain 240f
+  windows are 30fps entreno numbers on 25.7fps match footage with longer
+  tracked stretches (splits at 6114/6235/6483 around the old f6022 point).
+- **Game-state video (point-layer guard), honestly measured:** floors-ON
+  10/13, 72.1%, 1 false vs a FRESH floors-OFF baseline of 11/13, 73.7%,
+  1 false — the recorded 11/13-0-false-80.6% (2026-09-05) was already
+  stale (predates the session-7 ball rework; the false point sits inside
+  pt00's GT window). Mechanism deltas are marginal-group churn: pt00 (the
+  coach-fed point, previously unmatchable) is now MATCHED; pt01-03 lost
+  boundary coverage. Config-off escape hatch verified working
+  (output/lowconf_gs_off.yaml).
+- **Next:** session D re-tunes the point layer on BOTH videos jointly
+  (emit every rally candidate with confidence — no silent skips; windows
+  fps-aware), then detector retraining (class (a) remains).
 
 **(2026-09-24, sixteenth session): CALIBRATION AUTO-DETECT FIXED FOR CACHED
 _up1080 FILES.** Owner report: live-debug on
@@ -1272,11 +1322,24 @@ constraint. Side changes need no special handling as long as IDs survive.
     25.7fps tax (point 19a) was NOT implicated by the probe (px/frame
     histograms looked normal where candidates exist); re-examine only
     after the conf-floor mechanism ships.
+    **[UPDATE 2026-09-24, commit 2 — the conf-floor MECHANISM SHIPPED**
+    (narrow zero-high-frames scope; entreno evals fully neutral; match
+    actions +22%, serves 13→21, first-confirmed ≈ GT pt 8→4, ep f9150
+    confirmed; point count flat 13 — the point layer is now binding; see
+    the Where-we-are commit-2 block and open point 21). REMAINING here:
+    (i) detector retraining with sand/building positives (class (a) is
+    unreachable by tracker-side gates), (ii) the point-layer window
+    re-tune moved to open point 21 item 1.]
 21. **[NEW 2026-09-24 — the owner's match-feedback backlog; agreed plan
     order; GT now exists for all of it.]** From the owner's review of the
-    first full-match run: (1) **point count** — fixed downstream of point
-    20; every rally candidate should be EMITTED with a confidence (no
-    silent skips; "P1 started around P10"); baseline 14/33 recorded.
+    first full-match run: (1) **point count** — the ball half is SHIPPED
+    (low-conf floors, commit 2); the point layer half is now BINDING:
+    re-tune group_gap/contact_chain/confirm windows on the game-state
+    video AND the 25.7fps match JOINTLY (confirmed 13 with much better
+    coverage; splits at 6114/6235/6483 need the windows; game-state cost
+    10/13 vs 11/13 floors-off — marginal-group churn to recover), and
+    every rally candidate should be EMITTED with a confidence (no
+    silent skips; baseline 13/33 recorded, first-confirmed ≈ GT pt 4).
     (2) **per-point + per-action confidence** — actions: composite of
     gesture × attribution certainty (width votes/abstain) × ball-track
     continuity at contact; points: n_actions + confidences + tracked
@@ -1681,6 +1744,25 @@ changes.
   + point confidence, winner/score layer, side-switch layer + squad
   mapping + overlay label swap, persistent player numbers, landing
   confidence).
+- **Mechanism SHIPPED (commit 2): BallTracker low-confidence floors**
+  (ball_locked_low_conf_floor / ball_boot_low_conf_floor, 0.15 default,
+  0=off; drift-locked ctor parity; +14 tests/test_ball_low_conf.py, suite
+  419 green). Narrow zero-high-frames scope so the trusted coast stays
+  byte-exact P0 (the sim's broader P2 recovered ~2-5pt more but reopens
+  the e1-f77 distractor class — refused). Boot pairs may use low-tier
+  sightings with identical geometric gates; re-entry waits never traded.
+  **A/B:** fresh HEAD baselines first (lowconf_base; 6/7 byte-identical
+  to the e15e set, e7 == ratified post-e15e stream); post: entreno evals
+  FULLY NEUTRAL (0.706/0.571/1.0/1.0/1.0/0.933/0.75, team 1.0 x7); raw
+  shifts confined to 1-frame/contact-kind/index inside gates (e7 dig
+  f59→60, toward GT f61). **Match re-run:** actions 74→90, serves 13→21,
+  first-confirmed ≈ GT pt 4 (was 8), ep f9150 confirmed; point count 13
+  (flat — point layer now binding: 30fps windows on 25.7fps footage).
+  **Game-state guard:** 10/13 vs a FRESH floors-off baseline of 11/13
+  (the recorded 80.6% was stale — predates the session-7 ball rework);
+  pt00 recovered, pt01-03 lost at boundaries; config-off escape hatch
+  verified. Session D (point 21 item 1) re-tunes the point layer on both
+  videos jointly.
 
 ### 2026-09-24 (sixteenth session) — cached `_up1080` inputs resolve the source-stem calibration
 
