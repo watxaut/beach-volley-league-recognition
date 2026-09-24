@@ -37,6 +37,7 @@ from src.detection.ball_detector import BallDetector
 from src.detection.court_calibration import CourtCalibration
 from src.tracking.player_tracker import PlayerTracker
 from src.utils.config import Config
+from src.utils.video_upscale import resolve_source_stem
 
 # Production tracker config -- read straight from Config.DEFAULT_CONFIG so the
 # measurement provably matches what FrameProcessor runs (previously these were
@@ -89,7 +90,7 @@ def main():
     # Auto-load calibration
     court_path = args.court
     if not court_path:
-        auto = Path(__file__).resolve().parent.parent / "calibrations" / f"{Path(args.video).stem}.json"
+        auto = Path(__file__).resolve().parent.parent / "calibrations" / f"{resolve_source_stem(args.video)}.json"
         if auto.exists():
             court_path = str(auto)
             print(f"Auto-loaded court calibration: {court_path}")
@@ -156,7 +157,9 @@ def main():
 
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
-    video_name = Path(args.video).stem
+    # Output naming keys on the SOURCE stem (cached _up<target> files strip
+    # their suffix), matching the pipeline's calibration/output convention.
+    video_name = resolve_source_stem(args.video)
     writer = None
     if args.save_video:
         out_path = str(output_dir / f"{video_name}_player_tracking.mp4")

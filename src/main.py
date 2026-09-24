@@ -12,7 +12,7 @@ from pathlib import Path
 
 from src.analysis.video_processor import VideoProcessor
 from src.detection.base_detector import resolve_device
-from src.utils.video_upscale import ensure_1080
+from src.utils.video_upscale import ensure_1080, resolve_source_stem
 from src.output_gen.csv_exporter import CSVExporter
 from src.output_gen.json_exporter import JSONExporter
 from src.output_gen.visualization import VisualizationGenerator
@@ -149,7 +149,10 @@ def main() -> int:
         # (ball width side signal, NEAR_NET_PX, TOUCH_RISE_PX, tracker gates)
         # were all measured at 1080p. 1080p+ sources pass through untouched.
         # NOTE: calibration/output naming keeps keying on the SOURCE stem.
-        source_stem = video_file.stem
+        # A trailing _up<target> suffix (the cached upscale file, see
+        # src/utils/video_upscale.py) is stripped so pointing a run directly
+        # at the cache still auto-detects calibrations/<source_stem>.json.
+        source_stem = resolve_source_stem(video_file)
         video_file = ensure_1080(
             video_file, target_height=config.get("upscale_to_height", 1080)
         )

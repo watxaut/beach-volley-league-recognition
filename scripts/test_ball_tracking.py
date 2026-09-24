@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.detection.ball_detector import BallDetector
 from src.detection.court_calibration import CourtCalibration
 from src.tracking.ball_tracker import BallTracker
+from src.utils.video_upscale import resolve_source_stem
 
 
 def main():
@@ -46,7 +47,7 @@ def main():
     # Load court calibration (auto-detect from calibrations/<video_name>.json)
     court_path = args.court
     if not court_path:
-        auto_path = Path(__file__).resolve().parent.parent / "calibrations" / f"{Path(args.video).stem}.json"
+        auto_path = Path(__file__).resolve().parent.parent / "calibrations" / f"{resolve_source_stem(args.video)}.json"
         if auto_path.exists():
             court_path = str(auto_path)
             print(f"Auto-loaded court calibration: {court_path}")

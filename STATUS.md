@@ -5,7 +5,11 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-23 (fifteenth session — FIRST FULL-MATCH RUN on
+**Last updated:** 2026-09-24 (sixteenth session — small fix: pointing a
+run directly at a cached `_up1080` file now auto-detects the SOURCE-stem
+court calibration; live-debug on the match `_up1080` no longer reports
+"court not calibrated". Before that, 2026-09-23 fifteenth session — FIRST
+FULL-MATCH RUN on
 20260920: the episode layer finds all ~39 rallies but the point layer
 confirms only 14 — ball-track recall is the bottleneck; the player roster
 holds 4/4 all match with 0 id-number churn, but identities HOP across
@@ -14,6 +18,26 @@ Open point 20 opened for the ball-recall separation; point 2 needs the GT
 pass before side-change survival can be judged.)
 
 ## Where we are
+
+**(2026-09-24, sixteenth session): CALIBRATION AUTO-DETECT FIXED FOR CACHED
+_up1080 FILES.** Owner report: live-debug on
+`resources/full_videos/20260920_match_ari_joan_lost_up1080.mp4` reported
+"court not calibrated" although the court was clicked — because the run
+was pointed at the CACHED upscale file while the calibration lives under
+the SOURCE stem (`calibrations/20260920_match_ari_joan_lost.json`); the
+720 original worked because its raw stem matched. Fixed with one shared
+helper `resolve_source_stem()` in `src/utils/video_upscale.py` (the module
+that owns the `<stem>_up<target>.mp4` naming): strips a trailing
+`_up<digits>` suffix; wired into `src.main` (calibration auto-detect +
+annotated-video naming), `scripts/test_court_calibration.py` (its private
+regex deduped onto the helper — the WRITE side and the READ side now share
+one implementation), `scripts/dump_player_tracks.py` (the explicit
+`--court` workaround from the fifteenth session is no longer needed) and
+the four diagnostic `scripts/test_*.py` auto-detects. No pipeline/behavior
+change: `ensure_1080` passthrough is untouched, entreno stems never match
+the pattern. Suite **387 green** (+8 tests/test_source_stem.py, pure
+function + a calibration-script contract test; cov addopts still need
+`-o addopts=""` without pytest-cov).
 
 **(2026-09-23, fifteenth session): FIRST FULL-MATCH RUN — the point layer
 STARVES (14 confirmed vs ≈39 rallies), the player roster HOLDS but identities
@@ -1516,6 +1540,28 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-24 (sixteenth session) — cached `_up1080` inputs resolve the source-stem calibration
+
+**Trigger:** live-debug on
+`resources/full_videos/20260920_match_ari_joan_lost_up1080.mp4` said the
+court was not calibrated; the 720 original live-debugged fine.
+
+- **Diagnosis:** `src.main` keyed calibration auto-detect on the RAW input
+  stem — `..._up1080` → looked for
+  `calibrations/20260920_match_ari_joan_lost_up1080.json` (missing), while
+  `scripts/test_court_calibration.py` already stripped the suffix when it
+  WROTE the calibration. One convention, two implementations, the reader
+  was the broken one.
+- **Fix:** `resolve_source_stem()` in `src/utils/video_upscale.py`
+  (`re.fullmatch(r"(.+)_up(\d+)")` strip; plain stems unchanged, so
+  `video2`/`warm_up` never match); used by `src.main`, the calibration
+  script (dedupe), `dump_player_tracks` (auto-detect + output naming), and
+  `test_{ball_tracking,player_tracking,action_recognition,pose_estimation}.py`.
+- **Verified:** the `_up1080` file now resolves
+  `calibrations/20260920_match_ari_joan_lost.json` AND `ensure_1080`
+  passthrough keeps processing the same cached file; the 720 original
+  resolves identically (no regression). Suite 387 green (+8).
 
 ### 2026-09-23 (fifteenth session) — first full-match run: points starve 14/≈39, roster holds, identities hop; ball recall indicted (point 20)
 

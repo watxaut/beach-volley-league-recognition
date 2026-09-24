@@ -29,6 +29,7 @@ from src.recognition.pose_estimator import PoseEstimator
 from src.recognition.action_classifier import ActionClassifier
 from src.analysis.spike_analyzer import SpikeAnalyzer
 from src.output_gen import overlay
+from src.utils.video_upscale import resolve_source_stem
 
 
 def main():
@@ -60,7 +61,7 @@ def main():
     # Load court calibration (auto-detect from calibrations/<video_name>.json)
     court_path = args.court
     if not court_path:
-        auto_path = Path(__file__).resolve().parent.parent / "calibrations" / f"{Path(args.video).stem}.json"
+        auto_path = Path(__file__).resolve().parent.parent / "calibrations" / f"{resolve_source_stem(args.video)}.json"
         if auto_path.exists():
             court_path = str(auto_path)
             print(f"Auto-loaded court calibration: {court_path}")

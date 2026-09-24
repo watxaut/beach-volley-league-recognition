@@ -27,6 +27,7 @@ contact-window misses show up on real footage.
 
 import logging
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -91,6 +92,23 @@ def _transcode(source: Path, output: Path, target_height: int) -> None:
             "ffmpeg not found on PATH; it is required to upscale sub-1080p "
             "videos. Install ffmpeg or pre-upscale the video manually."
         ) from exc
+
+
+def resolve_source_stem(video_path: Union[str, Path]) -> str:
+    """Stem of the SOURCE video this path refers to.
+
+    ``ensure_1080`` caches upscaled copies as ``<stem>_up<target>.mp4`` next
+    to the original, and calibration auto-detect / output naming key on the
+    SOURCE stem. Pointing a run directly at a cached file must therefore
+    resolve back to the original stem: a trailing ``_up<digits>`` suffix is
+    stripped (``<name>_up1080`` -> ``<name>``). Plain stems pass through
+    unchanged (``video2`` stays ``video2``).
+    """
+    stem = Path(video_path).stem
+    match = re.fullmatch(r"(.+)_up(\d+)", stem)
+    if match:
+        stem = match.group(1)
+    return stem
 
 
 def ensure_1080(video_path: Union[str, Path], target_height: int = 1080) -> Path:

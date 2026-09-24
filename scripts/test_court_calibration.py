@@ -14,7 +14,6 @@ Usage:
 """
 
 import argparse
-import re
 import sys
 from pathlib import Path
 
@@ -24,6 +23,7 @@ import cv2
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.detection.court_calibration import CourtCalibration
+from src.utils.video_upscale import resolve_source_stem
 
 CALIBRATIONS_DIR = Path(__file__).resolve().parent.parent / "calibrations"
 
@@ -36,12 +36,7 @@ def get_calibration_path(video_path: str) -> Path:
     (calibrations/<source_stem>.json), and a calibration is only valid in
     the pixel space it was clicked in -- i.e. the upscaled file's.
     """
-    stem = Path(video_path).stem
-    # "<name>_up1080" -> "<name>"
-    match = re.fullmatch(r"(.+)_up(\d+)", stem)
-    if match:
-        stem = match.group(1)
-    return CALIBRATIONS_DIR / f"{stem}.json"
+    return CALIBRATIONS_DIR / f"{resolve_source_stem(video_path)}.json"
 
 
 def main():
