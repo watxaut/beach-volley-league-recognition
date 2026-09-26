@@ -1,0 +1,30 @@
+notebooks/finetune_yolo_ball.ipynb
+  s_a80e96cebcbc7f::t_1373d3afd1fef7 175,184
+  s_a80e96cebcbc7f::t_8f4d5698df4970 7,12-15,100,102-110,124-125,136,193-195,199,211-212
+STATUS.md
+  s_a80e96cebcbc7f::t_c914884f9ae11e 8-17,21-60
+  s_a80e96cebcbc7f::t_53fdb9f75143ac 1440-1451,1832-1871
+  s_a80e96cebcbc7f::t_5dac254c4104af 61
+  s_a80e96cebcbc7f::t_5ba5ebd71cc636 1872
+scripts/mine_ball_frames.py
+  s_a80e96cebcbc7f::t_913513f377284b 34-45,119-131,184-187,250-259,263-264,266-267,318-319
+tests/test_mine_ball_frames.py
+  s_a80e96cebcbc7f::t_57e92bad64f5f0 9,12,101-124
+  s_a80e96cebcbc7f::t_ec0e5fc12bd2fd 125-126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "559f86481702d67750a4e68f3ec0930cc3397ded",
+  "prompts": {},
+  "sessions": {
+    "s_a80e96cebcbc7f": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0def3-45ea-7575-8f8d-32e53d195c9f",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
