@@ -1,0 +1,28 @@
+STATUS.md
+  s_5a0f7b8038809d::t_70dcbd762a4aea 1328-1341
+  s_5a0f7b8038809d::t_5de3918003a222 8-21
+  s_5a0f7b8038809d::t_ed8c0ae339167b 57-59,68-105
+  s_5a0f7b8038809d::t_5117a909881f70 1768-1802
+  s_5a0f7b8038809d::t_5c38390ad9bc9a 106
+scripts/import_roboflow_coco.py
+  s_5a0f7b8038809d::t_42f4301ec4a773 1-58,60-70,73-132
+  s_5a0f7b8038809d::t_36af74683eb3ce 59,71-72
+tests/test_import_roboflow_coco.py
+  s_5a0f7b8038809d::t_52ab33702cf2ca 1-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "af3d748709d8189b8da8b3a18872caad9a5acbc1",
+  "prompts": {},
+  "sessions": {
+    "s_5a0f7b8038809d": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0d536-471f-7575-8f8d-32e3fac2673f",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
