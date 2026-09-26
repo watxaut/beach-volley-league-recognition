@@ -5,18 +5,20 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-25 (eighteenth session — DETECTOR-RETRAIN MINING
-SHIPPED: `scripts/mine_ball_frames.py` stratified the whole match's
-GAME_ON frames with the probe's bg_class and wrote the owner's 500-frame
-Roboflow annotation set to `resources/frames/match20260920/` (250 blind /
-100 low_sand / 50 low_other / 60 sand_noise / 40 sky_control, JPG q95,
-318MB, local pre-labels from the current detector, seeded min-spacing
-sampling; suite +16 → 435 green). Full-match scan verdict: blind = 23%
-of ALL game_on frames (1843/7994) — class (a) is bigger than the probe's
-episode-local share suggested. NEXT: owner annotates in Roboflow → merge
-export into `datasets/ball_detection/` → `prepare_dataset_for_training`
-→ Colab fine-tune → validation gate (entreno A/B drift-lock + match
-re-run + probe re-run to quantify class (a)/(b) shrinkage).)
+**Last updated:** 2026-09-26 (eighteenth session, TWO legs — mining
+SHIPPED, then the owner's HAND ANNOTATION landed and the retrain dataset
+is MERGED + ZIPPED: `scripts/mine_ball_frames.py` wrote the 500-frame
+stratified set; owner reported the pre-labels mostly wrong, re-annotated
+one-by-one in Roboflow (486 frames, 423 boxes, 208 on former blind
+frames); `scripts/import_roboflow_coco.py` merged it →
+`datasets/ball_detection/` now 1091 images, `ball_dataset.zip` 1.7G
+rebuilt (928/163). BIG DIAGNOSTIC CORRECTION: even ≥0.4-conf sky-backed
+raw picks were mostly NOT the ball per owner GT — raw detector precision
+on this venue is low; the tracker's motion gates carry production.
+Suite 435→440 green. NEXT: owner fine-tunes in Colab
+(`notebooks/finetune_yolo_ball.ipynb`, upload the zip, T4, run all) →
+validation-gate session: entreno A/B drift-lock + match re-run +
+evaluate_match_points + probe re-run for class (a)/(b) shrinkage.)
 
 ## Where we are
 
@@ -52,12 +54,9 @@ empty txt for blind/noise = negative unless the owner finds a ball) +
 motion-support proxy: 8/12 on smoke-set low picks — consistent with the
 probe's ~60%; blind picks show nothing at ±2 either (genuinely hard,
 human-only). Picks span f297..f25991.
-- **Owner handoff (the next step is YOURS):** upload
-`images/ + labels/` together to Roboflow → review/correct (pre-labels
-are starting points, not truth) → export YOLOv8 → merge into
-`datasets/ball_detection/` → `python scripts/prepare_dataset_for_training.py
-datasets/ball_detection` → fine-tune `notebooks/finetune_yolo_ball.ipynb`
-(Colab) → hand the new weights back.
+- **Owner handoff — COMPLETED 2026-09-25/26 (see the annotation leg
+below):** the owner hand-annotated in Roboflow; the dataset is merged
+and the training zip is BUILT.
 - **Validation gate when weights return (one session):** entreno A/B
 drift-lock (all 7 F1s must hold) → full match re-run +
 `evaluate_match_points` → re-run `diag_ball_probe_bgsky.py` on the same
@@ -65,6 +64,45 @@ drift-lock (all 7 F1s must hold) → full match re-run +
 baselines.
 - **Still queued after that:** session D (point-layer re-tune — the
 binding constraint for point COUNT), then the rest of open point 21.
+
+**(2026-09-26, the annotation leg of the eighteenth session — OWNER
+GT LANDED, DATASET MERGED, ZIP BUILT; one big diagnostic correction.)**
+
+- **The owner's report:** the shipped pre-labels were MOSTLY WRONG, so
+they uploaded the images WITHOUT labels and annotated one by one
+themselves. Export came as COCO from the dataset page (the version
+page's "rapid" download was broken); 486/500 frames made it (14 lost:
+6 blind / 3 low_sand / 2 low_other / 2 noise / 1 sky — accepted).
+Export images verified PIXEL-IDENTICAL to our mined frames (mean abs
+diff 0.00, n=346).
+- **DIAGNOSTIC CORRECTION (load-bearing for future probe reads):**
+pre-label-vs-owner-GT audit — our raw candidates were almost never on
+the owner's ball: low_sand 0/155 same-place, low_other 0/71,
+sky_control 3/77. Even ≥0.4-conf SKY-BACKED picks were mostly not the
+ball per human GT. Raw detector precision on this venue is far lower
+than the probe assumed; the tracker's motion/geometric gates (not
+confidence) carry production. Many probe "class (b)" candidates were
+sand noise, not missed balls. The floors mechanism keeps its
+entreno-neutrality + match action gains, but the retrain now attacks
+precision too, not just recall.
+- **Owner GT:** 423 boxes on 486 frames; 208/244 exported blind frames
+got a ball (the class-(a) gold); 73 frames empty = negatives; 6
+degenerate <2px boxes (click droppings) dropped with per-frame report.
+Box widths: med ~25px, tail to 95px.
+- **`scripts/import_roboflow_coco.py` (+5 tests, suite 440 green):**
+strips Roboflow's `_jpg.rf.<hash>` suffix back to canonical mining
+names, COCO→YOLO conversion, non-ball categories ABORT (never silently
+become class 0), refuses canonical-name collisions, empty labels =
+valid negatives.
+- **Merged + zipped:** `datasets/ball_detection/` now 1091 images
+(605 entreno + 486 match); `ball_dataset.zip` rebuilt 1.7G — 928
+train / 163 valid (418/68 match frames mixed in). Gotcha hit: disk
+filled mid-prepare (Errno 28) — removed the partial `yolo_dataset/`
+staging dir and reran fine.
+- **NEXT (owner):** Colab `notebooks/finetune_yolo_ball.ipynb` —
+upload `datasets/ball_detection/ball_dataset.zip`, T4 GPU, run all
+(same recipe: yolov8n base, freeze=10, imgsz=1280, epochs=100). Then
+hand the weights back for the validation-gate session.
 
 **(2026-09-24, seventeenth session — TWO commits; full detail in the
 log entry): (1) match GT transcribed** (`parse_match_gt_text.py` →
@@ -1287,7 +1325,20 @@ constraint. Side changes need no special handling as long as IDs survive.
     `datasets/ball_detection/` → prepare zip → Colab fine-tune → hand
     weights back. Then the validation-gate session: entreno A/B
     drift-lock + match re-run + evaluate_match_points + probe re-run to
-    quantify class (a)/(b) shrinkage.]**
+    quantify class (a)/(b) shrinkage.]
+    **[UPDATE 2026-09-26 — the annotation leg COMPLETED and the dataset
+    is merged. The owner hand-annotated (pre-labels reported mostly
+    wrong; uploaded images WITHOUT labels, drew one by one); 486/500
+    exported as COCO, 423 boxes (208 on former blind frames), 73
+    negatives; `scripts/import_roboflow_coco.py` (+5 tests) converted +
+    merged → 1091 images total; `ball_dataset.zip` 1.7G rebuilt
+    (928/163 split). DIAGNOSTIC CORRECTION that survives here: raw
+    candidates — even ≥0.4 sky-backed — were almost never on the
+    owner's ball (3/77 sky same-place); raw detector precision on this
+    venue is LOW, the tracker's motion gates carry production, and many
+    probe class-(b) "candidates" were sand noise. Re-read probe numbers
+    accordingly; the retrain attacks precision AND recall. NEXT:
+    Colab fine-tune → validation-gate session.]**
 21. **[NEW 2026-09-24 — the owner's match-feedback backlog; agreed plan
     order; GT now exists for all of it.]** From the owner's review of the
     first full-match run: (1) **point count** — the ball half is SHIPPED
@@ -1713,6 +1764,41 @@ script + tests.
   fine-tune (notebooks/finetune_yolo_ball.ipynb) → validation-gate
   session on the new weights (entreno A/B drift-lock, match re-run +
   evaluate_match_points, probe re-run for class (a)/(b) shrinkage).
+
+### 2026-09-26 (eighteenth session, annotation leg) — owner GT landed; retrain dataset merged + zipped; pre-label audit forces a diagnostic correction
+
+- **Owner report:** the shipped pre-labels were mostly wrong → they
+  uploaded images WITHOUT labels and annotated one by one in Roboflow.
+  Version-page "rapid" download was broken; COCO export from the
+  dataset page worked. 486/500 frames (14 lost: 6 blind/3 low_sand/
+  2 low_other/2 noise/1 sky). Export images pixel-identical to our
+  frames (diff 0.00, n=346) — same pixels, human labels.
+- **Audit BEFORE the owner's explanation (kept for the record):** owner
+  boxes vs pre-labels — low_sand 0/155 same-place, low_other 0/71,
+  sky_control 3/77; then all "deleted pre-labels" made sense: labels
+  never attached. **Correction that survives: raw detector precision on
+  this venue is LOW (even ≥0.4 sky-backed picks mostly not the ball per
+  human GT); the tracker's motion/geometric gates carry production;
+  many probe class-(b) candidates were sand noise, not missed balls.**
+  The floors mechanism keeps its validation (entreno-neutral, match
+  actions +22%) because its picks are motion-gated — but re-read probe
+  counts as noise-heavy. The retrain attacks precision AND recall.
+- **Owner GT contents:** 423 boxes on 486 frames (208/244 exported
+  blind frames now have a ball), 73 empty-label negatives, 6 degenerate
+  <2px boxes dropped with report (click droppings). Box widths med
+  ~25px, tail to 95px. One leftover empty Roboflow category mapped
+  harmlessly (0 annotations).
+- **`scripts/import_roboflow_coco.py`** (+5 tests, suite **440**):
+  `_jpg.rf.<hash>` suffix strip → canonical names, COCO→YOLO, non-ball
+  category aborts, collision refusal, empty labels = negatives,
+  degenerate-box drop policy at 2px.
+- **Merge + zip:** datasets/ball_detection/ = 1091 images (605 + 486);
+  ball_dataset.zip 1.7G, 928 train / 163 valid (418/68 match).
+  Gotcha: disk filled mid-prepare (Errno 28) — rm the partial
+  yolo_dataset/ staging dir, rerun clean.
+- **Next:** owner runs the Colab notebook on the new zip (T4, run all);
+  weights return → validation-gate session (drift-lock, match re-run,
+  probe re-run).
 
 ### 2026-09-24 (seventeenth session) — match GT transcribed + point evaluator; ball-recall probe indicts the 0.4 conf floor (blue-sky report confirmed)
 
