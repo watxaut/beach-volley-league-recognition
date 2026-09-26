@@ -5,20 +5,21 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-26 (eighteenth session, TWO legs — mining
-SHIPPED, then the owner's HAND ANNOTATION landed and the retrain dataset
-is MERGED + ZIPPED: `scripts/mine_ball_frames.py` wrote the 500-frame
-stratified set; owner reported the pre-labels mostly wrong, re-annotated
-one-by-one in Roboflow (486 frames, 423 boxes, 208 on former blind
-frames); `scripts/import_roboflow_coco.py` merged it →
-`datasets/ball_detection/` now 1091 images, `ball_dataset.zip` 1.7G
-rebuilt (928/163). BIG DIAGNOSTIC CORRECTION: even ≥0.4-conf sky-backed
-raw picks were mostly NOT the ball per owner GT — raw detector precision
-on this venue is low; the tracker's motion gates carry production.
-Suite 435→440 green. NEXT: owner fine-tunes in Colab
-(`notebooks/finetune_yolo_ball.ipynb`, upload the zip, T4, run all) →
-validation-gate session: entreno A/B drift-lock + match re-run +
-evaluate_match_points + probe re-run for class (a)/(b) shrinkage.)
+**Last updated:** 2026-09-26 (eighteenth session, THIRD leg — VALIDATION GATE
+RUN on the owner's Colab retrain (`models/volleyball_ball_best_v2_match.pt`,
+candidate): **REJECTED as drop-in**. GT-frame eval: recall flat (58%),
+class-(a) blind frames fixed (probe: 25→2 / 10→3 / 31→19 / 16→15 /
+20→9%), match confirmed 13→15, actions 90→104 — BUT raw precision at
+the 0.4 gate fell 40→25% (confident FPs 330→684), sky-backed TRUE-ball
+conf collapsed on unseen episodes (ep35 med 0.90→0.47), and entreno
+drift-lock FAILED 3/7 (e4 1.0→0.933, e5 1.0→0.923 lost opening serve,
+e7 0.75→0.625; e1/e2/e3/e6 exact, team 1.0×7). Production weights
+UNCHANGED. Round-2 retrain spec recorded in open point 20: more pure
+negatives + more sky positives from the 1233 scanned sky_control pool +
+73→~200 negatives, consider fine-tuning FROM the old best.pt. EVAL
+GOTCHA recorded: action evals MUST use `--ignore-player` (GT player_id
+is a per-frame L-R index; without it identical streams score 0.93 vs
+0.13). Artifacts: output/retrain_eval/, output/match20260920_retrain/.)
 
 ## Where we are
 
@@ -103,6 +104,52 @@ staging dir and reran fine.
 upload `datasets/ball_detection/ball_dataset.zip`, T4 GPU, run all
 (same recipe: yolov8n base, freeze=10, imgsz=1280, epochs=100). Then
 hand the weights back for the validation-gate session.
+
+**(2026-09-26, third leg — the VALIDATION GATE ran; candidate
+REJECTED; production untouched.)** The owner trained in Colab (same
+recipe) and dropped the weights in the repo root; stashed as
+`models/volleyball_ball_best_v2_match.pt` (old weights untouched for
+A/B). Gate legs:
+
+- **GT-frame eval (output/retrain_eval/diag_gt_frames.py, 486
+owner-GT frames, stateless raw predicts @0.15, imgsz 1280, IoU 0.3):**
+recall FLAT (old 58.3% / new 57.8%; valid-split 50.8→47.7%); detections
+1750→3026 with precision 13.9→8.0%; at the 0.4 gate: recall 52.5→55.4%
+but precision 39.9→25.3% (confident FPs 330→684, sky-backed 31→236).
+TRUE-det conf by bg: sand med 0.63→0.80 (62→82% ≥0.4), other 88→100%,
+sky 98.8% both — the intended confidence fix is real ON TRAINED FRAMES.
+- **Entreno drift-lock: FAILED 3/7** (test_action_recognition +
+evaluate --ignore-player on both runs): e1 0.706, e2 0.571, e3 1.0,
+e6 0.933 EXACT; e4 1.0→0.933 (+1 FP overpass f386), e5 1.0→0.923 (LOST
+the opening serve f17), e7 0.75→0.625 (lost the fragile f242 set,
+gained f440 dig). Team 1.0 everywhere. **EVAL GOTCHA (record): the
+recorded F1s require `--ignore-player`** — GT player_id is a per-frame
+L-R index; with player matching on, IDENTICAL streams score 0.933 vs
+0.133. First read of this leg falsely looked like a crash; always
+mirror the baseline invocation.
+- **Match re-run (output/match20260920_retrain/):** actions 90→104
+(serves 21→28, spikes 10→16, sets 4→9, digs 42 flat, block 2,
+overpass 7); episodes 48→63 (MORE fragmentation); **confirmed points
+13→15 (ratio 0.394→0.455)**; first-confirmed ordinal 4→7.
+- **Probe re-run (diag_ball_probe_v2.py + ball_probe_v2.json; floors ON
+in both tracker chains now — tracked% has floor parity, candidate stats
+are model-only):** class (a) blind frames SHRANK everywhere — ep02
+25→2%, ep06 10→3%, ep12 31→19%, ep08 16→15%, ep35 20→9% (the retrain's
+genuine win). But ep35 (control) sky-backed candidates med conf
+0.90→0.47, ≥0.4 share 92→51% — the OLD model's crown jewel REGRESSED on
+unseen sky; sand/other pool confs ~flat (the FP flood dilutes).
+Tracked: ep02 2→10%, ep06 25→31%, ep12 0→7%, ep08 4→11%, ep35 47→46%.
+- **VERDICT: REJECTED as a drop-in.** It buys class-(a) recall and +2
+confirmed points but pays with raw precision (2× confident FPs), sky
+regression on the control episode, and 3 entreno F1s moved — the
+neutrality bar and the robustness story (sky-confident tracking is the
+working regime) both break.
+- **Round-2 spec (open point 20):** rebalance the mining set — many more
+PURE NEGATIVES (sand-noise pool scanned 1100, only 60 exported; plus
+empty frames beyond the 73) and many more SKY POSITIVES from the match
+(scanned 1233 sky_control, only 40 exported) to protect the crown
+jewel; consider fine-tuning FROM volleyball_ball_best.pt instead of
+base yolov8n; retrain → same gate. One lever at a time.
 
 **(2026-09-24, seventeenth session — TWO commits; full detail in the
 log entry): (1) match GT transcribed** (`parse_match_gt_text.py` →
@@ -1338,7 +1385,22 @@ constraint. Side changes need no special handling as long as IDs survive.
     venue is LOW, the tracker's motion gates carry production, and many
     probe class-(b) "candidates" were sand noise. Re-read probe numbers
     accordingly; the retrain attacks precision AND recall. NEXT:
-    Colab fine-tune → validation-gate session.]**
+    Colab fine-tune → validation-gate session.]
+    **[UPDATE 2026-09-26 (third leg) — GATE RUN, CANDIDATE REJECTED,
+    ROUND-2 SPEC BELOW.** Owner's Colab retrain (v2_match) measured on
+    all four legs: class (a) genuinely fixed (blind 25→2 / 10→3 / 31→19 /
+    16→15 / 20→9% on the probe episodes; match confirmed 13→15, actions
+    90→104) BUT raw precision @0.4 fell 39.9→25.3% (confident FPs
+    330→684, sky 31→236), control-ep35 sky TRUE conf med 0.90→0.47, and
+    entreno drift-lock failed 3/7 (e4/e5/e7; e5 lost its opening serve;
+    e1/e2/e3/e6 exact, team 1.0). Production weights UNCHANGED.
+    ROUND 2 = rebalanced mining: ~200 pure negatives (sand-noise pool
+    has 1100 scanned vs 60 exported) + ~150 sky positives (1233 scanned
+    vs 40 exported) + keep the blind/low classes; optionally fine-tune
+    FROM the old best.pt rather than base yolov8n; then the SAME gate
+    (GT-frames → entreno --ignore-player A/B → match → probe). EVAL
+    CONVENTION: action evals REQUIRE --ignore-player to reproduce the
+    recorded F1s.]**
 21. **[NEW 2026-09-24 — the owner's match-feedback backlog; agreed plan
     order; GT now exists for all of it.]** From the owner's review of the
     first full-match run: (1) **point count** — the ball half is SHIPPED
@@ -1718,6 +1780,34 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-26 (eighteenth session, validation-gate leg) — candidate retrain measured on all four legs: class (a) fixed, precision/sky regress; REJECTED, round-2 spec recorded
+
+- Weights: owner's Colab run stashed as
+  `models/volleyball_ball_best_v2_match.pt`; production
+  `volleyball_ball_best.pt` untouched. All artifacts git-ignored:
+  output/retrain_eval/ (GT-frame eval + probe v2),
+  output/match20260920_retrain/ (full run + match_points_eval.json).
+- **GT-frame eval (new diag):** recall flat 58%, dets 1750→3026,
+  precision 13.9→8.0%, @0.4 recall 52.5→55.4% / precision 39.9→25.3%;
+  sand TRUE conf med 0.63→0.80. Valid-split (leakage-free, n=65):
+  recall 50.8→47.7%.
+- **Entreno A/B:** e1/e2/e3/e6 EXACT (0.706/0.571/1.0/0.933), e4
+  1.0→0.933 (+FP overpass f386), e5 1.0→0.923 (opening serve f17 lost),
+  e7 0.75→0.625 (f242 set lost, f440 dig gained). Team 1.0 ×7.
+- **EVAL GOTCHA (permanent record):** the recorded action F1s require
+  `evaluate.py --ignore-player`; with the default player matching,
+  byte-identical streams score 0.933 vs 0.133 (GT player_id is a
+  per-frame left-to-right index). Mirror the baseline invocation in
+  every A/B.
+- **Match:** confirmed 13→15 (0.394→0.455), actions 90→104, serves
+  21→28; episodes 48→63, first-confirmed ordinal 4→7.
+- **Probe v2:** blind% 25→2 / 10→3 / 31→19 / 16→15 / 20→9; ep35 sky
+  med conf 0.90→0.47 (≥0.4: 92→51%); tracked 2→10 / 25→31 / 0→7 /
+  4→11 / 47→46%.
+- **Verdict: reject as drop-in.** Round 2 (owner + this gate):
+  rebalanced mining (~200 pure negatives, ~150 sky positives; blind/low
+  classes kept), optional fine-tune-from-best.pt, same four-leg gate.
 
 ### 2026-09-25 (eighteenth session) — retrain-mining shipped: 500 stratified match frames staged for the owner's Roboflow annotation
 
