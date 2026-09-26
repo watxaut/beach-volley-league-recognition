@@ -31,6 +31,18 @@ Output (Roboflow-ready: drag & drop images/ + labels/ together):
     <output-dir>/labels/<stem>_f<idx>.txt   (PRE-LABELS -- review required)
     <output-dir>/manifest.json              (audit trail: class, candidates)
 
+Round 2 (2026-09-26, after the v2_match candidate was REJECTED at the
+validation gate): rebalanced mining only -- the blind/low classes were
+genuinely fixed (blind 25->2% on the probe episodes) but confident FPs
+exploded (330->684) and sky TRUE conf collapsed on unseen episodes
+(ep35 med 0.90->0.47). So round 2 mines ONLY hard negatives + sky
+controls and EXCLUDES the previous round's picks:
+    --caps 0,0,0,200,150 --no-prelabel \
+    --exclude-manifest resources/frames/match20260920/manifest.json \
+    --output-dir resources/frames/match20260920_round2
+The exclusion is same-class +-spacing (classes are deterministic, so a
+previous pick of class X can only collide with this round's pool of X).
+
 After the owner reviews/exports and the model is retrained, the validation
 gate is: entreno A/B drift-lock -> match re-run + evaluate_match_points ->
 re-run diag_ball_probe_bgsky.py on the same 5 episodes to quantify the
@@ -104,6 +116,19 @@ def classify_frame(cands):
             else "low_other"), best
 
 
+def exclusion_zone(frames, margin):
+    """All frames within +-margin of any frame in `frames`, as a set.
+
+    Used to keep a previous mining round's picks (and their near
+    duplicates) out of this round's pools.
+    """
+    out = set()
+    for f in frames:
+        for d in range(-margin, margin + 1):
+            out.add(f + d)
+    return out
+
+
 def pick_frames(pool, cap, spacing, rng):
     """Sample <=cap frame indices from pool with min `spacing` separation.
 
@@ -156,6 +181,10 @@ def main():
                     help="detector confidence floor (production parity: 0.15)")
     ap.add_argument("--caps", default=",".join(str(DEFAULT_CAPS[c]) for c in CLASSES),
                     help="comma caps for " + ",".join(CLASSES))
+    ap.add_argument("--exclude-manifest", default=None,
+                    help="mining manifest of a previous round: its same-class "
+                         "picks (+-spacing) are excluded from this round's pools "
+                         "(round-2 rebalanced mining)")
     ap.add_argument("--spacing", type=int, default=5,
                     help="min frame distance between two picks of one class")
     ap.add_argument("--pad", type=int, default=30,
@@ -218,12 +247,24 @@ def main():
     print("\nscanned-frame classes:", dict(counts))
 
     # ---- sample ---------------------------------------------------------
+    excluded = {cls: set() for cls in CLASSES}
+    if args.exclude_manifest:
+        prev = json.loads(Path(args.exclude_manifest).read_text())
+        for cls in CLASSES:
+            excluded[cls] = exclusion_zone(prev["picked"].get(cls, []),
+                                           args.spacing)
+        print(f"excluding previous picks (+-{args.spacing}f) from "
+              f"{args.exclude_manifest}: "
+              + ", ".join(f"{cls} {len(excluded[cls])}" for cls in CLASSES))
+
     rng = random.Random(args.seed)
     picks = {}
     for cls in CLASSES:
-        pool = (f for f, r in rows.items() if r["cls"] == cls)
+        pool = (f for f, r in rows.items()
+                if r["cls"] == cls and f not in excluded[cls])
         picks[cls] = pick_frames(pool, caps[cls], args.spacing, rng)
-        print(f"  {cls:<12} scanned {counts.get(cls, 0):>5}  cap {caps[cls]:>3}  "
+        print(f"  {cls:<12} scanned {counts.get(cls, 0):>5}  "
+              f"excl {len(excluded[cls]):>5}  cap {caps[cls]:>3}  "
               f"picked {len(picks[cls])}")
     picked_frames = sorted(f for lst in picks.values() for f in lst)
 
@@ -274,6 +315,8 @@ def main():
         "model": args.model,
         "conf": args.conf,
         "caps": caps, "spacing": args.spacing, "pad": args.pad, "seed": args.seed,
+        "exclude_manifest": args.exclude_manifest,
+        "excluded_counts": {cls: len(excluded[cls]) for cls in CLASSES},
         "total_frames": int(total),
         "scanned": scanned,
         "scanned_classes": dict(counts),

@@ -6,8 +6,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from mine_ball_frames import (
+    CLASSES,
     DEFAULT_CAPS,
     classify_frame,
+    exclusion_zone,
     game_on_ranges,
     pick_frames,
 )
@@ -94,6 +96,32 @@ class TestGameOnRanges:
     def test_all_game_on(self, tmp_path):
         p = self._write(tmp_path, [(0, "game_on"), (1, "game_on")])
         assert game_on_ranges(p) == [(0, 1)]
+
+
+class TestExclusionZone:
+    def test_margin_zero_is_exact(self):
+        assert exclusion_zone([5, 10], 0) == {5, 10}
+
+    def test_covers_margin_on_both_sides(self):
+        assert exclusion_zone([10], 2) == {8, 9, 10, 11, 12}
+
+    def test_empty_frames(self):
+        assert exclusion_zone([], 5) == set()
+
+    def test_overlapping_zones_union(self):
+        assert exclusion_zone([10, 12], 2) == set(range(8, 15))
+
+
+class TestRound2CapsContract:
+    def test_cap_zero_picks_nothing(self):
+        rng = __import__("random").Random(0)
+        assert pick_frames(range(100), cap=0, spacing=5, rng=rng) == []
+
+    def test_round2_caps_budget(self):
+        # round-2 rebalanced mining: only noise negatives + sky controls
+        caps = dict(zip(CLASSES, (0, 0, 0, 200, 150)))
+        assert sum(caps.values()) == 350
+        assert caps["blind"] == 0 and caps["low_sand"] == 0
 
 
 class TestDefaultsContract:

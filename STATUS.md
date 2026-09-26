@@ -5,23 +5,59 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-26 (eighteenth session, THIRD leg — VALIDATION GATE
-RUN on the owner's Colab retrain (`models/volleyball_ball_best_v2_match.pt`,
-candidate): **REJECTED as drop-in**. GT-frame eval: recall flat (58%),
-class-(a) blind frames fixed (probe: 25→2 / 10→3 / 31→19 / 16→15 /
-20→9%), match confirmed 13→15, actions 90→104 — BUT raw precision at
-the 0.4 gate fell 40→25% (confident FPs 330→684), sky-backed TRUE-ball
-conf collapsed on unseen episodes (ep35 med 0.90→0.47), and entreno
-drift-lock FAILED 3/7 (e4 1.0→0.933, e5 1.0→0.923 lost opening serve,
-e7 0.75→0.625; e1/e2/e3/e6 exact, team 1.0×7). Production weights
-UNCHANGED. Round-2 retrain spec recorded in open point 20: more pure
-negatives + more sky positives from the 1233 scanned sky_control pool +
-73→~200 negatives, consider fine-tuning FROM the old best.pt. EVAL
-GOTCHA recorded: action evals MUST use `--ignore-player` (GT player_id
-is a per-frame L-R index; without it identical streams score 0.93 vs
-0.13). Artifacts: output/retrain_eval/, output/match20260920_retrain/.)
+**Last updated:** 2026-09-26 (nineteenth session — ROUND-2 REBALANCED
+MINING per the round-1 rejection spec: 350 frames staged in
+`resources/frames/match20260920_round2/` — 200 sand-noise pure negatives +
+150 sky controls, round-1 picks excluded ±5f same-class, scanned classes
+BYTE-IDENTICAL to round 1 (determinism check). No pre-labels this time —
+the round-1 audit showed our ≥0.4 sky pre-labels sat on the owner's ball
+only 3/77 times. Colab notebook switched to fine-tune FROM the production
+best.pt (BASE_MODEL var; run/download renamed *_r2). Suite 446 green.
+Owner court: annotate → COCO export → import_roboflow_coco.py → rezip →
+train r2 → weights back → SAME four-leg gate. Production untouched.)
 
 ## Where we are
+
+**(2026-09-26, nineteenth session): ROUND-2 BALL RETRAIN STAGED — 350
+rebalanced frames await the owner's Roboflow annotation; pipeline src
+untouched, suite 446 green.**
+
+- **`scripts/mine_ball_frames.py` + `--exclude-manifest` (keeper, +6 tests →
+  suite 446):** same production-parity scan (best.pt, conf 0.15, _up1080,
+  30f warm-up, det.reset per range); scanned classes BYTE-IDENTICAL to the
+  round-1 scan (blind 1843 / low_sand 1407 / low_other 1541 / sand_noise
+  1100 / sky_control 1233 / high_other 870) — the determinism check came
+  free. Exclusion is same-class ±spacing (classes are deterministic, so a
+  round-1 pick can only collide with this round's pool of the same class).
+- **The round-2 set (`resources/frames/match20260920_round2/`, git-ignored,
+  222MB, README.md inside):** 200 sand_noise picks (pool 1100 → 449 after
+  excluding round-1's 60 picks ±5f) + 150 sky_control picks (1233 → 809
+  after round-1's 40) — caps hit exactly, span f240..f26004, no exact
+  collisions. **NO pre-labels** (`--no-prelabel`): round-1 audit showed
+  ≥0.4 sky pre-labels were on the owner's ball 3/77 — wrong labels are
+  worse than none. Noise frames = negatives by construction (owner adds a
+  box if they see a ball); sky frames = true ball or null (the nulls are
+  the sky-FP negatives v2 lacked). Footnote: 118/350 picks sit ≤5f from a
+  round-1 pick of a DIFFERENT class (noise/blind interleave inside
+  rallies) — accepted, different content; remember if the valid split
+  looks optimistic.
+- **Notebook round-2-ized (`notebooks/finetune_yolo_ball.ipynb`):**
+  `BASE_MODEL = "/content/volleyball_ball_best.pt"` — fine-tune FROM the
+  production weights to preserve the sky prior round 1 lost (ep35 med
+  0.90→0.47); `"yolov8n.pt"` reproduces round 1. Recipe unchanged
+  (freeze=10, imgsz=1280, epochs=100); run + download renamed *_r2 so the
+  production best.pt stays untouched for the A/B.
+- **Owner court:** annotate the 350 (COCO export from the dataset page —
+  the rapid download was broken) → `import_roboflow_coco.py` →
+  `prepare_dataset_for_training.py` → zip → Colab r2 → weights back.
+- **Then the SAME four-leg gate as round 1:** GT-frames eval → entreno A/B
+  drift-lock (all 7 F1s, `--ignore-player`) → full match +
+  `evaluate_match_points` → `diag_ball_probe_bgsky.py` on the 5 episodes.
+  Gate criteria: keep class-(a) wins (blind ≤ round-1 v2 numbers),
+  precision @0.4 back ≥ ~40%, sky TRUE conf med back near 0.9, entreno
+  7/7 exact.
+- **Still queued after that:** session D (point-layer re-tune — the
+  binding constraint for point COUNT), then the rest of open point 21.
 
 **(2026-09-25, eighteenth session): RETRAIN-MINING SESSION — the
 detector half of open point 20's second lever is PREPARED: 500
@@ -1401,6 +1437,18 @@ constraint. Side changes need no special handling as long as IDs survive.
     (GT-frames → entreno --ignore-player A/B → match → probe). EVAL
     CONVENTION: action evals REQUIRE --ignore-player to reproduce the
     recorded F1s.]**
+    **[UPDATE 2026-09-26 (nineteenth session) — ROUND-2 MINING DONE,
+    STAGED FOR THE OWNER.** 350 frames in
+    `resources/frames/match20260920_round2/`: 200 sand-noise pure
+    negatives (pool 1100, 449 after round-1 exclusion) + 150 sky controls
+    (1233 → 809); round-1 picks excluded ±5f same-class; scanned classes
+    byte-identical to round 1 (determinism check); NO pre-labels (owner
+    annotated without them last time; our sky pre-labels were 3/77
+    correct). Notebook now fine-tunes FROM production best.pt (BASE_MODEL
+    var, *_r2 run/download names). NEXT: owner annotates → COCO export →
+    import → rezip → train r2 → weights back → SAME four-leg gate (keep
+    the class-(a) wins, precision @0.4 back ≥ ~40%, sky med conf ~0.9,
+    entreno 7/7).]**
 21. **[NEW 2026-09-24 — the owner's match-feedback backlog; agreed plan
     order; GT now exists for all of it.]** From the owner's review of the
     first full-match run: (1) **point count** — the ball half is SHIPPED
@@ -1780,6 +1828,47 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-26 (nineteenth session) — round-2 rebalanced mining staged: 200 noise negatives + 150 sky controls, notebook switched to fine-tune-from-best.pt
+
+Executing the round-2 spec from open point 20 after v2_match was rejected
+(class (a) fixed, precision/sky/entreno regressions). No pipeline src
+changes; one script extension + tests.
+
+- **`--exclude-manifest` on `scripts/mine_ball_frames.py`:** a previous
+  round's manifest excludes its same-class picks ±spacing from this
+  round's pools (classes are deterministic, so cross-class collisions are
+  impossible at the exact frame). `exclusion_zone()` pure helper + cap-0
+  and round-2-caps contract tests (+6, suite **446 green**).
+- **Determinism check came free:** the re-scan reproduced round 1's
+  scanned-class counts EXACTLY (blind 1843 / low_sand 1407 / low_other
+  1541 / sand_noise 1100 / sky_control 1233 / high_other 870 over 7994
+  game_on frames).
+- **Picks (caps hit exactly, span f240..f26004, 222MB, no exact
+  collisions):** sand_noise 200/200 (pool 1100 → 449 available after
+  excluding round-1's 60 ±5f) + sky_control 150/150 (1233 → 809 after
+  round-1's 40). Blind/low classes NOT re-mined (round-1 GT fixed them;
+  v2 kept the wins).
+- **No pre-labels (`--no-prelabel`), README.md in the dir:** round-1
+  audit — our ≥0.4 sky pre-labels sat on the owner's ball 3/77; the owner
+  annotated without labels anyway. Noise frames are negatives by
+  construction (owner boxes a ball if they see one); sky frames get the
+  TRUE ball or null — the nulls are exactly the sky-FP negatives v2
+  lacked (236 confident sky FPs at the 0.4 gate).
+- **Recorded footnote:** 118/350 round-2 picks sit ≤5f from a round-1
+  pick of a DIFFERENT class (noise and blind interleave inside rallies);
+  accepted (different content), but remember if the valid split looks
+  optimistic. The real gate remains the four-leg validation.
+- **`notebooks/finetune_yolo_ball.ipynb` round-2-ized:** BASE_MODEL var
+  defaults to the uploaded production `volleyball_ball_best.pt`
+  (preserve the sky prior; round 1 from base yolov8n lost it),
+  `"yolov8n.pt"` reproduces round 1; run/download renamed
+  `volleyball_ball_r2` / `volleyball_ball_best_r2.pt` so production
+  weights stay untouched for the A/B; recipe unchanged.
+- **Handoff:** owner annotates the 350 → COCO export (dataset page —
+  rapid download broken last time) → `import_roboflow_coco.py` →
+  `prepare_dataset_for_training.py` → zip → Colab r2 (upload best.pt
+  alongside the zip) → weights back → SAME four-leg gate.
 
 ### 2026-09-26 (eighteenth session, validation-gate leg) — candidate retrain measured on all four legs: class (a) fixed, precision/sky regress; REJECTED, round-2 spec recorded
 
