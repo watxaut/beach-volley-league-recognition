@@ -5,20 +5,73 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-26 (nineteenth session — ROUND-2 REBALANCED
-MINING per the round-1 rejection spec: 350 frames staged in
-`resources/frames/match20260920_round2/` — 200 sand-noise pure negatives +
-150 sky controls, round-1 picks excluded ±5f same-class, scanned classes
-BYTE-IDENTICAL to round 1 (determinism check). No pre-labels this time —
-the round-1 audit showed our ≥0.4 sky pre-labels sat on the owner's ball
-only 3/77 times. Colab notebook switched to fine-tune FROM the production
-best.pt (BASE_MODEL var; run/download renamed *_r2). Suite 446 green.
-Owner court: annotate → COCO export → import_roboflow_coco.py → rezip →
-train r2 → weights back → SAME four-leg gate. Production untouched.)
+**Last updated:** 2026-09-26 (nineteenth session, gate leg — ROUND-2
+VALIDATION GATE RUN on `models/volleyball_ball_best_v3_r2.pt`: **3 of 4
+legs PASS decisively; entreno drift-lock FAILS 4/7-exact** (bar 7/7).
+GT-frames: recall 58→**94.2%**, @0.4 precision 40→**95.5%**, confident
+FPs 330→**18**, sky TRUE conf ≥0.4 **100%**. Match: **31/33 GT rallies
+confirmed (0.939** vs 13/0.394 base, 15/0.455 v2), first-confirmed GT pt
+**1**, actions 90→**206**. Probe: ep35 sky med conf 0.47(v2)→**0.85**,
+tracked up on 4/5 episodes (ep35 49→**78%**); blind% rose = the sand-noise
+candidates are GONE (the round-1 audit said they were never the ball).
+Entreno: e1/e2/e6/e7 exact BUT e3 1.0→**0.667** (new), e4 1.0→0.933
+(overpass FP — SAME mode as v2), e5 1.0→0.923 (opening serve lost — SAME
+mode as v2), and e6 team accuracy 1.0→**0.857** (one misattributed
+contact — the safety-critical signal; NEW). Production UNCHANGED — swap
+is the owner's call; recommendation + e3/e4/e5/e6 re-adjudication note
+in open point 20. Artifacts: output/retrain_eval_v3/,
+output/match20260920_v3/, output/retrain_eval/ (GT-frames 3-way log +
+probe 3-way log).)
 
 ## Where we are
 
-**(2026-09-26, nineteenth session): ROUND-2 BALL RETRAIN STAGED — 350
+**(2026-09-26, nineteenth session — gate leg): ROUND-2 GATE RUN.
+v3 (fine-tuned FROM best.pt on 1091 + 350 rebalanced frames) passes
+GT-frames, match and probe legs decisively; entreno drift-lock fails
+4/7-exact. Awaiting the owner's adoption decision; production weights
+UNTOUCHED.**
+
+- **Leg 1 GT-frames (486 frames, 3-way, output/retrain_eval/gt_frames_v3.log):**
+  recall 58.3 (old) / 57.8 (v2) / **94.2 (v3)**; @0.4 precision 39.9 / 25.3 /
+  **95.5**; dets 1750 / 3026 / **422** (the venue noise is gone); FP@0.4
+  330 / 682 / **18** (sky 31 / 236 / 11); blind-class recall 57→**94.6**;
+  TRUE-det conf: sky 0.85 med 100% ≥0.4, sand 0.81 med 93.5% ≥0.4 (the
+  background-confidence skew is DEAD); leakage-free valid split (59 frames
+  under the current 1441-pair split): 88.1 / 92.9.
+- **Leg 2 entreno A/B (output/retrain_eval_v3/, --ignore-player; base
+  reproduced the recorded 7 F1s EXACTLY):** e1 0.706 / e2 0.571 / e6 0.933 /
+  e7 0.75 all EXACT; **e3 1.0→0.667** (new: block FP, spike 2 FN), e4
+  1.0→0.933 (overpass FP f386 — same mode as v2), e5 1.0→0.923 (opening
+  serve lost — same mode as v2); **e6 team 1.0→0.857** (one misattributed
+  contact; v2 kept team 1.0×7). Drift-lock FAIL.
+- **Leg 3 match (output/match20260920_v3/):** confirmed **31/33 GT (0.939)**
+  vs 15 (v2) / 13 (base); episodes 57 (26 starved); first-confirmed at GT
+  point **1**; actions **206** (dig 83 / spike 45 / set 42 / serve 20 /
+  overpass 9 / block 7) vs 104 / 90. Serves 20 vs v2's 28 — the one match
+  metric that went DOWN; watch after adoption.
+- **Leg 4 probe (output/retrain_eval/ball_probe_v3_3way.log):** tracked
+  coverage old→v2→v3: ep02 6→10→**28%**, ep06 24→31→**42%**, ep12 4→7→2%
+  (both ~dead — hardest episode), ep08 11→11→**23%**, ep35 49→46→**78%**;
+  flight ep35 42→**60%**. ep35 sky cand conf med / ≥0.4: 0.90/92 (old) →
+  0.47/51 (v2) → **0.85/99 (v3)** — the v2 killer is fixed. Blind% ROSE
+  (25→51, 10→52, 31→94, 16→58, 20→20): that is the noise leaving, not
+  recall dying — class (b) conf-rejectable collapsed to 1-8%, and the
+  GT-frames leg proves 94% recall where a human sees a ball.
+- **Gate scorecard vs the recorded bars:** precision @0.4 ≥ ~40% ✓ (95.5),
+  sky med ~0.9 ✓ (0.85 + 99% ≥0.4), class-(a) wins kept ✓ (94.6% vs 58),
+  entreno 7/7 ✗ (4/7). **Recommendation (open point 20): adopt v3 as
+  production — the match is the product and 31/33 was unreachable by any
+  tracker-side lever — WITH the owner first re-adjudicating e3/e4/e5/e6
+  against the v3 streams (owner-ratified contact sheets): the GT was built
+  against base-model behavior, e4's "overpass" may be a real event base
+  could not see, and the e6 team flip needs a mechanism read before it is
+  called a detector bug.**
+- **After adoption:** re-rank open point 21 — point-layer re-tune (item 1)
+  is likely MOOT (31/33, first-confirmed pt 1); winner/side-switch/confidence
+  layers become the frontier; entreno GT touch-up pass if re-adjudication
+  changes events.
+
+**(2026-09-26, nineteenth session — mining leg): ROUND-2 BALL RETRAIN STAGED — 350
 rebalanced frames await the owner's Roboflow annotation; pipeline src
 untouched, suite 446 green.**
 
@@ -1449,6 +1502,27 @@ constraint. Side changes need no special handling as long as IDs survive.
     import → rezip → train r2 → weights back → SAME four-leg gate (keep
     the class-(a) wins, precision @0.4 back ≥ ~40%, sky med conf ~0.9,
     entreno 7/7).]**
+    **[UPDATE 2026-09-26 (nineteenth session, gate leg) — ROUND-2 GATE
+    RUN: v3 PASSES 3 OF 4 LEGS; entreno drift-lock fails 4/7-exact;
+    ADOPTION RECOMMENDED pending owner re-adjudication of e3/e4/e5/e6.
+    v3 = fine-tune FROM best.pt on the 1091 + 350 rebalanced frames
+    (BASE_MODEL switch mattered). GT-frames: recall 94.2% (58.3 old / 57.8
+    v2), @0.4 precision 95.5% (39.9 / 25.3), FPs 330→18, sky TRUE ≥0.4
+    100%, sand TRUE med 0.81 (the bg-conf skew is dead), valid-split
+    88.1/92.9 leakage-free. Match: 31/33 confirmed (0.939 vs 13/0.394,
+    15/0.455), first-confirmed GT pt 1, actions 206 vs 90/104, serves 20
+    (v2 28 — down, watch). Probe: ep35 sky 0.85/99% (v2 0.47/51), tracked
+    up 4/5 eps (ep35 78%, ep02 28%, ep06 42%, ep08 23%; ep12 2% — both
+    models ~dead there), blind% UP = noise gone (round-1 audit vindicated).
+    Entreno: e1/e2/e6/e7 F1-exact; e3 1.0→0.667 (NEW), e4→0.933 overpass
+    FP (same mode as v2), e5→0.923 serve lost (same mode as v2), e6 team
+    1.0→0.857 (NEW, safety-critical). The identical v2/v3 failure modes
+    say the e4/e5 churn is systematic to venue-matched retrains, not
+    training noise; the e4 "overpass" may be a REAL event base couldn't
+    see (GT was dictated against base behavior). NEXT: owner decides swap;
+    if adopted → re-adjudicate e3/e4/e5/e6 on v3 streams via owner-ratified
+    contact sheets, then re-rank open point 21 (point-layer re-tune likely
+    moot at 31/33; winner/side-switch/confidence layers next).]**
 21. **[NEW 2026-09-24 — the owner's match-feedback backlog; agreed plan
     order; GT now exists for all of it.]** From the owner's review of the
     first full-match run: (1) **point count** — the ball half is SHIPPED
@@ -1828,6 +1902,45 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-26 (nineteenth session, gate leg) — round-2 validation gate: v3 passes GT-frames / match / probe decisively, entreno drift-lock fails; adoption recommended with re-adjudication caveat
+
+Owner trained r2 in Colab (fine-tune FROM production best.pt, 1441-image
+zip); weights stashed as `models/volleyball_ball_best_v3_r2.pt` (production
+UNTOUCHED). All four legs, three-way where it matters:
+
+- **Leg 1 GT-frames (diag_gt_frames.py 3-way, 486 frames):** recall 94.2%
+  (58.3 old / 57.8 v2), @0.4 precision 95.5% (39.9 / 25.3), dets 422
+  (1750 / 3026 — noise gone), FP@0.4 18 (330 / 682; sky 11 / 31 / 236),
+  blind recall 94.6% (57.1 / 58.0), TRUE-det conf sky 0.85 med 100% ≥0.4 /
+  sand 0.81 med 93.5% ≥0.4. Valid-split tag updated to the current
+  1441-pair split (216 valid — matches the Colab run's valid count);
+  valid numbers comparable within-run only: 88.1% / 92.9%.
+- **Leg 2 entreno A/B (output/retrain_eval_v3/, 14 runs, --ignore-player):**
+  base leg reproduced the recorded F1s EXACTLY (0.706/0.571/1.0/1.0/1.0/
+  0.933/0.75 — drift-lock reference good). v3: e1/e2/e6/e7 F1-exact;
+  e3 1.0→0.667 (block FP, spike 2 FN, set churn), e4 1.0→0.933 (overpass
+  FP — v2's identical failure), e5 1.0→0.923 (opening serve lost — v2's
+  identical failure); e6 team 1.0→0.857 (NEW; one misattributed contact).
+- **Leg 3 match (output/match20260920_v3/, ~40min run):** confirmed 31/33
+  GT (0.939) vs 15/0.455 (v2) / 13/0.394 (base); episodes 57; 0 episodes
+  before first confirmed (first-confirmed = GT pt 1); actions 206 (dig 83 /
+  spike 45 / set 42 / serve 20 / overpass 9 / block 7) vs 104 / 90; serves
+  20 vs v2's 28 / base 21 — the only match metric that regressed.
+- **Leg 4 probe (diag_ball_probe_v2.py 3-way over the same 5 episodes):**
+  tracked old→v3: ep02 6→28%, ep06 24→42%, ep12 4→2%, ep08 11→23%, ep35
+  49→78% (flight 42→60%). ep35 sky cand conf med/≥0.4: 0.90/92 → 0.47/51
+  (v2) → 0.85/99 (v3). Blind% UP everywhere (25→51 / 10→52 / 31→94 /
+  16→58 / 20→20): the round-1 audit's "raw candidates were mostly sand
+  noise" made visible — class (b) collapsed to 1-8%.
+- **Verdict: 3/4 legs pass, decisively; entreno 4/7-exact vs the 7/7 bar.**
+  e4/e5 failure modes are IDENTICAL across v2 and v3 (systematic to
+  venue-matched retrains); e3's regression is v3-specific; e6's team flip
+  is new and touches the safety-critical emitted-team signal. Production
+  weights UNCHANGED. Recommendation recorded in open point 20: adopt v3
+  (31/33 was unreachable tracker-side) AFTER the owner re-adjudicates
+  e3/e4/e5/e6 against v3 streams — GT was dictated against base-model
+  behavior, and base was half-blind.
 
 ### 2026-09-26 (nineteenth session) — round-2 rebalanced mining staged: 200 noise negatives + 150 sky controls, notebook switched to fine-tune-from-best.pt
 
