@@ -17,18 +17,23 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-27 (twenty-fifth session — PERF: open point 23
-SHIPPED — live-debug producer/consumer display decoupling. The `--debug-live`
-loop no longer serializes processing + render + 33 ms pacing: a producer
-thread runs the EXACT shared processing loop in frame order and draws the
-court overlay per frame (so the main thread renders cached data only and
-owns the window); the depth gate keeps the same 90-frame label-latency
-guarantee. Neutrality: entreno_1 + entreno_3 buffered-live runs —
-action/tracker logs BYTE-IDENTICAL AND every rendered frame MD5-identical
-vs HEAD (run-to-run determinism proven first, ×2 each). Measured: 8.06 →
-11.84 fps (e1) / 8.06 → 12.04 fps (e3) with real 33 ms pacing — ×1.47-1.49;
-the rest of the gap to 1000/68 ms is thread GIL contention. Suite
-477 → 491 (+14 tests/test_live_debug_decoupling.py).)
+**Last updated:** 2026-09-27 (twenty-sixth session — open point 22
+mechanism 1 SHIPPED: the anchor-free episode→GT-point ORDER map. New
+diagnostic `scripts/map_episodes_to_points.py` (+34 tests): monotone DP
+alignment of the 57 GAME_ON episodes ↔ the 33 dictated GT points + a BURST
+class, keyed by emitted-serve side match (expected letter derived
+mechanically from serve-squad × court-half), confirmed-point overlap and
+description-implied rally size; hard constraints from the physics: a
+confirmed/action-rich rally can NEVER burst, attaches only across small
+game_off gaps (≤150f — a point cannot span inter-point dead time; measured
+real splits 11-115f). Result: 45 episodes → 33 points (12 attaches), 12
+bursts, 0 starved; 19/20 serve actions attributed to exactly one point.
+THE CENSUS (owner's far-side question, on TRUE windows): near-side serve
+actions emitted 11/16 (69%, all side-consistent) vs far-side 4/16 clean
+(25%) + 2 side-MISMATCHED (P4, P23) — far-side serve-ACTION loss is ~2-3×
+near-side, and both mismatches sit in far windows; P2 specimen verdict
+confirmed (serve MISSING = emission-layer loss, not ball tracking). Suite
+491 → 525 (+34 tests/test_episode_point_map.py).)
 
 ## North-star goals (set session 24)
 
@@ -77,7 +82,7 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
-**Production state (as of 2026-09-27).**
+**Production state (as of 2026-09-27, twenty-sixth session).**
 
 - **Weights:** `models/volleyball_ball_best.pt` = **v3** (fine-tuned FROM
   best.pt on 1091 + 350 rebalanced frames; ADOPTED 2026-09-26 after the
@@ -87,29 +92,36 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 - **Match (20260920 — the only real match):** **31/33 GT points confirmed
   (0.939)**, first-confirmed at GT point 1, 57 episodes (26 starved);
   actions 207 (dig 84 / spike 45 / set 42 / serve 20 / overpass 9 /
-  block 7); perf **68.0 ms/frame** (14.7 fps, 30.5 min) after the pose
-  gates (was 84.8). All data CSVs byte-identical through the last two
-  shipped mechanisms.
+  block 7); perf **68.0 ms/frame** (14.7 fps, 30.5 min). All data CSVs
+  byte-identical through the last three shipped mechanisms.
+- **Episode→point ORDER map (26th session, diagnostic):**
+  `output/episode_point_map.json` from `scripts/map_episodes_to_points.py`
+  — anchor-free monotone DP (57 episodes ↔ 33 GT points + BURST),
+  45 mapped / 12 bursts / 0 starved, 19/20 serves attributed. Serve census
+  on TRUE windows: near 11/16 emitted (69%, all side-consistent) vs far
+  4/16 clean + 2 side-mismatched (far loss ~2-3× near — the emission layer,
+  NOT ball tracking; P2 specimen confirmed). Structural flags for owner
+  adjudication: P4 + P23 serve-side mismatches (both far windows), P7/P20
+  double-serve points, serve f6928 emitted with no episode anywhere
+  (P12's rally never gathered).
 - **Entreno gate record** (`evaluate --ignore-player` F1): e1 0.706, e2
   0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933, e7 0.75; teams 1.0 except
-  e6 0.857. Suite **491 green**.
+  e6 0.857. Suite **525 green**. Live-debug decoupling SHIPPED (#25):
+  `--debug-live` ≈ 12 fps vs 8.0, rendered frames + logs byte-identical.
 - **Known residuals:** e4/e5/e6 GT re-adjudication vs the v3 streams
-  (queued — owner-ratified contact sheets; GT was dictated against
-  base-model behavior); e3 f539 outcome enrichment reads dug vs GT kill
-  (tracker-side fast-fall conf dip — open point 22 family); match serves
-  emitted 20 vs v2's 28 (open point 22). Live-debug display decoupling
-  SHIPPED (25th session): `--debug-live` ≈ 12 fps vs 8.0 serialized,
-  rendered frames + logs byte-identical (probe `output/
-  diag_live_debug_probe.py`); batch untouched (68.0 ms/f stands).
+  (queued — owner-ratified contact sheets); e3 f539 outcome enrichment
+  reads dug vs GT kill (tracker-side fast-fall conf dip — 22 family);
+  match serves emitted 20 vs v2's 28 (22).
 
-**Active next (ranked, goal-driven — see North-star).** (1) Open point
-22: build the episode→GT-point ORDER map (57 episodes ↔ 33 points), then
-the far/near serve census on TRUE windows — serves both goals (serve
-emission feeds aces/errors; the episode map is the backbone of per-point
-fantasy lines). (2) e4/e5/e6 re-adjudication sheets. (3) 21.3 point
-winner/outcome layer — G1's biggest missing signal (unlocks aces, serve
-errors, per-point grouping). (4) Fantasy scoring module + web points
-table (14e); assist ships with it (no perception needed).
+**Active next (ranked, goal-driven — see North-star).** (1) Open point 22
+mechanism 2: probe the 15 missing-serve TRUE windows — tracker coverage vs
+emission gates (is the ball tracked where the serve action is missing?),
+then the fix (rally-opening serve gate / episode starvation — 15a
+machinery). (2) 21.3 point winner/outcome layer — G1's biggest missing
+signal; the order map now provides per-point windows to validate against
+the 33 dictated winners. (3) Fantasy scoring module + web points table
+(14e); assist ships with it (no perception needed). (4) e4/e5/e6
+re-adjudication sheets.
 
 ## Open points
 
@@ -121,30 +133,42 @@ point number in `docs/history/`.
 ### Active
 
 22. **Far-side serves** (owner feedback at v3 adoption: match far-side
-    serves seem untracked; entreno serves track fine). **Status: SCOPED
-    (09-27); one measurement RETRACTED, one SOLID specimen.** Serve
-    team/side derivable mechanically → 16 far / 16 near
-    (`scripts/derive_match_serve_windows.py`, +17 tests). Retraction: a
-    first "measurement" paired the ENTRENO game-state anchor file with the
-    match — fictional windows (README warns; tests use synthetic anchors).
-    Corrected specimen (production-parity probe, continuous f0..6948 dump):
-    P2's far-side serve IS tracked END-TO-END by the ball tracker (toss
-    f889 → lock f890 → ~65/72 frames REAL through apex/descent/bounce/
-    roll, conf 0.24–0.90) — the owner-visible loss is game_on firing 36f
-    late (f925), the episode STARVED (point unconfirmed) and NO serve
-    action emitted → the loss is the game-state episode/confirmation +
-    rally-opening serve-ACTION gate (15a machinery), NOT ball tracking.
-    Same family, diagnosed unfixed: v3's conf dip on a FAST-FALLING ball
-    (e3 f613-618) lets the coast leave the court-bounds box, the re-entry
-    window rejects the falling dets, the track dies (this is why e3 f539's
-    outcome reads dug vs GT kill). **Next (one mechanism):** the
-    episode→GT-point order map (57 episodes ↔ 33 points + non-point
-    bursts, keyed by derived serve team/side + descriptions), then the
-    far/near census + probe verdicts on TRUE windows; owner-ratified
-    anchors welcome but not blocking. Tracker-side levers if needed:
-    round-3 fast-fall/toss mining, re-entry-window retune (match-wide
-    risk, own gate). Watch: v3 serves 20 vs v2 28. **Infra rule: VFR file
-    — never CAP_PROP_POS_FRAMES seeks; decode sequentially.**
+    serves seem untracked; entreno serves track fine). **Status: MECHANISM
+    1 DONE (09-27, 26th session) — episode→point ORDER MAP + census
+    BUILT; the far-side loss is QUANTIFIED and it is the emission layer,
+    not ball tracking.** Earlier scoping: serve team/side derivable
+    mechanically → 16 far / 16 near (`scripts/derive_match_serve_windows.py`,
+    +17 tests); a first "measurement" pairing the ENTRENO game-state
+    anchor file with the match was RETRACTED (fictional windows); the P2
+    specimen proved the ball IS tracked end-to-end (toss f889 → lock
+    f890 → ~65/72 frames) but game_on fired 36f late and NO serve action
+    was emitted. **Shipped (#26):** `scripts/map_episodes_to_points.py`
+    (+34 tests) — anchor-free monotone DP (57 episodes ↔ 33 points +
+    BURST), link evidence = emitted-serve side match (expected letter =
+    mechanical serve-squad × court-half; emitted team is SIDE, not squad),
+    confirmed-point overlap, description-implied rally size; hard rules:
+    confirmed/action-rich episodes can never burst, attaches need ≤150f
+    game_off gaps (real splits measure 11-115f; a 671f 13-action rally
+    once burst and P26 once hoarded 4 episodes across 126s before these
+    constraints). Map: 45/57 episodes → all 33 points (12 attaches, 12
+    bursts, 0 starved); 19/20 serves attributed (f6928 sits in a
+    no-episode gap = P12's rally never gathered). **Census verdict (TRUE
+    windows):** near 11/16 serve actions emitted, all side-consistent;
+    far 4/16 clean + 2 side-MISMATCHED (P4 f1396A, P23 f17159A) — far
+    loss ~2-3× near; both mismatches in far windows (width-band side
+    signal degrades far, consistent with AGENTS.md §5). P2 = serve
+    MISSING (specimen confirmed). Structural flags for owner: P4 "P1
+    fails serve" (description's player vs winner-serves rule), P7/P20
+    double-serve points (re-serve or misattribution), P26 = 4 episodes
+    (gap/count-forced; likely a GT boundary question at P26/P27).
+    **Next (mechanism 2):** probe the 15 missing-serve windows — raw
+    detector + tracker coverage vs the emission gates (the serve-action
+    gate, 15a machinery; episode starvation timing) — then ONE fix.
+    Owner-ratified anchors welcome but not blocking. Tracker-side levers
+    if needed: round-3 fast-fall/toss mining, re-entry-window retune
+    (match-wide risk, own gate). Watch: v3 serves 20 vs v2 28. **Infra
+    rule: VFR file — never CAP_PROP_POS_FRAMES seeks; decode
+    sequentially.**
 
 21. **Owner's match-feedback backlog** (agreed order; GT exists for all).
     (1) *Point count:* ball half SHIPPED (conf floors + v3); point-layer
@@ -317,6 +341,14 @@ survive across sessions; provenance in the archives.
 - The match file is VFR (25.67fps content in a 30.12fps container):
   cv2 `CAP_PROP_POS_FRAMES` seeks are frame-UNRELIABLE — decode
   sequentially for frame-accurate work.
+- Match serve-action emission on TRUE windows (26th session, from the
+  episode→point map): near 11/16 vs far 4/16 clean (+2 side-mismatched,
+  both far) — the far-side loss is the serve-ACTION/episode layer, not
+  ball tracking; emitted-team mismatches concentrate on far-side windows.
+- Anchor-free episode↔point alignment is COUNT+GAP constrained: with
+  every confirmed rally forced into a point and attaches limited to small
+  game_off gaps, most of the 20260920 mapping is forced 1:1 — treat
+  surviving side-mismatch flags as findings, not alignment errors.
 - Device caveat: MPS jitter can flip a gesture label (e.g. e6 f309
   block vs spike); the script path (deterministic) is the reference.
 
@@ -376,6 +408,7 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- 2026-09-27 **#26** — open point 22 mechanism 1 SHIPPED: anchor-free episode→GT-point order map (DP + BURST class, physics constraints) + far/near serve census on TRUE windows; far-side loss quantified ~2-3× near, emission-layer not tracking (Log below).
 - 2026-09-27 **#25** — open point 23 SHIPPED: live-debug producer/consumer decoupling; logs + rendered frames byte-identical; 8.0 → ~12 fps; +14 tests (Log below).
 - 2026-09-27 **#24** — product north-star goals set (G1 Fantasy scoring / G2 individual stats); stat-coverage audit + critical paths (Log below).
 - 2026-09-27 **#23** — pose gating shipped in the shared classifier (staleness + near-ball trail), byte-identical everywhere, match ×1.24 (Log below).
@@ -412,6 +445,69 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+
+### 2026-09-27 (twenty-sixth session) — open point 22, mechanism 1: anchor-free episode→GT-point order map + far/near serve census on TRUE windows
+
+- **Goal trace:** the map is the backbone of per-point fantasy lines
+  (G1) and the pre-condition for the serve census the owner asked for at
+  v3 adoption. Inputs: the posegate production run
+  (`output/match20260920_posegate/`), the dictated GT
+  (`ground_truth/20260920_match_points.json`, NO frame anchors), the
+  mechanical serve derivations (#22). No pipeline code touched; no video
+  decoded (CSV/JSON only — VFR-seek safe); no GT edits.
+- **Diagnose first:** episode features extracted from
+  `results_game_state.csv` + `pipeline_output.json`: 57 episodes, 18-ish
+  overlapping confirmed points, 20 serve actions (all `touch_number=1`,
+  15 of them emitted OUTSIDE episode spans — 5-30f before `game_on`
+  fires: the late-game_on family). Expected serve letters derived
+  mechanically (winner-serves × side switches): 16 near / 16 far, only 5
+  far-side serves observed → the owner's complaint was already visible in
+  the raw data.
+- **Shipped (`scripts/map_episodes_to_points.py`, +34
+  tests/test_episode_point_map.py):** monotone DP alignment over states
+  (episodes consumed, points closed, LAST episode touching the open
+  point) with actions open/attach/close/starve/burst. Link evidence:
+  emitted-serve side match ±(60/30)f window (strong), confirmed-point
+  overlap ±30f, description-implied rally size (ace/serve-fault → 1-2
+  contacts, "big rally" → 4-12, else 2-6). Physics constraints, each
+  installed after the production run exposed its violation: (1) attach
+  only across ≤150f game_off gaps (real mid-rally splits measure 11-115f;
+  before this, P24 hoarded 5 rallies across 126s and the DP burst a
+  671f/13-action confirmed rally to protect tail serve alignments);
+  (2) confirmed/action-rich episodes can NEVER burst (a rally is a
+  point); (3) point numbers carried in the backpointer walk, never
+  re-counted (a starved point shifts naive counters); (4) serve actions
+  attribute to EXACTLY ONE point (nearest episode span — adjacent windows
+  overlap by the ± serve margins).
+- **Map result (output/episode_point_map.json, provenance recorded):** 45
+  episodes → all 33 points (33 openers + 12 attaches), 12 bursts (all
+  unconfirmed flickers/dead-ball handling), 0 starved points. Spot checks:
+  P1=ep0 (first-confirmed ✓), P19=ep34+35 (25f flicker split), P20=ep36+37
+  (serve + re-serve reading of the two A-serves), P8/P13/P15 serve letters
+  match. **Census on TRUE windows: near 11/16 serve actions emitted (69%,
+  11/11 side-consistent); far 4/16 clean (25%) + 2 emitted-but-mismatched
+  (P4 f1396A, P23 f17159A) — far-side serve-ACTION loss ~2-3× near, both
+  mismatches in far windows (consistent with the width-band side signal
+  degrading far, AGENTS.md §5). P2 verdict: serve MISSING — the #22
+  specimen (ball tracked, emission lost) confirmed on the full map.**
+  Unattributed: f6928 (P12's serve, emitted with NO episode within ±120f
+  — that rally never gathered at all).
+- **Owner adjudication flags (NOT auto-fixed):** P4 "P1 fails serve"
+  (description player vs winner-serves rule → B); P7/P20 double-serve
+  points (re-serve vs misattribution); P23 = ep41+42 with ep42's serve
+  mismatched (count-forced cascade from P26); P26 = 4 episodes/39s
+  (gap+count-forced; likely a GT boundary question at P26/P27 — the
+  episodes are 37/48/81f apart, contiguous play).
+- **Suite:** 491 → **525** (+34; all green incl. the full suite).
+  Byte-parity trivially unaffected (no `src/` changes). FLAKE OBSERVED
+  (pre-existing, reproves on clean HEAD): #25's
+  `test_stop_without_flush_discards_tail` failed once in a full-suite run
+  (flush_calls 1 != 0 — `stop.set()` races the producer's flush) and
+  passed 8/8 in isolation + on re-runs; not touched this session, needs a
+  deterministic gate if it recurs.
+- Files: scripts/map_episodes_to_points.py,
+  tests/test_episode_point_map.py, output/episode_point_map.json
+  (git-ignored), STATUS.md.
 
 ### 2026-09-27 (twenty-fifth session) — PERF: open point 23 shipped (live-debug producer/consumer decoupling); byte-identical output; 8.0 → ~12 fps
 
@@ -496,59 +592,6 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - Ranking unchanged at #1 (22 serves both goals); 21.3 promoted above
   the rest of 21's frontier. Session #20's Log entry archived verbatim
   (live Log trimmed back to 3).
-
-### 2026-09-27 (twenty-third session) — perf: both parked pose levers shipped in the shared path; byte-identical everywhere; live-debug decoupling parked
-- **Context:** the owner asked to make BOTH offline and debug-live
-  processing faster. The 2026-08-17 perf session had measured and parked
-  exactly this ("pose only for near-ball players, 52→~26ms, needs an
-  occlusion-window fallback first" + producer/consumer display decoupling)
-  — the ask was the trigger to cash them in. Parity rule respected: both
-  levers live in the SHARED `ActionClassifier.classify_actions` (batch and
-  debug-lite inherit); `LiveDebugProcessor` untouched.
-- **Diagnose first (`output/diag_pose_gate_probe.py`, git-ignored like all
-  diag scripts):** mirrors the GT-validated script wiring; per frame it
-  records ball staleness, every observed player's point-to-bbox distance to
-  the live ball, and (patched `_closest_player_at`) every contact's chosen
-  snapshot frame / offset / reach / distance to the ball AT THE SNAPSHOT
-  FRAME and to the last-9f ball TRAIL. Findings that shaped the design:
-  (a) pose 29.7 ms/f × 3.54 calls/f is the largest non-YOLO stage; (b) the
-  ONLY pose consumer is `_gesture` via the chosen snapshot of an ACCEPTED
-  non-reentry contact — reentry gestures return ATTACK unread (probe gotcha:
-  `_closest_player_at` fires pre-reach-gate, so raw records include
-  reach-rejected contacts up to 1261px — filter `reach ≤ 160`; and reentry
-  f311 e6 reads trailmin 1163px but consumes NO pose); (c) every
-  pose-consuming snapshot ≤ **155 px** from some ball point in the last
-  NEIGH+2=9 frames (snapshot offsets measured −2..+4); (d) staleness split
-  entreno 71/27/1.6% vs match slice 28/20/52% live/occlusion(≤30f)/dead.
-- **Shipped (`src/recognition/action_classifier.py`, `src/utils/config.py`,
-  `src/analysis/frame_processor.py`):** `pose_gate_stale_frames` (30) +
-  `pose_near_ball_radius_px` (300.0), either ≤0 disables. Dead ball
-  (>30f untracked): skip MediaPipe entirely. Ball live: pose only players
-  within 300px of a last-9f ball point. Occlusion window (1..30f): pose
-  everyone. ALWAYS append a history entry per observed player (pose=None
-  when skipped) so `_closest_player_at` snapshot selection, the L-R index
-  and the takeoff-stance reads are untouched. `pose_gate_stats` counters
-  (posed/skipped_stale/skipped_radius) for tests + perf reports. Config
-  drift test extended with both keys (suite 465→477).
-- **Neutrality protocol executed in full:** fresh HEAD baselines
-  (output/posegate_base_e*) → edit → A/B (output/posegate_gated_e*):
-  7/7 entreno action logs **BYTE-IDENTICAL**; `evaluate --ignore-player`
-  reproduces the recorded gate F1s exactly. FULL match production re-run
-  (output/match20260920_posegate/): every data CSV BYTE-IDENTICAL to
-  output/match20260920_e3fix (results / detailed / game_state / spikes);
-  31/33 points, 57 episodes, 0-before-first unchanged; only the
-  self-referential timing statistics row differs. Match probe slice: 16/16
-  contacts identical incl. snapshots.
-- **Measured gains:** match wall 38 → 30.5 min (84.8 → 68.0 ms/frame,
-  11.79 → 14.71 fps — ×1.24); match probe slice 76.1 → 64.2 ms/f (×1.19);
-  entreno script wall ~96 → 85 ms/f (×1.13, little dead time there).
-- **Parked:** open point 23 (live-debug producer/consumer display
-  decoupling — fps only, pipeline untouched).
-- Files: src/recognition/action_classifier.py, src/utils/config.py,
-  src/analysis/frame_processor.py, tests/test_pose_gate.py (+12),
-  tests/test_team_attribution.py (stub gained `estimate_pose` — the gated
-  loop calls per-player, not the batch wrapper), tests/test_config_drift.py,
-  STATUS.md.
 
 ## Useful commands
 

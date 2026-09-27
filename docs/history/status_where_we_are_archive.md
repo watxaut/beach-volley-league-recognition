@@ -1542,3 +1542,37 @@ continuity is the primary identity signal**, appearance/body-size are
 conditional tie-breakers, and "exactly 4 players / 2 per side" is a hard
 constraint. Side changes need no special handling as long as IDs survive.
 
+
+**Production state (as of 2026-09-27).**
+
+- **Weights:** `models/volleyball_ball_best.pt` = **v3** (fine-tuned FROM
+  best.pt on 1091 + 350 rebalanced frames; ADOPTED 2026-09-26 after the
+  four-leg gate; old weights stashed as `*_v1_entreno.pt` / `*_v2_match.pt`).
+  Sub-1080p ingest upscales once to `_up1080.mp4`. Pose gating is live in
+  the shared `classify_actions` path.
+- **Match (20260920 — the only real match):** **31/33 GT points confirmed
+  (0.939)**, first-confirmed at GT point 1, 57 episodes (26 starved);
+  actions 207 (dig 84 / spike 45 / set 42 / serve 20 / overpass 9 /
+  block 7); perf **68.0 ms/frame** (14.7 fps, 30.5 min) after the pose
+  gates (was 84.8). All data CSVs byte-identical through the last two
+  shipped mechanisms.
+- **Entreno gate record** (`evaluate --ignore-player` F1): e1 0.706, e2
+  0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933, e7 0.75; teams 1.0 except
+  e6 0.857. Suite **491 green**.
+- **Known residuals:** e4/e5/e6 GT re-adjudication vs the v3 streams
+  (queued — owner-ratified contact sheets; GT was dictated against
+  base-model behavior); e3 f539 outcome enrichment reads dug vs GT kill
+  (tracker-side fast-fall conf dip — open point 22 family); match serves
+  emitted 20 vs v2's 28 (open point 22). Live-debug display decoupling
+  SHIPPED (25th session): `--debug-live` ≈ 12 fps vs 8.0 serialized,
+  rendered frames + logs byte-identical (probe `output/
+  diag_live_debug_probe.py`); batch untouched (68.0 ms/f stands).
+
+**Active next (ranked, goal-driven — see North-star).** (1) Open point
+22: build the episode→GT-point ORDER map (57 episodes ↔ 33 points), then
+the far/near serve census on TRUE windows — serves both goals (serve
+emission feeds aces/errors; the episode map is the backbone of per-point
+fantasy lines). (2) e4/e5/e6 re-adjudication sheets. (3) 21.3 point
+winner/outcome layer — G1's biggest missing signal (unlocks aces, serve
+errors, per-point grouping). (4) Fantasy scoring module + web points
+table (14e); assist ships with it (no perception needed).
