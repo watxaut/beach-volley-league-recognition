@@ -1,8 +1,10 @@
 # AGENTS.md
 
-Instruction file for the ZCode harness. This project is migrating from the
-Claude Code harness; the project memory below was carried over verbatim and
-must survive future edits.
+Instruction file for the harness. The project memory below was carried over
+verbatim and must survive future edits. `CLAUDE.md` (architecture, commands,
+config/GT conventions) was ABSORBED into this file on 2026-09-27 and
+removed; the verbatim original stays recoverable via
+`git show 09ceec2:CLAUDE.md`.
 
 ## Read-first rule (every session)
 
@@ -21,9 +23,103 @@ must survive future edits.
    one-line entry in the *Session index*. New durable protocol rules go
    here in AGENTS.md; new cross-session technical facts go one-line-each
    into STATUS.md's *Learnings*.
-2. **`CLAUDE.md`** — full architecture, commands, config conventions, GT/eval
-   docs. It is kept as the reference even though this harness does not load
-   it automatically; its guidance applies unchanged.
+2. **`ground_truth/README.md`** — GT format (incl. spike enrichment fields
+   and the entreno-anchor warning). Everything CLAUDE.md used to carry
+   lives in the conventions sections below.
+
+## Commands
+
+```bash
+make run VIDEO=resources/video_entreno_3.mp4        # full pipeline (device auto -> MPS on Apple Silicon); VIZ=1 adds graphs
+make run-live VIDEO=...                              # --debug-live at 2x speed
+make ui                                              # local web UI over data/volley.db
+make ingest-all                                      # (re)ingest output/*/pipeline_output.json into SQLite
+make db-reset                                        # DELETES the DB incl. owner player labels — ask first
+venv/bin/python -m pytest tests/ -o addopts=""       # cov addopts break w/o pytest-cov
+```
+
+Per-component probes (`scripts/`): `test_court_calibration.py` (interactive,
+one-time), `test_ball_detection.py`, `test_ball_tracking.py`,
+`test_player_tracking.py`, `test_pose_estimation.py`,
+`test_action_recognition.py` (the GT-validated action path — the
+reference for any action A/B), `dump_player_tracks.py` +
+`analyze_tracking.py` (tracking quality, no GT needed),
+`evaluate.py --predictions <dir> --ground-truth ground_truth/` (ALWAYS with
+`--ignore-player`; see STATUS Learnings), `evaluate_game_state.py`,
+`evaluate_match_points.py`, `annotate_player_gt.py` / `annotate_video.py`
+(owner GT passes).
+
+## Architecture snapshot
+
+Fixed camera on the court's LONG AXIS, net facing the camera; near half =
+Team A, far = Team B (team = side of the midcourt line the feet are on).
+Five layers under `src/`: `detection/` (YOLO ball + player, court
+calibration) → `tracking/` (BallTracker, PlayerTracker) → `recognition/`
+(pose + ActionClassifier) → `analysis/` (FrameProcessor orchestrates
+per-frame; game_state_manager, spike_analyzer are pure observers) →
+`output_gen/` (CSV/visualization; plus `db/` + `web/` fed by
+`pipeline_output.json`). `FrameProcessor.process_frame` is the ONE shared
+path — batch, scripts, and live-debug must all go through it.
+
+Component invariants that bite if ignored:
+- **BallDetector**: custom model (`ball_model_path`) needs no class filter;
+  the COCO `yolov8n.pt` fallback filters to class 32 (+29). No top-1 cull
+  (a high-conf spare must not hide the ball in play). Static handling is
+  two-stage: persist ≥0.55 removed outright, ≥0.30 only flagged
+  `stationary_suspect` for the tracker to distrust.
+- **BallTracker**: returns None when lost — never hallucinates. Identity
+  by trajectory + motion, never confidence alone: bootstrap/re-lock needs
+  ≥8 px/f over a near-consecutive pair; locked admission = top-conf
+  candidate inside the growing trajectory gate, with a stationary-suspect
+  override so a rack ball can't starve the track; out-of-view exits hold a
+  re-entry window (2× max_missing) instead of resetting.
+- **PlayerTracker**: locks EXACTLY 4 (k-means bootstrap, Hungarian
+  assignment); never a 5th track. Dormant gallery + squatter review +
+  bystander guard live here — admission/gating changes are
+  GT-validated territory (see entreno protocol below).
+- **CourtCalibration**: interactive one-time 8-point JSON in
+  `calibrations/` (4 corners + 2 net-ground + 2 net-top); provides
+  `is_near_net` / `is_behind_baseline` / `get_team` / `is_above_net` /
+  `world_point_to_zone` (9-zone grid per half, 180°-symmetric).
+  Court detection uses NO model — `court_model_path`-style config keys
+  are STALE, never wire them up.
+- **ActionClassifier**: event-driven at ball-trajectory inflections only;
+  Layer 1 gesture (motion + court + pose) → Layer 2 `ActionContextResolver`
+  (dig/set/spike/serve/overpass from touch count). Pose gated on ball
+  staleness/near-ball radius (shipped 09-27, byte-identical).
+- **SpikeAnalyzer**: pure observer; `spike_type` by POST-CONTACT ASCENT
+  (exit speed cannot separate touch/hard); `attack_zone` from the
+  pre-contact takeoff stance (airborne contact feet project deep);
+  outcome with loft-gated kill→dug retro-conversion (sand cannot rebound
+  a dig's 2-3 m rise).
+
+## Config, weights & artifacts
+
+- Defaults: `Config.DEFAULT_CONFIG` in `src/utils/config.py`; override via
+  `--config <yaml|json>`. Config-drift guard test pins DEFAULT_CONFIG ↔
+  ctor defaults ↔ GT-script kwargs — extend it for new keys.
+- **`ball_confidence` = 0.15 MUST match `scripts/test_action_recognition.py`**
+  — every GT-validated action number was measured at 0.15; a diverging
+  default silently flips gestures (the f539 bug class).
+- Device: `auto` = CUDA > MPS > CPU. `make run` uses MPS on Apple Silicon;
+  pass `--device cpu` for deterministic parity with CPU-measured baselines
+  (MPS jitter can flip a gesture label — the script path is the reference).
+- Required runtime weights (git-ignored, keep on disk):
+  `models/volleyball_ball_best.pt` (fine-tuned ball detector, auto-loaded
+  by main + the test scripts; currently v3) and `yolov8n.pt` (player
+  detector + ball fallback). Training provenance (keep for retrain):
+  `notebooks/finetune_yolo_ball.ipynb` (Colab, fine-tune FROM best.pt),
+  `scripts/prepare_dataset_for_training.py`, `datasets/ball_detection/`.
+- `archive/` holds unused weights and dead code — do not depend on it.
+
+## Implementation conventions
+
+- Draft a short plan and confirm the approach with the owner before
+  writing production code for a new feature.
+- Prefer extending existing modules under `src/` over new top-level files.
+- GT annotation format lives in `ground_truth/README.md`; Roboflow (COCO
+  export) is the annotation tool for detector retrains
+  (`scripts/import_roboflow_coco.py`).
 
 ## Project memory
 
