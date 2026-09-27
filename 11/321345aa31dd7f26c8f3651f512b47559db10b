@@ -1,0 +1,43 @@
+src/analysis/frame_processor.py
+  s_2fde0374493c64::t_284589aee87d6b 170-171
+AGENTS.md
+  s_2fde0374493c64::t_d37c2dee4248cd 46-50
+src/utils/config.py
+  s_2fde0374493c64::t_b3e5ef313d7981 132-139
+STATUS.md
+  s_2fde0374493c64::t_c3f6a31ea259a8 1690-1703
+  s_2fde0374493c64::t_fd38122eacfc63 8-15
+  s_2fde0374493c64::t_aba7b7d5061782 2139-2191
+  s_2fde0374493c64::t_89acb5113a53b7 1552-1557
+  s_2fde0374493c64::t_561149e62d5ce1 36-82
+tests/test_pose_gate.py
+  s_2fde0374493c64::t_827b1a4d0a33cf 1-191
+src/recognition/action_classifier.py
+  s_2fde0374493c64::t_dfc1dcbd6a53fa 258
+  s_2fde0374493c64::t_ce1cd33cd685d7 163-175,189-197,213-216
+  s_2fde0374493c64::t_a980d59eba6336 335
+  s_2fde0374493c64::t_3167509e9c3c4c 337-344
+  s_2fde0374493c64::t_d96a0b91c3d7c7 300-313,315-331,333-334,336,345-350,473-477
+  s_2fde0374493c64::t_ce7c1954faa46a 217
+  s_2fde0374493c64::t_03df71dbd7adc3 478
+tests/test_team_attribution.py
+  s_2fde0374493c64::t_9eda035177a757 35-37
+tests/test_config_drift.py
+  s_2fde0374493c64::t_628b7306a88d8f 96-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "11321345aa31dd7f26c8f3651f512b47559db10b",
+  "prompts": {},
+  "sessions": {
+    "s_2fde0374493c64": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0e327-42bf-71f3-877b-0741fecd0e9d",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
