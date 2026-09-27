@@ -5,10 +5,12 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-27 (twenty-first session — repo pi default
-model → `zai/glm-5.3-flash` via `.pi/settings.json`; harness config only,
-nothing pipeline-side touched, so the twentieth-session state below
-stands)
+**Last updated:** 2026-09-27 (twenty-second session — open point 22 scoped:
+per-point serve team/side derived mechanically and cross-checked, serve
+windows anchored for P1–13, `scripts/derive_match_serve_windows.py` +17
+tests; far-side serves 0/5 with a correct serve emission vs 2/7 near-side,
+P2 a TOTAL miss — probe leg is next; nothing pipeline-side touched, so the
+twentieth-session state below stands)
 
 **Last pipeline update:** 2026-09-27 (twentieth session — **e3 DRIFT FIXED, GT
 UNCHANGED**: the v3 e3 regression (F1 1.0→0.667) was ONE mechanism: v3's
@@ -28,6 +30,51 @@ window rejects the falling dets and the track dies at f623 — same
 re-entry machinery as open point 22's far-side serves.)
 
 ## Where we are
+
+**(2026-09-27, twenty-second session — OPEN POINT 22 SCOPED: the far-side
+serve complaint is now MEASURED, and the probe windows exist.)**
+
+- **Serve team is derivable MECHANICALLY:** winner of the previous point
+  serves next (beach rule); cross-checked against ALL 6 dictated mentions
+  of a server (P2/P4/P9/P12/P17/P32) — 6/6 agree, and the script RAISES on
+  a mismatch, so the derivation is self-policing. P1's server is not
+  derivable (description has no serve mention). Court side comes from the
+  GT conventions (A near at start; squads fixed; switches after
+  7/14/21/28): **16 far-side / 16 near-side serves across the 33 points**
+  (P1 unknown).
+- **`scripts/derive_match_serve_windows.py` (keeper, +17 tests → suite
+  465):** builds the per-point table (server, side, anchored window,
+  emitted serve actions, episode overlap) and writes
+  `output/far_side_serve_windows.json`. Anchor source is the partial
+  `gt_point_start_end.txt` — its "point starts" marks the SERVE moment —
+  but it only covers P1–13, so P14–33 are emitted UNANCHORED (server+side
+  only; the pipeline's own confirmed spans demonstrably do NOT map 1:1 to
+  GT points — e.g. c8 (234–255s) straddles P12/P13 — so they were NOT used
+  as windows).
+- **THE MEASUREMENT (anchored P1–13 only):** far-side serves P2/P4/P6/P8/P13
+  → **0/5 with a correct serve emission**; near-side P3/P5/P7/P9/P10/P11/P12
+  → 2/7 (P3 clean A@1039; P9 contaminated — B@3856 correct + spurious
+  A@3595). Specimens: **P2 = TOTAL miss** ("Team B fails serve out", B far:
+  ZERO game_on frames in 539..821 — a whole GT point invisible to the
+  game-state layer); P6 (B far) starved (raw ep at 2191 never confirmed);
+  P4 confirmed but its serve emission reads team A vs derived B (either a
+  misattribution or a spurious serve label on untracked-ball actions — the
+  probe decides); P8/P13 confirmed without any serve emission (serve flight
+  lost, rally recovered later). Caveat kept honest: n=5 vs n=7, and serve-
+  ACTION emission is a downstream symptom — the owner's complaint is ball
+  TRACKING; the probe on raw detector output is what classifies detector
+  vs tracker.
+- **NEXT (probe leg, same session family):** production-parity probe
+  (`diag_ball_probe_v2.py` pattern: raw candidates + tracker decision + bg
+  stratification) over the five anchored far-side windows ±2s around the
+  serve moments [539, 1361, 1900, 3029, 6366] plus near-side controls
+  [1052, 1592, 2516, 3568, 4467, 5262, 5699]; classify (a) detector recall
+  on toss/launch vs stands/other backdrop (→ round-3 mining lever: far-side
+  serve positives) vs (b) tracker admission (serve-zone/bootstrap gates
+  tuned on entreno near-side geometry → retune lever) vs (c) the e3-MechC
+  conf-dip family (fast small ball, brief dip, re-entry window rejects).
+  P14–33 need owner-ratified anchors (extend `gt_point_start_end.txt`) or
+  an episode-based approximation before they join the census.
 
 **(2026-09-27, twentieth session): e3 DRIFT FIXED WITHOUT GT EDITS.**
 The owner ruled the GT stays; the pipeline had to heal. See the Log entry
@@ -1598,6 +1645,20 @@ constraint. Side changes need no special handling as long as IDs survive.
     downstream. Fix levers ranked there apply here: round-3 mining of
     fast-fall/toss positives, or a re-entry-window retune (match-wide
     risk, own gate).]**
+    **[UPDATE 2026-09-27 (twenty-second session) — SCOPED + MEASURED:
+    serve team derived mechanically (winner-of-previous; 6/6 description
+    cross-checks; P1 unknown), side map from GT conventions → 16 far /
+    16 near serves. Anchored windows exist for P1–13 only
+    (`scripts/derive_match_serve_windows.py`, +17 tests, artifact
+    `output/far_side_serve_windows.json`; P14–33 UNANCHORED — pipeline
+    spans do NOT map 1:1 to GT points, and the anchor file stops at P13).
+    MEASUREMENT: far-side 0/5 with a correct serve emission (P2 TOTAL
+    miss — zero game_on frames; P6 starved; P4 emission misattributed to
+    team A; P8/P13 no serve emission at all) vs near-side 2/7. This is
+    the serve-ACTION symptom; the probe leg (raw candidates + tracker
+    decisions + bg stratification over windows [539, 1361, 1900, 3029,
+    6366] ±2s, controls [1052, 1592, 2516, 3568, 4467, 5262, 5699]) is
+    the next move and classifies detector-vs-tracker-vs-MechC.]**
     Owner's words (post-adoption, watching the match output): "the ball in
     the long video does not seem to be tracked when in the serve on the far
     side, I checked the entreno videos and the ball is tracked correctly".
