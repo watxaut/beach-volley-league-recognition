@@ -39,7 +39,7 @@ trace to a goal; when prioritizing, the critical paths below decide.
 **G1 — Fantasy scoring.** Per point, per player:
 Kill +1 (unreturnable attack) · Block +1 (defensive stop at the net) ·
 Ace +1 (unreturned serve) · Dig +1 (retrieving an attacked ball) ·
-Assist +0.5–1 (setting a teammate for a kill) · Error −1 (attack out,
+Assist +0.5 flat (setting a teammate for a kill) · Error −1 (attack out,
 service fault, ball-handling error).
 
 **G2 — Individual statistics.** Per-player understanding of your game
@@ -50,10 +50,11 @@ via player labels.
 - Kill — DONE: spike outcome `kill` (semantics ratified 08-31).
 - Dig — DONE: `dig` action.
 - Block — DONE: block action + kill_block/soft_block classification.
+  Fantasy: kill_block +1, soft_block 0 (ratified 09-27).
 - Error (attack) — DONE: spike outcome `out`.
 - Assist — DERIVABLE NOW, metric unbuilt: set → same-team spike with
-  outcome `kill` in the same point (actions×spikes join). The +0.5 vs +1
-  split (e.g. direct set vs overpass/second-ball) is a product decision.
+  outcome `kill` in the same point (actions×spikes join). Scoring
+  RATIFIED 09-27: +0.5 flat, no direct/indirect split.
 - Ace — BLOCKED: needs point-outcome layer (21.3) + far-side serve
   emission (22 — 16/32 match serves); parked as point 13.
 - Error (serve fault) — BLOCKED: same dependencies as ace.
@@ -479,7 +480,7 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 
 - Owner restated the product intent for the club service: (1) Fantasy-
   style scoring per point per player (Kill/Block/Ace/Dig +1, Assist
-  +0.5–1, Error −1) over recorded sessions; (2) individual per-player
+  +0.5, Error −1) over recorded sessions; (2) individual per-player
   statistics. Both now live as the North-star section at the top of
   STATUS; future prioritization traces to them.
 - Mechanism-level coverage audit (recorded in the North-star section):
@@ -489,6 +490,9 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
   far-side serve emission (22), the per-point×player scoring module +
   web points table (14e), and attribution robustness (2/21.4/21.5).
   Ball-handling errors ruled a manual-review path, not perception.
+- Product decisions ratified at session close: Assist scores **+0.5
+  flat** (set → same-team kill, no direct/indirect split); **soft
+  blocks score 0** (only kill blocks take the +1).
 - Ranking unchanged at #1 (22 serves both goals); 21.3 promoted above
   the rest of 21's frontier. Session #20's Log entry archived verbatim
   (live Log trimmed back to 3).
