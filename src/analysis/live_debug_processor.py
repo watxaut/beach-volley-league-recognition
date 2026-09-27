@@ -14,13 +14,18 @@ one arrives; see ``action_classifier.py``). Two render strategies remove that
   frame, caches lightweight overlay data, and builds the label plan; pass 2
   re-reads frames from disk and draws labels on their contact frames. Exact and
   low-memory.
-- ``--debug-live`` (real-time): a **buffered** render. Frames are shown/written
-  with a fixed ~3s delay so a contact's label -- emitted up to ~2s late -- is
-  already known by the time that frame is displayed.
+- ``--debug-live`` (real-time): a **producer/consumer** render. A producer
+  thread runs the EXACT shared processing loop in frame order (same calls,
+  same sequence as batch -- only the thread differs); the main thread renders
+  cached overlay data a fixed ~3s behind -- so a contact's label, emitted up
+  to ~2s late, is already known when its frame is shown -- and owns the
+  window pacing, so display never serialises behind processing.
 """
 
 import logging
-from collections import deque
+import queue
+import threading
+import time
 from typing import Dict, Any, Optional, List, Tuple
 
 import cv2
@@ -32,6 +37,31 @@ from src.output_gen import overlay
 # Overlay data cached per frame for the deferred render.
 BallOverlay = Optional[Tuple[int, int, bool]]           # (x, y, is_predicted)
 PlayerOverlay = List[Tuple[int, List[int]]]             # [(track_id, [x1,y1,x2,y2]), ...]
+
+# Sentinel the producer thread queues after its final flush; tells the
+# consumer the source is exhausted and the label plan is final.
+_PRODUCER_DONE = object()
+
+
+class _ThreadSafeLabelPlan(overlay.LabelPlan):
+    """``LabelPlan`` with a lock around ``add``/``active`` for the decoupled
+    live render: the producer thread ingests labels while the main thread
+    reads them per rendered frame. Presentation-only -- the shared pipeline
+    never touches this subclass.
+    """
+
+    def __init__(self, persist: int = overlay.LABEL_PERSIST):
+        super().__init__(persist)
+        self._lock = threading.Lock()
+
+    def add(self, track_id: Optional[int], contact_frame: Optional[int],
+            action: str, confidence: Optional[float] = None) -> None:
+        with self._lock:
+            super().add(track_id, contact_frame, action, confidence)
+
+    def active(self, track_id: int, frame_idx: int) -> Optional[Tuple[str, Optional[float]]]:
+        with self._lock:
+            return super().active(track_id, frame_idx)
 
 
 def _zone_str(zone: Optional[Dict[str, Any]]) -> Optional[str]:
@@ -107,8 +137,8 @@ class LiveDebugProcessor:
     ) -> None:
         """Process a video and render the contact-anchored overlay.
 
-        Picks the render strategy from ``display``: buffered real-time when a
-        window is shown, otherwise a two-pass headless save.
+        Picks the render strategy from ``display``: decoupled producer/consumer
+        real-time when a window is shown, otherwise a two-pass headless save.
 
         Args:
             video_path: Path to the video file.
@@ -214,7 +244,26 @@ class LiveDebugProcessor:
         try:
             if self.court_detector is not None:
                 out = self.court_detector.draw_court_overlay(out)
+        except Exception as e:
+            self.logger.error(f"Error rendering frame {frame_idx}: {e}")
+            cv2.putText(out, f"Render Error: {str(e)[:50]}",
+                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        return self._draw_overlay(out, frame_idx, ball, players, plan,
+                                  total_frames=total_frames, game_state=game_state)
 
+    def _draw_overlay(self, frame: np.ndarray, frame_idx: int, ball: BallOverlay,
+                      players: PlayerOverlay, plan: overlay.LabelPlan,
+                      total_frames: Optional[int] = None,
+                      game_state: Optional[Dict[str, Any]] = None) -> np.ndarray:
+        """Draw everything EXCEPT the court lines, in ``_render_frame`` order.
+
+        Split so the buffered live render can draw the court on the producer
+        thread -- which owns the calibration state -- and the rest on the main
+        thread from cached data, without changing the composited result.
+        (The two-pass save still draws everything via ``_render_frame``.)
+        """
+        out = frame
+        try:
             if ball is not None:
                 bx, by, pred = ball
                 overlay.draw_ball(out, bx, by, predicted=pred)
@@ -311,15 +360,95 @@ class LiveDebugProcessor:
         self.logger.info(f"Annotated video written: {save_video}")
 
     # ------------------------------------------------------------------ #
-    # Buffered real-time render (--debug-live)
+    # Producer/consumer real-time render (--debug-live)
     # ------------------------------------------------------------------ #
 
-    def _process_buffered_live(self, video_path: str, save_video: Optional[str]) -> None:
+    def _produce_frames(self, cap: cv2.VideoCapture, out_queue: "queue.Queue",
+                        stop: threading.Event, paused: threading.Event,
+                        plan: overlay.LabelPlan,
+                        done: threading.Event) -> None:
+        """Producer thread body: the EXACT shared processing loop, in order.
+
+        Mirrors the batch pipeline call-for-call (``cap.read`` ->
+        ``FrameProcessor.process_frame`` -> action ingest -> spike log ->
+        cache overlay data); only the thread it runs on differs -- the parity
+        rule is about the processing path, which this does not touch. The
+        court overlay is drawn HERE, right after each frame's processing, so
+        the consumer renders from cached data only and never reads
+        calibration state mid-update (byte-identical compositing: court is
+        still drawn first, from exactly this frame's post-process state).
+
+        ``out_queue`` (bounded) throttles the producer to the consumer's
+        delay window. ``stop`` ends the loop WITHOUT a flush (restart/quit
+        discard the tail, like the old serial loop); the natural end of
+        source flushes the held-back contact and typed spikes exactly as the
+        serial loop did. A sentinel follows every exit path, and ``done`` is
+        set strictly AFTER it is queued -- so the consumer that observes
+        ``done`` knows every frame is already enqueued and can drain without
+        the delay gate (the gate alone would deadlock on the sentinel: it
+        sits at the queue's back and can never be counted past the bound).
+        """
+        frame_idx = 0
+        try:
+            while not stop.is_set():
+                if paused.is_set():
+                    if stop.wait(0.05):
+                        break
+                    continue
+                ret, frame = cap.read()
+                if not ret:
+                    # Input over: finalise the last held-back contact, then drain.
+                    self._ingest_actions(self.frame_processor.flush_actions(), plan)
+                    self._log_resolved_spikes()
+                    self._ingest_typed_spikes(plan)
+                    break
+                result = self.frame_processor.process_frame(frame, frame_idx, enable_court_redetection=True)
+                self._ingest_actions(result.get("actions", []), plan)
+                self._log_resolved_spikes()
+                ball, players, gs = self._overlay_data(result)
+                if self.court_detector is not None:
+                    frame = self.court_detector.draw_court_overlay(frame)
+                out_queue.put((frame, frame_idx, ball, players, gs))
+                frame_idx += 1
+        except Exception:
+            self.logger.exception("Producer thread failed at frame %s", frame_idx)
+        finally:
+            out_queue.put(_PRODUCER_DONE)
+            done.set()
+
+    @staticmethod
+    def _stop_producer(thread: threading.Thread, out_queue: "queue.Queue",
+                       stop: threading.Event) -> None:
+        """Signal the producer to stop and reap it. Draining unblocks a
+        producer parked on a full queue; the sentinel marks its exit."""
+        stop.set()
+        while thread.is_alive():
+            try:
+                item = out_queue.get_nowait()
+            except queue.Empty:
+                item = None
+            if item is _PRODUCER_DONE:
+                break
+            time.sleep(0.002)
+        thread.join(timeout=5.0)
+        if thread.is_alive():
+            logging.getLogger(__name__).warning("Producer thread did not stop cleanly")
+
+    def _process_buffered_live(self, video_path: str, save_video: Optional[str] = None) -> None:
         """Show (and optionally write) frames on a fixed delay so labels land on
-        their contact frame once the classifier has emitted them."""
+        their contact frame once the classifier has emitted them.
+
+        Decoupled producer/consumer (open point 23): the producer thread runs
+        the shared processing loop ahead of display; the main thread renders
+        cached overlay data at the video's pace. Displaying a frame is gated
+        on the producer being a full delay deep -- the same label-latency
+        guarantee as the old serial loop, but throughput is no longer
+        processing + pacing: it is max(processing, pacing).
+        """
         self.logger.info(f"Starting buffered live processing: {video_path}")
         cap, fps, width, height, total = self._open(video_path)
         frame_delay = (1.0 / fps) / self.debug_speed if fps > 0 else 0.033
+        frame_delay_ms = max(1, int(frame_delay * 1000))
         self.logger.info(f"Video: {total} frames, {fps} FPS, {width}x{height}")
         self.frame_processor.setup_video_fps(fps)
         self.frame_processor.setup_video_dimensions(width, height)
@@ -335,62 +464,83 @@ class LiveDebugProcessor:
             delay_frames,
         )
 
-        plan = overlay.LabelPlan()
-        buffer: deque = deque()  # (frame, frame_idx, ball, players)
-        frame_idx = 0
-        paused = False
-        source_done = False
-        shown = None
+        restart = True
+        while restart:
+            restart = False
+            # Fresh per-run state: the producer owns the pipeline and all
+            # writes; the main thread only renders from cached data (plus the
+            # locked label-plan reads).
+            plan = _ThreadSafeLabelPlan()
+            frames_out: queue.Queue = queue.Queue(maxsize=delay_frames + 1)
+            stop = threading.Event()
+            paused = threading.Event()
+            done = threading.Event()
+            producer = threading.Thread(
+                target=self._produce_frames,
+                args=(cap, frames_out, stop, paused, plan, done),
+                name="live-debug-producer",
+                daemon=True,
+            )
+            producer.start()
 
-        while True:
-            # 1. Read + process the next source frame (unless paused / exhausted).
-            if not paused and not source_done:
-                ret, frame = cap.read()
-                if ret:
-                    result = self.frame_processor.process_frame(frame, frame_idx, enable_court_redetection=True)
-                    self._ingest_actions(result.get("actions", []), plan)
-                    self._log_resolved_spikes()
-                    ball, players, gs = self._overlay_data(result)
-                    buffer.append((frame, frame_idx, ball, players, gs))
-                    frame_idx += 1
-                else:
-                    source_done = True
-                    # Input over: finalise the last held-back contact, then drain.
-                    self._ingest_actions(self.frame_processor.flush_actions(), plan)
-                    self._log_resolved_spikes()
-                    self._ingest_typed_spikes(plan)
+            shown = None
+            drained = False
+            while True:
+                # 1. Show the next frame once the producer is a full delay
+                #    deep (same guarantee as the old serial buffer); once the
+                #    producer is done (everything enqueued), drain the rest.
+                item = None
+                if not paused.is_set():
+                    if drained or done.is_set():
+                        drained = True
+                        try:
+                            item = frames_out.get_nowait()
+                        except queue.Empty:
+                            item = None
+                    elif frames_out.qsize() > delay_frames:
+                        item = frames_out.get()
 
-            # 2. Release one frame once the buffer is a full delay deep (or draining).
-            if not paused and buffer and (len(buffer) > delay_frames or source_done):
-                f, i, ball, players, gs = buffer.popleft()
-                shown = self._render_frame(f, i, ball, players, plan, total_frames=total,
-                                           game_state=gs)
-                if writer is not None:
-                    writer.write(shown)
+                showed = False
+                if item is _PRODUCER_DONE:
+                    drained = True
+                elif item is not None:
+                    frame, idx, ball, players, gs = item
+                    shown = self._draw_overlay(frame, idx, ball, players, plan,
+                                               total_frames=total, game_state=gs)
+                    if writer is not None:
+                        writer.write(shown)
+                    cv2.imshow('Volleyball Analysis', shown)
+                    key = cv2.waitKey(frame_delay_ms) & 0xFF
+                    showed = True
+                elif drained and frames_out.empty() and not paused.is_set():
+                    break  # source exhausted, buffer drained: processing ended
 
-            # 3. Display + controls (block on key while paused).
-            if shown is not None:
-                cv2.imshow('Volleyball Analysis', shown)
-                key = cv2.waitKey(0 if paused else max(1, int(frame_delay * 1000))) & 0xFF
+                if not showed:
+                    # No frame shown this pass (producer still filling the
+                    # delay window, or paused): keep polling controls without
+                    # pacing so the window stays responsive. (waitKey returns
+                    # -1 without a key -- hence the flag, not the value.)
+                    key = cv2.waitKey(1) & 0xFF
+
+                # 2. Controls.
                 if key == ord('q'):
+                    self._stop_producer(producer, frames_out, stop)
                     break
                 elif key == ord(' '):
-                    paused = not paused
-                    self.logger.info("Paused" if paused else "Resumed")
+                    if paused.is_set():
+                        paused.clear()
+                        self.logger.info("Resumed")
+                    else:
+                        paused.set()
+                        self.logger.info("Paused")
                 elif key == ord('r'):
+                    self._stop_producer(producer, frames_out, stop)
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    frame_idx = 0
-                    source_done = False
-                    buffer.clear()
-                    shown = None
-                    plan = overlay.LabelPlan()
                     self.frame_processor.reset_trackers()
                     self._spike_log_state = []
                     self.logger.info("Video restarted")
-
-            # 4. Done once the source is exhausted and the buffer has drained.
-            if source_done and not buffer:
-                break
+                    restart = True
+                    break
 
         cap.release()
         if writer is not None:

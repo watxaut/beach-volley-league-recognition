@@ -17,10 +17,18 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-27 (twenty-fourth session — product NORTH-STAR
-GOALS set (G1 Fantasy scoring, G2 individual stats) with a stat-by-stat
-coverage audit and critical paths; no pipeline code touched. Pose gates
-from #23 remain the last shipped mechanism.)
+**Last updated:** 2026-09-27 (twenty-fifth session — PERF: open point 23
+SHIPPED — live-debug producer/consumer display decoupling. The `--debug-live`
+loop no longer serializes processing + render + 33 ms pacing: a producer
+thread runs the EXACT shared processing loop in frame order and draws the
+court overlay per frame (so the main thread renders cached data only and
+owns the window); the depth gate keeps the same 90-frame label-latency
+guarantee. Neutrality: entreno_1 + entreno_3 buffered-live runs —
+action/tracker logs BYTE-IDENTICAL AND every rendered frame MD5-identical
+vs HEAD (run-to-run determinism proven first, ×2 each). Measured: 8.06 →
+11.84 fps (e1) / 8.06 → 12.04 fps (e3) with real 33 ms pacing — ×1.47-1.49;
+the rest of the gap to 1000/68 ms is thread GIL contention. Suite
+477 → 491 (+14 tests/test_live_debug_decoupling.py).)
 
 ## North-star goals (set session 24)
 
@@ -83,13 +91,15 @@ placement, per-video splits); remaining adds = serve/assist/error stats
   shipped mechanisms.
 - **Entreno gate record** (`evaluate --ignore-player` F1): e1 0.706, e2
   0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933, e7 0.75; teams 1.0 except
-  e6 0.857. Suite **477 green**.
+  e6 0.857. Suite **491 green**.
 - **Known residuals:** e4/e5/e6 GT re-adjudication vs the v3 streams
   (queued — owner-ratified contact sheets; GT was dictated against
   base-model behavior); e3 f539 outcome enrichment reads dug vs GT kill
   (tracker-side fast-fall conf dip — open point 22 family); match serves
-  emitted 20 vs v2's 28 (open point 22); live-debug display decoupling
-  parked (open point 23).
+  emitted 20 vs v2's 28 (open point 22). Live-debug display decoupling
+  SHIPPED (25th session): `--debug-live` ≈ 12 fps vs 8.0 serialized,
+  rendered frames + logs byte-identical (probe `output/
+  diag_live_debug_probe.py`); batch untouched (68.0 ms/f stands).
 
 **Active next (ranked, goal-driven — see North-star).** (1) Open point
 22: build the episode→GT-point ORDER map (57 episodes ↔ 33 points), then
@@ -228,16 +238,6 @@ point number in `docs/history/`.
 
 ### Parked / conditional
 
-23. **Live-debug producer/consumer display decoupling** (parked 09-27;
-    owner's call). `--debug-live` serializes pipeline + render + 33 ms
-    pacing (~5-7 fps pre-gates). Design: a producer thread runs the EXACT
-    `FrameProcessor.process_frame` loop in frame order (the pipeline path
-    is untouched — the parity rule is about the pipeline), a consumer
-    thread renders cached overlays and owns pacing; expected ≈ 1000/68 ≈
-    15-20 fps live. Buys live fps only — batch is at the detector floor
-    (two YOLO imgsz-1280 calls ≈ 48 ms/f) unless a future session takes
-    on model fusion / imgsz changes (behavior changes → full gate).
-
 5.  **Same-team adjacent-player choice.** The team filter constrains the
     TEAM, not which teammate — e3 f69's dig goes to the wrong B player.
     Needs pose/reach signals, not team logic.
@@ -375,6 +375,7 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- 2026-09-27 **#25** — open point 23 SHIPPED: live-debug producer/consumer decoupling; logs + rendered frames byte-identical; 8.0 → ~12 fps; +14 tests (Log below).
 - 2026-09-27 **#24** — product north-star goals set (G1 Fantasy scoring / G2 individual stats); stat-coverage audit + critical paths (Log below).
 - 2026-09-27 **#23** — pose gating shipped in the shared classifier (staleness + near-ball trail), byte-identical everywhere, match ×1.24 (Log below).
 - 2026-09-27 **#22** — far-side serves scoped: retracted mispaired-anchor measurement; P2 specimen (ball tracked; loss = episode starvation + serve-action gate); `derive_match_serve_windows.py`.
@@ -410,6 +411,69 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+
+### 2026-09-27 (twenty-fifth session) — PERF: open point 23 shipped (live-debug producer/consumer decoupling); byte-identical output; 8.0 → ~12 fps
+
+- **Context:** the last parked 2026-08-17 perf lever. `--debug-live`
+  serialized per displayed frame: process (68 ms at HEAD) + render +
+  `waitKey(33 ms)` → ~8 fps. The parked design (producer thread runs the
+  EXACT `FrameProcessor.process_frame` loop in frame order; consumer renders
+  cached overlays and owns pacing) is blessed by the parity rule — the rule
+  protects the pipeline path, which is untouched (`git diff`: only
+  `src/analysis/live_debug_processor.py`).
+- **Diagnose first (probe `output/diag_live_debug_probe.py`, git-ignored):**
+  runs the real `_process_buffered_live` GUI-less (cv2 imshow/waitKey
+  patched, waitKey sleeping the real 33 ms pacing; fake VideoWriter
+  MD5-hashes every rendered frame) and captures the full INFO log stream.
+  HEAD baselines FIRST, ×2 each on entreno_1 + entreno_3: run-to-run
+  byte-identical (logs + all 441/665 frame MD5s) — the A/B ground truth is
+  deterministic. HEAD live throughput: 8.06 fps on both.
+- **Shipped (`src/analysis/live_debug_processor.py` only):** (1) producer
+  thread `_produce_frames` — the exact shared sequence (cap.read →
+  `process_frame(enable_court_redetection=True)` → ingest actions → spike
+  log → overlay-data cache), flush + typed spikes on natural end only, stop
+  discards the tail like the old loop, sentinel + done-event on every exit
+  path; (2) the court overlay is drawn ON THE PRODUCER, right after each
+  frame's processing — the consumer never reads calibration state
+  mid-redetection and the compositing order (court → ball → trail → kill →
+  players → counter → state) is pixel-identical (proved by the MD5s);
+  `_render_frame` split into court + `_draw_overlay` (two-pass save still
+  uses the full `_render_frame` — unchanged); (3) consumer (main thread —
+  macOS GUI requirement) gated on queue depth > delay (same 90-frame
+  label-latency guarantee as the old `len(buffer) > delay` arithmetic),
+  drains after the done-event, keeps polling keys at `waitKey(1)` while
+  filling/paused; (4) `_ThreadSafeLabelPlan` — lock around add/active
+  (presentation-only subclass; the shared pipeline never touches it);
+  (5) 'q'/'r' stop the producer via `_stop_producer` (drain-unblocks a
+  producer parked on a full queue, join, then reset/rewind on 'r').
+- **Two bugs caught by the probe/tests before they could ship:** (a) the
+  sentinel parks at the queue's BACK, so a depth-gated consumer deadlocks
+  (exit=124 on the first new-code run) — fixed with the done-event set
+  strictly AFTER the sentinel is queued (event seen ⇒ everything enqueued,
+  drain without the gate); regression test
+  `test_sentinel_deadlock_regression_long_video`. (b) `waitKey` returns −1
+  (→ 255 after `& 0xFF`), so a `key == -1` poll check never fires — replaced
+  with a showed-this-pass flag.
+- **Neutrality proof:** NEW code, same probe: e1 + e3 logs BYTE-IDENTICAL
+  to the HEAD baselines (all action/tracker lines) AND every rendered frame
+  MD5-identical (441/665). Suite 477 → **491** (+14
+  tests/test_live_debug_decoupling.py: producer order/flush/sentinel,
+  stop-without-flush, pause park/resume, stop-unblocks-full-queue, typed
+  spikes on flush, run-to-completion order, sentinel-deadlock regression,
+  quit key, restart re-runs + rewinds + resets, short-video drain, render
+  split order, thread-safe plan semantics + concurrency).
+- **Measured:** e1 8.06 → 11.84 fps, e3 8.06 → 12.04 fps (×1.47-1.49) with
+  real 33 ms pacing; remainder of the gap to 1000/68 ≈ 14.7 fps is thread
+  GIL contention (consumer render work steals producer time) — accepted,
+  not worth further engineering for a debug tool.
+- **Owner GUI validation still owed (cannot automate a real window):**
+  SPACE pause + 'r' restart + 'q' quit on a real run; also note 'r' on the
+  VFR match file inherits the pre-existing CAP_PROP_POS_FRAMES seek
+  unreliability (open point 22 lesson) — unchanged old behavior, just
+  remember it when restart looks misaligned there.
+- Files: src/analysis/live_debug_processor.py,
+  tests/test_live_debug_decoupling.py (+14; suite 491), STATUS.md. Probe
+  (git-ignored): output/diag_live_debug_probe.py.
 
 ### 2026-09-27 (twenty-fourth session) — product north-star goals set (G1 Fantasy, G2 stats); critical paths mapped, no pipeline code
 
@@ -481,16 +545,6 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
   tests/test_team_attribution.py (stub gained `estimate_pose` — the gated
   loop calls per-player, not the batch wrapper), tests/test_config_drift.py,
   STATUS.md.
-
-### 2026-09-27 (twenty-first session) — pi project default model set to zai/glm-5.3-flash (.pi/settings.json)
-- **Harness config only** — no pipeline code, no GT. New
-  `.pi/settings.json` sets `defaultProvider: zai` + `defaultModel:
-  glm-5.3-flash`, overriding the user-level `~/.pi/agent/settings.json`
-  (`zai/glm-5.3`) inside this repo only. Cross-checked before writing:
-  `zai/glm-5.3-flash` was already in the user settings' `enabledModels`,
-  and `~/.pi/agent/auth.json` authenticates `zai`, so no provider setup
-  was needed. Rest of `.pi/` (prompts/) untouched. Running pi sessions
-  need `/reload` or a restart to pick it up.
 
 ## Useful commands
 

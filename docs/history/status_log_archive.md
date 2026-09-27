@@ -1,4 +1,4 @@
-# STATUS.md archive — Log entries 2026-08-14 → 2026-09-27 (twentieth session onward)
+# STATUS.md archive — Log entries 2026-08-14 → 2026-09-27 (twenty-first session onward)
 
 > Provenance: the detailed session log entries that used to live in
 > STATUS.md's "Log" section, moved here VERBATIM on 2026-09-27 when the live
@@ -7,6 +7,15 @@
 > `status_where_we_are_archive.md` (same directory); the one-line-per-session
 > index is in STATUS.md. Nothing was edited or deleted.
 
+### 2026-09-27 (twenty-first session) — pi project default model set to zai/glm-5.3-flash (.pi/settings.json)
+- **Harness config only** — no pipeline code, no GT. New
+  `.pi/settings.json` sets `defaultProvider: zai` + `defaultModel:
+  glm-5.3-flash`, overriding the user-level `~/.pi/agent/settings.json`
+  (`zai/glm-5.3`) inside this repo only. Cross-checked before writing:
+  `zai/glm-5.3-flash` was already in the user settings' `enabledModels`,
+  and `~/.pi/agent/auth.json` authenticates `zai`, so no provider setup
+  was needed. Rest of `.pi/` (prompts/) untouched. Running pi sessions
+  need `/reload` or a restart to pick it up.
 ### 2026-09-27 (twentieth session) — e3 v3 drift FIXED without GT edits: the short-gap bridge now checks the normal path can actually host the touch
 
 Owner brief: after the v3 swap e3 drifted (F1 1.0→0.667), the GT stays,
