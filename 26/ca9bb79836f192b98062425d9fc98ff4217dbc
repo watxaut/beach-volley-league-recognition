@@ -1,0 +1,29 @@
+tests/test_team_attribution.py
+  s_074f96b7a61701::t_15eaf55388369c 480-521
+STATUS.md
+  s_074f96b7a61701::t_c9fb8fcfd30fd0 1585-1595
+  s_074f96b7a61701::t_ca1553e8ec71d2 1999-2039,2045
+  s_074f96b7a61701::t_fb3386bed8926f 2040-2044
+  s_074f96b7a61701::t_729bd1266e4ab0 70-76
+  s_074f96b7a61701::t_d2081a6a808d67 1468-1471
+  s_074f96b7a61701::t_f1ebda05d7c9c2 8-23,27-69
+src/recognition/action_classifier.py
+  s_074f96b7a61701::t_282aa01b361c9a 554-565,609-612,617-621,671-684
+  s_074f96b7a61701::t_082bd08c3e80f6 613-616
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "26ca9bb79836f192b98062425d9fc98ff4217dbc",
+  "prompts": {},
+  "sessions": {
+    "s_074f96b7a61701": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0e1bf-f56d-7575-8f8d-32e6ec0d6cd3",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
