@@ -17,10 +17,54 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-27 (twenty-third session — pose gates shipped in
-the shared classifier, byte-identical everywhere, match ×1.24; live Log and
-Where-we-are reflect it. Session 22's far-side-serve scoping and session
-20's e3-fix details live in the Log/open point 22 and the archives.)
+**Last updated:** 2026-09-27 (twenty-fourth session — product NORTH-STAR
+GOALS set (G1 Fantasy scoring, G2 individual stats) with a stat-by-stat
+coverage audit and critical paths; no pipeline code touched. Pose gates
+from #23 remain the last shipped mechanism.)
+
+## North-star goals (set session 24)
+
+Why this project exists — a service for the owner's beach-volley club:
+record a session, process it, deliver two things. New mechanisms should
+trace to a goal; when prioritizing, the critical paths below decide.
+
+**G1 — Fantasy scoring.** Per point, per player:
+Kill +1 (unreturnable attack) · Block +1 (defensive stop at the net) ·
+Ace +1 (unreturned serve) · Dig +1 (retrieving an attacked ball) ·
+Assist +0.5–1 (setting a teammate for a kill) · Error −1 (attack out,
+service fault, ball-handling error).
+
+**G2 — Individual statistics.** Per-player understanding of your game
+(kill%, dig%, zones, placement, tendencies), aggregated across sessions
+via player labels.
+
+**Stat coverage audit (2026-09-27):**
+- Kill — DONE: spike outcome `kill` (semantics ratified 08-31).
+- Dig — DONE: `dig` action.
+- Block — DONE: block action + kill_block/soft_block classification.
+- Error (attack) — DONE: spike outcome `out`.
+- Assist — DERIVABLE NOW, metric unbuilt: set → same-team spike with
+  outcome `kill` in the same point (actions×spikes join). The +0.5 vs +1
+  split (e.g. direct set vs overpass/second-ball) is a product decision.
+- Ace — BLOCKED: needs point-outcome layer (21.3) + far-side serve
+  emission (22 — 16/32 match serves); parked as point 13.
+- Error (serve fault) — BLOCKED: same dependencies as ace.
+- Error (ball handling) — NOT PERCEPTIBLE from ball+pose; plan a manual
+  override in the review UI instead of perception work.
+- Point winner / scoreboard (needed to group lines per point) — BLOCKED
+  on 21.3/21.4; validate against the 33 dictated match winners.
+
+**G1 critical path:** 22 (episode→point map; serves emitted on BOTH
+sides) → 21.3 (point winner/outcome layer) → 13 (ace/assist/serve-error
+derivation) → fantasy scoring module (per point × player, computed from
+the DB) + points table in the web UI (14e). Quality gate before any club
+rollout: 2/21.4/21.5 — identity hops and side switches corrupt per-player
+lines; plus a fast human-review pass per match (fantasy numbers must be
+trustworthy).
+**G2 critical path:** mostly BUILT (player pages, court heatmaps,
+placement, per-video splits); remaining adds = serve/assist/error stats
+(from the same 21.3/13 work), per-point views (14e), confidence surfaces
+(21.2), and multi-session aggregation UX.
 
 ## Where we are
 
@@ -47,10 +91,14 @@ Where-we-are reflect it. Session 22's far-side-serve scoping and session
   emitted 20 vs v2's 28 (open point 22); live-debug display decoupling
   parked (open point 23).
 
-**Active next (ranked).** (1) Open point 22: build the episode→GT-point
-ORDER map (57 episodes ↔ 33 points), then the far/near serve census on
-TRUE windows. (2) e4/e5/e6 re-adjudication sheets. (3) Then open point
-21's frontier: point winner/side-switch/confidence layers.
+**Active next (ranked, goal-driven — see North-star).** (1) Open point
+22: build the episode→GT-point ORDER map (57 episodes ↔ 33 points), then
+the far/near serve census on TRUE windows — serves both goals (serve
+emission feeds aces/errors; the episode map is the backbone of per-point
+fantasy lines). (2) e4/e5/e6 re-adjudication sheets. (3) 21.3 point
+winner/outcome layer — G1's biggest missing signal (unlocks aces, serve
+errors, per-point grouping). (4) Fantasy scoring module + web points
+table (14e); assist ships with it (no perception needed).
 
 ## Open points
 
@@ -327,6 +375,7 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- 2026-09-27 **#24** — product north-star goals set (G1 Fantasy scoring / G2 individual stats); stat-coverage audit + critical paths (Log below).
 - 2026-09-27 **#23** — pose gating shipped in the shared classifier (staleness + near-ball trail), byte-identical everywhere, match ×1.24 (Log below).
 - 2026-09-27 **#22** — far-side serves scoped: retracted mispaired-anchor measurement; P2 specimen (ball tracked; loss = episode starvation + serve-action gate); `derive_match_serve_windows.py`.
 - 2026-09-27 **#21** — pi repo default model → zai/glm-5.3-flash (Log below).
@@ -361,6 +410,24 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+
+### 2026-09-27 (twenty-fourth session) — product north-star goals set (G1 Fantasy, G2 stats); critical paths mapped, no pipeline code
+
+- Owner restated the product intent for the club service: (1) Fantasy-
+  style scoring per point per player (Kill/Block/Ace/Dig +1, Assist
+  +0.5–1, Error −1) over recorded sessions; (2) individual per-player
+  statistics. Both now live as the North-star section at the top of
+  STATUS; future prioritization traces to them.
+- Mechanism-level coverage audit (recorded in the North-star section):
+  Kill/Dig/Block/attack-Error already derivable from the DB; Assist is
+  one join away (set → same-team kill, same point) — pure metric work;
+  the real G1 blockers are the point winner/outcome layer (21.3),
+  far-side serve emission (22), the per-point×player scoring module +
+  web points table (14e), and attribution robustness (2/21.4/21.5).
+  Ball-handling errors ruled a manual-review path, not perception.
+- Ranking unchanged at #1 (22 serves both goals); 21.3 promoted above
+  the rest of 21's frontier. Session #20's Log entry archived verbatim
+  (live Log trimmed back to 3).
 
 ### 2026-09-27 (twenty-third session) — perf: both parked pose levers shipped in the shared path; byte-identical everywhere; live-debug decoupling parked
 - **Context:** the owner asked to make BOTH offline and debug-live
@@ -424,54 +491,6 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
   and `~/.pi/agent/auth.json` authenticates `zai`, so no provider setup
   was needed. Rest of `.pi/` (prompts/) untouched. Running pi sessions
   need `/reload` or a restart to pick it up.
-
-### 2026-09-27 (twentieth session) — e3 v3 drift FIXED without GT edits: the short-gap bridge now checks the normal path can actually host the touch
-
-Owner brief: after the v3 swap e3 drifted (F1 1.0→0.667), the GT stays,
-some contact "changes midpoint and then it starts going sideways" — fix
-without regressions. Diagnose-first, one shipped mechanism.
-
-- **Instrumentation:** production-parity ball-track dumps for e3 under
-  both models (`output/diag_e3_v3_balltrack.py` →
-  `output/diag_e3_balltrack_{base,v3}.json`, detector conf 0.15 + tracker
-  parity + court bounds) and a SpikeAnalyzer transition tracer
-  (`output/diag_e3_spike_trace.py`). The action diff against the gate
-  artifacts localized the break to the missing f378/379 set, everything
-  after being resolver cascade.
-- **Three mechanisms found (A causes the F1 loss; B moot; C enrichments):**
-  (A) v3's tracker accepts the true arc bottom f379 that base starved
-  (moving bystander out-confd the ball 0.76 vs 0.70 → trusted coast; the
-  in-gate ball was never tried); with the bottom real and v3 blind at
-  f385-386, no frame can host the set — bounce@378 not-lowest, bounce@379
-  right-sparse, drive@384 left3-empty — yet the bridge refused as "dense
-  both sides". (B) ±px jitter tips |inc[0]| 18→21 over XREV_MIN=20 at
-  f539, so the redirect test steals the kill → block gesture; harmless at
-  touch 3 (the resolver's poke rule returns SPIKE — the `touch < 3` block
-  guard is load-bearing). (C) v3 conf dip f613-618 → coast leaves the
-  court-bounds box → re-entry window rejects the falling dets → track
-  dies f623 → the dug→kill flush conversion loses the post-dig flight
-  (f539 outcome reads dug vs GT kill; base read kill).
-- **The fix (`src/recognition/action_classifier.py`, one mechanism):** the
-  short-band dense-side refusal now requires `_normal_vertex_in_range(a0,
-  c)` — a fireable normal vertex in the gap range — checked by reusing the
-  normal tests factored out pure (`_normal_contact_at`); no duplicated
-  thresholds, e6 f265 still defers. +2 tests
-  (`test_short_gap_bridge_takes_seen_bottom_with_sparse_right`,
-  `test_short_gap_bridge_still_defers_when_normal_vertex_fireable`),
-  suite **448 green**.
-- **Validation:** e3 v3 F1 **1.0** (14/14 matched; team 1.0, spike_type
-  4/4, attack_zone 1.0, dug_zone 1.0; outcome 0.75 = Mechanism C's f539
-  dug/kill; landing_zone 0.0 pre-exists in base — GT B8 vs emitted B7);
-  e1/e2/e4/e5/e6/e7 action streams BYTE-IDENTICAL to the gate record
-  (F1s 0.706/0.571/0.933/0.923/0.933/0.75; e6 team stays 0.857); base-
-  weights rerun all 7 BYTE-IDENTICAL (neutrality proof). Artifacts:
-  `output/e3_fix/`.
-- **Match re-run (`output/match20260920_e3fix/`):** confirmed 31/33
-  (0.939), 57 episodes, first-confirmed = GT pt 1 — identical to the gate
-  record; actions 207 vs 206 (the +1 is a bridge-recovered dig in GT pt 5;
-  all other labels unchanged: dig 84 / spike 45 / set 42 / serve 20 /
-  overpass 9 / block 7). `match_points_eval.json` written.
-
 
 ## Useful commands
 

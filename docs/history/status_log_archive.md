@@ -1,4 +1,4 @@
-# STATUS.md archive — Log entries 2026-08-14 → 2026-09-26 (nineteenth session onward)
+# STATUS.md archive — Log entries 2026-08-14 → 2026-09-27 (twentieth session onward)
 
 > Provenance: the detailed session log entries that used to live in
 > STATUS.md's "Log" section, moved here VERBATIM on 2026-09-27 when the live
@@ -6,6 +6,53 @@
 > The compressed per-session summaries live in
 > `status_where_we_are_archive.md` (same directory); the one-line-per-session
 > index is in STATUS.md. Nothing was edited or deleted.
+
+### 2026-09-27 (twentieth session) — e3 v3 drift FIXED without GT edits: the short-gap bridge now checks the normal path can actually host the touch
+
+Owner brief: after the v3 swap e3 drifted (F1 1.0→0.667), the GT stays,
+some contact "changes midpoint and then it starts going sideways" — fix
+without regressions. Diagnose-first, one shipped mechanism.
+
+- **Instrumentation:** production-parity ball-track dumps for e3 under
+  both models (`output/diag_e3_v3_balltrack.py` →
+  `output/diag_e3_balltrack_{base,v3}.json`, detector conf 0.15 + tracker
+  parity + court bounds) and a SpikeAnalyzer transition tracer
+  (`output/diag_e3_spike_trace.py`). The action diff against the gate
+  artifacts localized the break to the missing f378/379 set, everything
+  after being resolver cascade.
+- **Three mechanisms found (A causes the F1 loss; B moot; C enrichments):**
+  (A) v3's tracker accepts the true arc bottom f379 that base starved
+  (moving bystander out-confd the ball 0.76 vs 0.70 → trusted coast; the
+  in-gate ball was never tried); with the bottom real and v3 blind at
+  f385-386, no frame can host the set — bounce@378 not-lowest, bounce@379
+  right-sparse, drive@384 left3-empty — yet the bridge refused as "dense
+  both sides". (B) ±px jitter tips |inc[0]| 18→21 over XREV_MIN=20 at
+  f539, so the redirect test steals the kill → block gesture; harmless at
+  touch 3 (the resolver's poke rule returns SPIKE — the `touch < 3` block
+  guard is load-bearing). (C) v3 conf dip f613-618 → coast leaves the
+  court-bounds box → re-entry window rejects the falling dets → track
+  dies f623 → the dug→kill flush conversion loses the post-dig flight
+  (f539 outcome reads dug vs GT kill; base read kill).
+- **The fix (`src/recognition/action_classifier.py`, one mechanism):** the
+  short-band dense-side refusal now requires `_normal_vertex_in_range(a0,
+  c)` — a fireable normal vertex in the gap range — checked by reusing the
+  normal tests factored out pure (`_normal_contact_at`); no duplicated
+  thresholds, e6 f265 still defers. +2 tests
+  (`test_short_gap_bridge_takes_seen_bottom_with_sparse_right`,
+  `test_short_gap_bridge_still_defers_when_normal_vertex_fireable`),
+  suite **448 green**.
+- **Validation:** e3 v3 F1 **1.0** (14/14 matched; team 1.0, spike_type
+  4/4, attack_zone 1.0, dug_zone 1.0; outcome 0.75 = Mechanism C's f539
+  dug/kill; landing_zone 0.0 pre-exists in base — GT B8 vs emitted B7);
+  e1/e2/e4/e5/e6/e7 action streams BYTE-IDENTICAL to the gate record
+  (F1s 0.706/0.571/0.933/0.923/0.933/0.75; e6 team stays 0.857); base-
+  weights rerun all 7 BYTE-IDENTICAL (neutrality proof). Artifacts:
+  `output/e3_fix/`.
+- **Match re-run (`output/match20260920_e3fix/`):** confirmed 31/33
+  (0.939), 57 episodes, first-confirmed = GT pt 1 — identical to the gate
+  record; actions 207 vs 206 (the +1 is a bridge-recovered dig in GT pt 5;
+  all other labels unchanged: dig 84 / spike 45 / set 42 / serve 20 /
+  overpass 9 / block 7). `match_points_eval.json` written.
 
 ### 2026-09-26 (nineteenth session, adoption leg) — v3 ADOPTED as production; owner feedback: far-side serves untracked (new open point 22); session closed
 
