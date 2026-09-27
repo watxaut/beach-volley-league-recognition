@@ -1,0 +1,20 @@
+AGENTS.md
+  s_deb8223eb87515::t_d7767f5c1f1a98 33-38
+  s_deb8223eb87515::t_a0956f4d2e5c6e 3-7,26-32,39-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "b00093be077e8d785ce0a26e3f8e456cfb900881",
+  "prompts": {},
+  "sessions": {
+    "s_deb8223eb87515": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0e3c3-a966-74cd-8424-7dbec8733a1f",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
