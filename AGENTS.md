@@ -7,9 +7,20 @@ must survive future edits.
 ## Read-first rule (every session)
 
 1. **`STATUS.md`** — the cross-session memory: current state, ranked Open
-   points (treat as the backlog), per-session log. Read it before planning
-   any work; update it at the end of every session that changes anything and
-   commit it with the work.
+   points (treat as the backlog), standing Learnings, session index, and the
+   last ~3 session Log entries. Read it before planning any work; update it
+   at the end of every session that changes anything and commit it with the
+   work.
+   **Lean-STATUS convention (reorganized 2026-09-27):** *Where we are* is
+   rewritten each session (never appended to); *Open points* get one compact
+   entry each (status / problem / next step — collapse resolved
+   `[UPDATE …]` stacks); the Log keeps only the last ~3 sessions verbatim;
+   older entries move VERBATIM (never deleted) to
+   `docs/history/status_log_archive.md` and
+   `docs/history/status_where_we_are_archive.md`, and the session gets a
+   one-line entry in the *Session index*. New durable protocol rules go
+   here in AGENTS.md; new cross-session technical facts go one-line-each
+   into STATUS.md's *Learnings*.
 2. **`CLAUDE.md`** — full architecture, commands, config conventions, GT/eval
    docs. It is kept as the reference even though this harness does not load
    it automatically; its guidance applies unchanged.
