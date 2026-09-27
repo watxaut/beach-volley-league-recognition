@@ -5,7 +5,12 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-27 (twentieth session — **e3 DRIFT FIXED, GT
+**Last updated:** 2026-09-27 (twenty-first session — repo pi default
+model → `zai/glm-5.3-flash` via `.pi/settings.json`; harness config only,
+nothing pipeline-side touched, so the twentieth-session state below
+stands)
+
+**Last pipeline update:** 2026-09-27 (twentieth session — **e3 DRIFT FIXED, GT
 UNCHANGED**: the v3 e3 regression (F1 1.0→0.667) was ONE mechanism: v3's
 tracker accepted the f379 arc-bottom sighting that base's starved behind a
 higher-conf bystander, and the short-gap bridge's "dense both sides →
@@ -1995,6 +2000,16 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-27 (twenty-first session) — pi project default model set to zai/glm-5.3-flash (.pi/settings.json)
+- **Harness config only** — no pipeline code, no GT. New
+  `.pi/settings.json` sets `defaultProvider: zai` + `defaultModel:
+  glm-5.3-flash`, overriding the user-level `~/.pi/agent/settings.json`
+  (`zai/glm-5.3`) inside this repo only. Cross-checked before writing:
+  `zai/glm-5.3-flash` was already in the user settings' `enabledModels`,
+  and `~/.pi/agent/auth.json` authenticates `zai`, so no provider setup
+  was needed. Rest of `.pi/` (prompts/) untouched. Running pi sessions
+  need `/reload` or a restart to pick it up.
 
 ### 2026-09-27 (twentieth session) — e3 v3 drift FIXED without GT edits: the short-gap bridge now checks the normal path can actually host the touch
 
