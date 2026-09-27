@@ -1,0 +1,25 @@
+docs/history/status_log_archive.md
+  s_deb8223eb87515::t_2714a2804feaaa 1-1586
+docs/history/status_where_we_are_archive.md
+  s_deb8223eb87515::t_2714a2804feaaa 1-1544
+STATUS.md
+  s_deb8223eb87515::t_d1446ab31482dc 3-23,27-53,57-361
+AGENTS.md
+  s_deb8223eb87515::t_2853ceadd19e61 10-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "09ceec2ff7d6a3f86a98a5b013a8f3931312a634",
+  "prompts": {},
+  "sessions": {
+    "s_deb8223eb87515": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0e3c3-a966-74cd-8424-7dbec8733a1f",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
