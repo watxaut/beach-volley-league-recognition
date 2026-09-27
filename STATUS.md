@@ -5,31 +5,30 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-26 (nineteenth session, gate leg — ROUND-2
-VALIDATION GATE RUN on `models/volleyball_ball_best_v3_r2.pt`: **3 of 4
-legs PASS decisively; entreno drift-lock FAILS 4/7-exact** (bar 7/7).
-GT-frames: recall 58→**94.2%**, @0.4 precision 40→**95.5%**, confident
-FPs 330→**18**, sky TRUE conf ≥0.4 **100%**. Match: **31/33 GT rallies
-confirmed (0.939** vs 13/0.394 base, 15/0.455 v2), first-confirmed GT pt
-**1**, actions 90→**206**. Probe: ep35 sky med conf 0.47(v2)→**0.85**,
-tracked up on 4/5 episodes (ep35 49→**78%**); blind% rose = the sand-noise
-candidates are GONE (the round-1 audit said they were never the ball).
-Entreno: e1/e2/e6/e7 exact BUT e3 1.0→**0.667** (new), e4 1.0→0.933
-(overpass FP — SAME mode as v2), e5 1.0→0.923 (opening serve lost — SAME
-mode as v2), and e6 team accuracy 1.0→**0.857** (one misattributed
-contact — the safety-critical signal; NEW). Production UNCHANGED — swap
-is the owner's call; recommendation + e3/e4/e5/e6 re-adjudication note
-in open point 20. Artifacts: output/retrain_eval_v3/,
-output/match20260920_v3/, output/retrain_eval/ (GT-frames 3-way log +
-probe 3-way log).)
+**Last updated:** 2026-09-26 (nineteenth session CLOSED — round-2 retrain
+**ADOPTED**: `models/volleyball_ball_best.pt` is now v3 byte-identical
+(md5-verified); old production stashed as
+`volleyball_ball_best_v1_entreno.pt`, v2 kept for reference, root drop
+removed. Gate: 3/4 legs pass (GT-frames recall 94.2% / @0.4 precision
+95.5% / FPs 18; match 31/33 confirmed 0.939, first-confirmed GT pt 1,
+actions 206; probe ep35 sky 0.85/99%, tracked up 4/5 eps); entreno
+drift-lock 4/7-exact (e3/e4/e5 F1 regressions + e6 team 0.857) —
+re-adjudication queued. **NEW OWNER FEEDBACK (open point 22): far-side
+serves in the match don't seem to be tracked; entreno serves track
+correctly.** Fits v3's weakest background (stands/crowd "other": ep08
+conf med 0.38, 43% ≥0.4) and the serve count dip (20 vs v2's 28).
+Diagnose-first plan recorded; no mechanism built.)
 
 ## Where we are
 
-**(2026-09-26, nineteenth session — gate leg): ROUND-2 GATE RUN.
-v3 (fine-tuned FROM best.pt on 1091 + 350 rebalanced frames) passes
-GT-frames, match and probe legs decisively; entreno drift-lock fails
-4/7-exact. Awaiting the owner's adoption decision; production weights
-UNTOUCHED.**
+**(2026-09-26, nineteenth session — gate leg): ROUND-2 GATE RUN →
+ADOPTED. v3 (fine-tuned FROM best.pt on 1091 + 350 rebalanced frames)
+passed GT-frames, match and probe legs decisively; entreno drift-lock
+failed 4/7-exact; the owner ADOPTED it. Production
+`models/volleyball_ball_best.pt` = v3 (md5-verified); old production
+stashed as `volleyball_ball_best_v1_entreno.pt`; v2 kept for reference.
+All future defaults (main.py, test scripts) now run v3 behavior — the
+gate artifacts ARE the production-behavior record.**
 
 - **Leg 1 GT-frames (486 frames, 3-way, output/retrain_eval/gt_frames_v3.log):**
   recall 58.3 (old) / 57.8 (v2) / **94.2 (v3)**; @0.4 precision 39.9 / 25.3 /
@@ -57,19 +56,16 @@ UNTOUCHED.**
   (25→51, 10→52, 31→94, 16→58, 20→20): that is the noise leaving, not
   recall dying — class (b) conf-rejectable collapsed to 1-8%, and the
   GT-frames leg proves 94% recall where a human sees a ball.
-- **Gate scorecard vs the recorded bars:** precision @0.4 ≥ ~40% ✓ (95.5),
-  sky med ~0.9 ✓ (0.85 + 99% ≥0.4), class-(a) wins kept ✓ (94.6% vs 58),
-  entreno 7/7 ✗ (4/7). **Recommendation (open point 20): adopt v3 as
-  production — the match is the product and 31/33 was unreachable by any
-  tracker-side lever — WITH the owner first re-adjudicating e3/e4/e5/e6
-  against the v3 streams (owner-ratified contact sheets): the GT was built
-  against base-model behavior, e4's "overpass" may be a real event base
-  could not see, and the e6 team flip needs a mechanism read before it is
-  called a detector bug.**
-- **After adoption:** re-rank open point 21 — point-layer re-tune (item 1)
-  is likely MOOT (31/33, first-confirmed pt 1); winner/side-switch/confidence
-  layers become the frontier; entreno GT touch-up pass if re-adjudication
-  changes events.
+- **Adoption + follow-ups:** owner adopted v3 (see header). Queued:
+  (i) re-adjudicate e3/e4/e5/e6 against the v3 streams (owner-ratified
+  contact sheets) — the GT was dictated against base-model behavior, and
+  e4's "overpass" may be a real event base couldn't see; (ii) mechanism
+  read on e6's one-contact team flip before it is called a detector bug;
+  (iii) **new owner feedback = open point 22 (far-side serve tracking)**;
+  (iv) re-rank open point 21 — point-layer re-tune (item 1) likely moot
+  at 31/33 with first-confirmed at pt 1 (verify the residual 2 aren't
+  far-side-serve losses); winner/side-switch/confidence layers are the
+  frontier.
 
 **(2026-09-26, nineteenth session — mining leg): ROUND-2 BALL RETRAIN STAGED — 350
 rebalanced frames await the owner's Roboflow annotation; pipeline src
@@ -1412,7 +1408,11 @@ constraint. Side changes need no special handling as long as IDs survive.
 
 ## Open points
 
-20. **[OPEN 2026-09-23; INDICTED 2026-09-24 (seventeenth session) — the
+20. **[RESOLVED 2026-09-26 — v3 ADOPTED as production (see the gate-leg
+    updates below and the nineteenth-session log entry). Follow-ups that
+    survive the resolution: e3/e4/e5/e6 re-adjudication (queued), and the
+    owner's far-side-serve feedback moved to open point 22.]**
+    **[OPEN 2026-09-23; INDICTED 2026-09-24 (seventeenth session) — the
     separation probe ran background-stratified; mechanism named; the fix is
     a two-part lever.]** Ball-track starvation on the 20260920 match (14
     confirmed points vs ≈33 GT rallies — the count is now GT-backed, open
@@ -1523,6 +1523,31 @@ constraint. Side changes need no special handling as long as IDs survive.
     if adopted → re-adjudicate e3/e4/e5/e6 on v3 streams via owner-ratified
     contact sheets, then re-rank open point 21 (point-layer re-tune likely
     moot at 31/33; winner/side-switch/confidence layers next).]**
+22. **[NEW 2026-09-26 — owner feedback at adoption: far-side serves in the
+    match don't seem to be tracked; entreno serves track correctly.]**
+    Owner's words (post-adoption, watching the match output): "the ball in
+    the long video does not seem to be tracked when in the serve on the far
+    side, I checked the entreno videos and the ball is tracked correctly".
+    Corroborating signals already on record: match serves EMITTED 20 under
+    v3 (v2 28, base 21 — the only match metric that regressed at the gate);
+    v3's weakest background in the probe is "other" (stands/crowd/backdrop:
+    ep08 conf med 0.38, only 43% ≥0.4, vs sand 0.73-0.82 / sky 0.85-0.90) —
+    and a far-side serve toss flies exactly against that backdrop, tiny and
+    slow at launch. Counter-evidence: 31/33 rallies confirmed with
+    first-confirmed at GT pt 1, so whatever is lost is not killing the point
+    layer wholesale. DIAGNOSE-FIRST PLAN (one mechanism per session, probe
+    before any fix): (1) locate the far-side serve windows from the match GT
+    (serve sides are derivable from the dictated descriptions / winner
+    string); (2) run the production-parity probe (candidates + tracker
+    decision + bg stratification, diag_ball_probe_v2.py pattern) on those
+    windows; (3) classify: detector recall gap on toss/launch frames
+    (→ round-3 mining lever: far-side serve positives, same pipeline as
+    round 2) vs tracker admission (serve-zone admission + bootstrap dedup
+    were tuned on entreno-geometry serves — possibly near-side-only
+    geometry; → serve-zone retune lever); (4) 25.7fps tax (point 19a) also
+    live here — serve launch is the fastest ball motion in the match.
+    Validation bar: entreno serves stay F1-exact (they do today); far-side
+    serve windows reach tracked coverage comparable to ep35's 78%.]**
 21. **[NEW 2026-09-24 — the owner's match-feedback backlog; agreed plan
     order; GT now exists for all of it.]** From the owner's review of the
     first full-match run: (1) **point count** — the ball half is SHIPPED
@@ -1902,6 +1927,23 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-26 (nineteenth session, adoption leg) — v3 ADOPTED as production; owner feedback: far-side serves untracked (new open point 22); session closed
+
+- **Adoption:** `models/volleyball_ball_best.pt` overwritten with v3
+  (md5-verified byte-identical to `volleyball_ball_best_v3_r2.pt`); old
+  production preserved as `models/volleyball_ball_best_v1_entreno.pt`; v2
+  kept; owner's root drop removed (round-1 convention). Default loaders
+  smoke-tested. models/ is git-ignored — the swap is STATUS-only in git.
+- **Owner feedback recorded verbatim in open point 22:** far-side serves
+  in the match appear untracked; entreno serves fine. Hypotheses + probe
+  plan recorded there (v3 "other"-background weakness at the backdrop,
+  serve count dip 28→20, entreno-tuned serve-zone admission, 25.7fps
+  launch speed). No mechanism built — diagnose first.
+- **Session state:** ball retrain thread (open point 20) CLOSED after two
+  rounds; entreno re-adjudication (e3/e4/e5/e6) and point 22's probe are
+  the queued follow-ups; open point 21 re-ranked (point-layer re-tune
+  likely moot at 31/33).
 
 ### 2026-09-26 (nineteenth session, gate leg) — round-2 validation gate: v3 passes GT-frames / match / probe decisively, entreno drift-lock fails; adoption recommended with re-adjudication caveat
 
