@@ -1,0 +1,37 @@
+tests/test_live_debug_decoupling.py
+  s_f09f00e4d3e4f3::t_715955594e0b02 1-48,55-111,114-196,198-214,216-259,262-292,295,301,308-309,311-314,318-394
+  s_f09f00e4d3e4f3::t_16b98c9ea0c785 49-54,197,215,260-261,293,296-297,299-300,302-307,315-317
+  s_f09f00e4d3e4f3::t_297750015b7718 294
+  s_f09f00e4d3e4f3::t_d49c2975a07579 298,310
+  s_f09f00e4d3e4f3::t_62149a56fff531 112-113
+docs/history/status_log_archive.md
+  s_f09f00e4d3e4f3::t_04b6ae86138fd3 1,10-18
+src/analysis/live_debug_processor.py
+  s_f09f00e4d3e4f3::t_3378bc5887d1a9 363,366-367,370-384,390-416,419-437,439-447,451,467-476,478-479,481-489,492-493,496-502,504-513,515-516,519-520,523-525,527,530-535,537,542-543
+  s_f09f00e4d3e4f3::t_4dc7b568871152 17-22,26-28,41-46,48-64
+  s_f09f00e4d3e4f3::t_e49912decd861d 140-141
+  s_f09f00e4d3e4f3::t_3713144dae939e 47,247-258,260-266
+  s_f09f00e4d3e4f3::t_7d6bd0d972ed63 368-369,385-389,417,477,480,490-491,494-495,503,514,518,521-522
+  s_f09f00e4d3e4f3::t_102a2426a3ced6 418,517
+  s_f09f00e4d3e4f3::t_73e4ce7edf69ad 65
+STATUS.md
+  s_f09f00e4d3e4f3::t_cbeb3a1ea45172 20-31,94,99-102
+  s_f09f00e4d3e4f3::t_8b5eef5300808c 378,415-476
+  s_f09f00e4d3e4f3::t_0983fa8bbc2c7c 477
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "7f7cae667d4b207e0cfce7acb9ebe7c6bf1b6a70",
+  "prompts": {},
+  "sessions": {
+    "s_f09f00e4d3e4f3": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0e381-9adb-7436-9ed6-4f929e80b7da",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
