@@ -18,22 +18,25 @@
 >   archives).
 
 **Last updated:** 2026-09-27 (twenty-sixth session — open point 22
-mechanism 1 SHIPPED: the anchor-free episode→GT-point ORDER map. New
-diagnostic `scripts/map_episodes_to_points.py` (+34 tests): monotone DP
-alignment of the 57 GAME_ON episodes ↔ the 33 dictated GT points + a BURST
-class, keyed by emitted-serve side match (expected letter derived
-mechanically from serve-squad × court-half), confirmed-point overlap and
-description-implied rally size; hard constraints from the physics: a
-confirmed/action-rich rally can NEVER burst, attaches only across small
-game_off gaps (≤150f — a point cannot span inter-point dead time; measured
-real splits 11-115f). Result: 45 episodes → 33 points (12 attaches), 12
-bursts, 0 starved; 19/20 serve actions attributed to exactly one point.
-THE CENSUS (owner's far-side question, on TRUE windows): near-side serve
-actions emitted 11/16 (69%, all side-consistent) vs far-side 4/16 clean
-(25%) + 2 side-MISMATCHED (P4, P23) — far-side serve-ACTION loss is ~2-3×
-near-side, and both mismatches sit in far windows; P2 specimen verdict
-confirmed (serve MISSING = emission-layer loss, not ball tracking). Suite
-491 → 525 (+34 tests/test_episode_point_map.py).)
+mechanisms 1+2 SHIPPED. Mechanism 1: the anchor-free episode→GT-point
+ORDER map (`scripts/map_episodes_to_points.py`, +34 tests): monotone DP
+alignment (57 episodes ↔ 33 GT points + BURST), physics constraints
+(confirmed rallies never burst; attaches need ≤150f game_off gaps and
+may not cross a serve marker). Mechanism 2: the owner then RATIFIED
+serve anchors for P1-P15 (`ground_truth/20260920_match_serve_anchors.txt`)
+and the map ingests them (--serve-anchors): anchored prefix + DP tail,
+conflict/false-positive reporting. THE CENSUS (owner-anchored): far-side
+serve-action emission 1/8 clean (P13) vs near 6/8 (P3, P5, P11 +
+conflicted P7) — BUT the tracking probe (`scripts/probe_serve_tracking.py`)
+refutes detection as the loss: the detector sees the ball at ALL 15
+serves (conf 0.86-0.92) and the ≥8px/f bootstrap criterion is met fast;
+the real losses are (a) the rally-opening serve-ACTION gate (contact
+~25-35f before game_on arms — the #22 specimen mechanism), (b) gesture
+misclassification (bump serves read as dig/spike — the owner's P9/P10/
+P11/P12 verdicts reproduced mechanically, likely also P1/P2/P4/P14's
+"missing" serves = the dig-labeled actions at the anchors), (c) static
+suppression ONLY on the slow float serve P15 (33 frames suppressed,
+median motion 2.1 px/f). Suite 491 → 525.)
 
 ## North-star goals (set session 24)
 
@@ -94,16 +97,18 @@ placement, per-video splits); remaining adds = serve/assist/error stats
   actions 207 (dig 84 / spike 45 / set 42 / serve 20 / overpass 9 /
   block 7); perf **68.0 ms/frame** (14.7 fps, 30.5 min). All data CSVs
   byte-identical through the last three shipped mechanisms.
-- **Episode→point ORDER map (26th session, diagnostic):**
-  `output/episode_point_map.json` from `scripts/map_episodes_to_points.py`
-  — anchor-free monotone DP (57 episodes ↔ 33 GT points + BURST),
-  45 mapped / 12 bursts / 0 starved, 19/20 serves attributed. Serve census
-  on TRUE windows: near 11/16 emitted (69%, all side-consistent) vs far
-  4/16 clean + 2 side-mismatched (far loss ~2-3× near — the emission layer,
-  NOT ball tracking; P2 specimen confirmed). Structural flags for owner
-  adjudication: P4 + P23 serve-side mismatches (both far windows), P7/P20
-  double-serve points, serve f6928 emitted with no episode anywhere
-  (P12's rally never gathered).
+- **Episode→point map + serve anchors + probe (26th session, diagnostic):**
+  `scripts/map_episodes_to_points.py` (+34 tests) ingests the owner's
+  RATIFIED serve anchors (`ground_truth/20260920_match_serve_anchors.txt`,
+  P1-P15) → anchored prefix + DP tail (`output/episode_point_map.json`).
+  Anchored census: far-side serve emission 1/8 clean (P13) vs near 6/8 —
+  but the probe (`scripts/probe_serve_tracking.py`) shows the DETECTOR sees
+  the ball at all 15 serves (conf 0.86-0.92, bootstrap fast): the losses
+  are the serve-ACTION gate (pre-game_on contact), gesture misclassification
+  (bump serves → dig/spike; owner's P9/P10/P11/P12 verdicts + likely
+  P1/P2/P4/P14's dig-at-anchor), and static suppression on P15's slow float
+  serve only. Owner-sheet queue: P14/P15 boundary (serves 10070B/10541A),
+  P4/P5 (2414A), P7 (3595A vs 3856B), P11 (6928A), P20/P21 re-serve.
 - **Entreno gate record** (`evaluate --ignore-player` F1): e1 0.706, e2
   0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933, e7 0.75; teams 1.0 except
   e6 0.857. Suite **525 green**. Live-debug decoupling SHIPPED (#25):
@@ -114,14 +119,16 @@ placement, per-video splits); remaining adds = serve/assist/error stats
   match serves emitted 20 vs v2's 28 (22).
 
 **Active next (ranked, goal-driven — see North-star).** (1) Open point 22
-mechanism 2: probe the 15 missing-serve TRUE windows — tracker coverage vs
-emission gates (is the ball tracked where the serve action is missing?),
-then the fix (rally-opening serve gate / episode starvation — 15a
-machinery). (2) 21.3 point winner/outcome layer — G1's biggest missing
-signal; the order map now provides per-point windows to validate against
-the 33 dictated winners. (3) Fantasy scoring module + web points table
-(14e); assist ships with it (no perception needed). (4) e4/e5/e6
-re-adjudication sheets.
+mechanism 3, the FIX: rally-opening serve-action gate (arm from game_on
++ serve-marker context so pre-game_on serve contacts emit; NOT a
+detection problem — the probe settled that) + serve-gesture
+misclassification (bump serve ≠ dig/spike) + P15-class static suppression.
+(2) 21.3 point winner/outcome layer — G1's biggest missing signal; the
+anchored map provides TRUE windows to validate against the 33 dictated
+winners. (3) Fantasy scoring module + web points table (14e); assist
+ships with it (no perception needed). (4) e4/e5/e6 re-adjudication
+sheets + the new owner-sheet queue (P14/P15 boundary, P4/P5, P7, P11,
+P20/P21).
 
 ## Open points
 
@@ -133,42 +140,45 @@ point number in `docs/history/`.
 ### Active
 
 22. **Far-side serves** (owner feedback at v3 adoption: match far-side
-    serves seem untracked; entreno serves track fine). **Status: MECHANISM
-    1 DONE (09-27, 26th session) — episode→point ORDER MAP + census
-    BUILT; the far-side loss is QUANTIFIED and it is the emission layer,
-    not ball tracking.** Earlier scoping: serve team/side derivable
-    mechanically → 16 far / 16 near (`scripts/derive_match_serve_windows.py`,
-    +17 tests); a first "measurement" pairing the ENTRENO game-state
-    anchor file with the match was RETRACTED (fictional windows); the P2
-    specimen proved the ball IS tracked end-to-end (toss f889 → lock
-    f890 → ~65/72 frames) but game_on fired 36f late and NO serve action
-    was emitted. **Shipped (#26):** `scripts/map_episodes_to_points.py`
-    (+34 tests) — anchor-free monotone DP (57 episodes ↔ 33 points +
-    BURST), link evidence = emitted-serve side match (expected letter =
-    mechanical serve-squad × court-half; emitted team is SIDE, not squad),
-    confirmed-point overlap, description-implied rally size; hard rules:
-    confirmed/action-rich episodes can never burst, attaches need ≤150f
-    game_off gaps (real splits measure 11-115f; a 671f 13-action rally
-    once burst and P26 once hoarded 4 episodes across 126s before these
-    constraints). Map: 45/57 episodes → all 33 points (12 attaches, 12
-    bursts, 0 starved); 19/20 serves attributed (f6928 sits in a
-    no-episode gap = P12's rally never gathered). **Census verdict (TRUE
-    windows):** near 11/16 serve actions emitted, all side-consistent;
-    far 4/16 clean + 2 side-MISMATCHED (P4 f1396A, P23 f17159A) — far
-    loss ~2-3× near; both mismatches in far windows (width-band side
-    signal degrades far, consistent with AGENTS.md §5). P2 = serve
-    MISSING (specimen confirmed). Structural flags for owner: P4 "P1
-    fails serve" (description's player vs winner-serves rule), P7/P20
-    double-serve points (re-serve or misattribution), P26 = 4 episodes
-    (gap/count-forced; likely a GT boundary question at P26/P27).
-    **Next (mechanism 2):** probe the 15 missing-serve windows — raw
-    detector + tracker coverage vs the emission gates (the serve-action
-    gate, 15a machinery; episode starvation timing) — then ONE fix.
-    Owner-ratified anchors welcome but not blocking. Tracker-side levers
-    if needed: round-3 fast-fall/toss mining, re-entry-window retune
-    (match-wide risk, own gate). Watch: v3 serves 20 vs v2 28. **Infra
-    rule: VFR file — never CAP_PROP_POS_FRAMES seeks; decode
-    sequentially.**
+    serves seem untracked; entreno serves track fine). **Status:
+    MECHANISMS 1+2 DONE (09-27, 26th session) — order map + owner
+    anchors + detector probe; diagnosis COMPLETE: detection is NOT the
+    loss; the losses are the serve-ACTION gate, gesture
+    misclassification, and P15-class static suppression.**
+    Mechanism 1: `scripts/map_episodes_to_points.py` (+34 tests) —
+    monotone DP alignment (57 episodes ↔ 33 GT points + BURST class);
+    physics constraints: confirmed/action-rich rallies NEVER burst,
+    attaches need ≤150f game_off gaps (real splits 11-115f) and never
+    cross a serve marker, point numbers carried in backpointers, serves
+    attribute to exactly one point. Mechanism 2: the owner RATIFIED
+    serve anchors P1-P15 (`ground_truth/20260920_match_serve_anchors.txt`,
+    verbatim dictation + FALSE@3650; f230 fills P1's unknown server =
+    squad B). Anchored map (--serve-anchors): opener = first episode in
+    [s-180, s+300]; boundary conflicts + false-positive serve candidates
+    REPORTED, never auto-resolved. **Probe
+    (`scripts/probe_serve_tracking.py`)**: production + raw (no static
+    suppression) detectors inside all 15 anchored windows, sequential
+    decode. Result: dets present at EVERY serve (prod conf 0.86-0.92;
+    P1/P2/P6/P8/P14 all covered) and the ≥8px/f bootstrap pair exists
+    fast (P2 boot@890 vs owner f900) — "ball not tracked" is the
+    EMISSION layer, exactly the #22 specimen. Three loss mechanisms:
+    (a) rally-opening serve-ACTION gate (contact fires ~25-35f before
+    game_on arms); (b) gesture misclassification — bump serves read as
+    dig/spike (owner's P9 spike-hard, P10 spike-hard, P11 dig, P12
+    spike-touch reproduced mechanically; P1 dig@247, P2 dig@930, P4
+    dig@2195, P14 dig@9137 are the likely same class — why "not
+    tracked" reads on the far side: no serve label appears); (c) static
+    suppression bites ONLY on P15's slow float serve (33 frames
+    suppressed, median motion 2.1 px/f; P4 partial 17 frames).
+    False-positive serve actions confirmed as a class (owner
+    FALSE@3650; candidates 1039A, 5130B, 10070B, 10541A). **Next
+    (mechanism 3, ONE fix):** the serve gate — arm rally-opening serve
+    emission from game_on + serve-marker context (pre-game_on contacts
+    of an about-to-open episode); separately retune static suppression
+    for slow-float regimes (P15) and the serve-gesture vocabulary.
+    Owner sheet queue: P14/P15 boundary (10070B/10541A), P4/P5 (2414A),
+    P7 (3595A vs 3856B), P11 (6928A), P20/P21 re-serve. **Infra rule:
+    VFR file — never CAP_PROP_POS_FRAMES seeks; decode sequentially.**
 
 21. **Owner's match-feedback backlog** (agreed order; GT exists for all).
     (1) *Point count:* ball half SHIPPED (conf floors + v3); point-layer
@@ -349,6 +359,12 @@ survive across sessions; provenance in the archives.
   every confirmed rally forced into a point and attaches limited to small
   game_off gaps, most of the 20260920 mapping is forced 1:1 — treat
   surviving side-mismatch flags as findings, not alignment errors.
+- Serve-loss diagnosis (26th session probe): the ball detector sees EVERY
+  owner-anchored serve (conf ≥0.86) and the tracker's ≥8px/f bootstrap
+  criterion is met fast — far-side serve losses are the serve-ACTION gate
+  + bump-serve gesture misclassification (dig/spike labels), NOT
+  detection; static suppression only bites on slow float serves
+  (P15: median 2.1 px/f).
 - Device caveat: MPS jitter can flip a gesture label (e.g. e6 f309
   block vs spike); the script path (deterministic) is the reference.
 
@@ -498,6 +514,31 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
   mismatched (count-forced cascade from P26); P26 = 4 episodes/39s
   (gap+count-forced; likely a GT boundary question at P26/P27 — the
   episodes are 37/48/81f apart, contiguous play).
+- **Mid-session: the owner RATIFIED serve anchors** (P1-P15 + FALSE@3650,
+  verbatim in `ground_truth/20260920_match_serve_anchors.txt`): every
+  serve moment with side + verdict, the winner-serves rule confirmed, and
+  P1's unknown server filled (f230 far side = squad B). The map ingests
+  them (`--serve-anchors`): anchored prefix (opener = first episode in
+  [s-180, s+300]; attach chain ≤150f gaps, never across a serve marker;
+  emission window [s-180, s+120]; boundary conflicts and false-positive
+  serve candidates REPORTED) + DP tail for P16-33. The anchors exposed and
+  fixed real map errors: f1396A is P3's serve (not P4's), P10's big rally
+  = eps 17+18+19 (gaps 9f/20f), P11 = ep20, P12 = ep21 (the DP had burst
+  it), P26/P27 split correctly once the serve-crossing rule landed. The
+  owner's four misclassification verdicts REPRODUCE MECHANICALLY (P9
+  spike@5496, P10 spike@6034, P11 dig@7132, P12 spike-touch@7780).
+- **Probe (`scripts/probe_serve_tracking.py`):** production + raw (no
+  static suppression) detectors strictly inside the 15 anchored windows,
+  sequential CPU decode of the _up1080 file. VERDICT: dets present at
+  EVERY serve (prod conf 0.86-0.92; the "NOT_TRACKED" P1/P2/P4/P6/P8/P14
+  all covered) and the ≥8px/f bootstrap pair exists within ~±25f of every
+  anchor (P2 boot@890 vs owner f900). DETECTION IS NOT THE LOSS. Real
+  mechanisms: (a) serve-ACTION gate (contact before game_on arms); (b)
+  bump-serve gesture misclassification (dig/spike labels AT the anchors —
+  incl. the owner's four + likely P1/P2/P4/P14); (c) static suppression
+  only on P15's slow float serve (raw 91 vs prod 58 frames, median motion
+  2.1 px/f; P4 partial 17 frames). False-positive serves are a real class
+  (owner FALSE@3650; candidates 1039A, 5130B, 10070B, 10541A).
 - **Suite:** 491 → **525** (+34; all green incl. the full suite).
   Byte-parity trivially unaffected (no `src/` changes). FLAKE OBSERVED
   (pre-existing, reproves on clean HEAD): #25's
@@ -506,7 +547,9 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
   passed 8/8 in isolation + on re-runs; not touched this session, needs a
   deterministic gate if it recurs.
 - Files: scripts/map_episodes_to_points.py,
-  tests/test_episode_point_map.py, output/episode_point_map.json
+  scripts/probe_serve_tracking.py, ground_truth/
+  20260920_match_serve_anchors.txt, tests/test_episode_point_map.py,
+  output/episode_point_map.json + output/probe_serve_tracking.json
   (git-ignored), STATUS.md.
 
 ### 2026-09-27 (twenty-fifth session) — PERF: open point 23 shipped (live-debug producer/consumer decoupling); byte-identical output; 8.0 → ~12 fps

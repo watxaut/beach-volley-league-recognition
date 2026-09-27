@@ -106,6 +106,26 @@ _SERVE_FAULT_RE = re.compile(
 _ACE_RE = re.compile(r"\bace\b", re.IGNORECASE)
 _BIG_RALLY_RE = re.compile(r"\bbig rally\b|\brally\b|struggl", re.IGNORECASE)
 
+# --- owner serve anchors (2026-09-27 dictation) ---------------------------
+# The owner's frames are coarse video reads, so all tolerances below are
+# generous and every deviation is REPORTED, never silently resolved.
+# Emission window around an anchored serve moment: an emitted serve action
+# may sit well before the owner's contact estimate (the #22 specimen: toss
+# f889 vs owner f900) or the game_on layer may fire late.
+ANCHOR_EMIT_BEFORE = 180
+ANCHOR_EMIT_AFTER = 120
+# The point's first episode (its rally) starts within this window after the
+# serve moment (game_on fires on sustained flight, up to ~10s later).
+ANCHOR_OPENER_BEFORE = 180
+ANCHOR_OPENER_AFTER = 300
+# A serve action inside a point's span but OUTSIDE its emission window is a
+# false-positive candidate (the f3650 class: walking to the serve location
+# with the ball in hand); it is reported, never counted.
+
+_ANCHOR_RE = re.compile(
+    r"^(P\d+|FALSE)\s+(\d+)\s+(near|far)?\s*"
+    r"(TRACKED|NOT_TRACKED|MISCLASSIFIED)?\s*(.*)$")
+
 NEG_INF = float("-inf")
 
 
@@ -184,6 +204,8 @@ def episode_features(
             and start <= cp["end_frame"] + CONFIRM_TOLERANCE_FRAMES
             for cp in confirmed_points
         )
+        opens_with_serve = bool(collect_serves_near(serves, start, start + 30,
+                                                    before=60, after=0))
         feats.append({
             "start": start,
             "end": end,
@@ -192,6 +214,7 @@ def episode_features(
             "mix": mix,
             "confirmed": confirmed,
             "serves": collect_serves_near(serves, start, end),
+            "opens_with_serve": opens_with_serve,
         })
     return feats
 
@@ -335,7 +358,10 @@ def align(
                             bp[i + 1][k][jdx(i)] = (i, k, j, ("open", ev))
                     elif j >= 0 and k < m:
                         # attach episode i to the open point k+1, only
-                        # across a small game_off gap
+                        # across a small game_off gap, and never across a
+                        # serve marker (a serve opens a NEW point)
+                        if eps[i].get("opens_with_serve"):
+                            continue
                         gap = eps[i]["start"] - eps[j]["end"] - 1
                         if gap <= ATTACH_MAX_GAP_FRAMES:
                             sc, ev = link[i * m + k]
@@ -440,6 +466,7 @@ def build_point_view(
     # window contains it and whose nearest episode boundary is closest
     # (adjacent windows overlap by the +/- serve margins; naive containment
     # double-counted serves sitting in the gap between two points)
+    view_by_point = {v["point"]: v for v in view}
     for a in sorted(serves_all, key=action_frame):
         f = action_frame(a)
         best = None  # (distance, point)
@@ -452,12 +479,186 @@ def build_point_view(
                 if best is None or cand < best:
                     best = cand
         if best is not None:
-            view[best[1] - 1]["serves_emitted"].append({"frame": f, "team": a["team"]})
+            view_by_point[best[1]]["serves_emitted"].append(
+                {"frame": f, "team": a["team"]})
     for v in view:
         expected = v["expected_serve_letter"]
         if v["serves_emitted"] and expected is not None:
             v["serve_side_match"] = any(x["team"] == expected for x in v["serves_emitted"])
     return view
+
+
+# ----------------------------------------------------------------------
+# owner serve anchors
+# ----------------------------------------------------------------------
+
+def parse_serve_anchors(path: str) -> Dict[str, Any]:
+    """Parse the ratified serve-anchor file (see ground_truth/*.txt header).
+
+    Returns {"points": {k: {frame, side, verdict, note}}, "false":
+    [{frame, note}], "order": [k ...]}.
+    """
+    points: Dict[int, Dict[str, Any]] = {}
+    false_pos: List[Dict[str, Any]] = []
+    for raw in Path(path).read_text(encoding="utf-8").splitlines():
+        line = raw.split("#")[0].strip()
+        if not line:
+            continue
+        m = _ANCHOR_RE.match(line)
+        if not m:
+            raise ValueError(f"{path}: unparsable anchor line: {raw!r}")
+        kind, frame, side, verdict, note = m.groups()
+        if kind == "FALSE":
+            false_pos.append({"frame": int(frame), "note": note.strip()})
+            continue
+        k = int(kind[1:])
+        points[k] = {
+            "frame": int(frame),
+            "side": side,
+            "verdict": verdict,
+            "note": note.strip(),
+        }
+    order = sorted(points)
+    if order != list(range(1, len(order) + 1)):
+        raise ValueError(f"{path}: anchored points must be 1..K, got {order}")
+    return {"points": points, "false": false_pos, "order": order}
+
+
+def anchored_prefix(
+    eps: List[Dict[str, Any]],
+    actions: List[Dict[str, Any]],
+    points: List[Dict[str, Any]],
+    serve_teams: Dict[int, Optional[str]],
+    sides: Dict[int, Dict[str, str]],
+    anchors: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Assign episodes/serve emissions for the ANCHORED point prefix.
+
+    Owner frames are coarse, so the assignment is bracket-based and every
+    deviation becomes an explicit finding:
+    - opener of anchored point k = first episode starting in
+      [s_k - 180, s_k + 300]; none -> the point is window-only (starved);
+    - later episodes join by the normal attach gap while they start before
+      the next anchor; one that cannot join is a BOUNDARY CONFLICT
+      (reported, never silently a burst) -- a confirmed rally is somewhere
+      in the GT, the owner sheet must say where;
+    - serve emissions = serve actions in [s_k - 180, s_k + 120]; a serve
+      action inside the point's span but outside the window is a
+      FALSE-POSITIVE candidate (the f3650 walking-with-ball class);
+    - non-serve actions right at the serve moment are reported as
+      MISCLASSIFIED-SERVE candidates (the owner confirmed four).
+    """
+    aret = anchors["points"]
+    order = anchors["order"]
+    serves_all = [a for a in actions if a.get("action") == "serve"]
+
+    # P1's server is not derivable mechanically; the owner's side fills it.
+    if order and serve_teams.get(order[0]) is None and aret[order[0]]["side"]:
+        side = aret[order[0]]["side"]
+        serve_teams = dict(serve_teams)
+        serve_teams[order[0]] = next(
+            s for s in ("A", "B") if sides[order[0]][s] == side)
+
+    # ---- FALSE anchors: emitted serves near a FALSE frame are suspects
+    false_marks = [] if anchors is None else anchors["false"]
+
+    point_view: List[Dict[str, Any]] = []
+    claimed: set = set()
+    conflict_eps: List[int] = []
+    false_candidates: List[Dict[str, Any]] = []
+    for idx, k in enumerate(order):
+        a = aret[k]
+        s = a["frame"]
+        nxt = aret[order[idx + 1]]["frame"] if idx + 1 < len(order) else None
+        span_end = (nxt - 180) if nxt is not None else None
+        opener = next((i for i, e in enumerate(eps)
+                       if s - ANCHOR_OPENER_BEFORE <= e["start"] <= s + ANCHOR_OPENER_AFTER),
+                      None)
+        attached: List[int] = []
+        if opener is not None:
+            claimed.add(opener)
+            last = opener
+            for i in range(opener + 1, len(eps)):
+                if eps[i]["start"] >= (span_end if span_end is not None
+                                       else eps[len(eps) - 1]["end"] + 1):
+                    break
+                if eps[i].get("opens_with_serve"):
+                    break  # a serve marker starts a NEW point, never an attach
+                gap = eps[i]["start"] - eps[last]["end"] - 1
+                if gap <= ATTACH_MAX_GAP_FRAMES:
+                    attached.append(i)
+                    claimed.add(i)
+                    last = i
+                else:
+                    conflict_eps.append(i)  # boundary conflict, reported
+        episodes = ([opener] if opener is not None else []) + attached
+        window = [s - ANCHOR_EMIT_BEFORE, s + ANCHOR_EMIT_AFTER]
+        emitted, misclassified = [], []
+        span_lo = s - ANCHOR_OPENER_BEFORE
+        for x in serves_all:
+            f = action_frame(x)
+            if window[0] <= f <= window[1]:
+                emitted.append({"frame": f, "team": x["team"]})
+            elif (span_end is not None and span_lo <= f < span_end
+                  and f not in [e["frame"] for e in emitted]):
+                false_candidates.append({
+                    "frame": f, "team": x["team"], "point": k,
+                    "note": "serve action inside the point span but outside "
+                            "the anchored emission window"})
+        for x in actions:
+            f = action_frame(x)
+            if (x["action"] != "serve" and not emitted
+                    and s - 30 <= f <= s + 45):
+                misclassified.append({"frame": f, "action": x["action"],
+                                      "team": x["team"]})
+                if len(misclassified) >= 2:
+                    break
+        squad = serve_teams.get(k)
+        expected = expected_serve_letter(squad, sides, k)
+        emission_conflict = False
+        for fm in false_marks:
+            near = [e for e in emitted if abs(e["frame"] - fm["frame"]) <= 250]
+            for e in near:
+                false_candidates.append({
+                    "frame": e["frame"], "team": e["team"], "point": k,
+                    "note": f"near owner FALSE mark f{fm['frame']}: {fm['note']}"})
+                emitted.remove(e)
+                emission_conflict = True
+        side_match = None
+        if emitted and expected is not None:
+            side_match = any(x["team"] == expected for x in emitted)
+        point_view.append({
+            "point": k,
+            "winner": points[k - 1]["winner"],
+            "serve_squad": squad,
+            "serve_side_near_far": None if squad is None else sides[k][squad],
+            "expected_serve_letter": expected,
+            "description": points[k - 1]["description"],
+            "starved": opener is None,
+            "episodes": episodes,
+            "window_frames": window,
+            "serves_emitted": emitted,
+            "serve_side_match": side_match,
+            "attribution": "anchored",
+            "anchor_frame": s,
+            "anchor_side": a["side"],
+            "anchor_verdict": a["verdict"],
+            "emission_conflict": emission_conflict,
+            "misclassified_candidates": misclassified,
+        })
+    tail_start = (min(i for i in range(len(eps)) if i not in claimed
+                      and eps[i]["start"] >= aret[order[-1]]["frame"] - 180)
+                  if any(eps[i]["start"] >= aret[order[-1]]["frame"] - 180
+                         for i in range(len(eps)) if i not in claimed)
+                  else len(eps))
+    return {
+        "point_view": point_view,
+        "claimed": claimed,
+        "conflict_eps": sorted(set(conflict_eps)),
+        "false_candidates": false_candidates,
+        "tail_start": tail_start,
+        "serve_teams": serve_teams,
+    }
 
 
 def census(point_view: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -467,6 +668,8 @@ def census(point_view: List[Dict[str, Any]]) -> Dict[str, Any]:
         pts = [v for v in point_view if v["expected_serve_letter"] == letter]
         keyed = [v for v in pts if v["window_frames"] is not None]
         emitted = [v for v in keyed if v["serves_emitted"]]
+        misclassified = [v for v in keyed if not v["serves_emitted"]
+                         and v.get("misclassified_candidates")]
         matched = [v for v in keyed if v["serve_side_match"]]
         late = []
         for v in emitted:
@@ -476,7 +679,9 @@ def census(point_view: List[Dict[str, Any]]) -> Dict[str, Any]:
             "n_points": len(pts),
             "n_window": len(keyed),
             "n_serve_emitted": len(emitted),
-            "n_serve_missing": len(keyed) - len(emitted),
+            "n_serve_misclassified": len(misclassified),
+            "n_serve_missing": len(keyed) - len(emitted) - len(misclassified),
+            "misclassified_points": [v["point"] for v in misclassified],
             "n_side_match": len(matched),
             "n_side_mismatch": len(emitted) - len(matched),
             "n_starved_no_window": len(pts) - len(keyed),
@@ -493,10 +698,12 @@ def census(point_view: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 def print_report(records: List[Dict[str, Any]], eps: List[Dict[str, Any]],
                  point_view: List[Dict[str, Any]],
-                 census_view: Dict[str, Any]) -> None:
+                 census_view: Dict[str, Any],
+                 false_candidates: Optional[List[Dict[str, Any]]] = None) -> None:
     print("episode -> point map")
     print(f"{'ep':>4} {'frames':>15} {'dur':>5} {'act':>4} {'conf':>4}  {'point':>5}  role      evidence")
-    for r, ep in zip(records, eps):
+    for r in records:
+        ep = eps[r["episode"]]
         ev = r["evidence"]
         flags = []
         if ev.get("serve_side") == "MISMATCH":
@@ -516,7 +723,22 @@ def print_report(records: List[Dict[str, Any]], eps: List[Dict[str, Any]],
     for v in point_view:
         w = v["window_frames"]
         serves = ",".join(f"{s['frame']}{s['team']}" for s in v["serves_emitted"]) or "-"
-        if v["starved"]:
+        if v.get("attribution") == "anchored":
+            if v["starved"]:
+                verdict = "serve MISSING (anchored)"
+            elif not v["serves_emitted"]:
+                verdict = "serve MISSING"
+            elif v["serve_side_match"] is False:
+                verdict = "serve SIDE MISMATCH"
+            else:
+                verdict = "serve OK"
+            if v.get("emission_conflict"):
+                verdict += " + EMISSION CONFLICT (owner FALSE mark)"
+            if v.get("misclassified_candidates"):
+                verdict += " + MISCLASSIFIED[" + ",".join(
+                    f"{m['frame']}{m['action']}" for m in v["misclassified_candidates"]) + "]"
+            verdict = "ANCHORED " + verdict
+        elif v["starved"]:
             verdict = "STARVED (no episode)"
         elif not v["serves_emitted"]:
             verdict = "serve MISSING"
@@ -533,10 +755,25 @@ def print_report(records: List[Dict[str, Any]], eps: List[Dict[str, Any]],
     for key in ("near", "far"):
         c = census_view[key]
         print(f"  {key}: {c['n_serve_emitted']}/{c['n_window']} emitted "
-              f"({c['n_serve_missing']} missing), side match {c['n_side_match']}, "
+              f"({c['n_serve_missing']} missing, {c['n_serve_misclassified']} "
+              f"emitted-as-other-gesture at {c['misclassified_points']}), "
+              f"side match {c['n_side_match']}, "
               f"mismatch {c['n_side_mismatch']}, starved-no-window {c['n_starved_no_window']}; "
               f"points {c['points']}")
     print(f"  unknown-server points: {census_view['unknown_server']}")
+    if false_candidates:
+        print("\nFALSE-POSITIVE serve candidates (inside a point span, outside "
+              "its anchored emission window -- owner sheet to confirm):")
+        for x in false_candidates:
+            print(f"  f{x['frame']} team={x['team']} in P{x['point']}'s span")
+    conflicts = [r for r in records if r["role"] == "conflict"]
+    if conflicts:
+        print("\nBOUNDARY-CONFLICT episodes (confirmed rallies the anchored "
+              "brackets cannot place -- owner sheet to adjudicate):")
+        for r in conflicts:
+            i = r["episode"]
+            print(f"  ep{i:02d} f{eps[i]['start']}-{eps[i]['end']} "
+                  f"actions={eps[i]['n_actions']} confirmed={eps[i]['confirmed']}")
 
 
 # ----------------------------------------------------------------------
@@ -548,6 +785,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--gt", required=True)
     ap.add_argument("--pipeline", required=True)
     ap.add_argument("--game-state-csv", required=True)
+    ap.add_argument("--serve-anchors", help="owner-ratified serve anchor file "
+                    "(ground_truth/20260920_match_serve_anchors.txt)")
     ap.add_argument("--out", default="output/episode_point_map.json")
     args = ap.parse_args(argv)
 
@@ -563,15 +802,45 @@ def main(argv: Optional[List[str]] = None) -> int:
     serve_teams = derive_serve_teams(points)
     sides = derive_sides(points)
 
-    records = align(eps, points, serve_teams, sides)
+    anchors = None
+    anchored = None
+    false_candidates: List[Dict[str, Any]] = []
+    if args.serve_anchors:
+        anchors = parse_serve_anchors(args.serve_anchors)
+        anchored = anchored_prefix(eps, actions, points, serve_teams, sides, anchors)
+        serve_teams = anchored["serve_teams"]
+        false_candidates = anchored["false_candidates"]
+        tail_eps = eps[anchored["tail_start"]:]
+        tail_points = [p for p in points if p["point"] > max(anchors["order"])]
+        tail_records = align(tail_eps, tail_points, serve_teams, sides)
+        for r in tail_records:
+            r["episode"] += anchored["tail_start"]
+            r["frames"] = list(r["frames"])
+            r["point"] = (r["point"] + max(anchors["order"])) if r["point"] else None
+        tail_view = build_point_view(
+            eps, tail_records, tail_points, serve_teams, sides,
+            [a for a in actions if a.get("action") == "serve"
+             and action_frame(a) >= eps[anchored["tail_start"]]["start"] - SERVE_WINDOW_BEFORE])
+        records = (
+            [{"episode": i, "frames": [eps[i]["start"], eps[i]["end"]],
+              "point": None, "role": "conflict", "evidence": {}}
+             for i in anchored["conflict_eps"]]
+            + tail_records)
+        point_view = anchored["point_view"] + tail_view
+    else:
+        records = align(eps, points, serve_teams, sides)
+        point_view = None
     serves_all = [a for a in actions if a.get("action") == "serve"]
-    point_view = build_point_view(eps, records, points, serve_teams, sides, serves_all)
+    if point_view is None:
+        point_view = build_point_view(
+            eps, records, points, serve_teams, sides, serves_all)
     census_view = census(point_view)
 
-    print_report(records, eps, point_view, census_view)
+    print_report(records, eps, point_view, census_view, false_candidates)
 
-    n_mapped = sum(1 for r in records if r["role"] != "burst")
+    n_mapped = sum(1 for r in records if r["role"] not in ("burst", "conflict"))
     n_bursts = sum(1 for r in records if r["role"] == "burst")
+    n_conflicts = sum(1 for r in records if r["role"] == "conflict")
     n_starved = sum(1 for v in point_view if v["starved"])
     result = {
         "video": gt.get("video"),
@@ -579,15 +848,20 @@ def main(argv: Optional[List[str]] = None) -> int:
             "gt": args.gt,
             "pipeline": args.pipeline,
             "game_state_csv": args.game_state_csv,
-            "note": "anchor-free ORDER map; windows are inferred, not owner-ratified",
+            "serve_anchors": args.serve_anchors,
+            "note": "owner-anchored prefix + DP tail; windows are anchored "
+                    "or inferred, only the anchored prefix is owner-ratified",
         },
         "summary": {
             "n_episodes": len(eps),
             "n_points": len(points),
             "n_episodes_mapped": n_mapped,
             "n_bursts": n_bursts,
+            "n_conflict_episodes": n_conflicts,
             "n_points_starved": n_starved,
+            "n_false_serve_candidates": len(false_candidates),
         },
+        "false_serve_candidates": false_candidates,
         "episodes": records,
         "points": point_view,
         "census": census_view,

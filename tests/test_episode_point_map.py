@@ -373,8 +373,11 @@ class TestPointViewAndCensus:
         assert c["near"]["n_points"] == 2
         assert c["near"]["n_serve_emitted"] == 1
         assert c["near"]["n_serve_missing"] == 1
+        assert c["near"]["n_serve_misclassified"] == 0
+        assert c["near"]["misclassified_points"] == []
         assert c["far"] == {"n_points": 0, "n_window": 0, "n_serve_emitted": 0,
-                            "n_serve_missing": 0, "n_side_match": 0,
+                            "n_serve_missing": 0, "n_serve_misclassified": 0,
+                            "misclassified_points": [], "n_side_match": 0,
                             "n_side_mismatch": 0, "n_starved_no_window": 0,
                             "points": []}
         assert c["unknown_server"] == [1]
@@ -396,6 +399,7 @@ class TestPointViewAndCensus:
         assert view[1]["serve_side_match"] is True
         c = census(view)
         assert c["far"]["n_serve_emitted"] == 1
+        assert c["far"]["n_serve_misclassified"] == 0
 
 
 # ----------------------------------------------------------------------
