@@ -160,6 +160,19 @@ class ActionClassifier:
     HANDS_OVERHEAD = 1.0     # avg_wrist_height_ratio above this = hands overhead
     RALLY_RESET_GAP = 90     # frames of no contact after which a new rally starts
 
+    # --- Pose gating (perf, adopted 2026-09-27 after a byte-identical A/B) ---
+    # Pose is ONLY ever consumed by `_gesture` via the snapshot `_closest_player_at`
+    # chooses for an ACCEPTED (reach-passing, non-reentry) contact; reentry
+    # gestures return ATTACK without pose, and takeoff-stance team reads use
+    # bbox/team only. The chosen snapshot sits within NEIGH+2 frames of the
+    # contact vertex, and the vertex itself is a REAL ball point that passed
+    # the reach test (<=140/160 px to that snapshot's bbox). Measured on all
+    # 7 entrenos + a 2500-frame match slice (output/diag_pose_gate_probe_*): the
+    # chosen snapshot's bbox is at most 155 px from SOME ball point in the last
+    # NEIGH+2 frames -- so a 300 px trail radius covers every consumed snapshot
+    # with 2x margin while posing ~1.8 of 3.5 observed players on live frames.
+    POSE_TRAIL_WINDOW = NEIGH + 2  # frames of ball trail the radius keys on
+
     def __init__(
         self,
         pose_estimator: PoseEstimator,
@@ -173,6 +186,15 @@ class ActionClassifier:
         width_far_px: float = 26.0,
         width_near_px: float = 35.0,
         near_net_exempt_m: float = 2.5,
+        # --- Pose gating (perf; see POSE_TRAIL_WINDOW block for the design) ---
+        # pose_gate_stale_frames: skip pose entirely once the ball has been
+        #   untracked this long (no contact can consume pose past the reentry
+        #   horizon). <=0 disables the staleness gate.
+        # pose_near_ball_radius_px: when the ball IS tracked, only estimate
+        #   pose for players within this distance of a recent ball point
+        #   (point-to-bbox, POSE_TRAIL_WINDOW trail). <=0 disables the radius.
+        pose_gate_stale_frames: int = 30,
+        pose_near_ball_radius_px: float = 300.0,
         # Accept but ignore legacy params
         enhanced_validation_config: Optional[Dict[str, Any]] = None,
     ):
@@ -187,6 +209,11 @@ class ActionClassifier:
         self._width_far_px = width_far_px
         self._width_near_px = width_near_px
         self._near_net_exempt_m = near_net_exempt_m
+
+        self._pose_gate_stale_frames = pose_gate_stale_frames
+        self._pose_radius = pose_near_ball_radius_px
+        # Diagnostics (how much pose the gate skipped; tests + perf reports).
+        self.pose_gate_stats = {"posed": 0, "skipped_stale": 0, "skipped_radius": 0}
 
         # Ball trajectory of REAL (non-predicted) positions:
         # (frame, x, y, w, h) -- width feeds the near/far side estimate.
@@ -228,6 +255,7 @@ class ActionClassifier:
         self._last_touch_team = None
         self._last_touch_frame = None
         self._last_touch_went_over = False
+        self.pose_gate_stats = {"posed": 0, "skipped_stale": 0, "skipped_radius": 0}
         self._resolver.reset()
         self._pending = None
 
@@ -269,10 +297,57 @@ class ActionClassifier:
         # closest-player attribution (seen on entreno_3: a ghost riding a jump's
         # upward velocity steals the contact). _closest_player_at still finds
         # each player via their last REAL snapshot within the history window.
+        #
+        # PERF GATE (2026-09-27): a history entry is appended for EVERY observed
+        # player regardless -- snapshot selection, the L-R index and the
+        # takeoff-stance read only use center/bbox/team, and they must stay
+        # byte-identical. Only the expensive MediaPipe call is gated:
+        #   - ball untracked > pose_gate_stale_frames (dead time; no contact
+        #     can consume pose past the reentry horizon): skip pose;
+        #   - ball tracked: pose players within pose_near_ball_radius_px of a
+        #     ball point in the last POSE_TRAIL_WINDOW frames (see the class
+        #     constant block for the measured bound);
+        #   - ball lost 1..stale_frames ago (in-rally occlusion gap): pose
+        #     everyone -- bridge contacts fire at the first re-sighting and may
+        #     consume a snapshot from inside the gap (the recorded
+        #     "occlusion-window fallback").
         observed = [d for d in player_detections if not d.get("predicted", False)]
-        poses = self.pose_estimator.estimate_poses_batch(frame, observed)
-        for det, pose in zip(observed, poses):
+        trail = None
+        if observed:
+            stale = self._ball_stale_frames(frame_number)
+            pose_all = True
+            if stale > self._pose_gate_stale_frames > 0:
+                pose_all = False  # dead ball: nobody needs pose
+                self.pose_gate_stats["skipped_stale"] += len(observed)
+            elif stale > 0 or self._pose_radius <= 0:
+                # occlusion window (or radius disabled): keep posing everyone
+                pass
+            else:
+                pose_all = False
+                trail = [
+                    (p[1], p[2]) for p in self._ball_history
+                    if frame_number - self.POSE_TRAIL_WINDOW <= p[0] <= frame_number
+                ]
+        for det in observed:
             tid = det.get("track_id")
+            pose = None
+            bbox = det.get("bbox", [])
+            near_ball = pose_all
+            if trail is not None:
+                if len(bbox) == 4 and det.get("center") is not None:
+                    near_ball = any(
+                        self._point_to_bbox_distance(list(pt), bbox, det.get("center"))
+                        <= self._pose_radius
+                        for pt in trail
+                    )
+                    if not near_ball:
+                        self.pose_gate_stats["skipped_radius"] += 1
+            if pose_all or near_ball:
+                if len(bbox) == 4:
+                    pose = self.pose_estimator.estimate_pose(frame, bbox)
+                    if pose:
+                        pose["track_id"] = tid
+                        self.pose_gate_stats["posed"] += 1
             if tid is None:
                 continue
             if tid not in self._player_pose_history:
@@ -394,6 +469,12 @@ class ActionClassifier:
     def _real_points(self, lo: int, hi: int) -> List[Tuple]:
         """Real ball points (frame, x, y, w, h) with frame in [lo, hi]."""
         return [p for p in self._ball_history if lo <= p[0] <= hi]
+
+    def _ball_stale_frames(self, frame_number: int) -> int:
+        """Frames since the last REAL ball sighting in history (inf if none)."""
+        if not self._ball_history:
+            return frame_number + 1  # no sighting ever: certainly "dead"
+        return frame_number - self._ball_history[-1][0]
 
     def _point_at(self, f: int) -> Optional[Tuple]:
         for p in self._ball_history:

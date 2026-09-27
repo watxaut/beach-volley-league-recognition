@@ -32,6 +32,9 @@ class _StubPose:
     def estimate_poses_batch(self, frame, detections):
         return [None] * len(detections)
 
+    def estimate_pose(self, frame, bbox):
+        return None
+
 
 @pytest.fixture()
 def court():

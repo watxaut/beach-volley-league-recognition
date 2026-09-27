@@ -43,9 +43,11 @@ validate re-ID" call was wrong twice:
 The owner explicitly declined live-debug-only perf work: `--debug-live` must
 run the exact same code path as batch — no divergent fast paths, because it
 is used to debug the real pipeline (there was already one
-eval-vs-pipeline skew bug). Speed up shared components instead. The measured
-parked lever is pose for near-ball players only (52→~26ms), to be applied in
-`ActionClassifier`/`FrameProcessor`, never in `LiveDebugProcessor`.
+eval-vs-pipeline skew bug). Speed up shared components instead. The pose
+  near-ball + staleness gates were SHIPPED 2026-09-27 in
+  `ActionClassifier`/`FrameProcessor` (byte-identical A/B, see STATUS); the
+  still-parked lever is the live-debug producer/consumer display decoupling
+  (open point 23) — it must not alter the processing path either.
 
 ### 3. Diagnose-first working style
 

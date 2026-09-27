@@ -93,6 +93,8 @@ CTOR_PARITY = [
     ("attribution_width_far_px", ActionClassifier, "width_far_px"),
     ("attribution_width_near_px", ActionClassifier, "width_near_px"),
     ("attribution_near_net_exempt_m", ActionClassifier, "near_net_exempt_m"),
+    ("pose_gate_stale_frames", ActionClassifier, "pose_gate_stale_frames"),
+    ("pose_near_ball_radius_px", ActionClassifier, "pose_near_ball_radius_px"),
     # PlayerTracker
     ("player_max_disappeared", PlayerTracker, "max_disappeared"),
     ("tracking_max_distance", PlayerTracker, "max_distance"),

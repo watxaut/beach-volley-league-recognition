@@ -167,6 +167,8 @@ class FrameProcessor:
                 width_far_px=self.config.get("attribution_width_far_px", 26.0),
                 width_near_px=self.config.get("attribution_width_near_px", 35.0),
                 near_net_exempt_m=self.config.get("attribution_near_net_exempt_m", 2.5),
+                pose_gate_stale_frames=self.config.get("pose_gate_stale_frames", 30),
+                pose_near_ball_radius_px=self.config.get("pose_near_ball_radius_px", 300.0),
             )
 
             # Spike outcome/zone analyzer (pure observer of the stream above)

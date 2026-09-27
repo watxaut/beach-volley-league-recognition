@@ -129,6 +129,14 @@ class Config:
         # action logs vs 1 on the entreno_1/3 GT A/B (2026-08-16); raise to 1/2
         # only if a future video shows gesture (hands-overhead) misses.
         "pose_complexity": 0,
+        # Pose gating (perf, adopted 2026-09-27 after a byte-identical A/B on
+        # all 7 entrenos): skip MediaPipe pose once the ball has been untracked
+        # this many frames (dead time -- no contact can consume pose past the
+        # reentry horizon), and when the ball IS tracked only pose players
+        # within this many px of a ball point in the last NEIGH+2 frames
+        # (measured bound of consumed snapshots: 155 px max). 0 disables either.
+        "pose_gate_stale_frames": 30,
+        "pose_near_ball_radius_px": 300.0,
         "temporal_window": 10,
         "action_confidence": 0.3,  # Min confidence to emit an action; matches scripts/test_action_recognition.py (classifier scores ~0.3-0.8)
 

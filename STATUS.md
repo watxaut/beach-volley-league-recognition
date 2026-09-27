@@ -5,13 +5,14 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-27 (twenty-second session — open point 22 scoped,
-then one finding RETRACTED and replaced: the entreno game-state anchor file
-was wrongly paired with the match (fictional windows, wrong “measurement”);
-corrected probe finding: P2's far-side serve WAS tracked end-to-end by the
-production ball tracker — the P2 loss is point-CONFIRMATION + serve-ACTION,
-not ball tracking; `scripts/derive_match_serve_windows.py` keeper + tests
-fixed to synthetic anchors; nothing pipeline-side touched)
+**Last updated:** 2026-09-27 (twenty-third session — PERF: both parked
+pose levers SHIPPED in the shared classifier path — staleness gate (dead
+ball >30f → no pose) + near-ball trail radius (300px, last-9f ball trail;
+occlusion window poses all) — with the full neutrality proof: 7/7 entreno
+action streams BYTE-IDENTICAL + eval F1s exactly at the gate record, FULL
+match re-run byte-identical on every data CSV (only the timing row moved:
+84.8→68.0 ms/frame, 38→30.5 min, ×1.24). Lever 3 (live-debug display
+decoupling) PARKED as open point 23.)
 
 **Last pipeline update:** 2026-09-27 (twentieth session — **e3 DRIFT FIXED, GT
 UNCHANGED**: the v3 e3 regression (F1 1.0→0.667) was ONE mechanism: v3's
@@ -31,6 +32,53 @@ window rejects the falling dets and the track dies at f623 — same
 re-entry machinery as open point 22's far-side serves.)
 
 ## Where we are
+
+**(2026-09-27, twenty-third session — PERF SESSION: both parked pose levers
+shipped, byte-identical everywhere; lever 3 parked as open point 23.)**
+
+- **Shipped (one mechanism, `src/recognition/action_classifier.py` + config
+  plumbing):** the 2026-08-17 parked perf levers, now that the owner asked.
+  Pose is gated in the SHARED `classify_actions` path (batch + debug-live
+  inherit it — the parity rule is respected; nothing in
+  `LiveDebugProcessor` was touched): (1) **staleness gate** — no contact can
+  consume pose past the reentry horizon, so once the ball is untracked
+  > `pose_gate_stale_frames` (30 = `REENTRY_MAX_GAP`) MediaPipe is skipped;
+  (2) **near-ball trail radius** — when the ball IS tracked, only players
+  within `pose_near_ball_radius_px` (300) of a ball point in the last
+  `NEIGH+2` frames are posed; a ball lost 1..30f ago (in-rally occlusion
+  gap) still poses EVERYONE (the recorded occlusion-window fallback — bridge
+  contacts fire at the first re-sighting and can consume an in-gap
+  snapshot). A history entry is appended for EVERY observed player
+  regardless: snapshot selection / L-R index / takeoff-stance read only use
+  center+bbox+team, and they stay byte-identical; only the MediaPipe call is
+  gated.
+- **Measured first (probe `output/diag_pose_gate_probe.py`, all 7 entrenos +
+  a 2500f match slice):** pose = 29.7 ms/frame at 3.54 calls/frame (the
+  largest stage after the two YOLOs); the ONLY pose consumer is `_gesture`
+  reading the snapshot `_closest_player_at` chooses for an ACCEPTED
+  non-reentry contact (reentry returns ATTACK without pose — the e6 f311
+  outlier with trailmin 1163px is exactly that, no pose consumed); every
+  pose-consuming snapshot sits within **155 px** of SOME ball point in the
+  last 9f → R=300 gives 2× margin and poses ~1.8 of 3.5 observed players on
+  live frames. Staleness split: entreno 71% live / 27% occlusion / 1.6%
+  dead; match slice 28/20/52 (dead = free skip).
+- **Neutrality proof:** fresh HEAD baselines FIRST (output/posegate_base_*),
+  then the edit, then A/B — **7/7 entreno action logs BYTE-IDENTICAL**; eval
+  F1s exactly the recorded gate values (0.706 / 0.571 / 1.0 / 0.933 /
+  0.923 / 0.933 / 0.75, teams 1.0 except e6 0.857). **FULL match production
+  re-run** (output/match20260920_posegate/): results.csv,
+  results_detailed.csv, results_game_state.csv, results_spikes.csv ALL
+  BYTE-IDENTICAL to the e3fix gate record; points 31/33, episodes 57,
+  0-before-first unchanged; the only diff is the self-referential timing
+  row. Suite **477 green** (+12 tests/test_pose_gate.py; config-drift pins
+  the two new keys across DEFAULT_CONFIG/ctor/FrameProcessor).
+- **Measured gains:** match 38 → 30.5 min wall (84.8 → 68.0 ms/frame,
+  11.79 → 14.71 fps, ×1.24); match probe slice ×1.19 (76.1→64.2) with the
+  contact stream identical; entreno ×1.13 (~96→85 ms/f) — dead time is
+  where the staleness gate pays, entrenos are mostly live ball.
+- **PARKED as open point 23:** the live-debug producer/consumer display
+  decoupling (the other 2026-08-17 lever) — owner's call when wanted; it
+  buys live fps only, not batch time.
 
 **(2026-09-27, twenty-second session — open point 22: scoping leg done,
 one finding RETRACTED, one SOLID corrected specimen.)**
@@ -1501,9 +1549,12 @@ seek) and a (frame, mode) detection cache → ~30-40ms per interaction,
 revisits free; pose runs the lite model (`pose_complexity` 0, new default)
 after a byte-identical GT A/B on entreno_1/3. Pipeline per-frame ~102 →
 ~81ms. Live debug deliberately untouched — the owner wants it identical to
-the shared pipeline for real debugging. Next lever if ever wanted: pose only
-for near-ball players (measured 52→~26ms; needs an occlusion-window fallback
-first).
+the shared pipeline for real debugging. **[SHIPPED 2026-09-27 (twenty-third
+session): both parked pose levers are now live in the shared classifier —
+staleness gate + near-ball trail radius with the occlusion-window fallback;
+7/7 entreno byte-identical, full match CSVs byte-identical, match 84.8→68.0
+ms/frame. The remaining parked lever is open point 23 (live-debug display
+decoupling).]**
 
 **Plan reference:** the full design lives in the session plan file
 (`~/.claude-zai/plans/i-want-to-start-golden-naur.md`, identity) and
@@ -1636,6 +1687,20 @@ constraint. Side changes need no special handling as long as IDs survive.
     if adopted → re-adjudicate e3/e4/e5/e6 on v3 streams via owner-ratified
     contact sheets, then re-rank open point 21 (point-layer re-tune likely
     moot at 31/33; winner/side-switch/confidence layers next).]**
+23. **[PARKED 2026-09-27 (twenty-third session) — live-debug display
+    decoupling; the second 2026-08-17 perf lever, deliberately not done.]**
+    The `--debug-live` loop serializes pipeline + render + `waitKey(33ms)`
+    pacing → ~5-7 fps at HEAD before the pose gates (better now, still
+    serialized). The parked design: a producer thread runs the EXACT
+    `FrameProcessor.process_frame` loop in frame order (byte-identical
+    processing path — the parity rule is about the pipeline, which this
+    does not touch), a consumer thread renders the cached overlay data and
+    owns the pacing. Expected: live throughput ≈ 1000/processing-ms
+    (~15-20 fps at 68 ms/frame) instead of processing+33ms. Owner's call
+    when wanted; buys live fps only — batch is already at the detector
+    floor (two YOLO imgsz-1280 calls ≈ 48 ms/frame) unless a future session
+    takes on model fusion or imgsz changes (both behavior changes with a
+    full gate).]**
 22. **[NEW 2026-09-26 — owner feedback at adoption: far-side serves in the
     match don't seem to be tracked; entreno serves track correctly.]**
     **[UPDATE 2026-09-27 (twentieth session) — a live specimen of this
@@ -2070,6 +2135,59 @@ constraint. Side changes need no special handling as long as IDs survive.
     (set → same-team kill) is parked with it — same dependency.
 
 ## Log (newest first)
+
+### 2026-09-27 (twenty-third session) — perf: both parked pose levers shipped in the shared path; byte-identical everywhere; live-debug decoupling parked
+- **Context:** the owner asked to make BOTH offline and debug-live
+  processing faster. The 2026-08-17 perf session had measured and parked
+  exactly this ("pose only for near-ball players, 52→~26ms, needs an
+  occlusion-window fallback first" + producer/consumer display decoupling)
+  — the ask was the trigger to cash them in. Parity rule respected: both
+  levers live in the SHARED `ActionClassifier.classify_actions` (batch and
+  debug-lite inherit); `LiveDebugProcessor` untouched.
+- **Diagnose first (`output/diag_pose_gate_probe.py`, git-ignored like all
+  diag scripts):** mirrors the GT-validated script wiring; per frame it
+  records ball staleness, every observed player's point-to-bbox distance to
+  the live ball, and (patched `_closest_player_at`) every contact's chosen
+  snapshot frame / offset / reach / distance to the ball AT THE SNAPSHOT
+  FRAME and to the last-9f ball TRAIL. Findings that shaped the design:
+  (a) pose 29.7 ms/f × 3.54 calls/f is the largest non-YOLO stage; (b) the
+  ONLY pose consumer is `_gesture` via the chosen snapshot of an ACCEPTED
+  non-reentry contact — reentry gestures return ATTACK unread (probe gotcha:
+  `_closest_player_at` fires pre-reach-gate, so raw records include
+  reach-rejected contacts up to 1261px — filter `reach ≤ 160`; and reentry
+  f311 e6 reads trailmin 1163px but consumes NO pose); (c) every
+  pose-consuming snapshot ≤ **155 px** from some ball point in the last
+  NEIGH+2=9 frames (snapshot offsets measured −2..+4); (d) staleness split
+  entreno 71/27/1.6% vs match slice 28/20/52% live/occlusion(≤30f)/dead.
+- **Shipped (`src/recognition/action_classifier.py`, `src/utils/config.py`,
+  `src/analysis/frame_processor.py`):** `pose_gate_stale_frames` (30) +
+  `pose_near_ball_radius_px` (300.0), either ≤0 disables. Dead ball
+  (>30f untracked): skip MediaPipe entirely. Ball live: pose only players
+  within 300px of a last-9f ball point. Occlusion window (1..30f): pose
+  everyone. ALWAYS append a history entry per observed player (pose=None
+  when skipped) so `_closest_player_at` snapshot selection, the L-R index
+  and the takeoff-stance reads are untouched. `pose_gate_stats` counters
+  (posed/skipped_stale/skipped_radius) for tests + perf reports. Config
+  drift test extended with both keys (suite 465→477).
+- **Neutrality protocol executed in full:** fresh HEAD baselines
+  (output/posegate_base_e*) → edit → A/B (output/posegate_gated_e*):
+  7/7 entreno action logs **BYTE-IDENTICAL**; `evaluate --ignore-player`
+  reproduces the recorded gate F1s exactly. FULL match production re-run
+  (output/match20260920_posegate/): every data CSV BYTE-IDENTICAL to
+  output/match20260920_e3fix (results / detailed / game_state / spikes);
+  31/33 points, 57 episodes, 0-before-first unchanged; only the
+  self-referential timing statistics row differs. Match probe slice: 16/16
+  contacts identical incl. snapshots.
+- **Measured gains:** match wall 38 → 30.5 min (84.8 → 68.0 ms/frame,
+  11.79 → 14.71 fps — ×1.24); match probe slice 76.1 → 64.2 ms/f (×1.19);
+  entreno script wall ~96 → 85 ms/f (×1.13, little dead time there).
+- **Parked:** open point 23 (live-debug producer/consumer display
+  decoupling — fps only, pipeline untouched).
+- Files: src/recognition/action_classifier.py, src/utils/config.py,
+  src/analysis/frame_processor.py, tests/test_pose_gate.py (+12),
+  tests/test_team_attribution.py (stub gained `estimate_pose` — the gated
+  loop calls per-player, not the batch wrapper), tests/test_config_drift.py,
+  STATUS.md.
 
 ### 2026-09-27 (twenty-first session) — pi project default model set to zai/glm-5.3-flash (.pi/settings.json)
 - **Harness config only** — no pipeline code, no GT. New
