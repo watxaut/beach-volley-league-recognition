@@ -1,0 +1,27 @@
+scripts/derive_match_serve_windows.py
+  s_3cbd70970a19be::t_72a4cb5ce54c23 15-23
+STATUS.md
+  s_3cbd70970a19be::t_461b14d1873cae 8-14,35-81
+  s_3cbd70970a19be::t_bd921a5c18a93b 1652-1670
+tests/test_match_serve_windows.py
+  s_3cbd70970a19be::t_cbd8e8ddef3526 5-11,29,32-47,125,129-136,138-142,151,154-155,240,242-243,248
+  s_3cbd70970a19be::t_99aad571466a9a 246-247
+ground_truth/README.md
+  s_3cbd70970a19be::t_6bf938263abb61 35-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "303b3173738acf0d81c1cfcfb93816ad41a17127",
+  "prompts": {},
+  "sessions": {
+    "s_3cbd70970a19be": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0e27b-1c5a-7575-8f8d-32eb67f3d316",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
