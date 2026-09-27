@@ -1,0 +1,22 @@
+STATUS.md
+  s_d00edfe65a24d2::t_e37228a4e537bf 8-13,2004-2012
+  s_d00edfe65a24d2::t_c0d6f3023e62fe 2013
+.pi/settings.json
+  s_d00edfe65a24d2::t_2192226205abb9 1-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "38890ce6ea2773b81cca516ecc52cc4612a78b57",
+  "prompts": {},
+  "sessions": {
+    "s_d00edfe65a24d2": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0e279-45c6-7575-8f8d-32e9709bb7b4",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
