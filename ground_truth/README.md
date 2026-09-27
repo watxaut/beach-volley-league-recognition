@@ -32,6 +32,11 @@ python scripts/parse_match_gt_text.py ground_truth/20260920_match_ari_joan_lost.
 For the game on/off state machine there is a plain-text format (owner's
 convention, validated on `video_entreno_game_state.mp4`):
 
+> **WARNING: this file anchors `video_entreno_game_state.mp4` ONLY (30fps,
+> 4.5 min). Its timestamps are MEANINGLESS for the 20260920 match — never
+> pair them with `20260920_match_points.json`. The match has NO frame
+> anchors; per-point windows need owner-ratified anchors first.**
+
 ```
 00:10 point starts
 00:18 point stops

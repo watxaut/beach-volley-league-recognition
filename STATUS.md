@@ -5,12 +5,13 @@
 > every working session: refresh *Where we are*, move finished items into the
 > *Log*, and re-rank *Open points*.
 
-**Last updated:** 2026-09-27 (twenty-second session — open point 22 scoped:
-per-point serve team/side derived mechanically and cross-checked, serve
-windows anchored for P1–13, `scripts/derive_match_serve_windows.py` +17
-tests; far-side serves 0/5 with a correct serve emission vs 2/7 near-side,
-P2 a TOTAL miss — probe leg is next; nothing pipeline-side touched, so the
-twentieth-session state below stands)
+**Last updated:** 2026-09-27 (twenty-second session — open point 22 scoped,
+then one finding RETRACTED and replaced: the entreno game-state anchor file
+was wrongly paired with the match (fictional windows, wrong “measurement”);
+corrected probe finding: P2's far-side serve WAS tracked end-to-end by the
+production ball tracker — the P2 loss is point-CONFIRMATION + serve-ACTION,
+not ball tracking; `scripts/derive_match_serve_windows.py` keeper + tests
+fixed to synthetic anchors; nothing pipeline-side touched)
 
 **Last pipeline update:** 2026-09-27 (twentieth session — **e3 DRIFT FIXED, GT
 UNCHANGED**: the v3 e3 regression (F1 1.0→0.667) was ONE mechanism: v3's
@@ -31,50 +32,53 @@ re-entry machinery as open point 22's far-side serves.)
 
 ## Where we are
 
-**(2026-09-27, twenty-second session — OPEN POINT 22 SCOPED: the far-side
-serve complaint is now MEASURED, and the probe windows exist.)**
+**(2026-09-27, twenty-second session — open point 22: scoping leg done,
+one finding RETRACTED, one SOLID corrected specimen.)**
 
-- **Serve team is derivable MECHANICALLY:** winner of the previous point
-  serves next (beach rule); cross-checked against ALL 6 dictated mentions
-  of a server (P2/P4/P9/P12/P17/P32) — 6/6 agree, and the script RAISES on
-  a mismatch, so the derivation is self-policing. P1's server is not
-  derivable (description has no serve mention). Court side comes from the
-  GT conventions (A near at start; squads fixed; switches after
-  7/14/21/28): **16 far-side / 16 near-side serves across the 33 points**
-  (P1 unknown).
-- **`scripts/derive_match_serve_windows.py` (keeper, +17 tests → suite
-  465):** builds the per-point table (server, side, anchored window,
-  emitted serve actions, episode overlap) and writes
-  `output/far_side_serve_windows.json`. Anchor source is the partial
-  `gt_point_start_end.txt` — its "point starts" marks the SERVE moment —
-  but it only covers P1–13, so P14–33 are emitted UNANCHORED (server+side
-  only; the pipeline's own confirmed spans demonstrably do NOT map 1:1 to
-  GT points — e.g. c8 (234–255s) straddles P12/P13 — so they were NOT used
-  as windows).
-- **THE MEASUREMENT (anchored P1–13 only):** far-side serves P2/P4/P6/P8/P13
-  → **0/5 with a correct serve emission**; near-side P3/P5/P7/P9/P10/P11/P12
-  → 2/7 (P3 clean A@1039; P9 contaminated — B@3856 correct + spurious
-  A@3595). Specimens: **P2 = TOTAL miss** ("Team B fails serve out", B far:
-  ZERO game_on frames in 539..821 — a whole GT point invisible to the
-  game-state layer); P6 (B far) starved (raw ep at 2191 never confirmed);
-  P4 confirmed but its serve emission reads team A vs derived B (either a
-  misattribution or a spurious serve label on untracked-ball actions — the
-  probe decides); P8/P13 confirmed without any serve emission (serve flight
-  lost, rally recovered later). Caveat kept honest: n=5 vs n=7, and serve-
-  ACTION emission is a downstream symptom — the owner's complaint is ball
-  TRACKING; the probe on raw detector output is what classifies detector
-  vs tracker.
-- **NEXT (probe leg, same session family):** production-parity probe
-  (`diag_ball_probe_v2.py` pattern: raw candidates + tracker decision + bg
-  stratification) over the five anchored far-side windows ±2s around the
-  serve moments [539, 1361, 1900, 3029, 6366] plus near-side controls
-  [1052, 1592, 2516, 3568, 4467, 5262, 5699]; classify (a) detector recall
-  on toss/launch vs stands/other backdrop (→ round-3 mining lever: far-side
-  serve positives) vs (b) tracker admission (serve-zone/bootstrap gates
-  tuned on entreno near-side geometry → retune lever) vs (c) the e3-MechC
-  conf-dip family (fast small ball, brief dip, re-entry window rejects).
-  P14–33 need owner-ratified anchors (extend `gt_point_start_end.txt`) or
-  an episode-based approximation before they join the census.
+- **RETRACTED:** the “far-side 0/5 vs near-side 2/7 serve-emission”
+  measurement and the “P2 TOTAL miss / P6 starved” specimens from earlier
+  in this session. Root cause: `ground_truth/gt_point_start_end.txt` was
+  treated as MATCH serve anchors — it is the game-state GT for
+  **video_entreno_game_state.mp4** (30fps, 4.5 min, 13 points; every
+  diag_gs_* script pairs them; the GT README documents it). Mapping its
+  timestamps onto the 17-minute match produced fictional windows
+  (“P2 = 539..821” is dead time; P2's real rally is f889–~1032).
+  README now carries a hard warning; tests use synthetic anchors.
+- **SURVIVES the retraction:** serve TEAM is derivable mechanically
+  (winner-of-previous; cross-checked 6/6 against dictated server mentions;
+  P1 unknown) and side from GT conventions (A near at start, switches
+  after 7/14/21/28) → **16 far / 16 near serves**. The keeper
+  `scripts/derive_match_serve_windows.py` (+17 tests, suite 465) encodes
+  this; WITHOUT --anchors it emits server+side only (UNANCHORED) — correct
+  default until ratified match anchors exist. Also survives: the
+  pipeline's confirmed spans do NOT map 1:1 to GT points (c8 straddles
+  P12/P13), so episode-order alignment needs its own careful pass.
+- **THE CORRECTED SPECIMEN (production-parity probe,
+  `output/diag_farside_serve_probe.py`, continuous f0..6948 dump):** P2's
+  far-side serve (“Team B fails serve out”, B far) is tracked END-TO-END
+  by the production ball tracker: pre-serve hold (992,507) f626–640
+  (stationary-flagged, correctly not locked), toss from f889, LOCK at
+  f890, then REAL on ~65 of 72 frames through apex (913,276), descent,
+  sand bounce ~f928 and roll past f960; conf 0.24–0.90; only f928–929
+  read predicted during the fastest descent and re-acquired immediately.
+  **The owner-visible P2 loss is NOT ball tracking**: game_on fired only
+  at f925 (36f after lock — ep 925..1032, later STARVED → point never
+  confirmed) and NO serve action was emitted for the rally. For 1-touch
+  serve-out points the loss lives in the game-state episode/confirmation
+  + rally-opening serve-ACTION gate (open point 15a machinery), not in
+  the ball half.
+- **Probe-infra lesson (bit me, must not again):** cv2
+  `CAP_PROP_POS_FRAMES` seeks are frame-UNRELIABLE on this VFR file
+  (25.67fps content in a 30.12fps container) — seek-based sheets were
+  index-shifted; the pass-1 sequential dump is the ground truth. All
+  frame-accurate work must decode sequentially.
+- **NEXT (re-scoped, one mechanism):** build the episode→GT-point ORDER
+  map (57 episodes ↔ 33 points + non-point bursts, keyed by derived serve
+  team/side + descriptions + emitted actions; flag unratified), THEN the
+  far/near serve census and probe verdicts on TRUE windows; owner pass
+  with `annotate_video.py`/contact sheets can ratify anchors afterwards.
+  The 20-vs-28 serve-emission regression (v3 vs v2) stays the headline
+  symptom; P2 says check the serve gate + episode starvation first.
 
 **(2026-09-27, twentieth session): e3 DRIFT FIXED WITHOUT GT EDITS.**
 The owner ruled the GT stays; the pipeline had to heal. See the Log entry
@@ -1645,20 +1649,25 @@ constraint. Side changes need no special handling as long as IDs survive.
     downstream. Fix levers ranked there apply here: round-3 mining of
     fast-fall/toss positives, or a re-entry-window retune (match-wide
     risk, own gate).]**
-    **[UPDATE 2026-09-27 (twenty-second session) — SCOPED + MEASURED:
-    serve team derived mechanically (winner-of-previous; 6/6 description
-    cross-checks; P1 unknown), side map from GT conventions → 16 far /
-    16 near serves. Anchored windows exist for P1–13 only
-    (`scripts/derive_match_serve_windows.py`, +17 tests, artifact
-    `output/far_side_serve_windows.json`; P14–33 UNANCHORED — pipeline
-    spans do NOT map 1:1 to GT points, and the anchor file stops at P13).
-    MEASUREMENT: far-side 0/5 with a correct serve emission (P2 TOTAL
-    miss — zero game_on frames; P6 starved; P4 emission misattributed to
-    team A; P8/P13 no serve emission at all) vs near-side 2/7. This is
-    the serve-ACTION symptom; the probe leg (raw candidates + tracker
-    decisions + bg stratification over windows [539, 1361, 1900, 3029,
-    6366] ±2s, controls [1052, 1592, 2516, 3568, 4467, 5262, 5699]) is
-    the next move and classifies detector-vs-tracker-vs-MechC.]**
+    **[UPDATE 2026-09-27 (twenty-second session) — SCOPED, one finding
+    RETRACTED, one SOLID specimen. Serve team derived mechanically
+    (winner-of-previous; 6/6 description cross-checks; P1 unknown),
+    side from GT conventions → 16 far / 16 near serves
+    (`scripts/derive_match_serve_windows.py` +17 tests). RETRACTED: the
+    first “measurement” paired the ENTRENO game-state anchor file with
+    the match — fictional windows (README now warns). CORRECTED
+    specimen from the production-parity probe (continuous dump
+    `output/farside_serve_probe/`): P2's far-side serve is tracked
+    END-TO-END by the ball tracker (toss f889 → lock f890 → REAL
+    through apex/descent/bounce/roll, ~65/72 frames REAL, conf
+    0.24–0.90) — but game_on fired 36f late (f925), the episode was
+    STARVED (point unconfirmed), and NO serve action was emitted. So
+    for P2 the loss is the game-state episode/confirmation + the
+    rally-opening serve-ACTION gate (open point 15a machinery), NOT
+    ball tracking. Probe-infra rule: no CAP_PROP_POS_FRAMES seeks on
+    the VFR match file — decode sequentially. NEXT: episode→GT-point
+    order map (one mechanism) → true serve windows → far/near census;
+    owner-ratified anchors welcome but not blocking.]**
     Owner's words (post-adoption, watching the match output): "the ball in
     the long video does not seem to be tracked when in the serve on the far
     side, I checked the entreno videos and the ball is tracked correctly".

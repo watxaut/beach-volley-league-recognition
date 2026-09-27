@@ -2,8 +2,13 @@
 
 Derives per-point serve team (winner-of-previous rule, cross-checked against
 descriptions naming a server), court side (fixed squads + side-switch map)
-and anchored serve windows (gt_point_start_end.txt format). The real 20260920
-match GT is a repo fixture; the derived table must stay stable.
+and anchored serve windows (gt_point_start_end.txt format).
+
+ANCHOR-FILE CAUTION (twenty-second session, retracted finding): the repo's
+real ``gt_point_start_end.txt`` anchors video_entreno_game_state.mp4, NOT
+the 20260920 match — its timestamps must never be paired with the match
+JSON. These tests therefore use a SYNTHETIC anchor file for window logic
+and pin the real file only as the FORMAT fixture (13 windows at 30fps).
 """
 
 import json
@@ -21,7 +26,24 @@ for p in (REPO, SCRIPTS):
 import derive_match_serve_windows as dsw  # noqa: E402
 
 MATCH_JSON = os.path.join(REPO, "ground_truth", "20260920_match_points.json")
+# FORMAT fixture only (belongs to video_entreno_game_state.mp4)
 ANCHORS_TXT = os.path.join(REPO, "ground_truth", "gt_point_start_end.txt")
+
+# Synthetic anchors for the match JSON's first six points: serve moments in
+# whole-second MM:SS. Content is a test fixture, NOT ratified GT.
+SYNTH_ANCHORS = (
+    "00:00 point starts\n00:08 point stops\n"
+    "\n"
+    "00:35 point starts\n00:37 point stops\n"
+    "\n"
+    "00:40 point starts\n00:44 point stops\n"
+    "\n"
+    "00:53 point starts\n00:58 point stops\n"
+    "\n"
+    "01:02 point starts\n01:07 point stops\n"
+    "\n"
+    "01:14 point starts\n01:20 point stops\n"
+)
 
 
 # ----------------------------------------------------------------------
@@ -100,16 +122,24 @@ class TestBuildServeWindows:
     @classmethod
     def setup_class(cls):
         cls.gt = json.load(open(MATCH_JSON, encoding="utf-8"))
-        cls.anchors = open(ANCHORS_TXT, encoding="utf-8").read()
+        cls.anchors = SYNTH_ANCHORS
         cls.fps = 25.6702272643995
         cls.records = dsw.build_serve_windows(cls.gt, cls.anchors, cls.fps)
 
+    def test_real_anchor_file_is_entreno_game_state_format(self):
+        # The real file parses to 13 windows; at 30fps it spans ~4.5 min —
+        # the entreno game-state video, never to be paired with the match.
+        moments = dsw.parse_point_moments(
+            open(ANCHORS_TXT, encoding="utf-8").read())
+        assert len(moments) == 13
+        assert moments[-1][1] < 4.5 * 60
+
     def test_anchor_split(self):
-        # the committed anchor file covers exactly points 1..13
-        assert all(r["anchored"] for r in self.records[:13])
-        assert not any(r["anchored"] for r in self.records[13:])
-        assert [r["flags"] for r in self.records[13:]] == [
-            [dsw.F_UNANCHORED]] * 20
+        # the synthetic anchor file covers exactly points 1..6
+        assert all(r["anchored"] for r in self.records[:6])
+        assert not any(r["anchored"] for r in self.records[6:])
+        assert [r["flags"] for r in self.records[6:]] == [
+            [dsw.F_UNANCHORED]] * 27
 
     def test_point1_flags(self):
         r1 = self.records[0]
@@ -118,11 +148,11 @@ class TestBuildServeWindows:
         assert dsw.F_NO_SERVER in r1["flags"]
 
     def test_serve_frame_conversion(self):
-        # GT pt2 serves at 00:21 -> 21 s * fps
+        # GT pt2 serves at 00:35 -> 35 s * fps
         r2 = self.records[1]
         assert r2["serve_team"] == "B" and r2["serve_side"] == "far"
-        assert r2["serve_frame"] == round(21 * self.fps)
-        assert r2["window_frames"] == [round(21 * self.fps), round(32 * self.fps)]
+        assert r2["serve_frame"] == round(35 * self.fps)
+        assert r2["window_frames"] == [round(35 * self.fps), round(37 * self.fps)]
 
     def test_far_side_serve_census(self):
         # 17 far-side serves among the 32 with a derived server
@@ -207,13 +237,12 @@ class TestAttachEpisodeOverlap:
 class TestSummarizeRealMatch:
     def test_side_split_on_real_fixture(self):
         gt = json.load(open(MATCH_JSON, encoding="utf-8"))
-        anchors = open(ANCHORS_TXT, encoding="utf-8").read()
-        records = dsw.build_serve_windows(gt, anchors, 25.6702272643995)
+        records = dsw.build_serve_windows(gt, SYNTH_ANCHORS, 25.6702272643995)
         summary = dsw.summarize(records)
-        assert summary["n_anchored"] == 13
-        assert summary["n_unanchored"] == 20
+        assert summary["n_anchored"] == 6
+        assert summary["n_unanchored"] == 27
         far = summary["far_side"]
         near = summary["near_side"]
-        assert far["points"] == [2, 4, 6, 8, 13]
-        assert near["points"] == [3, 5, 7, 9, 10, 11, 12]
-        assert far["n_points"] + near["n_points"] == 12  # pt1 has no server
+        assert far["points"] == [2, 4, 6]
+        assert near["points"] == [3, 5]
+        assert far["n_points"] + near["n_points"] == 5  # pt1 has no server

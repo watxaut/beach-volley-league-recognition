@@ -12,12 +12,15 @@ but two fields are derivable MECHANICALLY:
 - court SIDE -- Team A played the near half at match start and halves swap
   after every flagged side switch; squads are fixed (GT convention).
 
-Serve-moment FRAMES come from the partial game-state anchor file
-(``gt_point_start_end.txt`` format: "MM:SS point starts" marks the SERVE
-moment, "point stops" the ball death; whole-second granularity, +/-15f).
-That file currently anchors only points 1..13 of the 20260920 match -- later
-points are emitted UNANCHORED (server + side only) rather than guessed from
-the pipeline's own spans, which demonstrably do not map 1:1 onto GT points.
+Serve-moment FRAMES would come from an anchor file in the
+``gt_point_start_end.txt`` format ("MM:SS point starts" marks the SERVE
+moment, "point stops" the ball death; whole-second granularity). NO such
+anchor file exists for the 20260920 match: ``gt_point_start_end.txt``
+anchors video_entreno_game_state.mp4 (the game-state machine's GT), and its
+timestamps are MEANINGLESS for the match (a 17-minute video vs a 4.5-minute
+one — mapping them produced a fully wrong "measurement", retracted in
+STATUS twenty-second session). Anchor inputs must be passed explicitly via
+--anchors; without one, records carry server + side only (UNANCHORED).
 
 Cross-checks against pipeline_output.json (optional inputs):
 - emitted serve ACTIONS inside an anchored window (label 'serve');
