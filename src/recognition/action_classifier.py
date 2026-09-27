@@ -551,8 +551,18 @@ class ActionClassifier:
         short = self.BRIDGE_SHORT_MIN_GAP <= gap < self.BRIDGE_MIN_GAP
         if short:
             if (len(self._real_points(c - self.NEIGH, c - 1)) >= 2
-                    and len(self._real_points(c + 1, c + self.NEIGH)) >= 2):
-                return None  # dense both sides: the normal detector's turf
+                    and len(self._real_points(c + 1, c + self.NEIGH)) >= 2
+                    and self._normal_vertex_in_range(a[0], c)):
+                return None  # dense both sides AND a fireable vertex there:
+                # the normal detector's turf (e6 f265). Dense sides ALONE are
+                # not enough to defer: the normal tests can still be provably
+                # unable to host the touch. v3 e3 f379-384 (round-2 drift):
+                # the arc's bottom was SEEN at a=f379, but the extra sighting
+                # made f378 non-lowest while f379's right side went sparse
+                # (two blind frames), and c=f384 is not a bottom (pre-gap
+                # points sit lower) with an empty left3 killing the drive --
+                # no frame can host the touch, and deferring dropped the set
+                # (spike->dig->set->dig->block touch-chain cascade).
             if abs(vertex[1] - a[1]) > max(
                     self.BRIDGE_X_CONT_PX, self.BRIDGE_X_CONT_PER_F * gap):
                 return None  # identity discontinuity: a different ball
@@ -595,6 +605,19 @@ class ActionClassifier:
         inc = (a[1] - left[0][1], a[2] - left[0][2])
         out = (right[-1][1] - vertex[1], right[-1][2] - vertex[2])
         return [x, y], "bounce", inc, out
+
+    def _normal_vertex_in_range(self, lo: int, hi: int) -> bool:
+        """True when some real sighting in ``[lo, hi]`` can host a normal-path
+        contact (the bridge may only defer a dense short gap to the normal
+        detector if the normal detector can actually place the vertex). The
+        touch itself sits inside the sighting gap; the only real sightings in
+        range are its edges (``lo`` = last pre-gap, ``hi`` = first post-gap),
+        and the normal tests are pure geometry over already-decided history,
+        so checking those edges is exact."""
+        return any(
+            lo <= p[0] <= hi and self._normal_contact_at(p[0]) is not None
+            for p in self._ball_history
+        )
 
     @staticmethod
     def _mean_velocity(
@@ -645,6 +668,20 @@ class ActionClassifier:
         reentry = self._reentry_contact(c, vertex)
         if reentry is not None:
             return reentry
+        return self._normal_contact_at(c)
+
+    def _normal_contact_at(
+        self, c: int
+    ) -> Optional[Tuple[List[float], str, Tuple[float, float], Tuple[float, float], int]]:
+        """The normal vertex tests at a REAL sighting ``c``: bounce
+        (fall-and-rise), redirect (horizontal deflect), drive (attacking hit)
+        and the rally-opening serve branch. Pure geometry -- no gating beyond
+        the data itself -- so :meth:`_bridge_contact` can reuse it to ask
+        "could the normal path actually host this touch?" without duplicating
+        (and drifting from) the thresholds."""
+        vertex = self._point_at(c)
+        if vertex is None:
+            return None
         vx, vy = vertex[1], vertex[2]
 
         left = self._real_points(c - self.NEIGH, c - 1)

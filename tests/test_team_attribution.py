@@ -477,6 +477,48 @@ def test_short_gap_bridge_leaves_dense_gaps_to_normal_path(clf):
     assert clf._detect_contact(108) is not None
 
 
+def test_short_gap_bridge_takes_seen_bottom_with_sparse_right(clf):
+    """v3 e3 f379-384 (round-2 drift): the arc's bottom was SEEN at the last
+    pre-gap sighting, but only ONE post-gap point falls inside its NEIGH
+    window (the next sightings sit just beyond), and the first post-gap frame
+    is not a bottom (pre-gap points sit lower) with an empty left3 killing
+    the drive there. Dense sides on their own must not defer the touch to a
+    normal path that provably cannot host it: the bridge fires and recovers
+    the set (upstream, the deferral had dropped it and broke the touch chain
+    into spike->dig->set->dig->block)."""
+    _ball(clf, [(96, 1016, 236, 22), (100, 1015, 297, 22), (101, 1014, 328, 22),
+                (102, 1013, 352, 22), (103, 1012, 378, 22), (104, 1011, 406, 24),
+                (109, 1022, 366, 24),
+                (112, 1020, 276, 24), (114, 1019, 196, 24), (116, 1021, 150, 24)])
+    # No fireable normal vertex anywhere in the touch's range...
+    assert clf._normal_contact_at(104) is None   # bottom, but right side sparse
+    assert clf._normal_contact_at(109) is None   # not a bottom, empty left3
+    # ... so the bridge owns the touch even though both sides look dense.
+    r = clf._detect_contact(109)
+    assert r is not None
+    point, kind, inc, out, frame = r
+    assert kind == "bounce"
+    assert frame == 109                          # event keeps the first post-gap frame
+    assert 1011 <= point[0] <= 1022              # x interpolated across the gap
+    assert point[1] > 406                        # bottom sits below both endpoints
+    assert inc[1] > 0 and out[1] < 0             # descending in, ascending out
+
+
+def test_short_gap_bridge_still_defers_when_normal_vertex_fireable(clf):
+    """The refined refusal's other half: dense sides AND a fireable normal
+    vertex in the touch's range (here the bottom itself, once its right side
+    has >=2 points within NEIGH) must still defer -- the normal path owns the
+    touch and the bridge must not double-report it."""
+    _ball(clf, [(96, 1016, 236, 22), (100, 1015, 297, 22), (101, 1014, 328, 22),
+                (102, 1013, 352, 22), (103, 1012, 378, 22), (104, 1011, 406, 24),
+                (109, 1022, 366, 24), (110, 1021, 340, 24),
+                (112, 1020, 276, 24), (114, 1019, 196, 24)])
+    assert clf._normal_contact_at(104) is not None   # bottom, dense both sides
+    vertex = clf._point_at(109)
+    assert vertex is not None
+    assert clf._bridge_contact(109, vertex) is None
+
+
 def test_short_gap_bridge_rejects_ball_identity_jump(clf):
     """A spare ball appearing ~700px away after a game-ball gap must not
     bridge (e6 f236/f289 and e5 f320/f325 classes, all refused by this gate
