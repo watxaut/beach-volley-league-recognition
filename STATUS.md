@@ -17,7 +17,13 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-28 (twenty-eighth session — POINT 22 MECHANISM
+**Last updated:** 2026-09-28 (thirtieth session — documentation-only action
+reliability assessment: `docs/202609-28-astra-fix-pipeline.md`. Proposed
+held-out benchmark → evidence sidecar → multi-signal contact proposals →
+small temporal learner → GT-free interpretation/review. Pending owner
+approval; no code, config, model, GT, or runtime changes; no tests/video runs.)
+
+**Last implementation update:** 2026-09-28 (twenty-eighth session — POINT 22 MECHANISM
 3 SHIPPED: `scripts/relabel_serves.py` (+29 tests) — the pass-2 serve
 re-labeling layer ratified in #27. The rally-opening contact of each TRUE
 map window is re-labeled serve by structural prior: touch t1 + dead-ball
@@ -85,9 +91,11 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
-**Production state (as of 2026-09-28; pipeline unchanged — #28 shipped
-the pass-2 serve re-label layer over existing artifacts, zero src/
-changes).**
+**Production state (as of 2026-09-28; unchanged by #30's documentation-only
+assessment — #28 shipped the pass-2 serve re-label layer over existing
+artifacts, zero src/ changes).** The proposed generalization roadmap in
+`docs/202609-28-astra-fix-pipeline.md` awaits owner approval; the active
+implementation backlog below remains unchanged.
 
 - **Weights:** `models/volleyball_ball_best.pt` = **v3** (fine-tuned FROM
   best.pt on 1091 + 350 rebalanced frames; ADOPTED 2026-09-26). Sub-1080p
@@ -333,6 +341,8 @@ tracker in multi-tracker harnesses). The distilled technical facts below
 survive across sessions; provenance in the archives.
 
 **Measurement & eval conventions**
+- `evaluate_match_points.py`'s 31/33 ratio compares counts, not temporally matched recall; the episode map/serve relabel results use GT structure and owner corrections, so autonomous winner/scoring evaluation must exclude those inputs (#30 assessment).
+- Canonical `pipeline_output.json` persists events, point segments and sparse thumbnail snapshots, not the dense ball/player/pose sequence; temporal-model experiments need a feature sidecar, not just existing event JSON (`json_exporter.py`, #30 assessment).
 - Recorded action F1s REQUIRE `evaluate --ignore-player`: GT player_id is
   a per-frame L-R index; with player matching on, IDENTICAL streams score
   0.933 vs 0.133. GT id conventions: e1/e3 = L-R indices, e4/e5 =
@@ -442,6 +452,7 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- 2026-09-28 **#30** — documentation-only generalization assessment and staged G1/G2 roadmap: `docs/202609-28-astra-fix-pipeline.md`; count-vs-recall, GT-assisted interpretation, and dense-feature persistence gaps verified; implementation pending approval, no runtime changes.
 - 2026-09-28 **#28** — point 22 mechanism 3 SHIPPED: pass-2 serve re-labeling (`scripts/relabel_serves.py`, +29 tests); far prefix 2/8 → 8/8, serve-typed 20 → 31, all 17 owner verdicts mechanical, 13 team overrides flagged; suite 554 (Log below).
 - 2026-09-28 **#27** — architecture ratified: pass-2 interpretation layer over the stream (map → serve re-label → winner → fantasy); full-video two-pass REJECTED (live parity + no perception gain); point 22 mechanism 3 reframed (Log below).
 - 2026-09-27 **#26** — open point 22 mechanism 1 SHIPPED: anchor-free episode→GT-point order map (DP + BURST class, physics constraints) + far/near serve census on TRUE windows; far-side loss quantified ~2-3× near, emission-layer not tracking (Log below).
