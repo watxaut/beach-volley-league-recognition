@@ -1714,3 +1714,66 @@ assignments + track state, all checked against the frames):
 - Ranking unchanged at #1 (22 serves both goals); 21.3 promoted above
   the rest of 21's frontier. Session #20's Log entry archived verbatim
   (live Log trimmed back to 3).
+### 2026-09-27 (twenty-fifth session) — PERF: open point 23 shipped (live-debug producer/consumer decoupling); byte-identical output; 8.0 → ~12 fps
+
+- **Context:** the last parked 2026-08-17 perf lever. `--debug-live`
+  serialized per displayed frame: process (68 ms at HEAD) + render +
+  `waitKey(33 ms)` → ~8 fps. The parked design (producer thread runs the
+  EXACT `FrameProcessor.process_frame` loop in frame order; consumer renders
+  cached overlays and owns pacing) is blessed by the parity rule — the rule
+  protects the pipeline path, which is untouched (`git diff`: only
+  `src/analysis/live_debug_processor.py`).
+- **Diagnose first (probe `output/diag_live_debug_probe.py`, git-ignored):**
+  runs the real `_process_buffered_live` GUI-less (cv2 imshow/waitKey
+  patched, waitKey sleeping the real 33 ms pacing; fake VideoWriter
+  MD5-hashes every rendered frame) and captures the full INFO log stream.
+  HEAD baselines FIRST, ×2 each on entreno_1 + entreno_3: run-to-run
+  byte-identical (logs + all 441/665 frame MD5s) — the A/B ground truth is
+  deterministic. HEAD live throughput: 8.06 fps on both.
+- **Shipped (`src/analysis/live_debug_processor.py` only):** (1) producer
+  thread `_produce_frames` — the exact shared sequence (cap.read →
+  `process_frame(enable_court_redetection=True)` → ingest actions → spike
+  log → overlay-data cache), flush + typed spikes on natural end only, stop
+  discards the tail like the old loop, sentinel + done-event on every exit
+  path; (2) the court overlay is drawn ON THE PRODUCER, right after each
+  frame's processing — the consumer never reads calibration state
+  mid-redetection and the compositing order (court → ball → trail → kill →
+  players → counter → state) is pixel-identical (proved by the MD5s);
+  `_render_frame` split into court + `_draw_overlay` (two-pass save still
+  uses the full `_render_frame` — unchanged); (3) consumer (main thread —
+  macOS GUI requirement) gated on queue depth > delay (same 90-frame
+  label-latency guarantee as the old `len(buffer) > delay` arithmetic),
+  drains after the done-event, keeps polling keys at `waitKey(1)` while
+  filling/paused; (4) `_ThreadSafeLabelPlan` — lock around add/active
+  (presentation-only subclass; the shared pipeline never touches it);
+  (5) 'q'/'r' stop the producer via `_stop_producer` (drain-unblocks a
+  producer parked on a full queue, join, then reset/rewind on 'r').
+- **Two bugs caught by the probe/tests before they could ship:** (a) the
+  sentinel parks at the queue's BACK, so a depth-gated consumer deadlocks
+  (exit=124 on the first new-code run) — fixed with the done-event set
+  strictly AFTER the sentinel is queued (event seen ⇒ everything enqueued,
+  drain without the gate); regression test
+  `test_sentinel_deadlock_regression_long_video`. (b) `waitKey` returns −1
+  (→ 255 after `& 0xFF`), so a `key == -1` poll check never fires — replaced
+  with a showed-this-pass flag.
+- **Neutrality proof:** NEW code, same probe: e1 + e3 logs BYTE-IDENTICAL
+  to the HEAD baselines (all action/tracker lines) AND every rendered frame
+  MD5-identical (441/665). Suite 477 → **491** (+14
+  tests/test_live_debug_decoupling.py: producer order/flush/sentinel,
+  stop-without-flush, pause park/resume, stop-unblocks-full-queue, typed
+  spikes on flush, run-to-completion order, sentinel-deadlock regression,
+  quit key, restart re-runs + rewinds + resets, short-video drain, render
+  split order, thread-safe plan semantics + concurrency).
+- **Measured:** e1 8.06 → 11.84 fps, e3 8.06 → 12.04 fps (×1.47-1.49) with
+  real 33 ms pacing; remainder of the gap to 1000/68 ≈ 14.7 fps is thread
+  GIL contention (consumer render work steals producer time) — accepted,
+  not worth further engineering for a debug tool.
+- **Owner GUI validation still owed (cannot automate a real window):**
+  SPACE pause + 'r' restart + 'q' quit on a real run; also note 'r' on the
+  VFR match file inherits the pre-existing CAP_PROP_POS_FRAMES seek
+  unreliability (open point 22 lesson) — unchanged old behavior, just
+  remember it when restart looks misaligned there.
+- Files: src/analysis/live_debug_processor.py,
+  tests/test_live_debug_decoupling.py (+14; suite 491), STATUS.md. Probe
+  (git-ignored): output/diag_live_debug_probe.py.
+

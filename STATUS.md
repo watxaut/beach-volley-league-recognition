@@ -17,29 +17,26 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-28 (twenty-seventh session — DIRECTION
-RATIFIED, no code. The owner proposed a full-video two-pass
-architecture — pass 1 dissects the match into points (a serve OPENS a
-point, ball-death/held-ball CLOSES it), pass 2 runs action detection
-inside the windows — to minimize false positives. Challenged and
-settled as the COUNTER-proposal: TWO PASSES OVER THE STREAM, ONE PASS
-OVER THE VIDEO. Perception stays causal single-pass through
-FrameProcessor (tracks are online filters — a re-decode reproduces
-them; match wall 30.5 min, two full passes ≈ 61 min for nothing new);
-hindsight lives post-hoc over pipeline_output.json/DB (map → TRUE
-windows → serve re-label → winner layer → fantasy). Full-video
-two-pass REJECTED: pass 1 still cannot detect serves directly (14a
-refuted every ball-track feature; the probe proved detection isn't the
-loss), and it breaks live-debug parity — a two-pass cannot exist live,
-the eval-vs-pipeline skew bug class (now AGENTS §6). POINT 22
-MECHANISM 3 REFRAMED: pass-2 serve re-labeling — the rally-opening
-contact of a TRUE map window is serve by structural prior (touch t1 +
-dead-ball gap + trajectory), killing loss classes (a) arming-timing
-and (b) bump-serve misclassification at once (the dig/spike actions AT
-the anchors are re-labeled, not re-gestured); (c) P15-class static
-suppression becomes a targeted window re-decode escalation (raw
-detector settings, logged), never a global second pass. Suite still
-525; no src/ files touched.)
+**Last updated:** 2026-09-28 (twenty-eighth session — POINT 22 MECHANISM
+3 SHIPPED: `scripts/relabel_serves.py` (+29 tests) — the pass-2 serve
+re-labeling layer ratified in #27. The rally-opening contact of each TRUE
+map window is re-labeled serve by structural prior: touch t1 + dead-ball
+gap in the MEASURED chasm (openers ≥153f vs mid-rally ≤134f; threshold
+143 = midpoint) + window-opening position; owner anchors outrank a
+rejected opener (anchor_only), owner TRACKED/MISCLASSIFIED verdicts
+outrank the gap veto and the fault-description guard, P20 is owner-pinned
+to 14516A (round-2 q5), P32 stays report_only (fault desc contradicted by
+a full post-serve rally, no owner verdict). Owner FALSE/OFFGAME serves
+demoted (1039, 2414, 3595, 3856, 5130, 14387); 6928 reported-only (no
+owner verdict). GATES: far prefix census **2/8 → 8/8** (target ≥6/8 ✓);
+serve-typed actions **20 → 31** (−6 demoted +17 relabeled; ~28 sanity
+anchor overshot because 30/33 points now hold an in-stream serve action —
+every one mapped to a distinct point, 6928 included, pending owner
+arbitration); ALL 17 owner round-1+2 verdicts reproduced mechanically
+(P9-P12 at the exact contact frames); 13 team overrides flagged (the
+far-side width-band class + P24's mirror). Entreno neutrality BY
+CONSTRUCTION (zero src/ changes — only the new script + tests). Suite
+**554** (+29).)
 
 ## North-star goals (set session 24)
 
@@ -88,59 +85,50 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
-**Production state (as of 2026-09-28; pipeline unchanged since the
-26th session — #27 ratified direction only, no code).**
+**Production state (as of 2026-09-28; pipeline unchanged — #28 shipped
+the pass-2 serve re-label layer over existing artifacts, zero src/
+changes).**
 
 - **Weights:** `models/volleyball_ball_best.pt` = **v3** (fine-tuned FROM
-  best.pt on 1091 + 350 rebalanced frames; ADOPTED 2026-09-26 after the
-  four-leg gate; old weights stashed as `*_v1_entreno.pt` / `*_v2_match.pt`).
-  Sub-1080p ingest upscales once to `_up1080.mp4`. Pose gating is live in
-  the shared `classify_actions` path.
+  best.pt on 1091 + 350 rebalanced frames; ADOPTED 2026-09-26). Sub-1080p
+  ingest upscales once to `_up1080.mp4`. Pose gating live in the shared
+  `classify_actions` path.
+- **Pass-2 serve layer SHIPPED (28th session):**
+  `scripts/relabel_serves.py` (+29 tests) over the anchored map +
+  pipeline JSON → `output/serve_relabel.json` (per-point resolution +
+  demotions + `actions_pass2` annotated stream + gates). Far prefix
+  census 2/8 → **8/8**; serve-typed 20 → **31** (−6 owner-FALSE/OFFGAME
+  demotions, +17 bump-serve re-labels, 6928A reported-only); 32/33
+  points carry a serve resolution (P32 report_only, round 3); P20
+  owner-pinned to 14516A (q5). All 17 owner verdicts reproduce
+  mechanically. 13 team overrides flagged (far-side width-band class).
 - **Match (20260920 — the only real match):** **31/33 GT points confirmed
-  (0.939)**, first-confirmed at GT point 1, 57 episodes (26 starved);
-  actions 207 (dig 84 / spike 45 / set 42 / serve 20 / overpass 9 /
-  block 7); perf **68.0 ms/frame** (14.7 fps, 30.5 min). All data CSVs
-  byte-identical through the last three shipped mechanisms.
-- **Episode→point map + serve anchors + probe (26th session, diagnostic):**
-  `scripts/map_episodes_to_points.py` (+34 tests) ingests the owner's
-  RATIFIED serve anchors (`ground_truth/20260920_match_serve_anchors.txt`,
-  rounds 1+2: P1-P17 + 7 FALSE serves + 4 OFFGAME ranges) → anchored
-  prefix + DP tail (`output/episode_point_map.json`). Round-2 contact
-  sheets adjudicated every disputed moment: 1039A/2414A/3595A/3856B/
-  5130B/6928A/14387A are FALSE (carried ball / walking to line / ball
-  passing); P5's serve = f2556, P7's = f3728-3752, P11's = the dig@7132
-  (owner-confirmed), P15's = f10040/10070 (rally ends f10200), P16's =
-  10541A (ends f10865), P17 = 11410A (forced: at f11050 the next server
-  is on the NEAR side); ep8/26/28/36 = off-game ball handling. Anchored
-  census: far 2/8 clean (P13, P15) + 4 misclassified-candidates (P1, P2,
-  P4, P14 — dig-at-anchor) vs near 3/7 clean (P3) + 1 conflicted (P7) +
-  3 misclassified (P9, P10, P12). The probe refuted detection as the
-  loss: dets at every serve (conf 0.86-0.92, bootstrap fast).
+  (0.939)**; actions 207 (dig 84 / spike 45 / set 42 / serve 20 /
+  overpass 9 / block 7) at the perception layer — the pass-2 layer
+  re-interprets serves post-hoc (31 serve-resolved incl. 17 re-labels);
+  perf **68.0 ms/frame** (14.7 fps, 30.5 min).
 - **Entreno gate record** (`evaluate --ignore-player` F1): e1 0.706, e2
   0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933, e7 0.75; teams 1.0 except
-  e6 0.857. Suite **525 green**. Live-debug decoupling SHIPPED (#25):
-  `--debug-live` ≈ 12 fps vs 8.0, rendered frames + logs byte-identical.
+  e6 0.857. Suite **554 green**. Live-debug decoupling (#25): `--debug-live`
+  ≈ 12 fps vs 8.0, rendered frames + logs byte-identical.
 - **Known residuals:** e4/e5/e6 GT re-adjudication vs the v3 streams
   (queued — owner-ratified contact sheets); e3 f539 outcome enrichment
   reads dug vs GT kill (tracker-side fast-fall conf dip — 22 family);
-  match serves emitted 20 vs v2's 28 (22).
+  P32's serve + 6928A's verdict + P20's window/re-serve question sit in
+  the round-3 owner queue.
 
-**Active next (ranked, goal-driven — see North-star).** (1) Open point 22
-mechanism 3, REFRAMED + owner-ratified 09-28 (AGENTS §6): pass-2 serve
-re-labeling — the post-hoc layer re-labels the rally-opening contact of
-each TRUE map window (anchored prefix first) as serve via structural
-prior (touch t1 + dead-ball gap before it + trajectory from behind the
-baseline); no causal gate, no serve-gesture vocabulary work. Gates:
-anchored census far 2/8 → ≥6/8 clean + serve actions 20 → ~28; entreno
-7/7 logs byte-identical; suite 525 green; A/B baselines from HEAD
-before editing. P15-class static suppression = targeted window
-re-decode escalation (raw detector settings, bounded + logged) —
-never global. (2) 21.3 point winner/outcome layer — G1's biggest missing signal; the
-anchored map provides TRUE windows to validate against the 33 dictated
-winners. (3) Fantasy scoring module + web points table (14e); assist
-ships with it (no perception needed). (4) e4/e5/e6 re-adjudication
-sheets + the round-3 owner queue (tail DP-inferred: P23 17159A and P31
-22873A side mismatches, ep45's nature, P18-P20 anchor round).
+**Active next (ranked, goal-driven — see North-star).** (1) **21.3 point
+winner/outcome layer** — G1's biggest missing signal; the anchored map +
+serve resolutions now give TRUE windows with openers to validate against
+the 33 dictated winners. (2) Round-3 owner queue (no code): P32's serve
+verdict, 6928A's verdict, P18-P20 anchors, ep45's nature, P23 17159A +
+P31 22873A team-fix confirmation — each flips one flag in
+`serve_relabel.json` when ratified. (3) Fantasy scoring module + web
+points table (14e); assist ships with it (no perception needed) — the
+pass-2 `actions_pass2` stream is the intended input. (4) P15-class
+targeted window re-decode escalation (raw detector settings, bounded +
+logged) — only if a missing serve (P5/P7 class) needs the perception
+back. (5) e4/e5/e6 re-adjudication sheets.
 
 ## Open points
 
@@ -151,61 +139,44 @@ point number in `docs/history/`.
 
 ### Active
 
-22. **Far-side serves** (owner feedback at v3 adoption: match far-side
-    serves seem untracked; entreno serves track fine). **Status:
-    MECHANISMS 1+2 DONE (09-27, 26th session) — order map + owner
-    anchors + detector probe; diagnosis COMPLETE: detection is NOT the
-    loss; the losses are the serve-ACTION gate, gesture
-    misclassification, and P15-class static suppression.**
-    Mechanism 1: `scripts/map_episodes_to_points.py` (+34 tests) —
-    monotone DP alignment (57 episodes ↔ 33 GT points + BURST class);
-    physics constraints: confirmed/action-rich rallies NEVER burst,
-    attaches need ≤150f game_off gaps (real splits 11-115f) and never
-    cross a serve marker, point numbers carried in backpointers, serves
-    attribute to exactly one point. Mechanism 2: the owner RATIFIED
-    serve anchors P1-P15 (`ground_truth/20260920_match_serve_anchors.txt`,
-    verbatim dictation + FALSE@3650; f230 fills P1's unknown server =
-    squad B). Anchored map (--serve-anchors): opener = first episode in
-    [s-180, s+300]; boundary conflicts + false-positive serve candidates
-    REPORTED, never auto-resolved. **Probe
-    (`scripts/probe_serve_tracking.py`)**: production + raw (no static
-    suppression) detectors inside all 15 anchored windows, sequential
-    decode. Result: dets present at EVERY serve (prod conf 0.86-0.92;
-    P1/P2/P6/P8/P14 all covered) and the ≥8px/f bootstrap pair exists
-    fast (P2 boot@890 vs owner f900) — "ball not tracked" is the
-    EMISSION layer, exactly the #22 specimen. Three loss mechanisms:
-    (a) rally-opening serve-ACTION gate (contact fires ~25-35f before
-    game_on arms); (b) gesture misclassification — bump serves read as
-    dig/spike (owner's P9 spike-hard, P10 spike-hard, P11 dig, P12
-    spike-touch reproduced mechanically; P1 dig@247, P2 dig@930, P4
-    dig@2195, P14 dig@9137 are the likely same class — why "not
-    tracked" reads on the far side: no serve label appears); (c) static
-    suppression bites ONLY on P15's slow float serve (33 frames
-    suppressed, median motion 2.1 px/f; P4 partial 17 frames).
-    False-positive serve actions confirmed as a class (owner
-    FALSE@3650; candidates 1039A, 5130B, 10070B, 10541A). **Next
-    (mechanism 3 — REFRAMED + owner-ratified 09-28, AGENTS §6):**
-    pass-2 serve re-labeling in the post-hoc layer — the rally-opening
-    contact of each TRUE map window (anchored prefix first) is
-    re-labeled serve by structural prior (touch t1 + dead-ball gap +
-    trajectory from behind the baseline); kills loss (a) arming-timing
-    and (b) bump-serve misclassification at once (the dig/spike actions
-    AT the anchors are re-labeled, not re-gestured — no causal gate, no
-    serve-gesture vocabulary work). (c) P15-class static suppression =
-    targeted re-decode escalation of flagged windows with raw detector
-    settings (no suppression), bounded + logged — never a global second
-    pass. Validation gates: far 2/8 → ≥6/8 clean, serve actions 20 →
-    ~28, entreno 7/7 byte-identical, suite green.
-    Round 2 (contact sheets) adjudicated every disputed moment: 7 FALSE
-    serves (1039A hands-as-ball, 2414A + 3595A/3856B + 6928A walking/
-    carried, 5130B + 14387A ball-passing), P5 = f2556, P7 = f3728-3752,
-    P11 = dig@7132 CONFIRMED as the serve, P15 = f10040/10070, P16 =
-    10541A, P17 = 11410A (forced by the f11050 near-side-server verdict);
-    OFFGAME ranges 2444-2534 / 10314-10406 / 11241-11327 / 14373-14479.
-    The P13-P17 chain is FORCED by the verdicts. Remaining tail findings
-    (DP-inferred, round-3 queue): P23 17159A + P31 22873A side mismatches,
-    ep45 (confirmed 1-dig, unattachable) forces P20's real serve (14516A,
-    owner-confirmed) to burst — needs P18-P20 anchors or an ep45 verdict.
+22. **Far-side serves** — **Status: MECHANISMS 1+2+3 DONE (mech 3 shipped
+    09-28, 28th session).** Mechanism 3 = pass-2 serve re-labeling
+    (`scripts/relabel_serves.py`, +29 tests): per TRUE map window, the
+    rally-opening contact is re-labeled serve by structural prior (t1 +
+    dead-ball gap 143f = midpoint of the measured chasm: openers ≥153f,
+    mid-rally ≤134f; window-opening position). Precedence ladder, all
+    owner-backed: owner FALSE/OFFGAME demote; owner TRACKED/MISCLASSIFIED
+    verdicts beat the gap veto AND the fault-description guard; anchors
+    turn a rejected opener into anchor_only (P5, P7); P20 owner-pinned to
+    14516A (round-2 q5, structured in OWNER_PINNED_SERVES); P32
+    report_only (fault desc + 8 post-opener actions, no owner verdict);
+    6928A structural-FP reported, never demoted without an owner verdict.
+    Gates: far prefix **2/8 → 8/8** (≥6/8 ✓); serve-typed **20 → 31**
+    (−6 demoted +17 relabeled; ~28 sanity anchor overshot — 30/33 points
+    hold an in-stream serve action, all distinct, 6928 included); ALL 17
+    owner verdicts reproduced mechanically (P9-P12 at the exact contact
+    frames); 13 team overrides flagged (emitted toucher team vs
+    anchor/winner-serves: P1/P2/P6/P8/P14/P21/P22/P25/P26/P28 A→B,
+    P24 B→A, P23/P31 emitted-fix A→B — the far-side width-band class);
+    entreno neutral by construction (zero src/ changes); suite 554.
+    Output: `output/serve_relabel.json` (resolutions + demotions +
+    `actions_pass2` annotated stream + gates). Round-3 owner queue from
+    this layer: P32's serve, 6928A's verdict, P20's window/re-serve
+    question, P23/P31 team-fix confirmation.
+    Mechanisms 1+2 (09-27, 26th session; full detail in git + archive):
+    `map_episodes_to_points.py` (+34 tests; monotone DP, physics
+    constraints, serves attribute to exactly one point) + the owner's
+    RATIFIED serve anchors P1-P17 with 7 FALSE serves + 4 OFFGAME ranges
+    (`ground_truth/20260920_match_serve_anchors.txt`) + the detector
+    probe (`probe_serve_tracking.py`: dets present at EVERY serve, conf
+    0.86-0.92 — detection is NOT the loss; the losses are the
+    serve-ACTION gate, bump-serve gesture misclassification, and
+    P15-class static suppression, which bites only on P15's slow float).
+    Round-2 contact sheets adjudicated every disputed moment; the
+    P13-P17 chain is FORCED by the verdicts. Tail findings (DP-inferred,
+    round-3 queue): ep45 (confirmed 1-dig, unattachable) forces P20's
+    owner-confirmed serve (14516A) to burst — needs P18-P20 anchors or
+    an ep45 verdict.
     **Infra rule: VFR file — never CAP_PROP_POS_FRAMES seeks; decode
     sequentially.**
 
@@ -394,6 +365,14 @@ survive across sessions; provenance in the archives.
   + bump-serve gesture misclassification (dig/spike labels), NOT
   detection; static suppression only bites on slow float serves
   (P15: median 2.1 px/f).
+- Serve-position openers follow ≥153f of dead time; the largest mid-rally
+  t1 gap on the 20260920 match is 134f — GAP_SERVE_MIN=143 splits them
+  (28th session, all 33 TRUE windows measured).
+- The emitted toucher team is unreliable at window-opening contacts:
+  13/31 pass-2 serves needed the structural squad (ten far-side windows
+  read A, P24's near-side serve read B, P23/P31 emitted-fixes) —
+  downstream layers consume `pass2_team`, keep `team_emitted` as
+  provenance (28th session).
 - Device caveat: MPS jitter can flip a gesture label (e.g. e6 f309
   block vs spike); the script path (deterministic) is the reference.
 
@@ -453,6 +432,7 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- 2026-09-28 **#28** — point 22 mechanism 3 SHIPPED: pass-2 serve re-labeling (`scripts/relabel_serves.py`, +29 tests); far prefix 2/8 → 8/8, serve-typed 20 → 31, all 17 owner verdicts mechanical, 13 team overrides flagged; suite 554 (Log below).
 - 2026-09-28 **#27** — architecture ratified: pass-2 interpretation layer over the stream (map → serve re-label → winner → fantasy); full-video two-pass REJECTED (live parity + no perception gain); point 22 mechanism 3 reframed (Log below).
 - 2026-09-27 **#26** — open point 22 mechanism 1 SHIPPED: anchor-free episode→GT-point order map (DP + BURST class, physics constraints) + far/near serve census on TRUE windows; far-side loss quantified ~2-3× near, emission-layer not tracking (Log below).
 - 2026-09-27 **#25** — open point 23 SHIPPED: live-debug producer/consumer decoupling; logs + rendered frames byte-identical; 8.0 → ~12 fps; +14 tests (Log below).
@@ -491,6 +471,64 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+
+### 2026-09-28 (twenty-eighth session) — open point 22 mechanism 3 SHIPPED: pass-2 serve re-labeling; far prefix 2/8 → 8/8; all owner verdicts reproduce mechanically
+
+- **Scope:** the layer ratified in #27 (AGENTS §6): two passes over the
+  STREAM, one over the video. Pure post-hoc — inputs are the anchored
+  episode→point map, the posegate pipeline JSON, and the ratified serve
+  anchors; zero `src/` changes, so entreno neutrality holds by
+  construction (verified: `git status` shows only the new script +
+  tests).
+- **Diagnose first:** evidence tables over all 33 TRUE windows before
+  any code. The dead-ball gap (frames since the previous action of ANY
+  kind) splits cleanly: serve-position window openers 153-1206f
+  (anchored prefix 219-853f or video start); the largest NON-opening t1
+  gap anywhere is 134f (P19 f13758 mid-rally possession change). GAP_
+  SERVE_MIN = 143 = chasm midpoint; below-threshold openers degrade to
+  report_only/anchor_only, never to a wrong serve. The contact-half
+  projection is evidence-only (the known airborne bias swamps it — 16
+  of 17 prefix windows read far).
+- **Shipped (`scripts/relabel_serves.py`, +29
+  tests/test_serve_relabel.py):** per TRUE window: live actions (owner
+  FALSE/OFFGAME excluded) → opener = first live action; t1 + gap +
+  adoptable action type → emitted / relabeled (bump-serve class,
+  `actions_pass2` carries pass2_action/pass2_team/pass2_source beside
+  the untouched original); rejected opener + anchor → anchor_only (P5,
+  P7 — the owner SAW the serve, nothing was emitted); no anchor →
+  report_only. Precedence learned in-build: (1) FALSE@3650 covers
+  3595A+3856B via the map's adjudicated false-candidate notes, not
+  exact frames; (2) owner TRACKED/MISCLASSIFIED verdicts outrank the
+  gap veto (a real emitted serve can follow a false one closely) AND
+  the fault-description guard (P12: desc says fault, owner says the
+  serve was emitted — desc yields); (3) P32-class guard: fault desc +
+  post-serve rally + no owner verdict → report_only, never forced;
+  (4) P20 owner-pinned to 14516A (round-2 q5 verbatim, structured in
+  OWNER_PINNED_SERVES — the DP window must not swallow the opener);
+  (5) 6928A stays report-only (structural map note, no owner verdict).
+- **Gates (all measured on the real data):** far prefix census
+  **2/8 → 8/8** (target ≥6/8 ✓; before = P13, P15 only). Serve-typed
+  actions **20 → 31** = 20 − 6 demotions (1039, 2414, 3595, 3856,
+  5130 owner-FALSE; 14387 OFFGAME) + 17 re-labels (prefix: P1 dig@247,
+  P2 dig@930, P4 dig@2195, P6 dig@3070, P8 dig@4801, P9 spike@5496,
+  P10 spike@6034, P11 dig@7132, P12 spike@7780, P14 dig@9137; tail:
+  P21, P22, P24, P25, P26, P28, P29). The ~28 sanity anchor (v2
+  emitted 28) is overshot DELIBERATELY: 30/33 points now hold an
+  in-stream serve action (P5, P7 anchor-only; P32 pending) — each maps
+  to a distinct point, and 6928A remains in-stream un-demoted pending
+  its owner verdict. **All 17 owner round-1+2 verdicts reproduce
+  mechanically** (MISCLASSIFIED points land on the exact contact
+  frames: 5496, 6034, 7132, 7780). **13 team overrides flagged**
+  (emitted toucher team vs anchor/winner-serves): twelve A→B
+  (far-side width-band degradation, incl. emitted-fixes P23 17159A and
+  P31 22873A) + P24's mirror B→A — the structural squad is what the
+  fantasy layer will consume; `team_emitted` kept as provenance.
+- **Suite:** 525 → **554** (+29; all green incl. full suite). Tests pin
+  the gap chasm, anchor precedence, FALSE/OFFGAME demotions, the
+  P32/P12 fault-rule pair, the P20 pin, census scoping + gate math,
+  pass2 stream annotations, determinism.
+- Files: scripts/relabel_serves.py, tests/test_serve_relabel.py (+29),
+  output/serve_relabel.json (git-ignored), STATUS.md.
 
 ### 2026-09-28 (twenty-seventh session) — architecture decision: pass-2 interpretation layer ratified; full-video two-pass rejected; mechanism 3 reframed (no code)
 
@@ -658,69 +696,6 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
   20260920_match_serve_anchors.txt, tests/test_episode_point_map.py,
   output/episode_point_map.json + output/probe_serve_tracking.json
   (git-ignored), STATUS.md.
-
-### 2026-09-27 (twenty-fifth session) — PERF: open point 23 shipped (live-debug producer/consumer decoupling); byte-identical output; 8.0 → ~12 fps
-
-- **Context:** the last parked 2026-08-17 perf lever. `--debug-live`
-  serialized per displayed frame: process (68 ms at HEAD) + render +
-  `waitKey(33 ms)` → ~8 fps. The parked design (producer thread runs the
-  EXACT `FrameProcessor.process_frame` loop in frame order; consumer renders
-  cached overlays and owns pacing) is blessed by the parity rule — the rule
-  protects the pipeline path, which is untouched (`git diff`: only
-  `src/analysis/live_debug_processor.py`).
-- **Diagnose first (probe `output/diag_live_debug_probe.py`, git-ignored):**
-  runs the real `_process_buffered_live` GUI-less (cv2 imshow/waitKey
-  patched, waitKey sleeping the real 33 ms pacing; fake VideoWriter
-  MD5-hashes every rendered frame) and captures the full INFO log stream.
-  HEAD baselines FIRST, ×2 each on entreno_1 + entreno_3: run-to-run
-  byte-identical (logs + all 441/665 frame MD5s) — the A/B ground truth is
-  deterministic. HEAD live throughput: 8.06 fps on both.
-- **Shipped (`src/analysis/live_debug_processor.py` only):** (1) producer
-  thread `_produce_frames` — the exact shared sequence (cap.read →
-  `process_frame(enable_court_redetection=True)` → ingest actions → spike
-  log → overlay-data cache), flush + typed spikes on natural end only, stop
-  discards the tail like the old loop, sentinel + done-event on every exit
-  path; (2) the court overlay is drawn ON THE PRODUCER, right after each
-  frame's processing — the consumer never reads calibration state
-  mid-redetection and the compositing order (court → ball → trail → kill →
-  players → counter → state) is pixel-identical (proved by the MD5s);
-  `_render_frame` split into court + `_draw_overlay` (two-pass save still
-  uses the full `_render_frame` — unchanged); (3) consumer (main thread —
-  macOS GUI requirement) gated on queue depth > delay (same 90-frame
-  label-latency guarantee as the old `len(buffer) > delay` arithmetic),
-  drains after the done-event, keeps polling keys at `waitKey(1)` while
-  filling/paused; (4) `_ThreadSafeLabelPlan` — lock around add/active
-  (presentation-only subclass; the shared pipeline never touches it);
-  (5) 'q'/'r' stop the producer via `_stop_producer` (drain-unblocks a
-  producer parked on a full queue, join, then reset/rewind on 'r').
-- **Two bugs caught by the probe/tests before they could ship:** (a) the
-  sentinel parks at the queue's BACK, so a depth-gated consumer deadlocks
-  (exit=124 on the first new-code run) — fixed with the done-event set
-  strictly AFTER the sentinel is queued (event seen ⇒ everything enqueued,
-  drain without the gate); regression test
-  `test_sentinel_deadlock_regression_long_video`. (b) `waitKey` returns −1
-  (→ 255 after `& 0xFF`), so a `key == -1` poll check never fires — replaced
-  with a showed-this-pass flag.
-- **Neutrality proof:** NEW code, same probe: e1 + e3 logs BYTE-IDENTICAL
-  to the HEAD baselines (all action/tracker lines) AND every rendered frame
-  MD5-identical (441/665). Suite 477 → **491** (+14
-  tests/test_live_debug_decoupling.py: producer order/flush/sentinel,
-  stop-without-flush, pause park/resume, stop-unblocks-full-queue, typed
-  spikes on flush, run-to-completion order, sentinel-deadlock regression,
-  quit key, restart re-runs + rewinds + resets, short-video drain, render
-  split order, thread-safe plan semantics + concurrency).
-- **Measured:** e1 8.06 → 11.84 fps, e3 8.06 → 12.04 fps (×1.47-1.49) with
-  real 33 ms pacing; remainder of the gap to 1000/68 ≈ 14.7 fps is thread
-  GIL contention (consumer render work steals producer time) — accepted,
-  not worth further engineering for a debug tool.
-- **Owner GUI validation still owed (cannot automate a real window):**
-  SPACE pause + 'r' restart + 'q' quit on a real run; also note 'r' on the
-  VFR match file inherits the pre-existing CAP_PROP_POS_FRAMES seek
-  unreliability (open point 22 lesson) — unchanged old behavior, just
-  remember it when restart looks misaligned there.
-- Files: src/analysis/live_debug_processor.py,
-  tests/test_live_debug_decoupling.py (+14; suite 491), STATUS.md. Probe
-  (git-ignored): output/diag_live_debug_probe.py.
 
 ## Useful commands
 
