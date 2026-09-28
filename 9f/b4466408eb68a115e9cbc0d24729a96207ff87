@@ -1,0 +1,34 @@
+scripts/contact_sheet.py
+  s_0f33cd2975d9ab::t_57d1492ef5d046 1-133
+scripts/map_episodes_to_points.py
+  s_0f33cd2975d9ab::t_9af4ed028d66f7 837-842
+  s_0f33cd2975d9ab::t_bd54b33d198582 875-879
+  s_0f33cd2975d9ab::t_a99ecc00cc16b8 128,504,509-513,531-532
+  s_0f33cd2975d9ab::t_88a7ce2c46ec2f 848-851,854-855
+  s_0f33cd2975d9ab::t_c331b7393a824c 562-567,589-590,602-603,667,670-671,673-674,681
+  s_0f33cd2975d9ab::t_f936a96cc68b61 799-805
+  s_0f33cd2975d9ab::t_7e4ea1145eb0cc 865-868,887,890,908
+  s_0f33cd2975d9ab::t_73875b7553c37a 208
+ground_truth/20260920_match_serve_anchors.txt
+  s_0f33cd2975d9ab::t_70a4bea631ca1f 2,12,25-26,34-35,47-48,52-53,55-60,62,64-65,67-68,70,73-98
+  s_0f33cd2975d9ab::t_45d015b8116cbf 3-9,13-17,19-22
+  s_0f33cd2975d9ab::t_93fa7ff8809190 1,49-51,54,61,63,66,69,71
+STATUS.md
+  s_0f33cd2975d9ab::t_bb7d714fc306fd 103-114,133-134,182-193,554-570
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "9fb4466408eb68a115e9cbc0d24729a96207ff87",
+  "prompts": {},
+  "sessions": {
+    "s_0f33cd2975d9ab": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0e42f-fd06-7575-8f8d-32efbadc876a",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
