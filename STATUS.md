@@ -426,6 +426,16 @@ survive across sessions; provenance in the archives.
   pre-labels were 3/77 correct); noise frames are negatives by
   construction.
 
+**Harness config (pi)**
+- pi has TWO config scopes only: `$PI_CODING_AGENT_DIR` (per-harness user
+  dir) and the project dir `<cwd>/.pi` (path is HARDCODED — no env
+  override). Project settings OVERRIDE agent-dir settings, and there is
+  no per-provider project scope. So model/provider defaults MUST live in
+  each harness's agent-dir `settings.json`; `.pi/settings.json` stays
+  provider-agnostic (shared prompts/extensions only). zai harness =
+  `~/.pi/agent`, openrouter harness = `~/.pi-openroute` (note the
+  spelling) — both read this repo's shared `.pi/`.
+
 ## Session index (one line each)
 
 Details: `docs/history/status_where_we_are_archive.md` (per-session state
@@ -439,7 +449,8 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-09-27 **#24** — product north-star goals set (G1 Fantasy scoring / G2 individual stats); stat-coverage audit + critical paths (archived).
 - 2026-09-27 **#23** — pose gating shipped in the shared classifier (staleness + near-ball trail), byte-identical everywhere, match ×1.24 (Log below).
 - 2026-09-27 **#22** — far-side serves scoped: retracted mispaired-anchor measurement; P2 specimen (ball tracked; loss = episode starvation + serve-action gate); `derive_match_serve_windows.py`.
-- 2026-09-27 **#21** — pi repo default model → zai/glm-5.3-flash (Log below).
+- 2026-09-28 **#29** — pi config split per harness: model defaults moved out of `.pi/settings.json` (project settings override agent-dir; no per-provider scope) into each harness's agent dir — `~/.pi-openroute/settings.json` gets openrouter/stealth-space-bunny-alpha.
+- 2026-09-27 **#21** — pi repo default model → zai/glm-5.3-flash (SUPERSEDED by #29: default now lives in `~/.pi/agent/settings.json` as zai/glm-5.3).
 - 2026-09-27 **#20** — e3 v3 drift FIXED without GT edits: bridge defers only when a fireable normal vertex exists; 7/7 neutrality; match 31/33 unchanged (Log below).
 - 2026-09-26 **#19** — round-2 rebalanced mining (350 frames); v3 four-leg gate → **ADOPTED as production**; far-side serve feedback → point 22.
 - 2026-09-25/26 **#18** — retrain-mining staged (500 stratified frames); owner GT landed (486 frames, pre-labels mostly wrong — diagnostic correction); dataset merged + zipped (1091); v2 candidate gate → **REJECTED** (precision/sky/entreno regress).

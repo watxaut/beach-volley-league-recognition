@@ -1,4 +1,3 @@
 {
-  "defaultProvider": "zai",
-  "defaultModel": "glm-5.3-flash"
+  "$comment": "Provider/model defaults live in each harness's agent-dir settings.json (~/.pi/agent for zai, ~/.pi-openroute for openrouter) because project settings override agent-dir settings and pi has no per-provider project scope. Keep this file provider-agnostic."
 }
