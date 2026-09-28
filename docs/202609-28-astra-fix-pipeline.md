@@ -1,6 +1,6 @@
 # Reliable actions on new recordings — assessment and plan
 
-**Date:** 2026-09-28
+**Date:** 2026-09-28 (revised same day to incorporate the companion proposal in `docs/20260928-space-bunny-fix-pipeline.md`, with corrections from a targeted `pi -p` fact check)
 
 **Scope:** Read-only assessment of the implementation at `78aee5b`, following `AGENTS.md`. No code, model, configuration, or GT changes; no video processing or fresh benchmark runs. Numbers below are recorded results, not new measurements. Deeper code inspection delegated to `pi -p` using the subscription harness.
 
@@ -46,6 +46,23 @@ Do not start by training a large end-to-end video model, replacing YOLO, or rewr
 These are not all “bad rules.” Reach, continuity, dead time, and possession are valid evidence. **The problem is treating setup-dependent measurements or incomplete observations as conclusive decisions.** Moving the constants into YAML would make tuning easier, not solve generalization.
 
 The tracking layer also matters: a good raw ball detection can be rejected by admission/static-motion logic, and a good person box can have the wrong identity. For example, `src/tracking/ball_tracker.py:80–88` defaults include a 10-frame missing window, 8 px/frame lock speed, and 90 px lock jump. “YOLO works” does not establish the quality of the evidence delivered to recognition.
+
+Two details matter when planning the fixes. First, the width bands do **not** fail by abstaining: `src/recognition/action_classifier.py:871–884` treats any width under `width_far_px` as a far vote and only abstains inside the band, so a smaller far-side ball makes the far vote *win by default* — a silently wrong side, not a degraded one. Second, nominal FPS is already known but unused by recognition: `src/analysis/video_processor.py:65` → `frame_processor.setup_video_fps` (`:197–200`) reaches only the game-state manager, and this match is VFR, so container FPS is not the real rate.
+
+### Cheap portability mechanisms worth adopting
+
+The companion plan in `docs/20260928-space-bunny-fix-pipeline.md` proposes several low-cost, testable changes. Adopted here as candidates, with corrections:
+
+1. **Make calibration and view readiness loud.** `src/main.py:168–180` logs one warning and continues when no `calibrations/<stem>.json` matches, and the classifier then drops court-derived team, near-net and serve-zone signals (`action_classifier.py:853–854`, `:915–916`). Add a readiness report — calibration loaded, source match, supported geometry, degraded outputs — and make a missing or unmatched calibration an explicit precondition failure, plus record the camera profile in `pipeline_output.json`. Cheap, and it makes "actions stopped" distinguishable from "calibration didn't load."
+2. **A perturbation suite as the standing generalization gate.** Crop-and-rescale (zoom), vertical court-region warp (elevation), frame drop/duplicate (frame rate), mild horizontal shear/rotation (off-axis), and blur/noise or 720p re-encode (different camera). Run in two levels: a cheap replay of saved features, and the full detector→tracker→recognizer path. Perturb calibration and GT consistently. Per-constant flip attribution matters more than the aggregate F1, and raw-detector output must be probed before blaming recognition.
+3. **Extend the existing calibration artifact with per-video scale/fps descriptors** (court depth in pixels, pixels-per-metre at the net and baselines, measured frame rate, observed ball-width statistics) — no second config surface, with the config-drift guard test extended for every new key.
+4. **An adaptive per-video width split** (two-cluster or histogram split of the observed width series) replacing the fixed 26/35 px numbers, with an `unreliable` state when the split is unimodal or weakly separated. Cluster separation alone is not proof of court halves; blur and depth variation can mislead it, so require corroborating evidence before committing a side.
+5. **Scale/fps normalization of the pixel and px-per-frame constants** — prominence, redirect, bridge shape, poke, rise, drive, lock speed, near-net, and the reach gates. Test it as a shadow correction; the previous near-net px→metres result (point 4, F1 0.929→0.857) is the precedent for caution.
+6. **Time-based (not frame-based) windows** for the constants that are really durations — `MIN_CONTACT_GAP`, `CONTACT_DELAY`, `RALLY_RESET_GAP` (90 frames is 3 s at 30 fps, 1.5 s at 60 fps). Only the touch-count rule in `action_context.py` is truly view/fps-invariant.
+7. **Dimensionless motion features** — impulse and rise expressed as ratios to the ball's own recent flight (gravity-predicted descent over the window is the soundest reference) — plus reach and body extents expressed relative to player scale.
+8. **A small learned head over the existing contact features, as a swappable component inside `FrameProcessor`, only after items 3–7 are measured.** Not before: a model trained on pixels from one camera memorizes the camera and hides the problem rather than fixing it.
+
+Corrections to the companion plan, all verified against the code: the width-band failure is confident misattribution, not abstention (1 above); frame-count constants are fps-dependent and belong with the speed class, not "camera-invariant"; `world_scale_at()` / `world_body_size()` (`src/detection/court_calibration.py:619–657`) are ground-plane, perspective-attenuated **relative** proxies by their own docstrings, so reach-to-metres is a testable feature, not a true physical conversion; a median-based scale factor is ≈1.0 for no particular video and therefore does not guarantee byte-identical parity (per-video reference = its own depth does, at the cost of no transfer); and synthetic warps and frame duplication probe image-transform robustness, not new 3D viewpoints or true frame-rate behavior.
 
 ### The current success numbers need careful interpretation
 
@@ -97,9 +114,9 @@ Use bounded storage or compressed sidecars rather than expanding the main JSON i
 - Use player-relative image distances (e.g. torso/body scale with confidence checks), normalized keypoints, and calibration/view descriptors. Body-relative speed helps with scale, but does **not** eliminate perspective or occlusion.
 - Use court coordinates for grounded stance/feet and supported ground-contact locations.
 - **Do not project an airborne ball through the court homography and call it a 3D court position.** Ball height and depth are ambiguous in one view. Likewise airborne feet are not ground stance.
-- Treat ball width and projected motion as uncertain features, not universal team or attack rules. Learn/test across real views; image resizing alone cannot simulate a new 3D camera angle.
-
-The earlier near-net px→metres replacement failed GT. Therefore normalization must be introduced in shadow mode and assessed per signal, not by globally replacing units and assuming correctness.
+- Treat ball width and projected motion as uncertain features, not universal team or attack rules. Learn/test across real views; image resizing alone cannot simulate a new 3D camera angle. Where a per-video width split is used, carry an explicit `unreliable` state rather than committing a side on weak separation.
+- The early near-net px→metres replacement failed GT. Therefore normalization must be introduced in shadow mode and assessed per signal, not by globally replacing units and assuming correctness. A uniform court-depth rescale corrects magnification, not perspective, parallax or occlusion; dimensionless is not the same as viewpoint-invariant.
+- Convert reach and body extents relative to the player's own scale first; treat ground-homography metres (the tracker's existing `world_body_size` usage) as a relative tie-breaker, never as a true off-ground length.
 
 ### C. Remove the candidate-recall ceiling
 
@@ -143,8 +160,8 @@ These are proposed engineering gates, **not achieved numbers or accuracy promise
 
 | Stage | Deliverable | Exit gate / decision |
 |---|---|---|
-| **0 — Scope and honest baseline** | Capture contract; session-level splits; error taxonomy; autonomous versus assisted audit | Time-match points and contacts on an unseen recording; quantify losses separately at detection, tracking, candidate, gesture, actor, and point/outcome stages. No new production heuristic. |
-| **1 — Evidence and unit handling** | Versioned timestamped feature sidecar; shadow normalized features; rejection traces | Saving features leaves legacy perception outputs unchanged. Deterministic feature replay reproduces the baseline. Temporal/scale perturbation tests expose rather than hide sensitivity. |
+| **0 — Scope and honest baseline** | Capture contract; session-level splits; error taxonomy; autonomous versus assisted audit; calibration/view readiness report; perturbation suite (feature replay, then full path) with per-constant flip attribution | Time-match points and contacts on an unseen recording; quantify losses separately at detection, tracking, candidate, gesture, actor, and point/outcome stages. Perturbation results expose sensitivity; they are not a new-camera proof. No new production heuristic. |
+| **1 — Evidence and unit handling** | Versioned timestamped feature sidecar; per-video camera profile in the existing calibration artifact; shadow normalized features (scale, frame-rate, time windows, player-relative reach); rejection traces | Saving features leaves legacy perception outputs unchanged. Deterministic feature replay reproduces the baseline. Every normalized signal is A/B-measured individually; a `~1.0` scale factor is not accepted as proof of parity, and a signal that does not improve unseen-view metrics is reverted rather than kept "for consistency." |
 | **2 — Candidate recovery** | Union proposals plus negative-window benchmark | Target ≥97% contact candidate recall overall and ≥90% in each adequately sampled class/view slice, with false candidates and downstream cost reported. Otherwise improve observability/proposals before gesture ML. |
 | **3 — Learned local model** | Small baseline first; temporal model only if needed | Beat frozen rules on unseen sessions, not just pooled familiar clips; target macro event F1 ≥0.90 with per-class/view precision/recall and uncertainty intervals. Promotion cannot trade away rare serves/blocks behind a better average. |
 | **4 — Point, identity and outcome integration** | GT-free interpretation, side-switch validation, deterministic scoring | Target ≥95% one-to-one point precision/recall; separately measure winner accuracy and joint action+stable-player accuracy. Target ≥98% precision for auto-accepted scoring events, with coverage reported so abstention cannot game the result. |
@@ -159,6 +176,8 @@ Evaluation details:
 - Keep legacy A/B baselines from untouched HEAD and the existing regression suite. Logging/performance-only changes must be byte-identical. Recognition improvements necessarily change intended outputs: adjudicate those differences while requiring neutrality on unaffected cases. Do not freeze known mistakes just to preserve byte parity.
 - Profile the same shared path on target hardware. The recorded match baseline is 68 ms/frame; agree an acceptable incremental budget before expanding pose or adding a model.
 
+Standing constraints, unchanged by any of the above: keep `ball_confidence` at `0.15` (every GT-validated action number was measured there); extend the config-drift guard test for every new profile or camera key; generate A/B baselines from untouched HEAD before editing; and keep perception causal and single-pass, with the pass-2 interpretation layer post-hoc.
+
 **Parallel work:** Identity GT around switches can start immediately. An assisted points ledger/review UI and deterministic assist/scoring derivations can also deliver club value before autonomous recognition is finished. Label them assisted; do not count corrected predictions as automatic model accuracy.
 
 ## 6. First concrete work package
@@ -169,6 +188,6 @@ After approval:
 2. Annotate a bounded diagnostic sample: approximately 50–100 contacts across both sides, full point boundaries, and several minutes of dead time. Add a short side-switch identity sample if available.
 3. Produce a waterfall for every missed/wrong event: **raw detection → track admission → candidate → actor → gesture/context → point/scoring**.
 4. Specify the minimal feature-sidecar fields missing from existing artifacts and estimate extraction/storage/runtime cost.
-5. Use that evidence to choose exactly one first mechanism: timestamp normalization, candidate recovery, or learned gesture disambiguation. Do not change all three together.
+5. Use that evidence to choose exactly one first mechanism: timestamp normalization, candidate recovery, or learned gesture disambiguation. Do not change all three together. Cheap readiness/perturbation work (items 1–2 above) is the exception — it changes no decisions and is meant to run first.
 
 **Bottom line:** Stop optimizing only for the known video suite. Preserve the perception investment, make missing/uncertain evidence visible, learn the view-dependent decisions from diverse sequences, and retain volleyball rules for interpretation. The finish line is correct, attributable, reviewable statistics on recordings that were never used to tune the system—not another perfect reconstruction of the current match.

@@ -18,9 +18,17 @@
 >   archives).
 
 **Last updated:** 2026-09-28 (thirtieth session — documentation-only action
-reliability assessment: `docs/202609-28-astra-fix-pipeline.md`. Proposed
-held-out benchmark → evidence sidecar → multi-signal contact proposals →
-small temporal learner → GT-free interpretation/review. Pending owner
+reliability assessment: `docs/202609-28-astra-fix-pipeline.md`, revised to
+incorporate the companion proposal in
+`docs/20260928-space-bunny-fix-pipeline.md` (cheap portability mechanisms:
+calibration/readiness loudness, perturbation gate, per-video camera profile in
+the existing calibration artifact, adaptive width split, scale/fps/time
+normalization, dimensionless motion features, conditional learned head — with
+fact-check corrections: width bands misattribute rather than abstain,
+frame-count constants are fps-dependent, ground-homography metres are relative
+proxies, median-scale ≠ guaranteed parity, synthetic warps ≠ new viewpoints).
+Proposed held-out benchmark → evidence sidecar → multi-signal contact proposals
+→ small temporal learner → GT-free interpretation/review. Pending owner
 approval; no code, config, model, GT, or runtime changes; no tests/video runs.)
 
 **Last implementation update:** 2026-09-28 (twenty-eighth session — POINT 22 MECHANISM
