@@ -197,3 +197,20 @@ Safety-critical distinctions for contact attribution in this camera geometry
   path's px `near_net` is load-bearing; px→m is GT-refuted (F1 0.929→0.857),
   revisit only with match footage.
 - Emitted team = toucher's per-contact foot team.
+
+### 6. Pass-2 interpretation layer (owner-ratified 2026-09-28)
+
+Hindsight work — episode→point mapping, serve re-labeling, point
+winner/outcome, fantasy scoring — lives in the POST-HOC layer over
+`pipeline_output.json` / the DB, never as a second full-video pass.
+Perception stays causal and single-pass through
+`FrameProcessor.process_frame` (the trackers are online filters; a
+re-decode reproduces the same tracks). A full-video two-pass
+architecture is REJECTED: pass 1 cannot detect serves directly (every
+ball-track serve feature was measured and refuted — open point 14a),
+it breaks live-debug parity (a two-pass cannot exist live; that is the
+eval-vs-pipeline skew bug class), and it doubles wall time for
+perception output we already have. Escalation path for windows the
+stream provably mis-serves (e.g. P15-class slow-float suppression):
+targeted re-decode of FLAGGED windows with modified detector settings
+(raw, no static suppression) — bounded, logged, never global.

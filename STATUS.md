@@ -17,26 +17,29 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-27 (twenty-sixth session — open point 22
-mechanisms 1+2 SHIPPED. Mechanism 1: the anchor-free episode→GT-point
-ORDER map (`scripts/map_episodes_to_points.py`, +34 tests): monotone DP
-alignment (57 episodes ↔ 33 GT points + BURST), physics constraints
-(confirmed rallies never burst; attaches need ≤150f game_off gaps and
-may not cross a serve marker). Mechanism 2: the owner then RATIFIED
-serve anchors for P1-P15 (`ground_truth/20260920_match_serve_anchors.txt`)
-and the map ingests them (--serve-anchors): anchored prefix + DP tail,
-conflict/false-positive reporting. THE CENSUS (owner-anchored): far-side
-serve-action emission 1/8 clean (P13) vs near 6/8 (P3, P5, P11 +
-conflicted P7) — BUT the tracking probe (`scripts/probe_serve_tracking.py`)
-refutes detection as the loss: the detector sees the ball at ALL 15
-serves (conf 0.86-0.92) and the ≥8px/f bootstrap criterion is met fast;
-the real losses are (a) the rally-opening serve-ACTION gate (contact
-~25-35f before game_on arms — the #22 specimen mechanism), (b) gesture
-misclassification (bump serves read as dig/spike — the owner's P9/P10/
-P11/P12 verdicts reproduced mechanically, likely also P1/P2/P4/P14's
-"missing" serves = the dig-labeled actions at the anchors), (c) static
-suppression ONLY on the slow float serve P15 (33 frames suppressed,
-median motion 2.1 px/f). Suite 491 → 525.)
+**Last updated:** 2026-09-28 (twenty-seventh session — DIRECTION
+RATIFIED, no code. The owner proposed a full-video two-pass
+architecture — pass 1 dissects the match into points (a serve OPENS a
+point, ball-death/held-ball CLOSES it), pass 2 runs action detection
+inside the windows — to minimize false positives. Challenged and
+settled as the COUNTER-proposal: TWO PASSES OVER THE STREAM, ONE PASS
+OVER THE VIDEO. Perception stays causal single-pass through
+FrameProcessor (tracks are online filters — a re-decode reproduces
+them; match wall 30.5 min, two full passes ≈ 61 min for nothing new);
+hindsight lives post-hoc over pipeline_output.json/DB (map → TRUE
+windows → serve re-label → winner layer → fantasy). Full-video
+two-pass REJECTED: pass 1 still cannot detect serves directly (14a
+refuted every ball-track feature; the probe proved detection isn't the
+loss), and it breaks live-debug parity — a two-pass cannot exist live,
+the eval-vs-pipeline skew bug class (now AGENTS §6). POINT 22
+MECHANISM 3 REFRAMED: pass-2 serve re-labeling — the rally-opening
+contact of a TRUE map window is serve by structural prior (touch t1 +
+dead-ball gap + trajectory), killing loss classes (a) arming-timing
+and (b) bump-serve misclassification at once (the dig/spike actions AT
+the anchors are re-labeled, not re-gestured); (c) P15-class static
+suppression becomes a targeted window re-decode escalation (raw
+detector settings, logged), never a global second pass. Suite still
+525; no src/ files touched.)
 
 ## North-star goals (set session 24)
 
@@ -85,7 +88,8 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
-**Production state (as of 2026-09-27, twenty-sixth session).**
+**Production state (as of 2026-09-28; pipeline unchanged since the
+26th session — #27 ratified direction only, no code).**
 
 - **Weights:** `models/volleyball_ball_best.pt` = **v3** (fine-tuned FROM
   best.pt on 1091 + 350 rebalanced frames; ADOPTED 2026-09-26 after the
@@ -122,11 +126,16 @@ placement, per-video splits); remaining adds = serve/assist/error stats
   match serves emitted 20 vs v2's 28 (22).
 
 **Active next (ranked, goal-driven — see North-star).** (1) Open point 22
-mechanism 3, the FIX: rally-opening serve-action gate (arm from game_on
-+ serve-marker context so pre-game_on serve contacts emit; NOT a
-detection problem — the probe settled that) + serve-gesture
-misclassification (bump serve ≠ dig/spike) + P15-class static suppression.
-(2) 21.3 point winner/outcome layer — G1's biggest missing signal; the
+mechanism 3, REFRAMED + owner-ratified 09-28 (AGENTS §6): pass-2 serve
+re-labeling — the post-hoc layer re-labels the rally-opening contact of
+each TRUE map window (anchored prefix first) as serve via structural
+prior (touch t1 + dead-ball gap before it + trajectory from behind the
+baseline); no causal gate, no serve-gesture vocabulary work. Gates:
+anchored census far 2/8 → ≥6/8 clean + serve actions 20 → ~28; entreno
+7/7 logs byte-identical; suite 525 green; A/B baselines from HEAD
+before editing. P15-class static suppression = targeted window
+re-decode escalation (raw detector settings, bounded + logged) —
+never global. (2) 21.3 point winner/outcome layer — G1's biggest missing signal; the
 anchored map provides TRUE windows to validate against the 33 dictated
 winners. (3) Fantasy scoring module + web points table (14e); assist
 ships with it (no perception needed). (4) e4/e5/e6 re-adjudication
@@ -175,10 +184,18 @@ point number in `docs/history/`.
     suppressed, median motion 2.1 px/f; P4 partial 17 frames).
     False-positive serve actions confirmed as a class (owner
     FALSE@3650; candidates 1039A, 5130B, 10070B, 10541A). **Next
-    (mechanism 3, ONE fix):** the serve gate — arm rally-opening serve
-    emission from game_on + serve-marker context (pre-game_on contacts
-    of an about-to-open episode); separately retune static suppression
-    for slow-float regimes (P15) and the serve-gesture vocabulary.
+    (mechanism 3 — REFRAMED + owner-ratified 09-28, AGENTS §6):**
+    pass-2 serve re-labeling in the post-hoc layer — the rally-opening
+    contact of each TRUE map window (anchored prefix first) is
+    re-labeled serve by structural prior (touch t1 + dead-ball gap +
+    trajectory from behind the baseline); kills loss (a) arming-timing
+    and (b) bump-serve misclassification at once (the dig/spike actions
+    AT the anchors are re-labeled, not re-gestured — no causal gate, no
+    serve-gesture vocabulary work). (c) P15-class static suppression =
+    targeted re-decode escalation of flagged windows with raw detector
+    settings (no suppression), bounded + logged — never a global second
+    pass. Validation gates: far 2/8 → ≥6/8 clean, serve actions 20 →
+    ~28, entreno 7/7 byte-identical, suite green.
     Round 2 (contact sheets) adjudicated every disputed moment: 7 FALSE
     serves (1039A hands-as-ball, 2414A + 3595A/3856B + 6928A walking/
     carried, 5130B + 14387A ball-passing), P5 = f2556, P7 = f3728-3752,
@@ -436,9 +453,10 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- 2026-09-28 **#27** — architecture ratified: pass-2 interpretation layer over the stream (map → serve re-label → winner → fantasy); full-video two-pass REJECTED (live parity + no perception gain); point 22 mechanism 3 reframed (Log below).
 - 2026-09-27 **#26** — open point 22 mechanism 1 SHIPPED: anchor-free episode→GT-point order map (DP + BURST class, physics constraints) + far/near serve census on TRUE windows; far-side loss quantified ~2-3× near, emission-layer not tracking (Log below).
 - 2026-09-27 **#25** — open point 23 SHIPPED: live-debug producer/consumer decoupling; logs + rendered frames byte-identical; 8.0 → ~12 fps; +14 tests (Log below).
-- 2026-09-27 **#24** — product north-star goals set (G1 Fantasy scoring / G2 individual stats); stat-coverage audit + critical paths (Log below).
+- 2026-09-27 **#24** — product north-star goals set (G1 Fantasy scoring / G2 individual stats); stat-coverage audit + critical paths (archived).
 - 2026-09-27 **#23** — pose gating shipped in the shared classifier (staleness + near-ball trail), byte-identical everywhere, match ×1.24 (Log below).
 - 2026-09-27 **#22** — far-side serves scoped: retracted mispaired-anchor measurement; P2 specimen (ball tracked; loss = episode starvation + serve-action gate); `derive_match_serve_windows.py`.
 - 2026-09-27 **#21** — pi repo default model → zai/glm-5.3-flash (Log below).
@@ -473,6 +491,66 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+
+### 2026-09-28 (twenty-seventh session) — architecture decision: pass-2 interpretation layer ratified; full-video two-pass rejected; mechanism 3 reframed (no code)
+
+- **Trigger:** the owner proposed processing matches in two full video
+  passes — pass 1 dissects the video into points (a serve STARTS a
+  point, so no guessing whether the ball is airborne; ball hitting the
+  ground or a 1-2s held ball ENDS it), pass 2 runs action recognition
+  inside the windows — accepting ~2× offline cost and a live-debug
+  divergence TBD; stated goal: MINIMIZE false positives.
+- **Challenge — what survives:** hindsight IS the winning ingredient.
+  A serve is hard to identify causally (the #22 diagnosis: contact
+  25-35f before game_on arms) but easy with hindsight ("the flight
+  that opened a rally with N contacts"), and the episode→point map
+  (#26) already IS that second pass — over the recorded stream, not a
+  video re-decode. A structural serve prior kills both main #22 loss
+  classes at once.
+- **Challenge — what breaks:** (1) the premise "we know a point is
+  taking place if the serve started" assumes pass 1 can detect serves
+  — it can't (14a: burst width, static hold, near→tape→far all
+  measured and REFUTED; the probe proved the detector sees every serve
+  — the loss is the DECISION, not the data). (2) Two video passes
+  double the wrong half: perception (68 ms/f) is causal anyway — the
+  trackers are online filters, a re-decode reproduces the same tracks;
+  the layer that profits from hindsight (which episodes are points,
+  which contact is the serve, who won) runs over pipeline_output.json
+  in seconds. (3) It breaks the two hardest invariants: the ONE shared
+  FrameProcessor path, and live-debug parity (owner-ratified after a
+  real skew bug — a two-pass cannot exist live by definition). (4) FP
+  taxonomy vs the proposal: off-game handling → already fixed by the
+  map's constraints + anchors (post-hoc, zero re-decode); gesture
+  misclassification → fixed by the structural serve prior
+  (interpretation); suppressed slow-float serves (P15) → the ONE class
+  genuinely needing re-perception, solvable by targeted re-decode of
+  flagged windows only (~15×500f ≈ 8-15% cost). (5) The proposed
+  point-END rule is already the shipped design (static_off_frames held
+  ball, density starvation ball-death, contact_chain/group_gap
+  boundaries). Honest caveat recorded: a cheap ball-only pass 1 +
+  full-stack pass 2 on windows could be cost-neutral at ~50% dead
+  time — but ball-only segmentation is exactly the FP-prone burst
+  gate; it saves money by weakening the FP-critical layer, opposite of
+  the stated goal.
+- **RATIFIED (owner): two passes over the STREAM, one pass over the
+  video.** Pass 1 unchanged causal FrameProcessor →
+  pipeline_output.json → DB; live-debug stays byte-identical to
+  production. Pass 2 offline (seconds): episode→point map (done) →
+  TRUE point windows → rally-opening-contact serve re-label → winner
+  layer (21.3, vs the 33 dictated winners) → fantasy lines (13/14e,
+  DB-side). Escalation only where flagged: window re-decode with raw
+  detector settings (P15 class), bounded + logged. Marginal math
+  noted: point segmentation is already 31/33 — re-architecting pass 1
+  chases 2 points; serve emission (16/32 missing) lives in the
+  interpretation layer.
+- **Mechanism 3 (point 22) reframed to:** pass-2 serve re-labeling
+  from map windows. Validation gates: anchored census far 2/8 → ≥6/8
+  clean, serve actions 20 → ~28 (v2 emitted 28); entreno 7/7 action
+  logs byte-identical; suite green; config-drift guard extended if new
+  keys appear; A/B baselines dumped from HEAD before editing.
+- Codified as AGENTS.md §6 (pass-2 interpretation layer). Session #24's
+  Log entry archived verbatim (live Log trimmed back to 3). No files
+  under src/, no GT edits, suite untouched (525).
 
 ### 2026-09-27 (twenty-sixth session) — open point 22, mechanism 1: anchor-free episode→GT-point order map + far/near serve census on TRUE windows
 
@@ -643,27 +721,6 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - Files: src/analysis/live_debug_processor.py,
   tests/test_live_debug_decoupling.py (+14; suite 491), STATUS.md. Probe
   (git-ignored): output/diag_live_debug_probe.py.
-
-### 2026-09-27 (twenty-fourth session) — product north-star goals set (G1 Fantasy, G2 stats); critical paths mapped, no pipeline code
-
-- Owner restated the product intent for the club service: (1) Fantasy-
-  style scoring per point per player (Kill/Block/Ace/Dig +1, Assist
-  +0.5, Error −1) over recorded sessions; (2) individual per-player
-  statistics. Both now live as the North-star section at the top of
-  STATUS; future prioritization traces to them.
-- Mechanism-level coverage audit (recorded in the North-star section):
-  Kill/Dig/Block/attack-Error already derivable from the DB; Assist is
-  one join away (set → same-team kill, same point) — pure metric work;
-  the real G1 blockers are the point winner/outcome layer (21.3),
-  far-side serve emission (22), the per-point×player scoring module +
-  web points table (14e), and attribution robustness (2/21.4/21.5).
-  Ball-handling errors ruled a manual-review path, not perception.
-- Product decisions ratified at session close: Assist scores **+0.5
-  flat** (set → same-team kill, no direct/indirect split); **soft
-  blocks score 0** (only kill blocks take the +1).
-- Ranking unchanged at #1 (22 serves both goals); 21.3 promoted above
-  the rest of 21's frontier. Session #20's Log entry archived verbatim
-  (live Log trimmed back to 3).
 
 ## Useful commands
 

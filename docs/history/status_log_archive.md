@@ -1693,3 +1693,24 @@ assignments + track state, all checked against the frames):
   loop calls per-player, not the batch wrapper), tests/test_config_drift.py,
   STATUS.md.
 
+
+### 2026-09-27 (twenty-fourth session) — product north-star goals set (G1 Fantasy, G2 stats); critical paths mapped, no pipeline code
+
+- Owner restated the product intent for the club service: (1) Fantasy-
+  style scoring per point per player (Kill/Block/Ace/Dig +1, Assist
+  +0.5, Error −1) over recorded sessions; (2) individual per-player
+  statistics. Both now live as the North-star section at the top of
+  STATUS; future prioritization traces to them.
+- Mechanism-level coverage audit (recorded in the North-star section):
+  Kill/Dig/Block/attack-Error already derivable from the DB; Assist is
+  one join away (set → same-team kill, same point) — pure metric work;
+  the real G1 blockers are the point winner/outcome layer (21.3),
+  far-side serve emission (22), the per-point×player scoring module +
+  web points table (14e), and attribution robustness (2/21.4/21.5).
+  Ball-handling errors ruled a manual-review path, not perception.
+- Product decisions ratified at session close: Assist scores **+0.5
+  flat** (set → same-team kill, no direct/indirect split); **soft
+  blocks score 0** (only kill blocks take the +1).
+- Ranking unchanged at #1 (22 serves both goals); 21.3 promoted above
+  the rest of 21's frontier. Session #20's Log entry archived verbatim
+  (live Log trimmed back to 3).
