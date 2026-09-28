@@ -1,0 +1,23 @@
+AGENTS.md
+  s_c91f78b94b71ce::t_9ead2fad14fc55 200-216
+STATUS.md
+  s_c91f78b94b71ce::t_e7840cb43b125f 20-42,91-92,129-138,187-198,456,459,495-554
+docs/history/status_log_archive.md
+  s_c91f78b94b71ce::t_db7ba0742a1b35 1696-1716
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "be141b7b1c88cbd511e72a267eff3ac6956e4fe5",
+  "prompts": {},
+  "sessions": {
+    "s_c91f78b94b71ce": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0e76b-d0a5-7035-a237-a63d3ebf05cc",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
