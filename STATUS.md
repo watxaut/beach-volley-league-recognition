@@ -100,15 +100,18 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 - **Episode→point map + serve anchors + probe (26th session, diagnostic):**
   `scripts/map_episodes_to_points.py` (+34 tests) ingests the owner's
   RATIFIED serve anchors (`ground_truth/20260920_match_serve_anchors.txt`,
-  P1-P15) → anchored prefix + DP tail (`output/episode_point_map.json`).
-  Anchored census: far-side serve emission 1/8 clean (P13) vs near 6/8 —
-  but the probe (`scripts/probe_serve_tracking.py`) shows the DETECTOR sees
-  the ball at all 15 serves (conf 0.86-0.92, bootstrap fast): the losses
-  are the serve-ACTION gate (pre-game_on contact), gesture misclassification
-  (bump serves → dig/spike; owner's P9/P10/P11/P12 verdicts + likely
-  P1/P2/P4/P14's dig-at-anchor), and static suppression on P15's slow float
-  serve only. Owner-sheet queue: P14/P15 boundary (serves 10070B/10541A),
-  P4/P5 (2414A), P7 (3595A vs 3856B), P11 (6928A), P20/P21 re-serve.
+  rounds 1+2: P1-P17 + 7 FALSE serves + 4 OFFGAME ranges) → anchored
+  prefix + DP tail (`output/episode_point_map.json`). Round-2 contact
+  sheets adjudicated every disputed moment: 1039A/2414A/3595A/3856B/
+  5130B/6928A/14387A are FALSE (carried ball / walking to line / ball
+  passing); P5's serve = f2556, P7's = f3728-3752, P11's = the dig@7132
+  (owner-confirmed), P15's = f10040/10070 (rally ends f10200), P16's =
+  10541A (ends f10865), P17 = 11410A (forced: at f11050 the next server
+  is on the NEAR side); ep8/26/28/36 = off-game ball handling. Anchored
+  census: far 2/8 clean (P13, P15) + 4 misclassified-candidates (P1, P2,
+  P4, P14 — dig-at-anchor) vs near 3/7 clean (P3) + 1 conflicted (P7) +
+  3 misclassified (P9, P10, P12). The probe refuted detection as the
+  loss: dets at every serve (conf 0.86-0.92, bootstrap fast).
 - **Entreno gate record** (`evaluate --ignore-player` F1): e1 0.706, e2
   0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933, e7 0.75; teams 1.0 except
   e6 0.857. Suite **525 green**. Live-debug decoupling SHIPPED (#25):
@@ -127,8 +130,8 @@ misclassification (bump serve ≠ dig/spike) + P15-class static suppression.
 anchored map provides TRUE windows to validate against the 33 dictated
 winners. (3) Fantasy scoring module + web points table (14e); assist
 ships with it (no perception needed). (4) e4/e5/e6 re-adjudication
-sheets + the new owner-sheet queue (P14/P15 boundary, P4/P5, P7, P11,
-P20/P21).
+sheets + the round-3 owner queue (tail DP-inferred: P23 17159A and P31
+22873A side mismatches, ep45's nature, P18-P20 anchor round).
 
 ## Open points
 
@@ -176,9 +179,18 @@ point number in `docs/history/`.
     emission from game_on + serve-marker context (pre-game_on contacts
     of an about-to-open episode); separately retune static suppression
     for slow-float regimes (P15) and the serve-gesture vocabulary.
-    Owner sheet queue: P14/P15 boundary (10070B/10541A), P4/P5 (2414A),
-    P7 (3595A vs 3856B), P11 (6928A), P20/P21 re-serve. **Infra rule:
-    VFR file — never CAP_PROP_POS_FRAMES seeks; decode sequentially.**
+    Round 2 (contact sheets) adjudicated every disputed moment: 7 FALSE
+    serves (1039A hands-as-ball, 2414A + 3595A/3856B + 6928A walking/
+    carried, 5130B + 14387A ball-passing), P5 = f2556, P7 = f3728-3752,
+    P11 = dig@7132 CONFIRMED as the serve, P15 = f10040/10070, P16 =
+    10541A, P17 = 11410A (forced by the f11050 near-side-server verdict);
+    OFFGAME ranges 2444-2534 / 10314-10406 / 11241-11327 / 14373-14479.
+    The P13-P17 chain is FORCED by the verdicts. Remaining tail findings
+    (DP-inferred, round-3 queue): P23 17159A + P31 22873A side mismatches,
+    ep45 (confirmed 1-dig, unattachable) forces P20's real serve (14516A,
+    owner-confirmed) to burst — needs P18-P20 anchors or an ep45 verdict.
+    **Infra rule: VFR file — never CAP_PROP_POS_FRAMES seeks; decode
+    sequentially.**
 
 21. **Owner's match-feedback backlog** (agreed order; GT exists for all).
     (1) *Point count:* ball half SHIPPED (conf floors + v3); point-layer
@@ -539,6 +551,23 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
   only on P15's slow float serve (raw 91 vs prod 58 frames, median motion
   2.1 px/f; P4 partial 17 frames). False-positive serves are a real class
   (owner FALSE@3650; candidates 1039A, 5130B, 10070B, 10541A).
+- **Mid-session round 2: the owner adjudicated 11 contact sheets**
+  (`scripts/contact_sheet.py`, raw-detector overlays + anchor/action
+  marks) covering every disputed moment. Verdicts: 7 emitted serves are
+  FALSE (carried ball / walking to the line / teammate ball-passing);
+  P5/P7/P11/P15/P16/P17/P20 real serve moments pinned (several confirming
+  that the "missing" serves sit at dig/spike-labeled actions); 4 episodes
+  are OFF-GAME ball handling. The P13-P17 chain is forced by the f11050
+  verdict (next server near-side → P17's ace 11410A). Anchored map
+  re-run: prefix P1-P17 ratified, OFFGAME ranges force-burst episodes
+  (8, 26, 28, 36), FALSE-marked serves removed globally. Final anchored
+  census: near 7/16 clean + 4 misclassified (P9-P12), far 5/17 clean
+  (P13, P15 + tail P27, P33) + 4 misclassified candidates (P1, P2, P4,
+  P14) + 2 tail side-mismatches (P23, P31, DP-inferred). Tail caveats:
+  ep45 (confirmed 1-dig at f19857, unattachable) forces P20's
+  owner-confirmed serve (14516A) to burst — needs P18-P20 anchors or an
+  ep45 verdict (round 3). A brute-force check of the tail DP (43.0 =
+  43.0) proved the alignment optimal under the current constraints.
 - **Suite:** 491 → **525** (+34; all green incl. the full suite).
   Byte-parity trivially unaffected (no `src/` changes). FLAKE OBSERVED
   (pre-existing, reproves on clean HEAD): #25's

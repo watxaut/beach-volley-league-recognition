@@ -125,6 +125,7 @@ ANCHOR_OPENER_AFTER = 300
 _ANCHOR_RE = re.compile(
     r"^(P\d+|FALSE)\s+(\d+)\s+(near|far)?\s*"
     r"(TRACKED|NOT_TRACKED|MISCLASSIFIED)?\s*(.*)$")
+_OFFGAME_RE = re.compile(r"^OFFGAME\s+(\d+)-(\d+)\s*(.*)$")
 
 NEG_INF = float("-inf")
 
@@ -204,7 +205,7 @@ def episode_features(
             and start <= cp["end_frame"] + CONFIRM_TOLERANCE_FRAMES
             for cp in confirmed_points
         )
-        opens_with_serve = bool(collect_serves_near(serves, start, start + 30,
+        opens_with_serve = bool(collect_serves_near(serves, start, start + 60,
                                                     before=60, after=0))
         feats.append({
             "start": start,
@@ -500,9 +501,15 @@ def parse_serve_anchors(path: str) -> Dict[str, Any]:
     """
     points: Dict[int, Dict[str, Any]] = {}
     false_pos: List[Dict[str, Any]] = []
+    offgame: List[Dict[str, Any]] = []
     for raw in Path(path).read_text(encoding="utf-8").splitlines():
         line = raw.split("#")[0].strip()
         if not line:
+            continue
+        m = _OFFGAME_RE.match(line)
+        if m:
+            offgame.append({"start": int(m.group(1)), "end": int(m.group(2)),
+                            "note": m.group(3).strip()})
             continue
         m = _ANCHOR_RE.match(line)
         if not m:
@@ -521,7 +528,8 @@ def parse_serve_anchors(path: str) -> Dict[str, Any]:
     order = sorted(points)
     if order != list(range(1, len(order) + 1)):
         raise ValueError(f"{path}: anchored points must be 1..K, got {order}")
-    return {"points": points, "false": false_pos, "order": order}
+    return {"points": points, "false": false_pos, "order": order,
+            "offgame": offgame}
 
 
 def anchored_prefix(
@@ -551,6 +559,12 @@ def anchored_prefix(
     aret = anchors["points"]
     order = anchors["order"]
     serves_all = [a for a in actions if a.get("action") == "serve"]
+    offgame_ranges = anchors.get("offgame", [])
+
+    def is_offgame(i: int) -> bool:
+        e = eps[i]
+        return any(r["start"] <= e["start"] and e["end"] <= r["end"]
+                   for r in offgame_ranges)
 
     # P1's server is not derivable mechanically; the owner's side fills it.
     if order and serve_teams.get(order[0]) is None and aret[order[0]]["side"]:
@@ -572,7 +586,8 @@ def anchored_prefix(
         nxt = aret[order[idx + 1]]["frame"] if idx + 1 < len(order) else None
         span_end = (nxt - 180) if nxt is not None else None
         opener = next((i for i, e in enumerate(eps)
-                       if s - ANCHOR_OPENER_BEFORE <= e["start"] <= s + ANCHOR_OPENER_AFTER),
+                       if s - ANCHOR_OPENER_BEFORE <= e["start"] <= s + ANCHOR_OPENER_AFTER
+                       and not is_offgame(i)),
                       None)
         attached: List[int] = []
         if opener is not None:
@@ -584,6 +599,8 @@ def anchored_prefix(
                     break
                 if eps[i].get("opens_with_serve"):
                     break  # a serve marker starts a NEW point, never an attach
+                if is_offgame(i):
+                    break  # owner-adjudicated off-game play ends the point
                 gap = eps[i]["start"] - eps[last]["end"] - 1
                 if gap <= ATTACH_MAX_GAP_FRAMES:
                     attached.append(i)
@@ -647,16 +664,21 @@ def anchored_prefix(
             "misclassified_candidates": misclassified,
         })
     tail_start = (min(i for i in range(len(eps)) if i not in claimed
+                      and not is_offgame(i)
                       and eps[i]["start"] >= aret[order[-1]]["frame"] - 180)
                   if any(eps[i]["start"] >= aret[order[-1]]["frame"] - 180
-                         for i in range(len(eps)) if i not in claimed)
+                         for i in range(len(eps)) if i not in claimed
+                         and not is_offgame(i))
                   else len(eps))
+    offgame_eps = [i for i in range(len(eps))
+                   if is_offgame(i) and i not in claimed]
     return {
         "point_view": point_view,
         "claimed": claimed,
         "conflict_eps": sorted(set(conflict_eps)),
         "false_candidates": false_candidates,
         "tail_start": tail_start,
+        "offgame_eps": offgame_eps,
         "serve_teams": serve_teams,
     }
 
@@ -774,6 +796,13 @@ def print_report(records: List[Dict[str, Any]], eps: List[Dict[str, Any]],
             i = r["episode"]
             print(f"  ep{i:02d} f{eps[i]['start']}-{eps[i]['end']} "
                   f"actions={eps[i]['n_actions']} confirmed={eps[i]['confirmed']}")
+    offgame = [r for r in records if r["role"] == "offgame"]
+    if offgame:
+        print("\nOFF-GAME episodes (owner-adjudicated: no point in play):")
+        for r in offgame:
+            i = r["episode"]
+            print(f"  ep{i:02d} f{eps[i]['start']}-{eps[i]['end']} "
+                  f"actions={eps[i]['n_actions']}")
 
 
 # ----------------------------------------------------------------------
@@ -805,17 +834,25 @@ def main(argv: Optional[List[str]] = None) -> int:
     anchors = None
     anchored = None
     false_candidates: List[Dict[str, Any]] = []
+    def _ep_is_offgame(e: Dict[str, Any], an: Optional[Dict[str, Any]]) -> bool:
+        if not an:
+            return False
+        return any(r["start"] <= e["start"] and e["end"] <= r["end"]
+                   for r in an.get("offgame", []))
+
     if args.serve_anchors:
         anchors = parse_serve_anchors(args.serve_anchors)
         anchored = anchored_prefix(eps, actions, points, serve_teams, sides, anchors)
         serve_teams = anchored["serve_teams"]
         false_candidates = anchored["false_candidates"]
-        tail_eps = eps[anchored["tail_start"]:]
+        tail_pairs = [(i, e) for i, e in enumerate(eps)
+                      if i >= anchored["tail_start"] and not _ep_is_offgame(e, anchors)]
+        tail_global = [i for i, _ in tail_pairs]
+        tail_eps = [e for _, e in tail_pairs]
         tail_points = [p for p in points if p["point"] > max(anchors["order"])]
         tail_records = align(tail_eps, tail_points, serve_teams, sides)
-        for r in tail_records:
-            r["episode"] += anchored["tail_start"]
-            r["frames"] = list(r["frames"])
+        for r, gi in zip(tail_records, tail_global):
+            r["episode"] = gi
             r["point"] = (r["point"] + max(anchors["order"])) if r["point"] else None
         tail_view = build_point_view(
             eps, tail_records, tail_points, serve_teams, sides,
@@ -825,12 +862,21 @@ def main(argv: Optional[List[str]] = None) -> int:
             [{"episode": i, "frames": [eps[i]["start"], eps[i]["end"]],
               "point": None, "role": "conflict", "evidence": {}}
              for i in anchored["conflict_eps"]]
+            + [{"episode": i, "frames": [eps[i]["start"], eps[i]["end"]],
+                "point": None, "role": "offgame",
+                "evidence": {"note": "owner-adjudicated off-game play"}}
+               for i in anchored["offgame_eps"]]
             + tail_records)
         point_view = anchored["point_view"] + tail_view
     else:
         records = align(eps, points, serve_teams, sides)
         point_view = None
     serves_all = [a for a in actions if a.get("action") == "serve"]
+    if anchors:
+        false_frames = [f["frame"] for f in anchors["false"]]
+        serves_all = [a for a in serves_all
+                      if not any(abs(action_frame(a) - ff) <= 250
+                                 for ff in false_frames)]
     if point_view is None:
         point_view = build_point_view(
             eps, records, points, serve_teams, sides, serves_all)
@@ -838,9 +884,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     print_report(records, eps, point_view, census_view, false_candidates)
 
-    n_mapped = sum(1 for r in records if r["role"] not in ("burst", "conflict"))
+    n_mapped = sum(1 for r in records if r["role"] not in ("burst", "conflict", "offgame"))
     n_bursts = sum(1 for r in records if r["role"] == "burst")
     n_conflicts = sum(1 for r in records if r["role"] == "conflict")
+    n_offgame = sum(1 for r in records if r["role"] == "offgame")
     n_starved = sum(1 for v in point_view if v["starved"])
     result = {
         "video": gt.get("video"),
@@ -858,6 +905,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             "n_episodes_mapped": n_mapped,
             "n_bursts": n_bursts,
             "n_conflict_episodes": n_conflicts,
+            "n_offgame_episodes": n_offgame,
             "n_points_starved": n_starved,
             "n_false_serve_candidates": len(false_candidates),
         },

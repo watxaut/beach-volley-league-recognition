@@ -1,26 +1,29 @@
-# 20260920 match — owner-ratified SERVE ANCHORS (2026-09-27)
-
-# The owner checked the first points of the match video and dictated every
-# serve moment. These are FRAME ANCHORS for the match — the artifact the
-# match-points-v1 format deliberately does not carry. Provenance: owner
-# dictation in chat, 2026-09-27 (twenty-sixth session). Frames are owner
-# estimates read off the video (whole-second coarse); the pipeline cross-
-# checks them against emitted actions/episodes and reports conflicts instead
-# of silently trusting or overriding them.
+# 20260920 match — owner-ratified SERVE ANCHORS (2026-09-27, rounds 1+2)
+#
+# The owner dictated every serve moment for the first 15 points (round 1),
+# then adjudicated contact sheets for the disputed moments (round 2). These
+# are FRAME ANCHORS for the match — the artifact the match-points-v1 format
+# deliberately does not carry. Provenance: owner dictation in chat,
+# 2026-09-27 (twenty-sixth session). Frames are owner estimates (coarse);
+# the pipeline cross-checks them against emitted actions/episodes and
+# reports conflicts instead of silently trusting or overriding them.
 #
 # Rule confirmed by the owner: the team that WINS a point serves the next
-# one (already the mechanical derivation in
-# scripts/derive_match_serve_windows.py; cross-checked 15/15 below).
-# The owner's f230 dictation also fills the one unknown the rule cannot
-# derive: P1's server (far side = squad B).
+# one (mechanical derivation in scripts/derive_match_serve_windows.py;
+# cross-checked against every anchored side). Round-2 verdicts FORCE the
+# P13-P17 chain: P14 = serve ~f9110 (never emitted) + ep24; P15 = serve
+# f10040/10070 + ep25; P16 = serve 10541A + ep27 (ends f10865); P17 =
+# serve 11410A (the ace) + eps 29+30 — at f11050 the next server is on the
+# NEAR side, matching squad A.
 #
-# Format (one serve per line):
-#     P<k> <frame> [near|far] [verdict] [free text]
-#     FALSE <frame> [free text]        <- a "serve" the pipeline invented
+# Format (one record per line):
+#     P<k> <frame> [near|far] [verdict] [free text]   serve moment (contact)
+#     FALSE <frame> [free text]                       invented "serve"
+#     OFFGAME <start>-<end> [free text]               no point in play
 # Verdicts: TRACKED, NOT_TRACKED, MISCLASSIFIED (the serve was emitted but
 # labeled as another gesture), or none.
-
-# --- verbatim owner dictation -------------------------------------------
+#
+# --- round 1 (verbatim owner dictation) ----------------------------------
 # f230 serve far side -> ball not tracked -> serve not tracked
 # f900 serve far side, goes outside -> Not tracked -> serve not tracked
 # f1400 serve near side -> tracked
@@ -28,8 +31,8 @@
 # f2550 serve near side directly outside -> not tracked (player box freeze)
 # f3000 serve far side -> player not tracked -> serve not tracked
 # serve at f3650 is not real, the player was going to the serve location
-#   with the ball in her hands and the serve is attributed to the player
-#   on the far side
+# with the ball in her hands and the serve is attributed to the player on
+# the far side
 # f3750 serve near side
 # side switch
 # f4700 serve far side
@@ -41,22 +44,55 @@
 # f9110 serve far side is not tracked
 # f11050 serve far side is not tracked
 # I believe the ball might be tracked by the yolo model, but maybe as it
-#   starts not moving then
-# ------------------------------------------------------------------------
+# starts not moving then
+#
+# --- round 2 (contact-sheet adjudication, verbatim) ----------------------
+# q1a: serve starts at f10040, rally ends at f10200          [-> P15]
+# q1b: off game. the near side team is preparing to serve; the other
+# player in the near team throws the ball in f10356 at the player who will
+# serve; the serve still did not start at f10412 [ep26]
+# q1c: (10541) yes real serve, the rally ends at f10865       [-> P16]
+# q1d: off game, the far team is passing the ball to the player who will
+# be serving on the near side [ep28]
+# q2: off game as well; the player in the near side is going to the serve
+# line on that frame; the real serve action starts at f2556
+# q3: serve action starts at f3728 and serve contact happens just before
+# f3752
+# q4a: off game; the player on the near side is going to the serve line
+# with the ball; at f6890 the serve action did not start yet
+# q4b: serve action starts at f7114 and serve contact at f7132
+# q5: off game; one player passing the ball to another; the serve action
+# starts at f14500 and contact happens just before f14520
+# q6: off game both; the hands of the player are being tracked as the
+# ball; the player is running towards the camera to recover the ball,
+# which landed behind the camera
+# q7: ball handling after point ended; there is no serve, just passing
+# the ball
+# -------------------------------------------------------------------------
 
-P1  230   far  NOT_TRACKED  ball not tracked
-P2  900   far  NOT_TRACKED  goes outside; ball not tracked
-P3  1400  near TRACKED
-P4  2150  far  NOT_TRACKED  into the net; ball not tracked
-P5  2550  near NOT_TRACKED  directly outside; player box freeze
-P6  3000  far  NOT_TRACKED  player not tracked
-FALSE 3650            not real: player walking to the serve location with the ball in her hands; the invented serve is attributed to the far-side player
-P7  3750  near         side switch AFTER this point (GT side_switch_after 7)
-P8  4700  far
-P9  5510       MISCLASSIFIED  emitted as spike hard
-P10 6000       MISCLASSIFIED  emitted as spike hard
-P11 7100       MISCLASSIFIED  emitted as dig
-P12 7780  near MISCLASSIFIED  emitted as spike touch
-P13 8506  far  NOT_TRACKED
-P14 9110  far  NOT_TRACKED
-P15 11050 far  NOT_TRACKED
+P1 230 far NOT_TRACKED ball not tracked; dig@247 = serve candidate
+P2 900 far NOT_TRACKED goes outside; ball not tracked; dig@930 = serve candidate
+P3 1400 near TRACKED
+P4 2150 far NOT_TRACKED into the net; ball not tracked
+P5 2556 near NOT_TRACKED directly outside; round-2: real serve starts f2556; 2414A = FALSE walking-to-line
+P6 3000 far NOT_TRACKED player not tracked
+FALSE 1039 hands tracked as the ball; player running towards the camera to recover the ball that landed behind the camera
+FALSE 2414 player going to the serve line (ball in hands)
+P7 3752 near NOT_TRACKED serve starts f3728, contact just before f3752
+FALSE 3650 player walking to the serve location with the ball in her hands; invented serve attributed to the far-side player (covers 3595A and 3856B)
+P8 4700 far NOT_TRACKED
+FALSE 5130 ball handling after the point ended; no serve, just passing the ball
+P9 5510 MISCLASSIFIED emitted as spike hard (contact ~5496)
+P10 6000 MISCLASSIFIED emitted as spike hard (contact ~6034)
+P11 7132 MISCLASSIFIED serve starts f7114, contact f7132 = the dig-labeled action (owner-confirmed)
+P12 7780 near MISCLASSIFIED emitted as spike touch (contact ~7780)
+P13 8506 far 8534B emitted 28f later = this serve; tracked
+P14 9110 far NOT_TRACKED
+P15 10040 far serve starts f10040 (10070B emitted = this serve; owner-confirmed); rally ends f10200
+P16 10541 near TRACKED owner-confirmed real serve; rally ends f10865
+FALSE 11050 off game: far team passing the ball to the player who will be serving on the NEAR side
+P17 11410 near TRACKED the ace (forced by the f11050 verdict)
+OFFGAME 2444-2534 q2: pre-serve ball handling (dig/overpass actions on the handled ball are false)
+OFFGAME 10314-10406 q1b: the throw from one near player to the server
+OFFGAME 11241-11327 q1d: the pass to the near-side server
+OFFGAME 14373-14479 q5: players passing the ball to each other (14387A is this pass mislabeled as a serve)
