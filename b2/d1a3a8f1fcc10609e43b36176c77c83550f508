@@ -1,0 +1,25 @@
+scripts/compare_runs.py
+  s_47883cfbca457d::t_de0d09c89cb619 1-98
+src/utils/diagnostics.py
+  s_47883cfbca457d::t_a4b7ee3fd946f1 1-154
+tests/test_diagnostics.py
+  s_47883cfbca457d::t_a7c3f7f62881d7 1-136
+tests/test_waterfall.py
+  s_47883cfbca457d::t_f9d986fd32fe7a 1-235
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "b2d1a3a8f1fcc10609e43b36176c77c83550f508",
+  "prompts": {},
+  "sessions": {
+    "s_47883cfbca457d": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "43cda942-f64e-4040-8f8e-7e2f385e3b04",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
