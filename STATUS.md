@@ -17,7 +17,26 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-29 (thirty-first session — action-reliability T3 DONE:
+**Last updated:** 2026-09-29 (thirty-sixth session — action-reliability T4 DONE:
+loss waterfall on the dev clip. `--diag-dump` writes a per-frame JSONL of what
+each stage already computed, from inside the shared `FrameProcessor.process_frame`
+(`src/utils/diagnostics.py`; `if self.diag_enabled:` guards, default OFF, config
+key `diag_dump` + config-drift guard extension); `scripts/waterfall.py` walks the
+7-stage chain per GT contact and imports the T3 matcher so the two agree;
+`scripts/compare_runs.py` is the byte-identity gate helper. BASELINE (first
+dev-clip run ever, `--device cpu`): contact P 0.586 / R 0.607 / F1 0.597, class
+0.706, team 0.706, 1 dup, 2.703 FP/dead-min, points 6/2/0 mean IoU 0.707.
+WATERFALL: detection 0, admission 0, candidate 6, gate 5 (all reach), actor/team 5
+(4 = post-P7 side switch), label 4, survives 8; FPs 8 in-point / 3 dead-time /
+1 dup. FINDING: 5 of the 6 candidate deaths are serves where the detector DOES
+see the ball (conf 0.74-0.87) and the tracker says `unlocked_no_motion` on
+19-25 of 31 window frames — a toss apex slower than `lock_min_speed = 8 px/f`
+cannot re-lock. T5 next: ONE mechanism, ball-tracker serve admission. Gates:
+hooks-off == pre-change HEAD byte-identical on dev + e3 + e1, hooks-on ==
+hooks-off byte-identical, +37 tests, suite 685. Table:
+`docs/t4_loss_waterfall_dev_clip.md`.)
+
+**Previous (thirty-first session — action-reliability T3 DONE:
 `scripts/evaluate_timed.py`, the TIME-MATCHED evaluator (a sibling of
 `evaluate.py`, which is untouched). One-to-one optimal assignment on time
 distance, tolerance `max(0.2 s, GT frame_tolerance/fps)`, per-frame PTS when
@@ -133,14 +152,21 @@ implementation backlog below remains unchanged.
   P32's serve + 6928A's verdict + P20's window/re-serve question sit in
   the round-3 owner queue.
 
-**Action-reliability track (session 31):** executable plan derived from the
-astra assessment lives in `docs/action_reliability_plan.md` (tasks T1–T15,
-status per task). Dev clip = `video_ari_joan_8_first_points.mp4` (had NO
-calibration → court signals silently dropped); T1 readiness DONE (main +
-probe scripts); held-out recording OPEN (fisheye Vall Hebron rejected);
-T2 dev-clip GT DONE; **T3 time-matched evaluator DONE
-(`scripts/evaluate_timed.py`)**; next = T4 loss waterfall (needs a dev-clip
-pipeline output, which does not exist yet — `output/` has none for that clip).
+**Action-reliability track (session 36):** executable plan lives in
+`docs/action_reliability_plan.md` (T1–T15, status per task). Dev clip =
+`video_ari_joan_8_first_points.mp4`; T1 readiness DONE, T2 dev-clip GT DONE,
+T3 time-matched evaluator DONE, **T4 loss waterfall DONE**. The dev clip now
+HAS a pipeline output: `evaluate_timed --ignore-player` gives contact P 0.586 /
+R 0.607 / **F1 0.597**, class 0.706, team 0.706, 1 duplicate, 2.703 FP per
+dead-time minute, points 6 matched / 2 missed / 0 spurious (mean IoU 0.707).
+Waterfall (`docs/t4_loss_waterfall_dev_clip.md`): 0 detection, 0 admission,
+**6 candidate, 5 gate (all reach), 5 actor/team, 4 label, 8 survives**;
+FPs 8 in-point spurious / 3 dead-time / 1 duplicate. **Root cause found: 5 of
+the 6 stage-3 deaths are serves where the detector DOES see the ball
+(conf 0.74–0.87, no suppression) while the tracker is `unlocked` with
+`unlocked_no_motion` on 19–25 of 31 window frames** — the toss apex never
+meets `lock_min_speed = 8 px/f`. Next = **T5: one mechanism, ball-tracker
+serve (re-)admission** (owner approval pending).
 
 **Active next (ranked, goal-driven — see North-star).** (1) **21.3 point
 winner/outcome layer** — G1's biggest missing signal; the anchored map +
@@ -443,6 +469,12 @@ survive across sessions; provenance in the archives.
   is 2.5 m in ground metres.
 - A "detection gap" is often tracker admission/gating, not recall — probe
   raw detector output before calling recall (entreno lessons 1c/serve-zone).
+- The loss waterfall (T4, dev clip) makes that concrete for serves: at all 5
+  lost serves the detector fires (conf 0.74–0.87, `removed=false`) while the
+  tracker reports `unlocked_no_motion` on 19–25 of the 31 window frames — a
+  toss apex slower than `lock_min_speed = 8 px/f` cannot (re-)lock. Serve loss
+  is a BALL-TRACK ADMISSION class, not detection and not the serve-action gate
+  STATUS open point 22 measured on the match.
 
 **Perf**
 - Pose gating SHIPPED in the shared classifier (staleness 30f + near-ball
@@ -491,6 +523,7 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - GT `touch_number` is PER-POSSESSION, never rally-global: serve = 1, the receiving team restarts at 1 (dig 1, set 2, spike/overpass 3) and the count resets on every side change (`ground_truth/README.md`, entreno_3 JSON). T2 contact GT now emits that; `possession_touch_numbers()` in `scripts/build_dev_clip_gt.py` is the reference.
 - In the pipeline taxonomy a set/dig that crosses the net is `final_action=overpass` (ActionContextResolver: overpass = sent over without an attack) with the gesture kept separately — T2 GT applies this to owner wording and flags it via `owner_interpretation_flag` for owner ratification.
 - Where owner-dictated CONTACTS exist they are the authoritative contact list: draft/suggested events are never appended to `events`, they move to `points[].superseded_draft_events` with the owner contact each duplicates (matched by same squad within the coarse ±15f window) so no prediction is lost.
+- 2026-09-29 **#36** — T4 loss waterfall SHIPPED: off-by-default `--diag-dump` capture in the shared frame path (`src/utils/diagnostics.py`) + `scripts/waterfall.py` + `scripts/compare_runs.py`; dev clip F1 0.597, 5 of 6 candidate deaths are serves lost to `unlocked_no_motion`; byte-identical on dev/e3/e1 with hooks off and on; +37 tests, suite 685 (Log below).
 - 2026-09-29 **#35** — T3 time-matched evaluator SHIPPED: `scripts/evaluate_timed.py` (+23 tests, suite 648); optimal one-to-one assignment in seconds, PTS-aware time base, separate contact/class/team/actor scores + duplicates + FP-per-dead-minute + point IoU, `--autonomous` GT-input guard; entreno gate reproduces `evaluate.py`'s F1s at the same tolerance window.
 - 2026-09-29 **#34** — T2 contact-GT code review fixed (3 defects: rally-global → per-possession `touch_number`, draft/suggested duplicates moved to `superseded_draft_events` (15 of them, `events` == the 28 owner contacts), cross-net set → `overpass` + `owner_interpretation_flag`); +9 tests, suite 625.
 - 2026-09-29 **#33** — T2 contact-level GT wired: `scripts/build_dev_clip_gt.py` parses the owner's `20260920_match_ari_joan_contacts_p1_p8.txt` (28 contacts, P1–P8, coarse ±10–15f, side-switch after P7) and emits `video_ari_joan_8_first_points_annotations.json` with status OWNER_DICTATED, per-contact `frame_tolerance: 15`, owner track id/side/note kept raw; +6 parser tests, suite 612.
@@ -536,6 +569,70 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+
+### 2026-09-29 (thirty-sixth session) — T4 loss waterfall on the dev clip: diagnose only, one root cause found (serve-time ball-track admission)
+
+- **Scope:** locate, per GT contact, the FIRST stage where it dies. NO
+  decision/threshold change; the only production change is inert capture.
+- **Step 1 — the first dev-clip run that ever existed**
+  (`--device cpu`, calibration auto-detected, T1 readiness green) into
+  `output/t4/base_dev`, then `scripts/evaluate_timed.py --ignore-player`:
+  contact P 0.586 / R 0.607 / **F1 0.597** (tp 17, fp 12 of which 1 duplicate,
+  fn 11), class 0.706, team 0.706, 2.703 FP per dead-time minute (4 FP over
+  1.48 dead min of 172.0 s), points 6 matched / 2 missed / 0 spurious, mean
+  temporal IoU 0.707. Baseline A/B dumps for the byte gates (dev + e3 + e1)
+  were taken from clean HEAD BEFORE any edit, per the standing rule.
+- **Step 2 — diagnostic capture (off by default).** `src/utils/diagnostics.py`
+  (`DiagRecorder` + `load_diag`, JSONL: a `meta` header line then one record
+  per frame) wired into the ONE shared `FrameProcessor.process_frame`: raw ball
+  candidates with their `persist`/`suspect`/`removed` flags (BallDetector),
+  tracker state + the branch/reason it took (BallTracker, via a thin `update`
+  wrapper around the untouched body), player boxes/ids/team, contact probes
+  incl. refusals with the gate that refused them, and the accepted contact with
+  actor/team/attribution source + resolved action/touch/rally (ActionClassifier).
+  All hooks are `if self.diag_enabled:` guards around values that already
+  exist; `diag_dump` is a real config key (None by default) wired to
+  `--diag-dump`, with a config-drift guard section pinning key-exists /
+  off-by-default / CLI-wired / no-mirror-while-off.
+- **Step 3 — `scripts/waterfall.py`.** Per GT contact, walks the 7-stage chain
+  inside the T3 tolerance window and blames the first failure; the GT/prediction
+  pairing is IMPORTED from `evaluate_timed.match_events` (never reimplemented),
+  and actions/candidates are keyed by CONTACT frame. FPs are classified by
+  source: duplicate / dead-time / in-point spurious, each annotated with the
+  candidate that produced it. `scripts/compare_runs.py` is the byte-identity
+  gate helper (ignores only `processed_at` and the three wall-clock rows of
+  `results_statistics.csv`).
+- **Result (`docs/t4_loss_waterfall_dev_clip.md`):** 0 raw detection, 0 track
+  admission, **6 candidate, 5 gate (all `reach`), 5 actor/team, 4 label, 8
+  survive**; FPs 8 in-point spurious / 3 dead-time / 1 duplicate.
+- **The finding:** 5 of the 6 candidate deaths are the 5 lost serves, and there
+  the detector DOES see the ball — 18–23 raw candidates per window at conf
+  0.74–0.87, `removed=false`, `suspect` almost never — while the tracker is
+  `unlocked` reporting `unlocked_no_motion` on 19–25 of the 31 window frames
+  (one `bootstrap_locked` frame, then `coast_short_trajectory`). The toss apex
+  never produces the >=8 px/f near-consecutive motion pair the bootstrap needs.
+  So the serve class is a BALL-TRACK ADMISSION loss, one layer earlier than both
+  the "serve-action gate" of STATUS point 22 (match footage) and the plan's
+  "candidate recovery" option — and it also explains the 4 false-positive
+  `serve` actions (same toss class, mistimed).
+- **Secondary, orthogonal:** 4 of the 5 actor/team deaths are P8 — exactly the
+  post-P7 side switch the owner dictated (near = B from P8). That is open point
+  2 / task T14, deliberately NOT the T5 mechanism. The 5 gate deaths are all the
+  `reach` gate; the 4 label deaths are 3 overpasses read as spike/set/dig plus
+  P7 f3852's set read as a serve.
+- **Gates (a)-(d) all green:** hooks off == pre-change HEAD byte-identical on
+  dev + e3 + e1 (only `processed_at` and the wall-clock statistic rows differ);
+  hooks on == hooks off byte-identical on the dev clip (and the evaluate_timed
+  numbers are unchanged); +37 unit tests (22 waterfall stage/precedence/FP, 11
+  diagnostics + compare_runs, 4 config-drift); suite **685**.
+- Files: `src/utils/diagnostics.py` (new), `src/utils/config.py`,
+  `src/detection/ball_detector.py`, `src/tracking/ball_tracker.py`,
+  `src/recognition/action_classifier.py`, `src/analysis/frame_processor.py`,
+  `src/main.py`, `scripts/waterfall.py` (new), `scripts/compare_runs.py` (new),
+  `tests/test_waterfall.py` (new), `tests/test_diagnostics.py` (new),
+  `tests/test_config_drift.py`, `docs/t4_loss_waterfall_dev_clip.md` (new),
+  `docs/action_reliability_plan.md`, STATUS.md.
+
 
 ### 2026-09-28 (twenty-eighth session) — open point 22 mechanism 3 SHIPPED: pass-2 serve re-labeling; far prefix 2/8 → 8/8; all owner verdicts reproduce mechanically
 
@@ -654,124 +751,3 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - Codified as AGENTS.md §6 (pass-2 interpretation layer). Session #24's
   Log entry archived verbatim (live Log trimmed back to 3). No files
   under src/, no GT edits, suite untouched (525).
-
-### 2026-09-27 (twenty-sixth session) — open point 22, mechanism 1: anchor-free episode→GT-point order map + far/near serve census on TRUE windows
-
-- **Goal trace:** the map is the backbone of per-point fantasy lines
-  (G1) and the pre-condition for the serve census the owner asked for at
-  v3 adoption. Inputs: the posegate production run
-  (`output/match20260920_posegate/`), the dictated GT
-  (`ground_truth/20260920_match_points.json`, NO frame anchors), the
-  mechanical serve derivations (#22). No pipeline code touched; no video
-  decoded (CSV/JSON only — VFR-seek safe); no GT edits.
-- **Diagnose first:** episode features extracted from
-  `results_game_state.csv` + `pipeline_output.json`: 57 episodes, 18-ish
-  overlapping confirmed points, 20 serve actions (all `touch_number=1`,
-  15 of them emitted OUTSIDE episode spans — 5-30f before `game_on`
-  fires: the late-game_on family). Expected serve letters derived
-  mechanically (winner-serves × side switches): 16 near / 16 far, only 5
-  far-side serves observed → the owner's complaint was already visible in
-  the raw data.
-- **Shipped (`scripts/map_episodes_to_points.py`, +34
-  tests/test_episode_point_map.py):** monotone DP alignment over states
-  (episodes consumed, points closed, LAST episode touching the open
-  point) with actions open/attach/close/starve/burst. Link evidence:
-  emitted-serve side match ±(60/30)f window (strong), confirmed-point
-  overlap ±30f, description-implied rally size (ace/serve-fault → 1-2
-  contacts, "big rally" → 4-12, else 2-6). Physics constraints, each
-  installed after the production run exposed its violation: (1) attach
-  only across ≤150f game_off gaps (real mid-rally splits measure 11-115f;
-  before this, P24 hoarded 5 rallies across 126s and the DP burst a
-  671f/13-action confirmed rally to protect tail serve alignments);
-  (2) confirmed/action-rich episodes can NEVER burst (a rally is a
-  point); (3) point numbers carried in the backpointer walk, never
-  re-counted (a starved point shifts naive counters); (4) serve actions
-  attribute to EXACTLY ONE point (nearest episode span — adjacent windows
-  overlap by the ± serve margins).
-- **Map result (output/episode_point_map.json, provenance recorded):** 45
-  episodes → all 33 points (33 openers + 12 attaches), 12 bursts (all
-  unconfirmed flickers/dead-ball handling), 0 starved points. Spot checks:
-  P1=ep0 (first-confirmed ✓), P19=ep34+35 (25f flicker split), P20=ep36+37
-  (serve + re-serve reading of the two A-serves), P8/P13/P15 serve letters
-  match. **Census on TRUE windows: near 11/16 serve actions emitted (69%,
-  11/11 side-consistent); far 4/16 clean (25%) + 2 emitted-but-mismatched
-  (P4 f1396A, P23 f17159A) — far-side serve-ACTION loss ~2-3× near, both
-  mismatches in far windows (consistent with the width-band side signal
-  degrading far, AGENTS.md §5). P2 verdict: serve MISSING — the #22
-  specimen (ball tracked, emission lost) confirmed on the full map.**
-  Unattributed: f6928 (P12's serve, emitted with NO episode within ±120f
-  — that rally never gathered at all).
-- **Owner adjudication flags (NOT auto-fixed):** P4 "P1 fails serve"
-  (description player vs winner-serves rule → B); P7/P20 double-serve
-  points (re-serve vs misattribution); P23 = ep41+42 with ep42's serve
-  mismatched (count-forced cascade from P26); P26 = 4 episodes/39s
-  (gap+count-forced; likely a GT boundary question at P26/P27 — the
-  episodes are 37/48/81f apart, contiguous play).
-- **Mid-session: the owner RATIFIED serve anchors** (P1-P15 + FALSE@3650,
-  verbatim in `ground_truth/20260920_match_serve_anchors.txt`): every
-  serve moment with side + verdict, the winner-serves rule confirmed, and
-  P1's unknown server filled (f230 far side = squad B). The map ingests
-  them (`--serve-anchors`): anchored prefix (opener = first episode in
-  [s-180, s+300]; attach chain ≤150f gaps, never across a serve marker;
-  emission window [s-180, s+120]; boundary conflicts and false-positive
-  serve candidates REPORTED) + DP tail for P16-33. The anchors exposed and
-  fixed real map errors: f1396A is P3's serve (not P4's), P10's big rally
-  = eps 17+18+19 (gaps 9f/20f), P11 = ep20, P12 = ep21 (the DP had burst
-  it), P26/P27 split correctly once the serve-crossing rule landed. The
-  owner's four misclassification verdicts REPRODUCE MECHANICALLY (P9
-  spike@5496, P10 spike@6034, P11 dig@7132, P12 spike-touch@7780).
-- **Probe (`scripts/probe_serve_tracking.py`):** production + raw (no
-  static suppression) detectors strictly inside the 15 anchored windows,
-  sequential CPU decode of the _up1080 file. VERDICT: dets present at
-  EVERY serve (prod conf 0.86-0.92; the "NOT_TRACKED" P1/P2/P4/P6/P8/P14
-  all covered) and the ≥8px/f bootstrap pair exists within ~±25f of every
-  anchor (P2 boot@890 vs owner f900). DETECTION IS NOT THE LOSS. Real
-  mechanisms: (a) serve-ACTION gate (contact before game_on arms); (b)
-  bump-serve gesture misclassification (dig/spike labels AT the anchors —
-  incl. the owner's four + likely P1/P2/P4/P14); (c) static suppression
-  only on P15's slow float serve (raw 91 vs prod 58 frames, median motion
-  2.1 px/f; P4 partial 17 frames). False-positive serves are a real class
-  (owner FALSE@3650; candidates 1039A, 5130B, 10070B, 10541A).
-- **Mid-session round 2: the owner adjudicated 11 contact sheets**
-  (`scripts/contact_sheet.py`, raw-detector overlays + anchor/action
-  marks) covering every disputed moment. Verdicts: 7 emitted serves are
-  FALSE (carried ball / walking to the line / teammate ball-passing);
-  P5/P7/P11/P15/P16/P17/P20 real serve moments pinned (several confirming
-  that the "missing" serves sit at dig/spike-labeled actions); 4 episodes
-  are OFF-GAME ball handling. The P13-P17 chain is forced by the f11050
-  verdict (next server near-side → P17's ace 11410A). Anchored map
-  re-run: prefix P1-P17 ratified, OFFGAME ranges force-burst episodes
-  (8, 26, 28, 36), FALSE-marked serves removed globally. Final anchored
-  census: near 7/16 clean + 4 misclassified (P9-P12), far 5/17 clean
-  (P13, P15 + tail P27, P33) + 4 misclassified candidates (P1, P2, P4,
-  P14) + 2 tail side-mismatches (P23, P31, DP-inferred). Tail caveats:
-  ep45 (confirmed 1-dig at f19857, unattachable) forces P20's
-  owner-confirmed serve (14516A) to burst — needs P18-P20 anchors or an
-  ep45 verdict (round 3). A brute-force check of the tail DP (43.0 =
-  43.0) proved the alignment optimal under the current constraints.
-- **Suite:** 491 → **525** (+34; all green incl. the full suite).
-  Byte-parity trivially unaffected (no `src/` changes). FLAKE OBSERVED
-  (pre-existing, reproves on clean HEAD): #25's
-  `test_stop_without_flush_discards_tail` failed once in a full-suite run
-  (flush_calls 1 != 0 — `stop.set()` races the producer's flush) and
-  passed 8/8 in isolation + on re-runs; not touched this session, needs a
-  deterministic gate if it recurs.
-- Files: scripts/map_episodes_to_points.py,
-  scripts/probe_serve_tracking.py, ground_truth/
-  20260920_match_serve_anchors.txt, tests/test_episode_point_map.py,
-  output/episode_point_map.json + output/probe_serve_tracking.json
-  (git-ignored), STATUS.md.
-
-## Useful commands
-
-```bash
-# tracking quality (no GT needed) — the main iteration loop
-python scripts/dump_player_tracks.py resources/video_entreno_1.mp4 --max-players 4
-python scripts/analyze_tracking.py output/video_entreno_1_tracks.json --max-players 4
-
-# full test suite (cov addopts are broken w/o pytest-cov; override them)
-venv/bin/python -m pytest tests/ -o addopts=""
-
-# full pipeline on a video
-python -m src.main <video.mp4> --court calibrations/<name>.json
-```

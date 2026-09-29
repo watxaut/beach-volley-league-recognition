@@ -113,6 +113,16 @@ def parse_arguments() -> argparse.Namespace:
              "probing, never for reported numbers."
     )
 
+    parser.add_argument(
+        "--diag-dump",
+        type=str,
+        help="Diagnostic capture (task T4): write a per-frame JSONL dump of raw ball "
+             "detections + suppression flags, ball-tracker state/reason, player tracks, "
+             "contact candidates (incl. rejected ones + the gate that refused them), "
+             "actor/team and the emitted label. Off by default and inert when off; "
+             "consumed by scripts/waterfall.py."
+    )
+
     return parser.parse_args()
 
 
@@ -141,6 +151,14 @@ def validate_inputs(video_path: str) -> Path:
     return video_file
 
 
+def _close_diagnostics(processor) -> None:
+    """Flush the T4 diag dump when the processor owns a FrameProcessor."""
+    frame_processor = getattr(processor, "frame_processor", None)
+    closer = getattr(frame_processor, "close_diagnostics", None)
+    if closer is not None:
+        closer()
+
+
 def main() -> int:
     """Main function to run the volleyball video analysis.
 
@@ -164,6 +182,8 @@ def main() -> int:
 
         # Load configuration
         config = Config.load(args.config) if args.config else Config.default()
+        if args.diag_dump:
+            config["diag_dump"] = args.diag_dump
 
         # Sub-1080p sources are upscaled ONCE (cached next to the original)
         # before anything reads them: the pixel-space constants downstream
@@ -239,6 +259,7 @@ def main() -> int:
             debug_processor.process_video_live(
                 str(video_file), save_video=save_path, display=args.debug_live
             )
+            _close_diagnostics(debug_processor)
             return 0
 
         # Batch processing
@@ -269,6 +290,7 @@ def main() -> int:
 
         logger.info("Analysis completed successfully!")
         logger.info(f"Results saved to: {output_dir}")
+        _close_diagnostics(processor)
 
         return 0
 

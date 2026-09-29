@@ -20,6 +20,7 @@ from ..recognition.pose_estimator import PoseEstimator
 from ..recognition.action_classifier import ActionClassifier
 from .game_state_manager import GameStateManager
 from .spike_analyzer import SpikeAnalyzer
+from ..utils.diagnostics import DiagRecorder
 
 
 class FrameProcessor:
@@ -46,7 +47,28 @@ class FrameProcessor:
         if calibration_path:
             self.court_calibration = CourtCalibration(calibration_path)
 
+        # T4 diagnostic capture (OFF unless the ``diag_dump`` config key is set
+        # -- `--diag-dump <path>` on the CLI). It observes values the pipeline
+        # has already computed; see src/utils/diagnostics.py.
+        self.diag: Optional[DiagRecorder] = None
+
         self._initialize_components()
+        self._enable_diagnostics()
+
+    def _enable_diagnostics(self) -> None:
+        """Create the diag recorder and turn the component sinks on.
+
+        No-op unless ``diag_dump`` is configured, which is why batch, live
+        debug and the GT probe scripts all keep byte-identical output.
+        """
+        path = self.config.get("diag_dump")
+        if not path:
+            return
+        self.diag = DiagRecorder(str(path))
+        for component in (self.ball_detector, self.ball_tracker,
+                          self.action_classifier):
+            component.diag_enabled = True
+        self.logger.info("Diagnostic capture ON -> %s", path)
 
     def _initialize_components(self) -> None:
         """Initialize all computer vision components.
@@ -198,6 +220,8 @@ class FrameProcessor:
         """Setup components with video FPS information."""
         if hasattr(self.game_state_manager, "set_video_info"):
             self.game_state_manager.fps = fps
+        if self.diag is not None:
+            self.diag.fps = fps
 
     def setup_video_dimensions(self, width: int, height: int) -> None:
         """Setup components with video dimensions."""
@@ -234,6 +258,12 @@ class FrameProcessor:
         }
 
         start_time = time.time()
+
+        # Bound up front so the diagnostic mirror below sees the frame's real
+        # state even if a stage raised (the except branch keeps the run going).
+        ball_detections: List[Dict[str, Any]] = []
+        tracked_ball: Optional[Dict[str, Any]] = None
+        tracked_players: List[Dict[str, Any]] = []
 
         try:
             # 0. Court is pre-calibrated -- just ensure mask exists
@@ -308,8 +338,70 @@ class FrameProcessor:
         except Exception as e:
             self.logger.error(f"Error processing frame {frame_index}: {e}")
 
+        if self.diag is not None:
+            self._record_diagnostics(
+                frame_index, ball_detections, tracked_ball, tracked_players,
+                frame_result.get("actions") or [],
+            )
+
         frame_result["processing_time"] = time.time() - start_time
         return frame_result
+
+    def _record_diagnostics(
+        self,
+        frame_index: int,
+        ball_detections: List[Dict[str, Any]],
+        tracked_ball: Optional[Dict[str, Any]],
+        tracked_players: List[Dict[str, Any]],
+        actions: List[Dict[str, Any]],
+    ) -> None:
+        """Mirror this frame's already-computed state into the diag dump.
+
+        Runs inside the ONE shared ``process_frame`` path (AGENTS.md: no
+        divergent fast paths) and only ever reads existing values.
+        """
+        assert self.diag is not None
+        # Raw candidates, with what static suppression did to each.
+        self.diag.add_frame(frame_index, {
+            "ball_dets": self.ball_detector.pop_diag(),
+            "ball_track": self.ball_tracker.pop_diag(),
+            "players": [
+                {
+                    "track_id": p.get("track_id"),
+                    "team": p.get("team"),
+                    "bbox": p.get("bbox"),
+                    "center": p.get("center"),
+                    "predicted": bool(p.get("predicted", False)),
+                    "confidence": p.get("confidence"),
+                }
+                for p in tracked_players
+            ],
+            # Emitted actions are keyed by their CONTACT frame, not by the
+            # frame they were confirmed on.
+            "actions": [dict(a, frame=a.get("frame_number", frame_index))
+                        for a in actions],
+        })
+        # No player tracks at all: the classifier was never asked, which is a
+        # distinct (and reportable) loss stage.
+        if not tracked_players:
+            self.diag.add_section("candidates", [{
+                "frame": frame_index - self.action_classifier.CONTACT_DELAY,
+                "seen_at": frame_index, "stage": "rejected",
+                "reason": "no_players_tracked",
+            }])
+        self.diag.add_section("candidates", self.action_classifier.pop_diag())
+
+    def close_diagnostics(self) -> Optional[str]:
+        """Flush the diag dump (if enabled) and return its path."""
+        if self.diag is None:
+            return None
+        # The end-of-video flush finalises the last contact outside
+        # process_frame; capture its records too.
+        if self.action_classifier.diag_enabled:
+            self.diag.add_section("candidates", self.action_classifier.pop_diag())
+        path = self.diag.write()
+        self.logger.info("Diagnostic capture written: %s", path)
+        return path
 
     def flush_actions(self) -> List[Dict[str, Any]]:
         """Return the last action(s) the classifier held back for look-ahead.
@@ -337,6 +429,10 @@ class FrameProcessor:
         self.game_state_manager.observe_flushed_actions(visible)
         self.game_state_manager.finish()
         self.spike_analyzer.flush()
+        if self.diag is not None:
+            self.diag.add_section("candidates", self.action_classifier.pop_diag())
+            self.diag.add_section("actions", [dict(a, frame=a.get("frame_number"))
+                                              for a in actions if isinstance(a, dict)])
         return actions
 
     def reset_trackers(self) -> None:

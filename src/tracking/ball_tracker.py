@@ -157,6 +157,14 @@ class BallTracker:
         self._await_reentry = False
         self._reentry_anchor: Optional[List[float]] = None
 
+        # T4 diagnostics: OFF by default. `update` records the branch it took
+        # (lock / admission / coast / gate miss / re-entry wait) in
+        # `_diag_reason`; `pop_diag` hands the mirror to FrameProcessor. Pure
+        # observation -- no branch, threshold or return value depends on it.
+        self.diag_enabled = False
+        self._diag_reason: str = "none"
+        self._diag_last: Optional[Dict[str, Any]] = None
+
         self.logger = logging.getLogger(__name__)
 
     def set_court_bounds(self, bounds: tuple) -> None:
@@ -168,6 +176,33 @@ class BallTracker:
         self.court_bounds = bounds
 
     def update(self, detections: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Update tracker with new detections (thin diagnostic wrapper).
+
+        The body lives in :meth:`_update` unchanged; this wrapper only mirrors
+        the state/reason when ``diag_enabled`` (off by default).
+        """
+        self._diag_reason = "locked" if self.locked else "unlocked"
+        result = self._update(detections)
+        if self.diag_enabled:
+            self._diag_last = {
+                "state": ("tracked" if result is not None and not result.get("is_predicted")
+                          else "predicted" if result is not None
+                          else "none"),
+                "locked": self.locked,
+                "missing": self.missing_count,
+                "await_reentry": self._await_reentry,
+                "center": (result or {}).get("center"),
+                "conf": (result or {}).get("confidence"),
+                "reason": self._diag_reason,
+            }
+        return result
+
+    def pop_diag(self) -> Optional[Dict[str, Any]]:
+        """Take the diagnostic mirror of the last update (None when diag off)."""
+        last, self._diag_last = self._diag_last, None
+        return last
+
+    def _update(self, detections: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """Update tracker with new detections.
 
         Args:
@@ -183,7 +218,9 @@ class BallTracker:
         lock_low = self._tier(detections, self.locked_low_conf_floor)
 
         if not self.locked:
-            return self._try_lock(valid, boot_low)
+            out = self._try_lock(valid, boot_low)
+            self._diag_reason = "bootstrap_locked" if out is not None else "unlocked_no_motion"
+            return out
 
         if not valid:
             # No high-tier candidate this frame: the ball most likely dropped
@@ -195,16 +232,23 @@ class BallTracker:
             if not self._await_reentry:
                 low = self._select_low_candidate(lock_low)
                 if low is not None:
+                    self._diag_reason = "low_floor_admitted"
                     return self._accept_detection(low)
+            self._diag_reason = ("await_reentry" if self._await_reentry
+                                 else "no_high_tier_candidate")
             return self._handle_missing()
 
         if self._await_reentry:
             best = self._select_reentry(valid)
+            self._diag_reason = "reentry_gate_admitted" if best is not None else "reentry_gate"
         else:
             best = self._select_candidate(valid)
         if best is None:
+            if self._diag_reason in ("locked", "reentry_gate_admitted"):
+                self._diag_reason = "trajectory_gate_miss"
             return self._handle_missing()
 
+        self._diag_reason = "locked_admitted"
         return self._accept_detection(best)
 
     def _tier(self, detections: List[Dict[str, Any]],
@@ -349,11 +393,13 @@ class BallTracker:
         if _dist(top_all) <= gate:
             return top_all
         if not top_all.get("stationary_suspect"):
+            self._diag_reason = "primary_out_of_gate"
             return None
 
         plausible = [d for d in detections if not d.get("stationary_suspect")]
         in_gate = [(_dist(d), d) for d in plausible if _dist(d) <= gate]
         if not in_gate:
+            self._diag_reason = "suspect_blocker_no_candidate"
             return None
         min_dist = min(dist for dist, _ in in_gate)
         tied = [d for dist, d in in_gate
@@ -469,16 +515,22 @@ class BallTracker:
                     self._reentry_anchor = list(self.last_position)
                 if self.missing_count > 2 * self.max_missing_frames:
                     self._reset_tracker()
+                    self._diag_reason = "track_reset_lost"
+                else:
+                    self._diag_reason = "out_of_view_reentry_wait"
                 return None
 
         if self.missing_count > self.max_missing_frames:
             self._reset_tracker()
+            self._diag_reason = "track_reset_lost"
             return None
 
         # Conservative prediction: only if we have good velocity data
         if self.last_position is None or self.last_velocity is None:
+            self._diag_reason = "coast_no_velocity"
             return None
         if len(self.trajectory) < 3:
+            self._diag_reason = "coast_short_trajectory"
             return None
 
         predicted = self._predict_position()
@@ -487,9 +539,11 @@ class BallTracker:
 
         # Reject if outside court bounds
         if not self._in_court_bounds(predicted):
+            self._diag_reason = "prediction_out_of_bounds"
             return None
 
         confidence = max(0.05, 0.3 - 0.03 * self.missing_count)
+        self._diag_reason = "coast_predicted"
 
         return {
             "center": predicted,

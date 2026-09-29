@@ -325,3 +325,46 @@ def test_inline_fallbacks_match_defaults():
     # Guard the guard: the scan must still be finding the wiring surface.
     assert seen >= 40, "fallback scan went near-empty -- files or matcher moved?"
     assert not problems, "\n" + "\n".join(problems)
+
+
+# ---------------------------------------------------------------------------
+# 5. Diagnostic-capture keys (T4): the flags must exist and default OFF
+# ---------------------------------------------------------------------------
+# A diagnostic key that silently defaults ON would put the hooks on every
+# production/live/probe run, which is exactly the "divergent fast path" the
+# shared-path rule forbids. These tests pin: the key exists, it is off, and the
+# CLI actually wires it (a flag nobody reads is a dead key, the mirror image of
+# the inline-fallback landmine above).
+
+def test_diag_dump_key_exists_and_is_off_by_default():
+    assert "diag_dump" in DEFAULTS
+    assert DEFAULTS["diag_dump"] is None, (
+        "diag_dump must default to None: the T4 diagnostic hooks are inert "
+        "unless a path is configured (byte-identical output requirement)."
+    )
+
+
+def test_frame_processor_reads_the_diag_dump_key():
+    src = (ROOT / "src" / "analysis" / "frame_processor.py").read_text()
+    assert 'self.config.get("diag_dump")' in src, (
+        "FrameProcessor must gate the recorder on the diag_dump config key"
+    )
+
+
+def test_main_cli_wires_diag_dump_into_the_config():
+    src = (ROOT / "src" / "main.py").read_text()
+    assert '"--diag-dump"' in src
+    assert 'config["diag_dump"] = args.diag_dump' in src, (
+        "--diag-dump is parsed but never reaches the config"
+    )
+
+
+def test_diag_sinks_are_inert_unless_enabled():
+    """Components must not build any diag state when diag_enabled is False."""
+    from src.tracking.ball_tracker import BallTracker
+
+    tracker = BallTracker()
+    assert tracker.diag_enabled is False
+    tracker.update([{"center": [10.0, 10.0], "bbox": [5, 5, 15, 15],
+                     "confidence": 0.9}])
+    assert tracker.pop_diag() is None, "diag mirror built while diag is off"

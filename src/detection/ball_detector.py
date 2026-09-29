@@ -103,6 +103,13 @@ class BallDetector(BaseDetector):
         # Rolling history of per-frame detection centers (all passing detections,
         # pre-suppression) used to detect stationary courtside balls.
         self._recent_centers: deque = deque(maxlen=static_window)
+        # T4 diagnostics: OFF by default. When FrameProcessor enables it, every
+        # candidate (including the ones static suppression removes) is mirrored
+        # here with its persistence fraction, so the loss waterfall can see what
+        # the suppression stage dropped. Pure observation -- no effect on the
+        # returned detections.
+        self.diag_enabled = False
+        self._diag_dets: List[Dict[str, Any]] = []
 
         self.load_model()
 
@@ -172,6 +179,8 @@ class BallDetector(BaseDetector):
         if not self.validate_frame(frame):
             return []
 
+        if self.diag_enabled:
+            self._diag_dets = []
         try:
             imgsz = self._get_imgsz(frame)
             # Custom model: all classes are balls, no filtering needed.
@@ -224,6 +233,15 @@ class BallDetector(BaseDetector):
                 survivors = []
                 for d in detections:
                     persist = self._static_persist(d["center"])
+                    if self.diag_enabled:
+                        self._diag_dets.append({
+                            "center": [float(d["center"][0]), float(d["center"][1])],
+                            "conf": float(d.get("confidence", 0.0)),
+                            "bbox": list(d.get("bbox", [])),
+                            "persist": round(float(persist), 3),
+                            "suspect": persist >= self.static_suspect_frac,
+                            "removed": persist >= self.static_persist_frac,
+                        })
                     if persist >= self.static_persist_frac:
                         continue
                     if persist >= self.static_suspect_frac:
@@ -266,6 +284,15 @@ class BallDetector(BaseDetector):
     def reset(self) -> None:
         """Clear rolling static-suppression history (call between videos)."""
         self._recent_centers.clear()
+
+    def pop_diag(self) -> List[Dict[str, Any]]:
+        """Take the diagnostic mirror of the last frame's candidates.
+
+        Empty unless :attr:`diag_enabled` was set by FrameProcessor; the caller
+        (FrameProcessor) is the only consumer, and only when diag is on.
+        """
+        dets, self._diag_dets = self._diag_dets, []
+        return dets
 
     def get_ball_trajectory(
         self, detections_sequence: List[List[Dict[str, Any]]]

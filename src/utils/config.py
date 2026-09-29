@@ -161,6 +161,15 @@ class Config:
         "frame_skip": 1,  # Process every nth frame
         "save_debug_frames": False,
         "debug_output_dir": "./debug",
+        # T4 diagnostic capture: path to write a per-frame JSONL dump
+        # (raw ball dets + suppression flags, ball-tracker state/reason,
+        # player tracks, contact candidates incl. rejections + gate reason,
+        # actor/team, gesture + resolved label) or None = OFF. Off by default
+        # and inert when off: the hooks are `if self.diag_enabled:` guards
+        # around values the pipeline already computed, so batch/live/probe
+        # output is byte-identical either way. Read by
+        # scripts/waterfall.py (see src/utils/diagnostics.py).
+        "diag_dump": None,
 
         # Model paths (optional - uses defaults if not specified)
         "ball_model_path": None,

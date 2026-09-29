@@ -241,7 +241,25 @@ class ActionClassifier:
         self._resolver = ActionContextResolver(rally_reset_gap=self.RALLY_RESET_GAP)
         self._pending: Optional[Dict[str, Any]] = None
 
+        # T4 diagnostics: OFF by default. When FrameProcessor enables it, every
+        # contact probe (accepted or refused) is mirrored into `_diag_records`
+        # keyed by its CONTACT frame, with the gate that refused it. Pure
+        # observation -- no threshold, branch or return value reads these.
+        self.diag_enabled = False
+        self._diag_records: List[Dict[str, Any]] = []
+        self._diag_seen_at: Optional[int] = None
+
         self.logger = logging.getLogger(__name__)
+
+    def _diag(self, **record: Any) -> None:
+        """Mirror one contact-probe result (no-op unless diag is enabled)."""
+        if self.diag_enabled:
+            self._diag_records.append(record)
+
+    def pop_diag(self) -> List[Dict[str, Any]]:
+        """Take the contact-probe records collected since the last call."""
+        recs, self._diag_records = self._diag_records, []
+        return recs
 
     def set_court_calibration(self, court) -> None:
         """Set court calibration for spatial reasoning."""
@@ -258,6 +276,7 @@ class ActionClassifier:
         self.pose_gate_stats = {"posed": 0, "skipped_stale": 0, "skipped_radius": 0}
         self._resolver.reset()
         self._pending = None
+        self._diag_records = []
 
     def classify_actions(
         self,
@@ -277,6 +296,10 @@ class ActionClassifier:
         """
         if frame_number is None:
             frame_number = 0
+
+        if self.diag_enabled:
+            self._diag_records = []
+            self._diag_seen_at = frame_number
 
         # Track the ball only when it is really detected (not tracker-predicted).
         if ball_info and not ball_info.get("is_predicted", False):
@@ -377,6 +400,11 @@ class ActionClassifier:
 
         chosen = self._closest_player_at(contact_frame, contact_point, target_team)
         if chosen is None:
+            self._diag(seen_at=frame_number, frame=contact_frame, stage="rejected",
+                       reason="no_player_snapshot", kind=kind,
+                       contact_point=[round(float(contact_point[0]), 1),
+                                      round(float(contact_point[1]), 1)],
+                       target_team=target_team, attribution_source=side_info.get("source"))
             return []
         pdata, distance, lr_index = chosen
         # Rally-opening serve reach: the server meets the ball at the top of
@@ -390,6 +418,10 @@ class ActionClassifier:
                 and contact_frame - self._last_contact_frame > self.RALLY_RESET_GAP):
             reach = self.SERVE_REACH_PX
         if distance > reach:
+            self._diag(seen_at=frame_number, frame=contact_frame, stage="rejected",
+                       reason="reach", kind=kind, distance=round(float(distance), 1),
+                       reach=reach, track_id=pdata.get("track_id"),
+                       player_id=lr_index, target_team=target_team)
             return []
 
         if kind == "reentry" or self._is_poke_drive(kind, out):
@@ -410,6 +442,19 @@ class ActionClassifier:
         )
         self._last_touch_team = contact_evt.get("team")
         self._last_touch_frame = contact_frame
+        self._diag(seen_at=frame_number, frame=contact_frame,
+                   stage="candidate_passed_gates", kind=kind,
+                   gesture=contact_evt["gesture"].value,
+                   gesture_confidence=contact_evt.get("gesture_confidence"),
+                   track_id=contact_evt.get("track_id"),
+                   player_id=contact_evt.get("player_id"),
+                   team=contact_evt.get("team"),
+                   near_net=contact_evt.get("near_net"),
+                   behind_baseline=contact_evt.get("behind_baseline"),
+                   ball_side=contact_evt.get("ball_side"),
+                   attribution_source=contact_evt.get("attribution_source"),
+                   contact_point=[round(float(contact_point[0]), 1),
+                                  round(float(contact_point[1]), 1)])
         # Did this touch send the ball over the net? Attacks, blocks and the
         # serve do; a dig/set keeps the ball on this side (an overpass is the
         # width-side override's job to catch).
@@ -443,8 +488,28 @@ class ActionClassifier:
         it falls below the confidence threshold."""
         resolved = self._resolver.resolve(contact_evt, next_contact)
         if resolved["confidence"] < self.confidence_threshold:
+            self._diag(stage="rejected", reason="context_confidence",
+                       frame=contact_evt["frame"],
+                       candidate_action=resolved.get("action"),
+                       confidence=round(float(resolved.get("confidence", 0.0)), 3),
+                       threshold=self.confidence_threshold,
+                       gesture=contact_evt["gesture"].value,
+                       kind=contact_evt.get("contact_kind"),
+                       track_id=contact_evt.get("track_id"),
+                       team=contact_evt.get("team"))
             return None
         cp = contact_evt["contact_point"]
+        self._diag(stage="accepted", frame=contact_evt["frame"],
+                   action=resolved["action"], gesture=contact_evt["gesture"].value,
+                   track_id=contact_evt["track_id"], player_id=contact_evt["player_id"],
+                   team=contact_evt.get("team"),
+                   team_in_possession=resolved.get("team_in_possession"),
+                   touch_number=resolved.get("touch_number"),
+                   rally_id=resolved.get("rally_id"), kind=contact_evt.get("contact_kind"),
+                   attribution_source=contact_evt.get("attribution_source"),
+                   ball_side=contact_evt.get("ball_side"),
+                   near_net=contact_evt.get("near_net"),
+                   confidence=round(float(resolved["confidence"]), 3))
         return {
             "track_id": contact_evt["track_id"],
             "player_id": contact_evt["player_id"],   # left-to-right index (GT convention)
@@ -728,12 +793,19 @@ class ActionClassifier:
         ``c`` for the detected kinds, the gap midpoint for a reentry.
         """
         if c <= self.NEIGH:
+            self._diag(seen_at=self._diag_seen_at, frame=c, stage="rejected",
+                       reason="pre_history")
             return None
         if c - self._last_contact_frame < self.MIN_CONTACT_GAP:
+            self._diag(seen_at=self._diag_seen_at, frame=c, stage="rejected",
+                       reason="min_contact_gap",
+                       gap=c - self._last_contact_frame)
             return None
 
         vertex = self._point_at(c)
         if vertex is None:
+            self._diag(seen_at=self._diag_seen_at, frame=c, stage="rejected",
+                       reason="no_ball_sighting")
             return None
 
         # Gap-bridged bounce first (see the BRIDGE_* constants): if c is the
@@ -742,14 +814,23 @@ class ActionClassifier:
         # bridge can see the touch that happened inside the gap.
         bridged = self._bridge_contact(c, vertex)
         if bridged is not None:
+            self._diag(seen_at=self._diag_seen_at, frame=c, stage="candidate_found",
+                       kind="bounce", source="bridge")
             return bridged[0], bridged[1], bridged[2], bridged[3], c
         # Reentry band next (see the REENTRY_* constants): an out-of-frame
         # excursion the tracker never bridged -- the gap endpoints are not
         # free-flight connectible and the outgoing run is attack-fast.
         reentry = self._reentry_contact(c, vertex)
         if reentry is not None:
+            self._diag(seen_at=self._diag_seen_at, frame=reentry[4],
+                       stage="candidate_found", kind="reentry", source="reentry")
             return reentry
-        return self._normal_contact_at(c)
+        normal = self._normal_contact_at(c)
+        if normal is None:
+            self._diag(seen_at=self._diag_seen_at, frame=c, stage="rejected",
+                       reason="no_contact_geometry", bridge_considered=True,
+                       reentry_considered=True)
+        return normal
 
     def _normal_contact_at(
         self, c: int
