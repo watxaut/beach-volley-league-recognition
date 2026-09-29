@@ -17,19 +17,19 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-28 (thirtieth session — documentation-only action
-reliability assessment: `docs/202609-28-astra-fix-pipeline.md`, revised to
-incorporate the companion proposal in
-`docs/20260928-space-bunny-fix-pipeline.md` (cheap portability mechanisms:
-calibration/readiness loudness, perturbation gate, per-video camera profile in
-the existing calibration artifact, adaptive width split, scale/fps/time
-normalization, dimensionless motion features, conditional learned head — with
-fact-check corrections: width bands misattribute rather than abstain,
-frame-count constants are fps-dependent, ground-homography metres are relative
-proxies, median-scale ≠ guaranteed parity, synthetic warps ≠ new viewpoints).
-Proposed held-out benchmark → evidence sidecar → multi-signal contact proposals
-→ small temporal learner → GT-free interpretation/review. Pending owner
-approval; no code, config, model, GT, or runtime changes; no tests/video runs.)
+**Last updated:** 2026-09-29 (thirty-first session — action-reliability T3 DONE:
+`scripts/evaluate_timed.py`, the TIME-MATCHED evaluator (a sibling of
+`evaluate.py`, which is untouched). One-to-one optimal assignment on time
+distance, tolerance `max(0.2 s, GT frame_tolerance/fps)`, per-frame PTS when
+the blob carries one else `frame/fps` (reported, no decode); SEPARATE scores —
+class-agnostic contact P/R/F1, class accuracy + confusion matrix, team, actor,
+duplicates, FP per dead-time minute, point intervals by temporal IoU.
+`--autonomous` refuses a prediction file carrying GT-derived inputs (winners,
+serve anchors, owner pins/verdicts, the map/re-label layers). +23 tests,
+suite 648. Gate: entreno contact F1 e1 .941 e2 .857 e3 .929 e4 1.0 e5 1.0
+e6 .933 e7 .750; at `evaluate.py`'s effective ±15f window the two agree
+exactly and the ORDERING is preserved. No dev-clip prediction output exists,
+so no dev-clip run. T4 next.)
 
 **Last implementation update:** 2026-09-28 (twenty-eighth session — POINT 22 MECHANISM
 3 SHIPPED: `scripts/relabel_serves.py` (+29 tests) — the pass-2 serve
@@ -137,7 +137,10 @@ implementation backlog below remains unchanged.
 astra assessment lives in `docs/action_reliability_plan.md` (tasks T1–T15,
 status per task). Dev clip = `video_ari_joan_8_first_points.mp4` (had NO
 calibration → court signals silently dropped); T1 readiness DONE (main +
-probe scripts); held-out recording OPEN (fisheye Vall Hebron rejected); next = T2 dev-clip GT.
+probe scripts); held-out recording OPEN (fisheye Vall Hebron rejected);
+T2 dev-clip GT DONE; **T3 time-matched evaluator DONE
+(`scripts/evaluate_timed.py`)**; next = T4 loss waterfall (needs a dev-clip
+pipeline output, which does not exist yet — `output/` has none for that clip).
 
 **Active next (ranked, goal-driven — see North-star).** (1) **21.3 point
 winner/outcome layer** — G1's biggest missing signal; the anchored map +
@@ -475,9 +478,20 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- `evaluate_timed.py`'s contact F1 is CLASS-AGNOSTIC and its tolerance is a
+  TIME, not a frame count: at `evaluate.py`'s effective ±15f window (0.5 s @
+  30 fps) the two reproduce the same 7/7 entreno F1s; at 0.2 s only e3 changes
+  (GT f69 dig / pred f76 = 0.23 s late). `evaluate.py`'s F1 is lower on e1/e2
+  because it is CLASS-AWARE — a mislabelled-but-found contact scores 0 there
+  and 1 in the class-agnostic contact score (read the confusion matrix for the
+  label half). T3, session #35.
+- No `output/` prediction exists for the dev clip
+  (`video_ari_joan_8_first_points`) — T3/T4 need one run before they can
+  report dev-clip numbers.
 - GT `touch_number` is PER-POSSESSION, never rally-global: serve = 1, the receiving team restarts at 1 (dig 1, set 2, spike/overpass 3) and the count resets on every side change (`ground_truth/README.md`, entreno_3 JSON). T2 contact GT now emits that; `possession_touch_numbers()` in `scripts/build_dev_clip_gt.py` is the reference.
 - In the pipeline taxonomy a set/dig that crosses the net is `final_action=overpass` (ActionContextResolver: overpass = sent over without an attack) with the gesture kept separately — T2 GT applies this to owner wording and flags it via `owner_interpretation_flag` for owner ratification.
 - Where owner-dictated CONTACTS exist they are the authoritative contact list: draft/suggested events are never appended to `events`, they move to `points[].superseded_draft_events` with the owner contact each duplicates (matched by same squad within the coarse ±15f window) so no prediction is lost.
+- 2026-09-29 **#35** — T3 time-matched evaluator SHIPPED: `scripts/evaluate_timed.py` (+23 tests, suite 648); optimal one-to-one assignment in seconds, PTS-aware time base, separate contact/class/team/actor scores + duplicates + FP-per-dead-minute + point IoU, `--autonomous` GT-input guard; entreno gate reproduces `evaluate.py`'s F1s at the same tolerance window.
 - 2026-09-29 **#34** — T2 contact-GT code review fixed (3 defects: rally-global → per-possession `touch_number`, draft/suggested duplicates moved to `superseded_draft_events` (15 of them, `events` == the 28 owner contacts), cross-net set → `overpass` + `owner_interpretation_flag`); +9 tests, suite 625.
 - 2026-09-29 **#33** — T2 contact-level GT wired: `scripts/build_dev_clip_gt.py` parses the owner's `20260920_match_ari_joan_contacts_p1_p8.txt` (28 contacts, P1–P8, coarse ±10–15f, side-switch after P7) and emits `video_ari_joan_8_first_points_annotations.json` with status OWNER_DICTATED, per-contact `frame_tolerance: 15`, owner track id/side/note kept raw; +6 parser tests, suite 612.
 - 2026-09-29 **#32** — T2 dev-clip GT BUILT (REVIEW, not ratified): offset map (identity, residual 0.0 at start/mid/end), `scripts/build_dev_clip_gt.py` (+25 tests), DRAFT GT for P1–P8 (8 owner serve anchors + 15 flagged suggestions + missing/fault report), ratification sheets in `output/t2_contact_sheet/`; the side switch is after P7, not P3–P4.
