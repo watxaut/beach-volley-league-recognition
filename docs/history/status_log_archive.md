@@ -7,6 +7,188 @@
 > `status_where_we_are_archive.md` (same directory); the one-line-per-session
 > index is in STATUS.md. Nothing was edited or deleted.
 
+### 2026-09-29 (thirty-seventh session) - T5 DECIDED (owner: serve-time ball-track (re-)admission) + step 1 diagnosis, diagnose only
+
+- **Owner decisions recorded:** (a) T5 mechanism = serve-time ball-track
+  (re-)admission - extend the UNLOCKED bootstrap so the far-side toss can lock
+  below `lock_min_speed = 8 px/f` (NOT time-based windows, NOT the width-split
+  `unreliable` state); (b) P6 f3131 set->overpass RATIFIED ("it's an
+  overpass").
+- **Scope:** measurement only. Zero `src/` change (the only code is a new
+  diagnostic script + tests + a GT ratification table).
+- **Harness:** `scripts/probe_serve_admission.py` reads the T4
+  `--diag-dump` JSONL + the GT serves, reports per frame the raw detections
+  (pos, px width, conf, `persist`/suspect/removed), the tracker state+reason,
+  the observed gap-1 speed and the exact bootstrap pair the tracker computes,
+  plus WHICH gate failed. It also REPLAYS the unlock decision over the whole
+  clip (the dumped `locked` flag resyncs it - fidelity 4966/4968 frames) so
+  counterfactual rules can be scored: serves recovered AND every extra lock
+  they create. Artifacts: `output/t5/*.jsonl|json`, e3/e6/e7 diag dumps from
+  fresh `--device cpu` runs.
+- **Result (dev clip, 8 GT serves):** 5 of 8 are unlocked at their own contact
+  frame, and they are EXACTLY the 5 far-side serves (P1 f210, P2 f880, P4 f2154,
+  P6 f3038, P8 f4770); the 3 near-side serves (P3/P5/P7) lock at contact.
+  Far-side toss: 13-17 px ball, median pre-contact rise 1.6-6.7 px/f, 0
+  detections at the contact frame. Near-side: 46-53 px, 7-17 px/f.
+- **Ranked failing conditions:** 1) `speed_below_lock_min_speed` (the cause,
+  all 5); 2) `no_previous_sighting_in_window` / `no_detections` (the far ball
+  is seen every 2-4 frames and is invisible at contact - caps any rule);
+  3) `no_plausible_survivor` (1 frame each in P1/P2, 14 in the healthy P3).
+  NOT failing: `lock_max_jump`, `lock_max_pair_gap` (`pair_gap=3..4` alone
+  recovers nothing), candidate crowding.
+- **Counterfactuals:** `lock_min_speed` 3.0 px/f recovers **5/5** at lock
+  latency 0 with 20-31/31 window frames owned (4.0 -> 4/5, 5.0 -> 1/5, 6.0 ->
+  0); cost 15 new bootstrap locks per 4968 frames, ~3 of them the intended
+  tosses. Size-normalised gate (`8 px/f * w/ref`) recovers only 3/5.
+  Discriminators measured and rejected: 3-of-3 sustained sightings within
+  20 px, `persist < 0.25`, player proximity < 120/250 px remove ZERO spurious
+  locks; ascending-only LOSES P4 and P6.
+- **Contrast:** every surviving serve in the corpus is near-side - dev P3 f1395
+  (w50, 11.5 px/f, lock -19f), P5 f2575 (w51, 16.8, -34f), P7 f3747 (w50, lock
+  -18f), entreno 3 f29 (w51-55, lock f14), entreno 7 f22 (w51-57, lock f21);
+  entreno 6's serve is not an admission failure at all (locked from f1). So
+  the entreno gate has little power over this mechanism - the A/B must be
+  "entreno not worse" + the dev clip.
+- **Proposal for step 2 (NOT implemented):** a second, weaker motion tier used
+  only while UNLOCKED (`ball_lock_weak_min_speed = 3.0` px/f) gated on the far
+  apparent-width band (`w < 30 px`) so near-side behaviour is byte-identical,
+  with the 8 px/f fast path untouched; risks enumerated with measured
+  instances (rack ball f3360, held balls f4095/f2365, other-court f1173/f4551)
+  in the doc.
+- **GT ratification:** `scripts/build_dev_clip_gt.py` gained a generic
+  `OWNER_RATIFICATIONS[(point, match_frame, gesture)]` table; a ratified flag
+  carries `owner_ratified/owner_ratification_date/owner_ratification_statement`
+  and ratified wording, an unratified one keeps "needs ratification". P6 f3131
+  ratified 2026-09-29; GT regenerated (only those fields changed).
+- **Tests:** +19 (`tests/test_probe_serve_admission.py`) +4 GT-ratification
+  tests; suite green.
+
+
+### 2026-09-29 (thirty-sixth session) — T4 loss waterfall on the dev clip: diagnose only, one root cause found (serve-time ball-track admission)
+
+- **Scope:** locate, per GT contact, the FIRST stage where it dies. NO
+  decision/threshold change; the only production change is inert capture.
+- **Step 1 — the first dev-clip run that ever existed**
+  (`--device cpu`, calibration auto-detected, T1 readiness green) into
+  `output/t4/base_dev`, then `scripts/evaluate_timed.py --ignore-player`:
+  contact P 0.586 / R 0.607 / **F1 0.597** (tp 17, fp 12 of which 1 duplicate,
+  fn 11), class 0.706, team 0.706, 2.703 FP per dead-time minute (4 FP over
+  1.48 dead min of 172.0 s), points 6 matched / 2 missed / 0 spurious, mean
+  temporal IoU 0.707. Baseline A/B dumps for the byte gates (dev + e3 + e1)
+  were taken from clean HEAD BEFORE any edit, per the standing rule.
+- **Step 2 — diagnostic capture (off by default).** `src/utils/diagnostics.py`
+  (`DiagRecorder` + `load_diag`, JSONL: a `meta` header line then one record
+  per frame) wired into the ONE shared `FrameProcessor.process_frame`: raw ball
+  candidates with their `persist`/`suspect`/`removed` flags (BallDetector),
+  tracker state + the branch/reason it took (BallTracker, via a thin `update`
+  wrapper around the untouched body), player boxes/ids/team, contact probes
+  incl. refusals with the gate that refused them, and the accepted contact with
+  actor/team/attribution source + resolved action/touch/rally (ActionClassifier).
+  All hooks are `if self.diag_enabled:` guards around values that already
+  exist; `diag_dump` is a real config key (None by default) wired to
+  `--diag-dump`, with a config-drift guard section pinning key-exists /
+  off-by-default / CLI-wired / no-mirror-while-off.
+- **Step 3 — `scripts/waterfall.py`.** Per GT contact, walks the 7-stage chain
+  inside the T3 tolerance window and blames the first failure; the GT/prediction
+  pairing is IMPORTED from `evaluate_timed.match_events` (never reimplemented),
+  and actions/candidates are keyed by CONTACT frame. FPs are classified by
+  source: duplicate / dead-time / in-point spurious, each annotated with the
+  candidate that produced it. `scripts/compare_runs.py` is the byte-identity
+  gate helper (ignores only `processed_at` and the three wall-clock rows of
+  `results_statistics.csv`).
+- **Result (`docs/t4_loss_waterfall_dev_clip.md`):** 0 raw detection, 0 track
+  admission, **6 candidate, 5 gate (all `reach`), 5 actor/team, 4 label, 8
+  survive**; FPs 8 in-point spurious / 3 dead-time / 1 duplicate.
+- **The finding:** 5 of the 6 candidate deaths are the 5 lost serves, and there
+  the detector DOES see the ball — 18–23 raw candidates per window at conf
+  0.74–0.87, `removed=false`, `suspect` almost never — while the tracker is
+  `unlocked` reporting `unlocked_no_motion` on 19–25 of the 31 window frames
+  (one `bootstrap_locked` frame, then `coast_short_trajectory`). The toss apex
+  never produces the >=8 px/f near-consecutive motion pair the bootstrap needs.
+  So the serve class is a BALL-TRACK ADMISSION loss, one layer earlier than both
+  the "serve-action gate" of STATUS point 22 (match footage) and the plan's
+  "candidate recovery" option — and it also explains the 4 false-positive
+  `serve` actions (same toss class, mistimed).
+- **Secondary, orthogonal:** 4 of the 5 actor/team deaths are P8 — exactly the
+  post-P7 side switch the owner dictated (near = B from P8). That is open point
+  2 / task T14, deliberately NOT the T5 mechanism. The 5 gate deaths are all the
+  `reach` gate; the 4 label deaths are 3 overpasses read as spike/set/dig plus
+  P7 f3852's set read as a serve.
+- **Gates (a)-(d) all green:** hooks off == pre-change HEAD byte-identical on
+  dev + e3 + e1 (only `processed_at` and the wall-clock statistic rows differ);
+  hooks on == hooks off byte-identical on the dev clip (and the evaluate_timed
+  numbers are unchanged); +37 unit tests (22 waterfall stage/precedence/FP, 11
+  diagnostics + compare_runs, 4 config-drift); suite **685**.
+- Files: `src/utils/diagnostics.py` (new), `src/utils/config.py`,
+  `src/detection/ball_detector.py`, `src/tracking/ball_tracker.py`,
+  `src/recognition/action_classifier.py`, `src/analysis/frame_processor.py`,
+  `src/main.py`, `scripts/waterfall.py` (new), `scripts/compare_runs.py` (new),
+  `tests/test_waterfall.py` (new), `tests/test_diagnostics.py` (new),
+  `tests/test_config_drift.py`, `docs/t4_loss_waterfall_dev_clip.md` (new),
+  `docs/action_reliability_plan.md`, STATUS.md.
+
+
+### 2026-09-28 (twenty-seventh session) — architecture decision: pass-2 interpretation layer ratified; full-video two-pass rejected; mechanism 3 reframed (no code)
+
+- **Trigger:** the owner proposed processing matches in two full video
+  passes — pass 1 dissects the video into points (a serve STARTS a
+  point, so no guessing whether the ball is airborne; ball hitting the
+  ground or a 1-2s held ball ENDS it), pass 2 runs action recognition
+  inside the windows — accepting ~2× offline cost and a live-debug
+  divergence TBD; stated goal: MINIMIZE false positives.
+- **Challenge — what survives:** hindsight IS the winning ingredient.
+  A serve is hard to identify causally (the #22 diagnosis: contact
+  25-35f before game_on arms) but easy with hindsight ("the flight
+  that opened a rally with N contacts"), and the episode→point map
+  (#26) already IS that second pass — over the recorded stream, not a
+  video re-decode. A structural serve prior kills both main #22 loss
+  classes at once.
+- **Challenge — what breaks:** (1) the premise "we know a point is
+  taking place if the serve started" assumes pass 1 can detect serves
+  — it can't (14a: burst width, static hold, near→tape→far all
+  measured and REFUTED; the probe proved the detector sees every serve
+  — the loss is the DECISION, not the data). (2) Two video passes
+  double the wrong half: perception (68 ms/f) is causal anyway — the
+  trackers are online filters, a re-decode reproduces the same tracks;
+  the layer that profits from hindsight (which episodes are points,
+  which contact is the serve, who won) runs over pipeline_output.json
+  in seconds. (3) It breaks the two hardest invariants: the ONE shared
+  FrameProcessor path, and live-debug parity (owner-ratified after a
+  real skew bug — a two-pass cannot exist live by definition). (4) FP
+  taxonomy vs the proposal: off-game handling → already fixed by the
+  map's constraints + anchors (post-hoc, zero re-decode); gesture
+  misclassification → fixed by the structural serve prior
+  (interpretation); suppressed slow-float serves (P15) → the ONE class
+  genuinely needing re-perception, solvable by targeted re-decode of
+  flagged windows only (~15×500f ≈ 8-15% cost). (5) The proposed
+  point-END rule is already the shipped design (static_off_frames held
+  ball, density starvation ball-death, contact_chain/group_gap
+  boundaries). Honest caveat recorded: a cheap ball-only pass 1 +
+  full-stack pass 2 on windows could be cost-neutral at ~50% dead
+  time — but ball-only segmentation is exactly the FP-prone burst
+  gate; it saves money by weakening the FP-critical layer, opposite of
+  the stated goal.
+- **RATIFIED (owner): two passes over the STREAM, one pass over the
+  video.** Pass 1 unchanged causal FrameProcessor →
+  pipeline_output.json → DB; live-debug stays byte-identical to
+  production. Pass 2 offline (seconds): episode→point map (done) →
+  TRUE point windows → rally-opening-contact serve re-label → winner
+  layer (21.3, vs the 33 dictated winners) → fantasy lines (13/14e,
+  DB-side). Escalation only where flagged: window re-decode with raw
+  detector settings (P15 class), bounded + logged. Marginal math
+  noted: point segmentation is already 31/33 — re-architecting pass 1
+  chases 2 points; serve emission (16/32 missing) lives in the
+  interpretation layer.
+- **Mechanism 3 (point 22) reframed to:** pass-2 serve re-labeling
+  from map windows. Validation gates: anchored census far 2/8 → ≥6/8
+  clean, serve actions 20 → ~28 (v2 emitted 28); entreno 7/7 action
+  logs byte-identical; suite green; config-drift guard extended if new
+  keys appear; A/B baselines dumped from HEAD before editing.
+- Codified as AGENTS.md §6 (pass-2 interpretation layer). Session #24's
+  Log entry archived verbatim (live Log trimmed back to 3). No files
+  under src/, no GT edits, suite untouched (525).
+
+
 ### 2026-09-27 (twenty-first session) — pi project default model set to zai/glm-5.3-flash (.pi/settings.json)
 - **Harness config only** — no pipeline code, no GT. New
   `.pi/settings.json` sets `defaultProvider: zai` + `defaultModel:
