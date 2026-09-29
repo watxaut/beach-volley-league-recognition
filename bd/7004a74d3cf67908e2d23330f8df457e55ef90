@@ -1,0 +1,31 @@
+scripts/dump_player_tracks.py
+  s_47883cfbca457d::t_65886c2a79839e 38,78-81,95-101
+scripts/test_action_recognition.py
+  s_47883cfbca457d::t_32104bf404de88 26,49-54,67-76
+scripts/test_ball_tracking.py
+  s_47883cfbca457d::t_b8e6ac18e907e7 24,35-38,51-57
+scripts/test_player_tracking.py
+  s_47883cfbca457d::t_46adf439e0e3d9 24,50-53,66-72
+scripts/test_pose_estimation.py
+  s_47883cfbca457d::t_33a493c1c0558c 24,43-46,59-64
+src/detection/calibration_readiness.py
+  s_47883cfbca457d::t_6873dafd4c9a39 1-300
+src/main.py
+  s_47883cfbca457d::t_fc272575d392d1 15-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "bd7004a74d3cf67908e2d23330f8df457e55ef90",
+  "prompts": {},
+  "sessions": {
+    "s_47883cfbca457d": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "43cda942-f64e-4040-8f8e-7e2f385e3b04",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
