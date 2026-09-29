@@ -1633,7 +1633,10 @@
             "rule": "overpass_wording_with_gesture_keyword",
             "raw_action_label": "set",
             "gesture": "set",
-            "why": "OWNER INTERPRETATION (needs ratification): the owner line states the ball went over ('overpass'), so the pipeline taxonomy (ActionContextResolver: overpass = ball sent over WITHOUT an attack) makes this a final_action='overpass' with gesture='set' -- the gesture is kept as 'set' because that is the touch the owner described. Raw wording: Near team P4 set f3131 overpasses"
+            "why": "OWNER INTERPRETATION (RATIFIED 2026-09-29, owner: \"it's an overpass\"): the owner line states the ball went over ('overpass'), and the pipeline taxonomy (ActionContextResolver: overpass = ball sent over WITHOUT an attack) agrees, so final_action='overpass' with gesture='set'. See OWNER_RATIFICATIONS for the owner ratification of this flag. Raw wording: Near team P4 set f3131 overpasses",
+            "owner_ratified": true,
+            "owner_ratification_date": "2026-09-29",
+            "owner_ratification_statement": "it's an overpass"
           }
         },
         {
@@ -1744,7 +1747,10 @@
             "rule": "overpass_wording_with_gesture_keyword",
             "raw_action_label": "set",
             "gesture": "set",
-            "why": "OWNER INTERPRETATION (needs ratification): the owner line states the ball went over ('overpass'), so the pipeline taxonomy (ActionContextResolver: overpass = ball sent over WITHOUT an attack) makes this a final_action='overpass' with gesture='set' -- the gesture is kept as 'set' because that is the touch the owner described. Raw wording: Near team P4 set f3131 overpasses"
+            "why": "OWNER INTERPRETATION (RATIFIED 2026-09-29, owner: \"it's an overpass\"): the owner line states the ball went over ('overpass'), and the pipeline taxonomy (ActionContextResolver: overpass = ball sent over WITHOUT an attack) agrees, so final_action='overpass' with gesture='set'. See OWNER_RATIFICATIONS for the owner ratification of this flag. Raw wording: Near team P4 set f3131 overpasses",
+            "owner_ratified": true,
+            "owner_ratification_date": "2026-09-29",
+            "owner_ratification_statement": "it's an overpass"
           },
           "match_frame": 3131,
           "extra_match_frames": [],
@@ -3012,7 +3018,10 @@
             "rule": "overpass_wording_with_gesture_keyword",
             "raw_action_label": "set",
             "gesture": "set",
-            "why": "OWNER INTERPRETATION (needs ratification): the owner line states the ball went over ('overpass'), so the pipeline taxonomy (ActionContextResolver: overpass = ball sent over WITHOUT an attack) makes this a final_action='overpass' with gesture='set' -- the gesture is kept as 'set' because that is the touch the owner described. Raw wording: Near team P4 set f3131 overpasses"
+            "why": "OWNER INTERPRETATION (RATIFIED 2026-09-29, owner: \"it's an overpass\"): the owner line states the ball went over ('overpass'), and the pipeline taxonomy (ActionContextResolver: overpass = ball sent over WITHOUT an attack) agrees, so final_action='overpass' with gesture='set'. See OWNER_RATIFICATIONS for the owner ratification of this flag. Raw wording: Near team P4 set f3131 overpasses",
+            "owner_ratified": true,
+            "owner_ratification_date": "2026-09-29",
+            "owner_ratification_statement": "it's an overpass"
           }
         },
         {

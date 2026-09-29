@@ -465,6 +465,58 @@ def test_set_that_crosses_the_net_is_an_overpass(tmp_path):
     assert ev["owner_interpretation_flag"] == flag
 
 
+def test_unratified_flag_keeps_asking_for_ratification(tmp_path):
+    """A flagged contact the owner has NOT ruled on stays open."""
+    doc = _contacts(tmp_path, "Point 1\nNear team P4 set f999 overpasses\n")
+    flag = doc["points"][0]["contacts"][0]["owner_interpretation_flag"]
+    assert flag["rule"] == "overpass_wording_with_gesture_keyword"
+    assert "needs ratification" in flag["why"]
+    assert "owner_ratified" not in flag
+
+
+def test_owner_ratified_overpass_flag(tmp_path):
+    """P6 f3131: the owner RATIFIED the reading ("it's an overpass", 2026-09-29)."""
+    doc = _contacts(tmp_path, "Point 6\nNear team P4 set f3131 overpasses\n")
+    flag = doc["points"][0]["contacts"][0]["owner_interpretation_flag"]
+    assert flag["owner_ratified"] is True
+    assert flag["owner_ratification_date"] == "2026-09-29"
+    assert flag["owner_ratification_statement"] == "it's an overpass"
+    assert "RATIFIED 2026-09-29" in flag["why"]
+    assert "needs ratification" not in flag["why"]
+    # ... and the event carries the same flag through to the GT blob
+    om = {"segments": [{"clip_start": 0, "clip_end": 4000, "match_offset": 0}]}
+    events, _ = mod.contact_events(4000, om, doc, [6])
+    assert events[0]["owner_interpretation_flag"] == flag
+
+
+def test_ratification_table_is_generic_and_point_scoped():
+    """The table is keyed by (point, frame, gesture): no flag is ratified by
+    accident because another point's row matches."""
+    assert mod.OWNER_RATIFICATIONS[(6, 3131, "set")]["owner_ratified"] is True
+    assert mod._ratification(7, 3131, "set") is None
+    assert mod._ratification(6, 3131, "dig") is None
+    assert mod._ratification(6, 1543, None) is None
+    assert mod._ratification(None, 3131, "set") is None
+
+
+def test_committed_dev_gt_carries_the_ratification():
+    gt = json.loads((ROOT / "ground_truth"
+                     / "video_ari_joan_8_first_points_annotations.json")
+                    .read_text(encoding="utf-8"))
+    p6 = next(p for p in gt["points"] if p["point"] == 6)
+    ev = next(e for e in p6["events"] if e["match_frame"] == 3131)
+    assert ev["final_action"] == "overpass" and ev["gesture"] == "set"
+    flag = ev["owner_interpretation_flag"]
+    assert flag["owner_ratified"] is True
+    assert flag["owner_ratification_date"] == "2026-09-29"
+    # every other flagged contact would still read "needs ratification"
+    for p in gt["points"]:
+        for e in p["events"]:
+            f = e.get("owner_interpretation_flag")
+            if f and not f.get("owner_ratified"):
+                assert "needs ratification" in f["why"]
+
+
 @pytest.mark.parametrize("line,action,gesture,flagged", [
     ("Near team P4 set f3131 overpasses", "overpass", "set", True),
     ("Near team P4 dig f3131 overpasses it", "overpass", "dig", True),

@@ -338,9 +338,34 @@ OVERPASS_FLAG_TEMPLATE = (
     "wording: {raw}"
 )
 
+# Owner RATIFICATIONS of the flags above (owner decisions, 2026-09-29). Keyed
+# by (point, match_frame, gesture) so the rule stays generic: adding a row here
+# is all it takes to ratify a future flagged contact, and an UNRATIFIED flag
+# keeps its "needs ratification" wording. Nothing here invents GT - it records
+# what the owner said about a flag the generator already raised.
+OWNER_RATIFICATIONS = {
+    (6, 3131, "set"): {
+        "owner_ratified": True,
+        "date": "2026-09-29",
+        "statement": "it's an overpass",
+        "channel": "owner decision recorded in the T5 session",
+    },
+}
+
+
+def _ratification(point: Optional[int], frame: Optional[int],
+                  gesture: Optional[str]) -> Optional[Dict[str, Any]]:
+    """The owner ratification for one flagged contact, or None."""
+    if point is None or frame is None:
+        return None
+    return OWNER_RATIFICATIONS.get((int(point), int(frame), gesture))
+
+
 
 def _contact_interpretation(action: str, token: str, remainder: str,
-                            raw: str) -> Tuple[str, Optional[str], Optional[Dict[str, Any]]]:
+                            raw: str, point: Optional[int] = None,
+                            frame: Optional[int] = None
+                            ) -> Tuple[str, Optional[str], Optional[Dict[str, Any]]]:
     """(final_action, gesture, owner_interpretation_flag) for one contact line.
 
     A set/dig keyword co-occurring with "overpass" wording is a cross-net send
@@ -358,11 +383,24 @@ def _contact_interpretation(action: str, token: str, remainder: str,
         # no set/dig keyword: the owner's own vocabulary already says it
         # ("bump overpass"), so the action stands unchanged
         return action, None, None
-    return ("overpass", gesture,
-            {"rule": "overpass_wording_with_gesture_keyword",
-             "raw_action_label": action,
-             "gesture": gesture,
-             "why": OVERPASS_FLAG_TEMPLATE.format(gesture=gesture, raw=raw)})
+    flag = {"rule": "overpass_wording_with_gesture_keyword",
+            "raw_action_label": action,
+            "gesture": gesture,
+            "why": OVERPASS_FLAG_TEMPLATE.format(gesture=gesture, raw=raw)}
+    rat = _ratification(point, frame, gesture)
+    if rat is not None:
+        flag["owner_ratified"] = True
+        flag["owner_ratification_date"] = rat["date"]
+        flag["owner_ratification_statement"] = rat["statement"]
+        flag["why"] = (
+            "OWNER INTERPRETATION (RATIFIED {date}, owner: \"{stmt}\"): the owner "
+            "line states the ball went over ('overpass'), and the pipeline "
+            "taxonomy (ActionContextResolver: overpass = ball sent over WITHOUT "
+            "an attack) agrees, so final_action='overpass' with "
+            "gesture='{gesture}'. See OWNER_RATIFICATIONS for the owner "
+            "ratification of this flag. Raw wording: {raw}"
+        ).format(date=rat["date"], stmt=rat["statement"], gesture=gesture, raw=raw)
+    return "overpass", gesture, flag
 
 
 def _contact_action(remainder: str) -> Tuple[Optional[str], Optional[str]]:
@@ -456,7 +494,8 @@ def parse_contact_gt(path: str) -> Dict[str, Any]:
             final_action, gesture, flag = (None, None, None)
             if action is not None:
                 final_action, gesture, flag = _contact_interpretation(
-                    action, token or "", remainder, raw.strip())
+                    action, token or "", remainder, raw.strip(),
+                    point=cur["point"], frame=frames[0])
             if action is None:
                 unparsed.append({"line": raw, "line_no": line_no,
                                  "reason": "contact line with no known action"})
@@ -1336,7 +1375,12 @@ def render_readme(points: List[Dict[str, Any]], offset_map: Dict[str, Any],
                 elif e.get("pass2_action") and e["pass2_action"] != e["final_action"]:
                     note = f"pass2 re-labels this as {e['pass2_action']}"
                 if e.get("owner_interpretation_flag"):
-                    note = (note + " | " if note else "") + "FLAG: overpass wording"
+                    fl = e["owner_interpretation_flag"]
+                    note = (note + " | " if note else "") + (
+                        "FLAG: overpass wording (OWNER-RATIFIED "
+                        f"{fl['owner_ratification_date']})"
+                        if fl.get("owner_ratified")
+                        else "FLAG: overpass wording")
                 lines.append(
                     f"| {e['frame']} | {e['match_frame']} | {e['final_action']} | "
                     f"{e.get('gesture') or '-'} | "

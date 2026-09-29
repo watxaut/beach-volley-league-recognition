@@ -17,7 +17,28 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-29 (thirty-sixth session — action-reliability T4 DONE:
+**Last updated:** 2026-09-29 (thirty-seventh session — action-reliability T5
+DECIDED + step 1 DONE (diagnose only). **Owner APPROVED the T5 mechanism
+(2026-09-29): serve-time ball-track (re-)admission** — extend the UNLOCKED
+bootstrap so the far-side toss can lock below `lock_min_speed = 8 px/f`; NOT
+time windows, NOT the width-split `unreliable` state. Step 1 measured it
+offline: `scripts/probe_serve_admission.py` (new, reads the T4
+`--diag-dump`, replays the bootstrap decision over the whole clip — baseline
+replay reproduces the dumped `locked` flag on 4966/4968 frames) +
+`docs/t5_serve_admission_diagnosis.md`. FINDINGS: **all 5 stage-3 serve deaths
+are FAR-side serves** (toss ball 13-17 px wide, median pre-contact rise
+1.6-6.7 px/f; the 3 surviving serves are near-side, 46-53 px, 7-17 px/f, locked
+at contact); the failing condition is `speed_below_lock_min_speed`; a 3 px/f
+weak tier recovers **5/5** at lock latency 0 (>= 20/31 window frames owned) for
+~12 extra bootstrap locks per 4968 frames, and no candidate-geometry
+discriminator removes them (ascending-only LOSES 2 serves). Entreno contrast:
+every surviving serve there is near-side (e3 f29, e7 f22), so the entreno gate
+has little power over this mechanism. Also **owner RATIFIED the P6 f3131
+set->overpass reading** ("it's an overpass"): `scripts/build_dev_clip_gt.py`
+gained a generic `OWNER_RATIFICATIONS` table and the GT flag now carries
+`owner_ratified/date/statement`. +23 tests, suite 708.)
+
+**Previous (thirty-sixth session — action-reliability T4 DONE:
 loss waterfall on the dev clip. `--diag-dump` writes a per-frame JSONL of what
 each stage already computed, from inside the shared `FrameProcessor.process_frame`
 (`src/utils/diagnostics.py`; `if self.diag_enabled:` guards, default OFF, config
@@ -152,34 +173,45 @@ implementation backlog below remains unchanged.
   P32's serve + 6928A's verdict + P20's window/re-serve question sit in
   the round-3 owner queue.
 
-**Action-reliability track (session 36):** executable plan lives in
-`docs/action_reliability_plan.md` (T1–T15, status per task). Dev clip =
-`video_ari_joan_8_first_points.mp4`; T1 readiness DONE, T2 dev-clip GT DONE,
-T3 time-matched evaluator DONE, **T4 loss waterfall DONE**. The dev clip now
-HAS a pipeline output: `evaluate_timed --ignore-player` gives contact P 0.586 /
-R 0.607 / **F1 0.597**, class 0.706, team 0.706, 1 duplicate, 2.703 FP per
-dead-time minute, points 6 matched / 2 missed / 0 spurious (mean IoU 0.707).
-Waterfall (`docs/t4_loss_waterfall_dev_clip.md`): 0 detection, 0 admission,
-**6 candidate, 5 gate (all reach), 5 actor/team, 4 label, 8 survives**;
-FPs 8 in-point spurious / 3 dead-time / 1 duplicate. **Root cause found: 5 of
-the 6 stage-3 deaths are serves where the detector DOES see the ball
-(conf 0.74–0.87, no suppression) while the tracker is `unlocked` with
-`unlocked_no_motion` on 19–25 of 31 window frames** — the toss apex never
-meets `lock_min_speed = 8 px/f`. Next = **T5: one mechanism, ball-tracker
-serve (re-)admission** (owner approval pending).
+**Action-reliability track (session 37):** executable plan lives in
+`docs/action_reliability_plan.md` (T1-T15, status per task). Dev clip =
+`video_ari_joan_8_first_points.mp4`; T1 readiness DONE, T2 dev-clip GT DONE
+(P6 f3131 owner-RATIFIED as an overpass, 09-29), T3 time-matched evaluator
+DONE, T4 loss waterfall DONE, **T5 mechanism APPROVED (owner, 09-29) =
+serve-time ball-track (re-)admission; T5 step 1 (diagnosis) DONE**, step 2 =
+implement + A/B. Dev-clip baseline: contact P 0.586 / R 0.607 / **F1 0.597**,
+class 0.706, team 0.706, 1 duplicate, 2.703 FP per dead-time minute, points
+6 matched / 2 missed / 0 spurious (mean IoU 0.707); waterfall 0 detection /
+0 admission / **6 candidate** / 5 gate (all reach) / 5 actor-team / 4 label /
+8 survives. **T5 step 1 measurement (`docs/t5_serve_admission_diagnosis.md`,
+`scripts/probe_serve_admission.py`):** the 5 stage-3 deaths are exactly the 5
+FAR-side serves - their toss is a 13-17 px ball creeping 1.6-6.7 px/f, never
+meeting `lock_min_speed = 8`; the 3 surviving serves are near-side (46-53 px,
+7-17 px/f, locked AT the contact frame). A weak 3 px/f tier recovers **5/5** at
+lock latency 0 (>= 20/31 window frames owned) and costs ~12 extra bootstrap
+locks per 4968 frames; the candidate-geometry discriminators (sustained
+sightings, low `persist`, player proximity) remove none of those locks and an
+ascending-only gate LOSES two serves, so serve-vs-spare separation must come
+from context, not geometry. Entreno contrast: every surviving serve there is
+near-side (e3 f29, e7 f22), so the entreno gate has little power over this
+mechanism - the A/B gate must be the dev clip + "entreno not worse".
+Next = **T5 step 2: implement the weak tier far-band-gated, then A/B**
+(entreno e1-e7 byte-identical-or-better; dev waterfall 5 fewer stage-3 deaths,
+no new `serve` false positives).
 
-**Active next (ranked, goal-driven — see North-star).** (1) **21.3 point
-winner/outcome layer** — G1's biggest missing signal; the anchored map +
-serve resolutions now give TRUE windows with openers to validate against
-the 33 dictated winners. (2) Round-3 owner queue (no code): P32's serve
-verdict, 6928A's verdict, P18-P20 anchors, ep45's nature, P23 17159A +
-P31 22873A team-fix confirmation — each flips one flag in
-`serve_relabel.json` when ratified. (3) Fantasy scoring module + web
-points table (14e); assist ships with it (no perception needed) — the
-pass-2 `actions_pass2` stream is the intended input. (4) P15-class
-targeted window re-decode escalation (raw detector settings, bounded +
-logged) — only if a missing serve (P5/P7 class) needs the perception
-back. (5) e4/e5/e6 re-adjudication sheets.
+**Active next (ranked, goal-driven - see North-star).** (1) **T5 step 2: the
+serve-time ball-track (re-)admission mechanism** (owner-approved; diagnosis in
+hand; the biggest measured deficit on the dev clip). (2) **21.3 point
+winner/outcome layer** - G1's biggest missing signal; the anchored map + serve
+resolutions now give TRUE windows with openers to validate against the 33
+dictated winners. (3) Round-3 owner queue (no code): P32's serve verdict,
+6928A's verdict, P18-P20 anchors, ep45's nature, P23 17159A + P31 22873A
+team-fix confirmation - each flips one flag in `serve_relabel.json` when
+ratified. (4) Fantasy scoring module + web points table (14e); assist ships
+with it (no perception needed) - the pass-2 `actions_pass2` stream is the
+intended input. (5) P15-class targeted window re-decode escalation (raw
+detector settings, bounded + logged) - only if a missing serve (P5/P7 class)
+needs the perception back. (6) e4/e5/e6 re-adjudication sheets.
 
 ## Open points
 
@@ -475,6 +507,22 @@ survive across sessions; provenance in the archives.
   toss apex slower than `lock_min_speed = 8 px/f` cannot (re-)lock. Serve loss
   is a BALL-TRACK ADMISSION class, not detection and not the serve-action gate
   STATUS open point 22 measured on the match.
+- T5 step 1 (#37) measured WHY: all 5 lost dev-clip serves are FAR-side serves
+  and all 3 surviving ones are NEAR-side. A far-side toss is a 13-17 px ball
+  creeping 1.6-6.7 px/f (near-side: 46-53 px, 7-17 px/f), so `lock_min_speed =
+  8 px/f` - a constant measured on near-side balls - is above what a far-side
+  toss can ever produce; the far ball also has 0 detections AT the contact
+  frame, so no threshold can lock there (earliest lock = first post-contact
+  sighting, latency +2..+4f). A 3 px/f weak tier recovers 5/5 at latency 0 for
+  ~12 extra bootstrap locks / 4968 frames, and NO candidate-geometry
+  discriminator removes those locks (sustained sightings, low `persist`, player
+  proximity) while ascending-only LOSES 2 serves - serve-vs-spare separation
+  needs context, not geometry.
+- An UNLOCKED tracker replays exactly from a `--diag-dump`: the only decision
+  is `_try_lock`, and the dumped `locked` flag resyncs it (4966/4968 frames
+  identical on the dev clip). Counterfactuals ("what if `lock_min_speed` were
+  3") are therefore measurable per frame WITHOUT re-running the pipeline -
+  `scripts/probe_serve_admission.py` is the reference harness.
 
 **Perf**
 - Pose gating SHIPPED in the shared classifier (staleness 30f + near-ball
@@ -523,6 +571,7 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - GT `touch_number` is PER-POSSESSION, never rally-global: serve = 1, the receiving team restarts at 1 (dig 1, set 2, spike/overpass 3) and the count resets on every side change (`ground_truth/README.md`, entreno_3 JSON). T2 contact GT now emits that; `possession_touch_numbers()` in `scripts/build_dev_clip_gt.py` is the reference.
 - In the pipeline taxonomy a set/dig that crosses the net is `final_action=overpass` (ActionContextResolver: overpass = sent over without an attack) with the gesture kept separately — T2 GT applies this to owner wording and flags it via `owner_interpretation_flag` for owner ratification.
 - Where owner-dictated CONTACTS exist they are the authoritative contact list: draft/suggested events are never appended to `events`, they move to `points[].superseded_draft_events` with the owner contact each duplicates (matched by same squad within the coarse ±15f window) so no prediction is lost.
+- 2026-09-29 **#37** — T5 mechanism APPROVED by the owner (serve-time ball-track (re-)admission) + step 1 diagnosis ONLY (`scripts/probe_serve_admission.py` + `docs/t5_serve_admission_diagnosis.md`, no `src/` change): all 5 lost serves are far-side, the failing condition is `speed_below_lock_min_speed`, a 3 px/f weak tier recovers 5/5 at latency 0 for ~12 extra locks and no geometry gate removes them; owner RATIFIED the P6 f3131 overpass reading via a generic `OWNER_RATIFICATIONS` table in `scripts/build_dev_clip_gt.py`; +23 tests, suite 708 (Log below).
 - 2026-09-29 **#36** — T4 loss waterfall SHIPPED: off-by-default `--diag-dump` capture in the shared frame path (`src/utils/diagnostics.py`) + `scripts/waterfall.py` + `scripts/compare_runs.py`; dev clip F1 0.597, 5 of 6 candidate deaths are serves lost to `unlocked_no_motion`; byte-identical on dev/e3/e1 with hooks off and on; +37 tests, suite 685 (Log below).
 - 2026-09-29 **#35** — T3 time-matched evaluator SHIPPED: `scripts/evaluate_timed.py` (+23 tests, suite 648); optimal one-to-one assignment in seconds, PTS-aware time base, separate contact/class/team/actor scores + duplicates + FP-per-dead-minute + point IoU, `--autonomous` GT-input guard; entreno gate reproduces `evaluate.py`'s F1s at the same tolerance window.
 - 2026-09-29 **#34** — T2 contact-GT code review fixed (3 defects: rally-global → per-possession `touch_number`, draft/suggested duplicates moved to `superseded_draft_events` (15 of them, `events` == the 28 owner contacts), cross-net set → `overpass` + `owner_interpretation_flag`); +9 tests, suite 625.
@@ -569,6 +618,62 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+### 2026-09-29 (thirty-seventh session) - T5 DECIDED (owner: serve-time ball-track (re-)admission) + step 1 diagnosis, diagnose only
+
+- **Owner decisions recorded:** (a) T5 mechanism = serve-time ball-track
+  (re-)admission - extend the UNLOCKED bootstrap so the far-side toss can lock
+  below `lock_min_speed = 8 px/f` (NOT time-based windows, NOT the width-split
+  `unreliable` state); (b) P6 f3131 set->overpass RATIFIED ("it's an
+  overpass").
+- **Scope:** measurement only. Zero `src/` change (the only code is a new
+  diagnostic script + tests + a GT ratification table).
+- **Harness:** `scripts/probe_serve_admission.py` reads the T4
+  `--diag-dump` JSONL + the GT serves, reports per frame the raw detections
+  (pos, px width, conf, `persist`/suspect/removed), the tracker state+reason,
+  the observed gap-1 speed and the exact bootstrap pair the tracker computes,
+  plus WHICH gate failed. It also REPLAYS the unlock decision over the whole
+  clip (the dumped `locked` flag resyncs it - fidelity 4966/4968 frames) so
+  counterfactual rules can be scored: serves recovered AND every extra lock
+  they create. Artifacts: `output/t5/*.jsonl|json`, e3/e6/e7 diag dumps from
+  fresh `--device cpu` runs.
+- **Result (dev clip, 8 GT serves):** 5 of 8 are unlocked at their own contact
+  frame, and they are EXACTLY the 5 far-side serves (P1 f210, P2 f880, P4 f2154,
+  P6 f3038, P8 f4770); the 3 near-side serves (P3/P5/P7) lock at contact.
+  Far-side toss: 13-17 px ball, median pre-contact rise 1.6-6.7 px/f, 0
+  detections at the contact frame. Near-side: 46-53 px, 7-17 px/f.
+- **Ranked failing conditions:** 1) `speed_below_lock_min_speed` (the cause,
+  all 5); 2) `no_previous_sighting_in_window` / `no_detections` (the far ball
+  is seen every 2-4 frames and is invisible at contact - caps any rule);
+  3) `no_plausible_survivor` (1 frame each in P1/P2, 14 in the healthy P3).
+  NOT failing: `lock_max_jump`, `lock_max_pair_gap` (`pair_gap=3..4` alone
+  recovers nothing), candidate crowding.
+- **Counterfactuals:** `lock_min_speed` 3.0 px/f recovers **5/5** at lock
+  latency 0 with 20-31/31 window frames owned (4.0 -> 4/5, 5.0 -> 1/5, 6.0 ->
+  0); cost 15 new bootstrap locks per 4968 frames, ~3 of them the intended
+  tosses. Size-normalised gate (`8 px/f * w/ref`) recovers only 3/5.
+  Discriminators measured and rejected: 3-of-3 sustained sightings within
+  20 px, `persist < 0.25`, player proximity < 120/250 px remove ZERO spurious
+  locks; ascending-only LOSES P4 and P6.
+- **Contrast:** every surviving serve in the corpus is near-side - dev P3 f1395
+  (w50, 11.5 px/f, lock -19f), P5 f2575 (w51, 16.8, -34f), P7 f3747 (w50, lock
+  -18f), entreno 3 f29 (w51-55, lock f14), entreno 7 f22 (w51-57, lock f21);
+  entreno 6's serve is not an admission failure at all (locked from f1). So
+  the entreno gate has little power over this mechanism - the A/B must be
+  "entreno not worse" + the dev clip.
+- **Proposal for step 2 (NOT implemented):** a second, weaker motion tier used
+  only while UNLOCKED (`ball_lock_weak_min_speed = 3.0` px/f) gated on the far
+  apparent-width band (`w < 30 px`) so near-side behaviour is byte-identical,
+  with the 8 px/f fast path untouched; risks enumerated with measured
+  instances (rack ball f3360, held balls f4095/f2365, other-court f1173/f4551)
+  in the doc.
+- **GT ratification:** `scripts/build_dev_clip_gt.py` gained a generic
+  `OWNER_RATIFICATIONS[(point, match_frame, gesture)]` table; a ratified flag
+  carries `owner_ratified/owner_ratification_date/owner_ratification_statement`
+  and ratified wording, an unratified one keeps "needs ratification". P6 f3131
+  ratified 2026-09-29; GT regenerated (only those fields changed).
+- **Tests:** +19 (`tests/test_probe_serve_admission.py`) +4 GT-ratification
+  tests; suite green.
+
 
 ### 2026-09-29 (thirty-sixth session) — T4 loss waterfall on the dev clip: diagnose only, one root cause found (serve-time ball-track admission)
 
