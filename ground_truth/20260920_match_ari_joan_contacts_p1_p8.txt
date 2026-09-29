@@ -1,0 +1,86 @@
+# 20260920 match — owner-dictated CONTACT-LEVEL GT, points 1-8
+# (resources/full_videos/20260920_match_ari_joan_lost_up1080.mp4)
+#
+# Dictated by the owner 2026-09-28 (thirty-first session), verbatim, on top of
+# the earlier point-level GT (20260920_match_ari_joan_lost.txt) and the serve
+# anchors (20260920_match_serve_anchors.txt). Frame numbers are MATCH frames
+# (same numbering as the serve anchors; coarse owner estimates, +-10-15f).
+#
+# Scope: every rally contact of points 1-8 with the PLAYER TRACK ID the owner
+# saw AT THE MOMENT OF THE CONTACT, the side that player was on
+# (near = Team A at match start, far = Team B at match start), the action, and
+# the point outcome.
+#
+# PLAYER-NUMBER CONVENTION (owner, verbatim): "Some players change number when
+# occlusions happen or they go outside the screen, I used the one that they had
+# at the moment of the contact with the ball." So a player id here is the
+# pipeline track id AT THAT FRAME, not a stable per-person jersey number —
+# ids are NOT expected to be constant across occlusions; only the id valid at
+# the annotated contact frame is GT. Do NOT treat id drift between points as a
+# GT contradiction.
+#
+# Format (one contact per line, after the per-point headers):
+#     <side> team P<k> <action> at f<frame>[  <- verbatim owner note]
+# Actions used: serve, dig, set, overpass/bump, spike (accelerated = hard).
+#
+# Cross-check vs the point-level GT (20260920_match_ari_joan_lost.txt): all 8
+# point WINNERS agree. One wording conflict to arbitrate later: P7 is dictated
+# here as an ACCELERATED spike (middle wide, kill) while the point-level text
+# says "poke spike from A team"; treat the new contact dictation as the more
+# specific (and post-hoc) statement.
+#
+# Not yet wired into any script: this file is the source of truth; producing a
+# machine-readable form (and feeding it to scripts/evaluate.py) is follow-up
+# work (see STATUS open point 22, round-3 owner queue).
+# -------------------------------------------------------------------------
+
+Some players change number when occlusions happen or they go outside the screen, I used the one that they had
+at the moment of the contact with the ball
+
+GT 8 points match
+Point 1
+Far team P2 serve at f210
+Near team P4 dig at f245
+Near team P3 set at f300 (missatributed to P2)
+Near team P4 spike accelerated into the net f345, far team scores
+
+Point 2
+Far team P2 serve at f880 -> goes wide outside court at f930, near team scores
+
+Point 3
+Near team P3 serve at f1395
+Far team P2 dig at f1431
+Far team P1 set f1487
+Far team bump overpass at f1543 -> touches the line on the exterior at f1595, far team scores
+
+Point 4
+Far team serve at f2154, goes into the net, near team scores
+
+Point 5
+Near team P2 serve at f2575, goes wide to the side and lands out of bounds, far team scores
+
+Point 6
+Far team P3 serve at f3038
+Near team P2 dig at f3071
+Near team P4 set f3131 overpasses
+Far team P1 digs at f3172
+Far team P3 set f3228 slips hands and loses point, near team scores
+
+Point 7
+Near team serve at f3747 (the previous attributed serve is just the player carrying the ball near another player)
+Far team P4 digs f3782, the reception goes behind
+Far team P1 sets f3852 already outside of the court (attributed as a serve)
+Far team P4 bump passes the ball f3915
+Near side P2 digs f3950
+Near side P3 sets the ball f4002
+Near side P2 spikes accelerated at f4040 middle wide court and scores
+
+Side switch (near team now is far team)
+
+Point 8
+Far team serves f4770
+Near team dig at f4800
+Near team set at f4842
+Near team spikes ball to the side f4888
+Far team hand digs the ball f4910 and goes wide, ball falls to the ground f4950 and near team score.
+

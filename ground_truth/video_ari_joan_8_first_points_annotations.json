@@ -1,0 +1,3353 @@
+{
+  "status": "OWNER_DICTATED",
+  "status_note": "OWNER_DICTATED: every contact of P1-P8 was dictated by the owner (ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt, 2026-09-28) with the player track id seen AT the contact. FRAMES ARE COARSE (owner estimates, +-10-15f) \u2014 each event carries frame_tolerance=15, so nothing here is frame-exact and a prediction outside that tolerance is NOT a GT error by construction.",
+  "video": "resources/video_ari_joan_8_first_points.mp4",
+  "fps": 28.84197410905439,
+  "fps_note": "VFR container (r_frame_rate 30.12, avg ~28.84); the clip is a frame-exact re-encode of the match prefix, so frame indices match the match 1:1 and NO time conversion is applied",
+  "resolution": [
+    1920,
+    1080
+  ],
+  "frame_indexing": "clip-local; `match_frame` carries the same event in resources/full_videos/20260920_match_ari_joan_lost_up1080.mp4",
+  "generated_by": "scripts/build_dev_clip_gt.py",
+  "offset_map": {
+    "method": "sequential decode + downscaled grayscale abs-difference",
+    "vfr_safe": true,
+    "n_clip_frames": 4961,
+    "n_match_frames": 26061,
+    "coarse_stride": 100,
+    "search_radius": 96,
+    "base_offset": 0,
+    "base_residual": 0.0,
+    "local_offsets": [
+      [
+        25,
+        0
+      ],
+      [
+        75,
+        0
+      ],
+      [
+        125,
+        0
+      ],
+      [
+        175,
+        0
+      ],
+      [
+        225,
+        0
+      ],
+      [
+        275,
+        0
+      ],
+      [
+        325,
+        0
+      ],
+      [
+        375,
+        0
+      ],
+      [
+        425,
+        0
+      ],
+      [
+        475,
+        0
+      ],
+      [
+        525,
+        0
+      ],
+      [
+        575,
+        0
+      ],
+      [
+        625,
+        0
+      ],
+      [
+        675,
+        0
+      ],
+      [
+        725,
+        0
+      ],
+      [
+        775,
+        0
+      ],
+      [
+        825,
+        0
+      ],
+      [
+        875,
+        0
+      ],
+      [
+        925,
+        0
+      ],
+      [
+        975,
+        0
+      ],
+      [
+        1025,
+        0
+      ],
+      [
+        1075,
+        0
+      ],
+      [
+        1125,
+        0
+      ],
+      [
+        1175,
+        0
+      ],
+      [
+        1225,
+        0
+      ],
+      [
+        1275,
+        0
+      ],
+      [
+        1325,
+        0
+      ],
+      [
+        1375,
+        0
+      ],
+      [
+        1425,
+        0
+      ],
+      [
+        1475,
+        0
+      ],
+      [
+        1525,
+        0
+      ],
+      [
+        1575,
+        0
+      ],
+      [
+        1625,
+        0
+      ],
+      [
+        1675,
+        0
+      ],
+      [
+        1725,
+        0
+      ],
+      [
+        1775,
+        0
+      ],
+      [
+        1825,
+        0
+      ],
+      [
+        1875,
+        0
+      ],
+      [
+        1925,
+        0
+      ],
+      [
+        1975,
+        0
+      ],
+      [
+        2025,
+        0
+      ],
+      [
+        2075,
+        0
+      ],
+      [
+        2125,
+        0
+      ],
+      [
+        2175,
+        0
+      ],
+      [
+        2225,
+        0
+      ],
+      [
+        2275,
+        0
+      ],
+      [
+        2325,
+        0
+      ],
+      [
+        2375,
+        0
+      ],
+      [
+        2425,
+        0
+      ],
+      [
+        2475,
+        0
+      ],
+      [
+        2525,
+        0
+      ],
+      [
+        2575,
+        0
+      ],
+      [
+        2625,
+        0
+      ],
+      [
+        2675,
+        0
+      ],
+      [
+        2725,
+        0
+      ],
+      [
+        2775,
+        0
+      ],
+      [
+        2825,
+        0
+      ],
+      [
+        2875,
+        0
+      ],
+      [
+        2925,
+        0
+      ],
+      [
+        2975,
+        0
+      ],
+      [
+        3025,
+        0
+      ],
+      [
+        3075,
+        0
+      ],
+      [
+        3125,
+        0
+      ],
+      [
+        3175,
+        0
+      ],
+      [
+        3225,
+        0
+      ],
+      [
+        3275,
+        0
+      ],
+      [
+        3325,
+        0
+      ],
+      [
+        3375,
+        0
+      ],
+      [
+        3425,
+        0
+      ],
+      [
+        3475,
+        0
+      ],
+      [
+        3525,
+        0
+      ],
+      [
+        3575,
+        0
+      ],
+      [
+        3625,
+        0
+      ],
+      [
+        3675,
+        0
+      ],
+      [
+        3725,
+        0
+      ],
+      [
+        3775,
+        0
+      ],
+      [
+        3825,
+        0
+      ],
+      [
+        3875,
+        0
+      ],
+      [
+        3925,
+        0
+      ],
+      [
+        3975,
+        0
+      ],
+      [
+        4025,
+        0
+      ],
+      [
+        4075,
+        0
+      ],
+      [
+        4125,
+        0
+      ],
+      [
+        4175,
+        0
+      ],
+      [
+        4225,
+        0
+      ],
+      [
+        4275,
+        0
+      ],
+      [
+        4325,
+        0
+      ],
+      [
+        4375,
+        0
+      ],
+      [
+        4425,
+        0
+      ],
+      [
+        4475,
+        0
+      ],
+      [
+        4525,
+        0
+      ],
+      [
+        4575,
+        0
+      ],
+      [
+        4625,
+        0
+      ],
+      [
+        4675,
+        0
+      ],
+      [
+        4725,
+        0
+      ],
+      [
+        4775,
+        0
+      ],
+      [
+        4825,
+        0
+      ],
+      [
+        4875,
+        0
+      ],
+      [
+        4925,
+        0
+      ],
+      [
+        4955,
+        0
+      ]
+    ],
+    "drift": false,
+    "segments": [
+      {
+        "clip_start": 0,
+        "clip_end": 4960,
+        "match_offset": 0,
+        "residual": 0.0
+      }
+    ],
+    "checks": [
+      {
+        "check": "start",
+        "clip_frame": 0,
+        "mapped_match_frame": 0,
+        "residual_at_mapped": 0.0,
+        "best_residual_in_band": 0.0,
+        "best_offset_in_band": 0,
+        "ok": true
+      },
+      {
+        "check": "middle",
+        "clip_frame": 2480,
+        "mapped_match_frame": 2480,
+        "residual_at_mapped": 0.0,
+        "best_residual_in_band": 0.0,
+        "best_offset_in_band": 0,
+        "ok": true
+      },
+      {
+        "check": "end",
+        "clip_frame": 4960,
+        "mapped_match_frame": 4960,
+        "residual_at_mapped": 0.0,
+        "best_residual_in_band": 0.0,
+        "best_offset_in_band": 0,
+        "ok": true
+      }
+    ]
+  },
+  "points": [
+    {
+      "point": 1,
+      "winner": "B",
+      "serving_team": "B",
+      "serving_side": "far",
+      "description": "Team A fails spike into the net",
+      "side_switch_after": false,
+      "side_switch_before": false,
+      "clip_start_frame": 216,
+      "clip_end_frame": 495,
+      "match_start_frame": 216,
+      "match_end_frame": 495,
+      "window_source": "game_state_confirmed_segment",
+      "window_is_prediction": true,
+      "owner_serve_anchor_frame": 230,
+      "owner_serve_anchor_clip_frame": 230,
+      "map_attribution": "anchored",
+      "serve_relabel_decision": "relabeled",
+      "events": [
+        {
+          "frame": 210,
+          "match_frame": 210,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": 2,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 1,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 2,
+          "owner_note": null,
+          "owner_raw": "Far team P2 serve at f210",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 245,
+          "match_frame": 245,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 4,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 1,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": 4,
+          "owner_note": null,
+          "owner_raw": "Near team P4 dig at f245",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 300,
+          "match_frame": 300,
+          "final_action": "set",
+          "action": "set",
+          "player_id": 3,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 2,
+          "point": 1,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": 3,
+          "owner_note": "(missatributed to P2)",
+          "owner_raw": "Near team P3 set at f300 (missatributed to P2)",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 345,
+          "match_frame": 345,
+          "final_action": "spike",
+          "action": "spike",
+          "player_id": 4,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 3,
+          "point": 1,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": 4,
+          "owner_note": "far team scores",
+          "owner_raw": "Near team P4 spike accelerated into the net f345, far team scores",
+          "owner_extra_match_frames": null,
+          "error": {
+            "type": "spike_into_net",
+            "team": "A",
+            "text": "far team scores"
+          },
+          "spike_type": "hard",
+          "outcome": "out"
+        }
+      ],
+      "excluded_by_owner_verdict": [],
+      "n_owner_gt_events": 4,
+      "n_owner_contact_events": 4,
+      "owner_contacts": [
+        {
+          "point": 1,
+          "side": "far",
+          "side_word": "far team",
+          "team": "B",
+          "player_id": 2,
+          "action": "serve",
+          "action_token": "serve",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 210,
+          "extra_match_frames": [],
+          "note": null,
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Far team P2 serve at f210",
+          "raw_line_no": 42
+        },
+        {
+          "point": 1,
+          "side": "near",
+          "side_word": "near team",
+          "team": "A",
+          "player_id": 4,
+          "action": "dig",
+          "action_token": "dig",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 245,
+          "extra_match_frames": [],
+          "note": null,
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Near team P4 dig at f245",
+          "raw_line_no": 43
+        },
+        {
+          "point": 1,
+          "side": "near",
+          "side_word": "near team",
+          "team": "A",
+          "player_id": 3,
+          "action": "set",
+          "action_token": "set",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 300,
+          "extra_match_frames": [],
+          "note": "(missatributed to P2)",
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Near team P3 set at f300 (missatributed to P2)",
+          "raw_line_no": 44
+        },
+        {
+          "point": 1,
+          "side": "near",
+          "side_word": "near team",
+          "team": "A",
+          "player_id": 4,
+          "action": "spike",
+          "action_token": "spike",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 345,
+          "extra_match_frames": [],
+          "note": "far team scores",
+          "frame_tolerance": 15,
+          "spike_type": "hard",
+          "outcome": "out",
+          "error": {
+            "type": "spike_into_net"
+          },
+          "raw": "Near team P4 spike accelerated into the net f345, far team scores",
+          "raw_line_no": 45
+        }
+      ],
+      "contacts_side_switch_after": false,
+      "unmappable_owner_contacts": [],
+      "n_suggested_events": 0,
+      "superseded_draft_events": [
+        {
+          "frame": 247,
+          "match_frame": 247,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 4,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 1,
+          "source": "suggested_from_prediction",
+          "source_detail": "output/match20260920_posegate/pipeline_output.json",
+          "suggestion_window": [
+            216,
+            495
+          ],
+          "gesture": "bump_set",
+          "confidence": 0.55,
+          "contact_point": [
+            1289.5,
+            473.0
+          ],
+          "pass2_action": "serve",
+          "pass2_team": "B",
+          "pass2_source": "relabeled",
+          "error": null,
+          "superseded_by_owner_contact": {
+            "frame": 245,
+            "match_frame": 245,
+            "final_action": "dig",
+            "player_id": 4,
+            "player_team": "A",
+            "touch_number": 1,
+            "owner_raw": "Near team P4 dig at f245"
+          },
+          "superseded_reason": "duplicate of the owner-dictated contact at clip f245 (dig), 2f away on the same squad; the owner contact is authoritative (coarse frame tolerance +-15f)"
+        },
+        {
+          "frame": 304,
+          "match_frame": 304,
+          "final_action": "set",
+          "action": "set",
+          "player_id": 2,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 2,
+          "point": 1,
+          "source": "suggested_from_prediction",
+          "source_detail": "output/match20260920_posegate/pipeline_output.json",
+          "suggestion_window": [
+            216,
+            495
+          ],
+          "gesture": "bump_set",
+          "confidence": 0.6,
+          "contact_point": [
+            970.5,
+            465.0
+          ],
+          "pass2_action": null,
+          "pass2_team": null,
+          "pass2_source": null,
+          "error": null,
+          "superseded_by_owner_contact": {
+            "frame": 300,
+            "match_frame": 300,
+            "final_action": "set",
+            "player_id": 3,
+            "player_team": "A",
+            "touch_number": 2,
+            "owner_raw": "Near team P3 set at f300 (missatributed to P2)"
+          },
+          "superseded_reason": "duplicate of the owner-dictated contact at clip f300 (set), 4f away on the same squad; the owner contact is authoritative (coarse frame tolerance +-15f)"
+        },
+        {
+          "frame": 345,
+          "match_frame": 345,
+          "final_action": "spike",
+          "action": "spike",
+          "player_id": 2,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 3,
+          "point": 1,
+          "source": "suggested_from_prediction",
+          "source_detail": "output/match20260920_posegate/pipeline_output.json",
+          "suggestion_window": [
+            216,
+            495
+          ],
+          "gesture": "block",
+          "confidence": 0.5,
+          "contact_point": [
+            1179.0,
+            335.0
+          ],
+          "pass2_action": null,
+          "pass2_team": null,
+          "pass2_source": null,
+          "error": null,
+          "superseded_by_owner_contact": {
+            "frame": 345,
+            "match_frame": 345,
+            "final_action": "spike",
+            "player_id": 4,
+            "player_team": "A",
+            "touch_number": 3,
+            "owner_raw": "Near team P4 spike accelerated into the net f345, far team scores"
+          },
+          "superseded_reason": "duplicate of the owner-dictated contact at clip f345 (spike), 0f away on the same squad; the owner contact is authoritative (coarse frame tolerance +-15f)"
+        },
+        {
+          "frame": 355,
+          "match_frame": 355,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 1,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 1,
+          "source": "suggested_from_prediction",
+          "source_detail": "output/match20260920_posegate/pipeline_output.json",
+          "suggestion_window": [
+            216,
+            495
+          ],
+          "gesture": "block",
+          "confidence": 0.55,
+          "contact_point": [
+            978.0,
+            404.5
+          ],
+          "pass2_action": null,
+          "pass2_team": null,
+          "pass2_source": null,
+          "error": null,
+          "superseded_by_owner_contact": null,
+          "superseded_reason": "no owner contact on this squad within +-15f \u2014 kept here (not in events) so the prediction is not lost; owner to adjudicate whether a contact is missing"
+        },
+        {
+          "frame": 398,
+          "match_frame": 398,
+          "final_action": "overpass",
+          "action": "overpass",
+          "player_id": 1,
+          "player_team": "A",
+          "team_in_possession": "B",
+          "touch_number": 2,
+          "point": 1,
+          "source": "suggested_from_prediction",
+          "source_detail": "output/match20260920_posegate/pipeline_output.json",
+          "suggestion_window": [
+            216,
+            495
+          ],
+          "gesture": "bump_set",
+          "confidence": 0.45,
+          "contact_point": [
+            730.5,
+            648.5
+          ],
+          "pass2_action": null,
+          "pass2_team": null,
+          "pass2_source": null,
+          "error": null,
+          "superseded_by_owner_contact": null,
+          "superseded_reason": "no owner contact on this squad within +-15f \u2014 kept here (not in events) so the prediction is not lost; owner to adjudicate whether a contact is missing"
+        }
+      ],
+      "n_superseded_draft_events": 5,
+      "implied_events": [
+        {
+          "type": "spike_into_net",
+          "team": "A",
+          "text": "Team A fails spike into the net",
+          "frame": null,
+          "note": null
+        }
+      ],
+      "missing_events": [],
+      "error_events": []
+    },
+    {
+      "point": 2,
+      "winner": "A",
+      "serving_team": "B",
+      "serving_side": "far",
+      "description": "Team B fails serve goes outside bounds",
+      "side_switch_after": false,
+      "side_switch_before": false,
+      "clip_start_frame": 720,
+      "clip_end_frame": 1020,
+      "match_start_frame": 720,
+      "match_end_frame": 1020,
+      "window_source": "episode_map_emission_window",
+      "window_is_prediction": true,
+      "owner_serve_anchor_frame": 900,
+      "owner_serve_anchor_clip_frame": 900,
+      "map_attribution": "anchored",
+      "serve_relabel_decision": "relabeled",
+      "events": [
+        {
+          "frame": 880,
+          "match_frame": 880,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": 2,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 2,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 2,
+          "owner_note": "goes wide outside court at f930, near team scores",
+          "owner_raw": "Far team P2 serve at f880 -> goes wide outside court at f930, near team scores",
+          "owner_extra_match_frames": [
+            930
+          ],
+          "error": {
+            "type": "serve_out",
+            "team": "B",
+            "text": "goes wide outside court at f930, near team scores"
+          }
+        }
+      ],
+      "excluded_by_owner_verdict": [],
+      "n_owner_gt_events": 1,
+      "n_owner_contact_events": 1,
+      "owner_contacts": [
+        {
+          "point": 2,
+          "side": "far",
+          "side_word": "far team",
+          "team": "B",
+          "player_id": 2,
+          "action": "serve",
+          "action_token": "serve",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 880,
+          "extra_match_frames": [
+            930
+          ],
+          "note": "goes wide outside court at f930, near team scores",
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": {
+            "type": "serve_out"
+          },
+          "raw": "Far team P2 serve at f880 -> goes wide outside court at f930, near team scores",
+          "raw_line_no": 48
+        }
+      ],
+      "contacts_side_switch_after": false,
+      "unmappable_owner_contacts": [],
+      "n_suggested_events": 0,
+      "superseded_draft_events": [
+        {
+          "frame": 930,
+          "match_frame": 930,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 2,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 2,
+          "source": "suggested_from_prediction",
+          "source_detail": "output/match20260920_posegate/pipeline_output.json",
+          "suggestion_window": [
+            720,
+            1020
+          ],
+          "gesture": "bump_set",
+          "confidence": 0.55,
+          "contact_point": [
+            938.0,
+            743.5
+          ],
+          "pass2_action": "serve",
+          "pass2_team": "B",
+          "pass2_source": "relabeled",
+          "error": null,
+          "superseded_by_owner_contact": null,
+          "superseded_reason": "no owner contact on this squad within +-15f \u2014 kept here (not in events) so the prediction is not lost; owner to adjudicate whether a contact is missing"
+        }
+      ],
+      "n_superseded_draft_events": 1,
+      "implied_events": [
+        {
+          "type": "serve_out",
+          "team": "B",
+          "text": "Team B fails serve goes outside bounds",
+          "frame": null,
+          "note": null
+        }
+      ],
+      "missing_events": [],
+      "error_events": []
+    },
+    {
+      "point": 3,
+      "winner": "B",
+      "serving_team": "A",
+      "serving_side": "near",
+      "description": "Team B bumb passes ball on third contact, touches line court and scores",
+      "side_switch_after": false,
+      "side_switch_before": false,
+      "clip_start_frame": 1376,
+      "clip_end_frame": 1674,
+      "match_start_frame": 1376,
+      "match_end_frame": 1674,
+      "window_source": "game_state_confirmed_segment",
+      "window_is_prediction": true,
+      "owner_serve_anchor_frame": 1400,
+      "owner_serve_anchor_clip_frame": 1400,
+      "map_attribution": "anchored",
+      "serve_relabel_decision": "emitted",
+      "events": [
+        {
+          "frame": 1395,
+          "match_frame": 1395,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": 3,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 3,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": 3,
+          "owner_note": null,
+          "owner_raw": "Near team P3 serve at f1395",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 1431,
+          "match_frame": 1431,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 2,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 3,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 2,
+          "owner_note": null,
+          "owner_raw": "Far team P2 dig at f1431",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 1487,
+          "match_frame": 1487,
+          "final_action": "set",
+          "action": "set",
+          "player_id": 1,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 2,
+          "point": 3,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 1,
+          "owner_note": null,
+          "owner_raw": "Far team P1 set f1487",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 1543,
+          "match_frame": 1543,
+          "final_action": "overpass",
+          "action": "overpass",
+          "player_id": null,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 3,
+          "point": 3,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": null,
+          "owner_note": "touches the line on the exterior at f1595, far team scores",
+          "owner_raw": "Far team bump overpass at f1543 -> touches the line on the exterior at f1595, far team scores",
+          "owner_extra_match_frames": [
+            1595
+          ],
+          "error": null
+        }
+      ],
+      "excluded_by_owner_verdict": [],
+      "n_owner_gt_events": 4,
+      "n_owner_contact_events": 4,
+      "owner_contacts": [
+        {
+          "point": 3,
+          "side": "near",
+          "side_word": "near team",
+          "team": "A",
+          "player_id": 3,
+          "action": "serve",
+          "action_token": "serve",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 1395,
+          "extra_match_frames": [],
+          "note": null,
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Near team P3 serve at f1395",
+          "raw_line_no": 51
+        },
+        {
+          "point": 3,
+          "side": "far",
+          "side_word": "far team",
+          "team": "B",
+          "player_id": 2,
+          "action": "dig",
+          "action_token": "dig",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 1431,
+          "extra_match_frames": [],
+          "note": null,
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Far team P2 dig at f1431",
+          "raw_line_no": 52
+        },
+        {
+          "point": 3,
+          "side": "far",
+          "side_word": "far team",
+          "team": "B",
+          "player_id": 1,
+          "action": "set",
+          "action_token": "set",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 1487,
+          "extra_match_frames": [],
+          "note": null,
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Far team P1 set f1487",
+          "raw_line_no": 53
+        },
+        {
+          "point": 3,
+          "side": "far",
+          "side_word": "far team",
+          "team": "B",
+          "player_id": null,
+          "action": "overpass",
+          "action_token": "bump",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 1543,
+          "extra_match_frames": [
+            1595
+          ],
+          "note": "touches the line on the exterior at f1595, far team scores",
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Far team bump overpass at f1543 -> touches the line on the exterior at f1595, far team scores",
+          "raw_line_no": 54
+        }
+      ],
+      "contacts_side_switch_after": false,
+      "unmappable_owner_contacts": [],
+      "n_suggested_events": 0,
+      "superseded_draft_events": [
+        {
+          "frame": 1428,
+          "match_frame": 1428,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 2,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 3,
+          "source": "suggested_from_prediction",
+          "source_detail": "output/match20260920_posegate/pipeline_output.json",
+          "suggestion_window": [
+            1376,
+            1674
+          ],
+          "gesture": "bump_set",
+          "confidence": 0.55,
+          "contact_point": [
+            1134.5,
+            472.5
+          ],
+          "pass2_action": null,
+          "pass2_team": null,
+          "pass2_source": null,
+          "error": null,
+          "superseded_by_owner_contact": {
+            "frame": 1431,
+            "match_frame": 1431,
+            "final_action": "dig",
+            "player_id": 2,
+            "player_team": "B",
+            "touch_number": 1,
+            "owner_raw": "Far team P2 dig at f1431"
+          },
+          "superseded_reason": "duplicate of the owner-dictated contact at clip f1431 (dig), 3f away on the same squad; the owner contact is authoritative (coarse frame tolerance +-15f)"
+        },
+        {
+          "frame": 1488,
+          "match_frame": 1488,
+          "final_action": "set",
+          "action": "set",
+          "player_id": 1,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 2,
+          "point": 3,
+          "source": "suggested_from_prediction",
+          "source_detail": "output/match20260920_posegate/pipeline_output.json",
+          "suggestion_window": [
+            1376,
+            1674
+          ],
+          "gesture": "bump_set",
+          "confidence": 0.6,
+          "contact_point": [
+            1008.0,
+            503.0
+          ],
+          "pass2_action": null,
+          "pass2_team": null,
+          "pass2_source": null,
+          "error": null,
+          "superseded_by_owner_contact": {
+            "frame": 1487,
+            "match_frame": 1487,
+            "final_action": "set",
+            "player_id": 1,
+            "player_team": "B",
+            "touch_number": 2,
+            "owner_raw": "Far team P1 set f1487"
+          },
+          "superseded_reason": "duplicate of the owner-dictated contact at clip f1487 (set), 1f away on the same squad; the owner contact is authoritative (coarse frame tolerance +-15f)"
+        },
+        {
+          "frame": 1542,
+          "match_frame": 1542,
+          "final_action": "spike",
+          "action": "spike",
+          "player_id": 2,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 3,
+          "point": 3,
+          "source": "suggested_from_prediction",
+          "source_detail": "output/match20260920_posegate/pipeline_output.json",
+          "suggestion_window": [
+            1376,
+            1674
+          ],
+          "gesture": "bump_set",
+          "confidence": 0.5,
+          "contact_point": [
+            1288.0,
+            495.5
+          ],
+          "pass2_action": null,
+          "pass2_team": null,
+          "pass2_source": null,
+          "error": null,
+          "superseded_by_owner_contact": {
+            "frame": 1543,
+            "match_frame": 1543,
+            "final_action": "overpass",
+            "player_id": null,
+            "player_team": "B",
+            "touch_number": 3,
+            "owner_raw": "Far team bump overpass at f1543 -> touches the line on the exterior at f1595, far team scores"
+          },
+          "superseded_reason": "duplicate of the owner-dictated contact at clip f1543 (overpass), 1f away on the same squad; the owner contact is authoritative (coarse frame tolerance +-15f); NOTE the draft label 'spike' differs from the owner action 'overpass' \u2014 owner to adjudicate"
+        }
+      ],
+      "n_superseded_draft_events": 3,
+      "implied_events": [],
+      "missing_events": [
+        {
+          "type": "third_contact_pass",
+          "reason": "dictated but no action emitted for it",
+          "frame": null,
+          "nearby_suggestions": []
+        }
+      ],
+      "error_events": []
+    },
+    {
+      "point": 4,
+      "winner": "A",
+      "serving_team": "B",
+      "serving_side": "far",
+      "description": "P1 fails serve",
+      "side_switch_after": false,
+      "side_switch_before": false,
+      "clip_start_frame": 1970,
+      "clip_end_frame": 2270,
+      "match_start_frame": 1970,
+      "match_end_frame": 2270,
+      "window_source": "episode_map_emission_window",
+      "window_is_prediction": true,
+      "owner_serve_anchor_frame": 2150,
+      "owner_serve_anchor_clip_frame": 2150,
+      "map_attribution": "anchored",
+      "serve_relabel_decision": "relabeled",
+      "events": [
+        {
+          "frame": 2154,
+          "match_frame": 2154,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": null,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 4,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": null,
+          "owner_note": "goes into the net, near team scores",
+          "owner_raw": "Far team serve at f2154, goes into the net, near team scores",
+          "owner_extra_match_frames": null,
+          "error": {
+            "type": "serve_into_net",
+            "team": "B",
+            "text": "goes into the net, near team scores"
+          }
+        }
+      ],
+      "excluded_by_owner_verdict": [],
+      "n_owner_gt_events": 1,
+      "n_owner_contact_events": 1,
+      "owner_contacts": [
+        {
+          "point": 4,
+          "side": "far",
+          "side_word": "far team",
+          "team": "B",
+          "player_id": null,
+          "action": "serve",
+          "action_token": "serve",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 2154,
+          "extra_match_frames": [],
+          "note": "goes into the net, near team scores",
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": {
+            "type": "serve_into_net"
+          },
+          "raw": "Far team serve at f2154, goes into the net, near team scores",
+          "raw_line_no": 57
+        }
+      ],
+      "contacts_side_switch_after": false,
+      "unmappable_owner_contacts": [],
+      "n_suggested_events": 0,
+      "superseded_draft_events": [
+        {
+          "frame": 2195,
+          "match_frame": 2195,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 1,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 4,
+          "source": "suggested_from_prediction",
+          "source_detail": "output/match20260920_posegate/pipeline_output.json",
+          "suggestion_window": [
+            1970,
+            2270
+          ],
+          "gesture": "bump_set",
+          "confidence": 0.55,
+          "contact_point": [
+            777.0,
+            603.0
+          ],
+          "pass2_action": "serve",
+          "pass2_team": "B",
+          "pass2_source": "relabeled",
+          "error": null,
+          "superseded_by_owner_contact": null,
+          "superseded_reason": "no owner contact on this squad within +-15f \u2014 kept here (not in events) so the prediction is not lost; owner to adjudicate whether a contact is missing"
+        }
+      ],
+      "n_superseded_draft_events": 1,
+      "implied_events": [
+        {
+          "type": "serve_fault",
+          "team": "B",
+          "text": "P1 fails serve",
+          "frame": null,
+          "note": "the dictation does not say WHERE the serve failed (net / out / into the net) \u2014 owner must confirm"
+        }
+      ],
+      "missing_events": [],
+      "error_events": []
+    },
+    {
+      "point": 5,
+      "winner": "B",
+      "serving_team": "A",
+      "serving_side": "near",
+      "description": "serve out of bounds",
+      "side_switch_after": false,
+      "side_switch_before": false,
+      "clip_start_frame": 2404,
+      "clip_end_frame": 2684,
+      "match_start_frame": 2404,
+      "match_end_frame": 2684,
+      "window_source": "game_state_confirmed_segment",
+      "window_is_prediction": true,
+      "owner_serve_anchor_frame": 2556,
+      "owner_serve_anchor_clip_frame": 2556,
+      "map_attribution": "anchored",
+      "serve_relabel_decision": "anchor_only",
+      "events": [
+        {
+          "frame": 2575,
+          "match_frame": 2575,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": 2,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 5,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": 2,
+          "owner_note": "goes wide to the side and lands out of bounds, far team scores",
+          "owner_raw": "Near team P2 serve at f2575, goes wide to the side and lands out of bounds, far team scores",
+          "owner_extra_match_frames": null,
+          "error": {
+            "type": "serve_out",
+            "team": "A",
+            "text": "goes wide to the side and lands out of bounds, far team scores"
+          }
+        }
+      ],
+      "excluded_by_owner_verdict": [
+        {
+          "match_frame": 2414,
+          "clip_frame": 2414,
+          "action": "serve",
+          "team": "A",
+          "because": "owner FALSE mark"
+        },
+        {
+          "match_frame": 2445,
+          "clip_frame": 2445,
+          "action": "dig",
+          "team": "A",
+          "because": "owner OFFGAME range"
+        },
+        {
+          "match_frame": 2494,
+          "clip_frame": 2494,
+          "action": "overpass",
+          "team": "A",
+          "because": "owner OFFGAME range"
+        }
+      ],
+      "n_owner_gt_events": 1,
+      "n_owner_contact_events": 1,
+      "owner_contacts": [
+        {
+          "point": 5,
+          "side": "near",
+          "side_word": "near team",
+          "team": "A",
+          "player_id": 2,
+          "action": "serve",
+          "action_token": "serve",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 2575,
+          "extra_match_frames": [],
+          "note": "goes wide to the side and lands out of bounds, far team scores",
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": {
+            "type": "serve_out"
+          },
+          "raw": "Near team P2 serve at f2575, goes wide to the side and lands out of bounds, far team scores",
+          "raw_line_no": 60
+        }
+      ],
+      "contacts_side_switch_after": false,
+      "unmappable_owner_contacts": [],
+      "n_suggested_events": 0,
+      "superseded_draft_events": [],
+      "n_superseded_draft_events": 0,
+      "implied_events": [
+        {
+          "type": "serve_out",
+          "team": "A",
+          "text": "serve out of bounds",
+          "frame": null,
+          "note": null
+        }
+      ],
+      "missing_events": [],
+      "error_events": []
+    },
+    {
+      "point": 6,
+      "winner": "A",
+      "serving_team": "B",
+      "serving_side": "far",
+      "description": "player fails hand set",
+      "side_switch_after": false,
+      "side_switch_before": false,
+      "clip_start_frame": 2820,
+      "clip_end_frame": 3120,
+      "match_start_frame": 2820,
+      "match_end_frame": 3120,
+      "window_source": "episode_map_emission_window",
+      "window_is_prediction": true,
+      "owner_serve_anchor_frame": 3000,
+      "owner_serve_anchor_clip_frame": 3000,
+      "map_attribution": "anchored",
+      "serve_relabel_decision": "relabeled",
+      "events": [
+        {
+          "frame": 3038,
+          "match_frame": 3038,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": 3,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 6,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 3,
+          "owner_note": null,
+          "owner_raw": "Far team P3 serve at f3038",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 3071,
+          "match_frame": 3071,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 2,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 6,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": 2,
+          "owner_note": null,
+          "owner_raw": "Near team P2 dig at f3071",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 3131,
+          "match_frame": 3131,
+          "final_action": "overpass",
+          "action": "overpass",
+          "player_id": 4,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 2,
+          "point": 6,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": 4,
+          "owner_note": "overpasses",
+          "owner_raw": "Near team P4 set f3131 overpasses",
+          "owner_extra_match_frames": null,
+          "error": null,
+          "gesture": "set",
+          "owner_interpretation_flag": {
+            "rule": "overpass_wording_with_gesture_keyword",
+            "raw_action_label": "set",
+            "gesture": "set",
+            "why": "OWNER INTERPRETATION (needs ratification): the owner line states the ball went over ('overpass'), so the pipeline taxonomy (ActionContextResolver: overpass = ball sent over WITHOUT an attack) makes this a final_action='overpass' with gesture='set' -- the gesture is kept as 'set' because that is the touch the owner described. Raw wording: Near team P4 set f3131 overpasses"
+          }
+        },
+        {
+          "frame": 3172,
+          "match_frame": 3172,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 1,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 6,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 1,
+          "owner_note": null,
+          "owner_raw": "Far team P1 digs at f3172",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 3228,
+          "match_frame": 3228,
+          "final_action": "set",
+          "action": "set",
+          "player_id": 3,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 2,
+          "point": 6,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 3,
+          "owner_note": "slips hands and loses point, near team scores",
+          "owner_raw": "Far team P3 set f3228 slips hands and loses point, near team scores",
+          "owner_extra_match_frames": null,
+          "error": {
+            "type": "set_slip_off_hands",
+            "team": "B",
+            "text": "slips hands and loses point, near team scores"
+          }
+        }
+      ],
+      "excluded_by_owner_verdict": [],
+      "n_owner_gt_events": 5,
+      "n_owner_contact_events": 5,
+      "owner_contacts": [
+        {
+          "point": 6,
+          "side": "far",
+          "side_word": "far team",
+          "team": "B",
+          "player_id": 3,
+          "action": "serve",
+          "action_token": "serve",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 3038,
+          "extra_match_frames": [],
+          "note": null,
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Far team P3 serve at f3038",
+          "raw_line_no": 63
+        },
+        {
+          "point": 6,
+          "side": "near",
+          "side_word": "near team",
+          "team": "A",
+          "player_id": 2,
+          "action": "dig",
+          "action_token": "dig",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 3071,
+          "extra_match_frames": [],
+          "note": null,
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Near team P2 dig at f3071",
+          "raw_line_no": 64
+        },
+        {
+          "point": 6,
+          "side": "near",
+          "side_word": "near team",
+          "team": "A",
+          "player_id": 4,
+          "action": "overpass",
+          "action_token": "set",
+          "gesture": "set",
+          "owner_interpretation_flag": {
+            "rule": "overpass_wording_with_gesture_keyword",
+            "raw_action_label": "set",
+            "gesture": "set",
+            "why": "OWNER INTERPRETATION (needs ratification): the owner line states the ball went over ('overpass'), so the pipeline taxonomy (ActionContextResolver: overpass = ball sent over WITHOUT an attack) makes this a final_action='overpass' with gesture='set' -- the gesture is kept as 'set' because that is the touch the owner described. Raw wording: Near team P4 set f3131 overpasses"
+          },
+          "match_frame": 3131,
+          "extra_match_frames": [],
+          "note": "overpasses",
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Near team P4 set f3131 overpasses",
+          "raw_line_no": 65
+        },
+        {
+          "point": 6,
+          "side": "far",
+          "side_word": "far team",
+          "team": "B",
+          "player_id": 1,
+          "action": "dig",
+          "action_token": "digs",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 3172,
+          "extra_match_frames": [],
+          "note": null,
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Far team P1 digs at f3172",
+          "raw_line_no": 66
+        },
+        {
+          "point": 6,
+          "side": "far",
+          "side_word": "far team",
+          "team": "B",
+          "player_id": 3,
+          "action": "set",
+          "action_token": "set",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 3228,
+          "extra_match_frames": [],
+          "note": "slips hands and loses point, near team scores",
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": {
+            "type": "set_slip_off_hands"
+          },
+          "raw": "Far team P3 set f3228 slips hands and loses point, near team scores",
+          "raw_line_no": 67
+        }
+      ],
+      "contacts_side_switch_after": false,
+      "unmappable_owner_contacts": [],
+      "n_suggested_events": 0,
+      "superseded_draft_events": [
+        {
+          "frame": 3070,
+          "match_frame": 3070,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 1,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 6,
+          "source": "suggested_from_prediction",
+          "source_detail": "output/match20260920_posegate/pipeline_output.json",
+          "suggestion_window": [
+            2820,
+            3120
+          ],
+          "gesture": "bump_set",
+          "confidence": 0.55,
+          "contact_point": [
+            485.5,
+            492.5
+          ],
+          "pass2_action": "serve",
+          "pass2_team": "B",
+          "pass2_source": "relabeled",
+          "error": null,
+          "superseded_by_owner_contact": {
+            "frame": 3071,
+            "match_frame": 3071,
+            "final_action": "dig",
+            "player_id": 2,
+            "player_team": "A",
+            "touch_number": 1,
+            "owner_raw": "Near team P2 dig at f3071"
+          },
+          "superseded_reason": "duplicate of the owner-dictated contact at clip f3071 (dig), 1f away on the same squad; the owner contact is authoritative (coarse frame tolerance +-15f)"
+        }
+      ],
+      "n_superseded_draft_events": 1,
+      "implied_events": [
+        {
+          "type": "set_slip_off_hands",
+          "team": "B",
+          "text": "player fails hand set",
+          "frame": null,
+          "note": "INFERRED: the score table says A WON, so the faulty set reads as squad B's; if the slip did not decide the point the squad is the other one \u2014 owner to confirm (no frame anchored)"
+        }
+      ],
+      "missing_events": [],
+      "error_events": []
+    },
+    {
+      "point": 7,
+      "winner": "A",
+      "serving_team": "A",
+      "serving_side": "near",
+      "description": "poke spike from A team wins the point",
+      "side_switch_after": true,
+      "side_switch_before": false,
+      "clip_start_frame": 3729,
+      "clip_end_frame": 4073,
+      "match_start_frame": 3729,
+      "match_end_frame": 4073,
+      "window_source": "game_state_confirmed_segment",
+      "window_is_prediction": true,
+      "owner_serve_anchor_frame": 3752,
+      "owner_serve_anchor_clip_frame": 3752,
+      "map_attribution": "anchored",
+      "serve_relabel_decision": "anchor_only",
+      "events": [
+        {
+          "frame": 3747,
+          "match_frame": 3747,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": null,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 7,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": null,
+          "owner_note": "(the previous attributed serve is just the player carrying the ball near another player)",
+          "owner_raw": "Near team serve at f3747 (the previous attributed serve is just the player carrying the ball near another player)",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 3782,
+          "match_frame": 3782,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 4,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 7,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 4,
+          "owner_note": "the reception goes behind",
+          "owner_raw": "Far team P4 digs f3782, the reception goes behind",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 3852,
+          "match_frame": 3852,
+          "final_action": "set",
+          "action": "set",
+          "player_id": 1,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 2,
+          "point": 7,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 1,
+          "owner_note": "already outside of the court (attributed as a serve)",
+          "owner_raw": "Far team P1 sets f3852 already outside of the court (attributed as a serve)",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 3915,
+          "match_frame": 3915,
+          "final_action": "overpass",
+          "action": "overpass",
+          "player_id": 4,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 3,
+          "point": 7,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 4,
+          "owner_note": null,
+          "owner_raw": "Far team P4 bump passes the ball f3915",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 3950,
+          "match_frame": 3950,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 2,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 7,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near side",
+          "owner_track_id": 2,
+          "owner_note": null,
+          "owner_raw": "Near side P2 digs f3950",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 4002,
+          "match_frame": 4002,
+          "final_action": "set",
+          "action": "set",
+          "player_id": 3,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 2,
+          "point": 7,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near side",
+          "owner_track_id": 3,
+          "owner_note": null,
+          "owner_raw": "Near side P3 sets the ball f4002",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 4040,
+          "match_frame": 4040,
+          "final_action": "spike",
+          "action": "spike",
+          "player_id": 2,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 3,
+          "point": 7,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near side",
+          "owner_track_id": 2,
+          "owner_note": "middle wide court and scores",
+          "owner_raw": "Near side P2 spikes accelerated at f4040 middle wide court and scores",
+          "owner_extra_match_frames": null,
+          "error": null,
+          "spike_type": "hard",
+          "outcome": "kill"
+        }
+      ],
+      "excluded_by_owner_verdict": [
+        {
+          "match_frame": 3856,
+          "clip_frame": 3856,
+          "action": "serve",
+          "team": "B",
+          "because": "owner FALSE mark"
+        }
+      ],
+      "n_owner_gt_events": 7,
+      "n_owner_contact_events": 7,
+      "owner_contacts": [
+        {
+          "point": 7,
+          "side": "near",
+          "side_word": "near team",
+          "team": "A",
+          "player_id": null,
+          "action": "serve",
+          "action_token": "serve",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 3747,
+          "extra_match_frames": [],
+          "note": "(the previous attributed serve is just the player carrying the ball near another player)",
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Near team serve at f3747 (the previous attributed serve is just the player carrying the ball near another player)",
+          "raw_line_no": 70
+        },
+        {
+          "point": 7,
+          "side": "far",
+          "side_word": "far team",
+          "team": "B",
+          "player_id": 4,
+          "action": "dig",
+          "action_token": "digs",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 3782,
+          "extra_match_frames": [],
+          "note": "the reception goes behind",
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Far team P4 digs f3782, the reception goes behind",
+          "raw_line_no": 71
+        },
+        {
+          "point": 7,
+          "side": "far",
+          "side_word": "far team",
+          "team": "B",
+          "player_id": 1,
+          "action": "set",
+          "action_token": "sets",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 3852,
+          "extra_match_frames": [],
+          "note": "already outside of the court (attributed as a serve)",
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Far team P1 sets f3852 already outside of the court (attributed as a serve)",
+          "raw_line_no": 72
+        },
+        {
+          "point": 7,
+          "side": "far",
+          "side_word": "far team",
+          "team": "B",
+          "player_id": 4,
+          "action": "overpass",
+          "action_token": "bump",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 3915,
+          "extra_match_frames": [],
+          "note": null,
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Far team P4 bump passes the ball f3915",
+          "raw_line_no": 73
+        },
+        {
+          "point": 7,
+          "side": "near",
+          "side_word": "near side",
+          "team": "A",
+          "player_id": 2,
+          "action": "dig",
+          "action_token": "digs",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 3950,
+          "extra_match_frames": [],
+          "note": null,
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Near side P2 digs f3950",
+          "raw_line_no": 74
+        },
+        {
+          "point": 7,
+          "side": "near",
+          "side_word": "near side",
+          "team": "A",
+          "player_id": 3,
+          "action": "set",
+          "action_token": "sets",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 4002,
+          "extra_match_frames": [],
+          "note": null,
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Near side P3 sets the ball f4002",
+          "raw_line_no": 75
+        },
+        {
+          "point": 7,
+          "side": "near",
+          "side_word": "near side",
+          "team": "A",
+          "player_id": 2,
+          "action": "spike",
+          "action_token": "spikes",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 4040,
+          "extra_match_frames": [],
+          "note": "middle wide court and scores",
+          "frame_tolerance": 15,
+          "spike_type": "hard",
+          "outcome": "kill",
+          "error": null,
+          "raw": "Near side P2 spikes accelerated at f4040 middle wide court and scores",
+          "raw_line_no": 76
+        }
+      ],
+      "contacts_side_switch_after": true,
+      "unmappable_owner_contacts": [],
+      "n_suggested_events": 0,
+      "superseded_draft_events": [
+        {
+          "frame": 3913,
+          "match_frame": 3913,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 2,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 7,
+          "source": "suggested_from_prediction",
+          "source_detail": "output/match20260920_posegate/pipeline_output.json",
+          "suggestion_window": [
+            3729,
+            4073
+          ],
+          "gesture": "bump_set",
+          "confidence": 0.55,
+          "contact_point": [
+            1172.5,
+            450.0
+          ],
+          "pass2_action": null,
+          "pass2_team": null,
+          "pass2_source": null,
+          "error": null,
+          "superseded_by_owner_contact": {
+            "frame": 3915,
+            "match_frame": 3915,
+            "final_action": "overpass",
+            "player_id": 4,
+            "player_team": "B",
+            "touch_number": 3,
+            "owner_raw": "Far team P4 bump passes the ball f3915"
+          },
+          "superseded_reason": "duplicate of the owner-dictated contact at clip f3915 (overpass), 2f away on the same squad; the owner contact is authoritative (coarse frame tolerance +-15f); NOTE the draft label 'dig' differs from the owner action 'overpass' \u2014 owner to adjudicate"
+        },
+        {
+          "frame": 4037,
+          "match_frame": 4037,
+          "final_action": "spike",
+          "action": "spike",
+          "player_id": 4,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 7,
+          "source": "suggested_from_prediction",
+          "source_detail": "output/match20260920_posegate/pipeline_output.json",
+          "suggestion_window": [
+            3729,
+            4073
+          ],
+          "gesture": "attack",
+          "confidence": 0.55,
+          "contact_point": [
+            1227.0,
+            299.0
+          ],
+          "pass2_action": null,
+          "pass2_team": null,
+          "pass2_source": null,
+          "error": null,
+          "superseded_by_owner_contact": null,
+          "superseded_reason": "no owner contact on this squad within +-15f \u2014 kept here (not in events) so the prediction is not lost; owner to adjudicate whether a contact is missing"
+        },
+        {
+          "frame": 4067,
+          "match_frame": 4067,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 1,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 7,
+          "source": "suggested_from_prediction",
+          "source_detail": "output/match20260920_posegate/pipeline_output.json",
+          "suggestion_window": [
+            3729,
+            4073
+          ],
+          "gesture": "bump_set",
+          "confidence": 0.55,
+          "contact_point": [
+            1042.0,
+            588.5
+          ],
+          "pass2_action": null,
+          "pass2_team": null,
+          "pass2_source": null,
+          "error": null,
+          "superseded_by_owner_contact": null,
+          "superseded_reason": "no owner contact on this squad within +-15f \u2014 kept here (not in events) so the prediction is not lost; owner to adjudicate whether a contact is missing"
+        }
+      ],
+      "n_superseded_draft_events": 3,
+      "implied_events": [],
+      "missing_events": [
+        {
+          "type": "poke_spike",
+          "reason": "dictated but no action emitted for it",
+          "frame": null,
+          "nearby_suggestions": []
+        },
+        {
+          "type": "poke_by_team_A",
+          "reason": "dictated 'poke' by squad A has no matching contact (team/label to adjudicate)",
+          "frame": null,
+          "nearby_suggestions": []
+        }
+      ],
+      "error_events": []
+    },
+    {
+      "point": 8,
+      "winner": "B",
+      "serving_team": "A",
+      "serving_side": "far",
+      "description": "spike from B team wins the point",
+      "side_switch_after": false,
+      "side_switch_before": true,
+      "clip_start_frame": 4520,
+      "clip_end_frame": 4820,
+      "match_start_frame": 4520,
+      "match_end_frame": 4820,
+      "window_source": "episode_map_emission_window",
+      "window_is_prediction": true,
+      "owner_serve_anchor_frame": 4700,
+      "owner_serve_anchor_clip_frame": 4700,
+      "map_attribution": "anchored",
+      "serve_relabel_decision": "relabeled",
+      "events": [
+        {
+          "frame": 4770,
+          "match_frame": 4770,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": null,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 8,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": null,
+          "owner_note": null,
+          "owner_raw": "Far team serves f4770",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 4800,
+          "match_frame": 4800,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": null,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 8,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": null,
+          "owner_note": null,
+          "owner_raw": "Near team dig at f4800",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 4842,
+          "match_frame": 4842,
+          "final_action": "set",
+          "action": "set",
+          "player_id": null,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 2,
+          "point": 8,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": null,
+          "owner_note": null,
+          "owner_raw": "Near team set at f4842",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 4888,
+          "match_frame": 4888,
+          "final_action": "spike",
+          "action": "spike",
+          "player_id": null,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 3,
+          "point": 8,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": null,
+          "owner_note": null,
+          "owner_raw": "Near team spikes ball to the side f4888",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 4910,
+          "match_frame": 4910,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": null,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 8,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": null,
+          "owner_note": "and goes wide, ball falls to the ground f4950 and near team score.",
+          "owner_raw": "Far team hand digs the ball f4910 and goes wide, ball falls to the ground f4950 and near team score.",
+          "owner_extra_match_frames": [
+            4950
+          ],
+          "error": null
+        }
+      ],
+      "excluded_by_owner_verdict": [],
+      "n_owner_gt_events": 5,
+      "n_owner_contact_events": 5,
+      "owner_contacts": [
+        {
+          "point": 8,
+          "side": "far",
+          "side_word": "far team",
+          "team": "A",
+          "player_id": null,
+          "action": "serve",
+          "action_token": "serves",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 4770,
+          "extra_match_frames": [],
+          "note": null,
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Far team serves f4770",
+          "raw_line_no": 81
+        },
+        {
+          "point": 8,
+          "side": "near",
+          "side_word": "near team",
+          "team": "B",
+          "player_id": null,
+          "action": "dig",
+          "action_token": "dig",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 4800,
+          "extra_match_frames": [],
+          "note": null,
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Near team dig at f4800",
+          "raw_line_no": 82
+        },
+        {
+          "point": 8,
+          "side": "near",
+          "side_word": "near team",
+          "team": "B",
+          "player_id": null,
+          "action": "set",
+          "action_token": "set",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 4842,
+          "extra_match_frames": [],
+          "note": null,
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Near team set at f4842",
+          "raw_line_no": 83
+        },
+        {
+          "point": 8,
+          "side": "near",
+          "side_word": "near team",
+          "team": "B",
+          "player_id": null,
+          "action": "spike",
+          "action_token": "spikes",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 4888,
+          "extra_match_frames": [],
+          "note": null,
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Near team spikes ball to the side f4888",
+          "raw_line_no": 84
+        },
+        {
+          "point": 8,
+          "side": "far",
+          "side_word": "far team",
+          "team": "A",
+          "player_id": null,
+          "action": "dig",
+          "action_token": "digs",
+          "gesture": null,
+          "owner_interpretation_flag": null,
+          "match_frame": 4910,
+          "extra_match_frames": [
+            4950
+          ],
+          "note": "and goes wide, ball falls to the ground f4950 and near team score.",
+          "frame_tolerance": 15,
+          "spike_type": null,
+          "outcome": null,
+          "error": null,
+          "raw": "Far team hand digs the ball f4910 and goes wide, ball falls to the ground f4950 and near team score.",
+          "raw_line_no": 85
+        }
+      ],
+      "contacts_side_switch_after": false,
+      "unmappable_owner_contacts": [],
+      "n_suggested_events": 0,
+      "superseded_draft_events": [
+        {
+          "frame": 4801,
+          "match_frame": 4801,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 2,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 8,
+          "source": "suggested_from_prediction",
+          "source_detail": "output/match20260920_posegate/pipeline_output.json",
+          "suggestion_window": [
+            4520,
+            4820
+          ],
+          "gesture": "bump_set",
+          "confidence": 0.55,
+          "contact_point": [
+            880.0,
+            539.5
+          ],
+          "pass2_action": "serve",
+          "pass2_team": "B",
+          "pass2_source": "relabeled",
+          "error": null,
+          "superseded_by_owner_contact": null,
+          "superseded_reason": "no owner contact on this squad within +-15f \u2014 kept here (not in events) so the prediction is not lost; owner to adjudicate whether a contact is missing"
+        }
+      ],
+      "n_superseded_draft_events": 1,
+      "implied_events": [],
+      "missing_events": [
+        {
+          "type": "spike_by_team_B",
+          "reason": "dictated 'spike' by squad B has no matching contact (team/label to adjudicate)",
+          "frame": null,
+          "nearby_suggestions": []
+        }
+      ],
+      "error_events": []
+    }
+  ],
+  "provenance": {
+    "owner_gt_inputs": [
+      "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt (contact-level dictation: every rally contact of P1-P8 with track id / side / action; coarse +-10-15f frames)",
+      "ground_truth/20260920_match_serve_anchors.txt (serve frame anchors, rounds 1+2; superseded by the contact-level serve wherever both exist)",
+      "ground_truth/20260920_match_points.json (parsed verbatim from ground_truth/20260920_match_ari_joan_lost.txt: descriptions, mechanical winner, side switches)"
+    ],
+    "prediction_inputs_suggestions_only": [
+      "output/episode_point_map.json",
+      "output/serve_relabel.json",
+      "output/match20260920_posegate/pipeline_output.json"
+    ],
+    "not_used": [
+      "ground_truth/gt_point_start_end.txt \u2014 anchors the game-state video ONLY, meaningless for the match (ground_truth/README.md warning)"
+    ],
+    "point_range": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "contacts_unparsed_lines": [
+      {
+        "line": "Some players change number when occlusions happen or they go outside the screen, I used the one that they had",
+        "line_no": 37,
+        "reason": "before the first 'Point <k>' header (verbatim preamble)"
+      },
+      {
+        "line": "at the moment of the contact with the ball",
+        "line_no": 38,
+        "reason": "before the first 'Point <k>' header (verbatim preamble)"
+      },
+      {
+        "line": "GT 8 points match",
+        "line_no": 40,
+        "reason": "before the first 'Point <k>' header (verbatim preamble)"
+      }
+    ],
+    "contacts_unmappable": [],
+    "event_sources": {
+      "owner_gt": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt + ground_truth/20260920_match_serve_anchors.txt",
+      "suggested": "output/episode_point_map.json + output/serve_relabel.json + output/match20260920_posegate/pipeline_output.json"
+    },
+    "events_in_annotated_frames": [
+      "owner_gt"
+    ],
+    "n_owner_contact_events": 28,
+    "superseded_draft_events": 15,
+    "superseded_draft_events_note": "Draft/suggested events that coexisted with owner-dictated CONTACTS. The owner contacts are the authoritative contact list, so these live in points[].superseded_draft_events (with the owner contact each duplicates) and are NOT graded."
+  },
+  "annotated_frames": {
+    "ball": {
+      "description": "No ball annotations in T2 (frame-level GT covers contact events only).",
+      "frames": {}
+    },
+    "players": {
+      "description": "No player boxes in T2 \u2014 player_id is null on every serve-anchor event; owner-dictated CONTACT events carry the pipeline track id valid at the contact frame (ids are NOT stable across occlusions \u2014 see the contacts txt header).",
+      "frames": {}
+    },
+    "actions": {
+      "description": "Contact events, clip-local frames. Only source='owner_gt' events are ground truth; source='suggested_from_prediction' events are pipeline suggestions flagged for owner adjudication and are excluded from this list by default. Where the owner dictated contacts, the owner contacts are the whole list and every draft/suggested event was moved to points[].superseded_draft_events.",
+      "events": [
+        {
+          "frame": 210,
+          "match_frame": 210,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": 2,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 1,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 2,
+          "owner_note": null,
+          "owner_raw": "Far team P2 serve at f210",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 245,
+          "match_frame": 245,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 4,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 1,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": 4,
+          "owner_note": null,
+          "owner_raw": "Near team P4 dig at f245",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 300,
+          "match_frame": 300,
+          "final_action": "set",
+          "action": "set",
+          "player_id": 3,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 2,
+          "point": 1,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": 3,
+          "owner_note": "(missatributed to P2)",
+          "owner_raw": "Near team P3 set at f300 (missatributed to P2)",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 345,
+          "match_frame": 345,
+          "final_action": "spike",
+          "action": "spike",
+          "player_id": 4,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 3,
+          "point": 1,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": 4,
+          "owner_note": "far team scores",
+          "owner_raw": "Near team P4 spike accelerated into the net f345, far team scores",
+          "owner_extra_match_frames": null,
+          "error": {
+            "type": "spike_into_net",
+            "team": "A",
+            "text": "far team scores"
+          },
+          "spike_type": "hard",
+          "outcome": "out"
+        },
+        {
+          "frame": 880,
+          "match_frame": 880,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": 2,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 2,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 2,
+          "owner_note": "goes wide outside court at f930, near team scores",
+          "owner_raw": "Far team P2 serve at f880 -> goes wide outside court at f930, near team scores",
+          "owner_extra_match_frames": [
+            930
+          ],
+          "error": {
+            "type": "serve_out",
+            "team": "B",
+            "text": "goes wide outside court at f930, near team scores"
+          }
+        },
+        {
+          "frame": 1395,
+          "match_frame": 1395,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": 3,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 3,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": 3,
+          "owner_note": null,
+          "owner_raw": "Near team P3 serve at f1395",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 1431,
+          "match_frame": 1431,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 2,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 3,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 2,
+          "owner_note": null,
+          "owner_raw": "Far team P2 dig at f1431",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 1487,
+          "match_frame": 1487,
+          "final_action": "set",
+          "action": "set",
+          "player_id": 1,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 2,
+          "point": 3,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 1,
+          "owner_note": null,
+          "owner_raw": "Far team P1 set f1487",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 1543,
+          "match_frame": 1543,
+          "final_action": "overpass",
+          "action": "overpass",
+          "player_id": null,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 3,
+          "point": 3,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": null,
+          "owner_note": "touches the line on the exterior at f1595, far team scores",
+          "owner_raw": "Far team bump overpass at f1543 -> touches the line on the exterior at f1595, far team scores",
+          "owner_extra_match_frames": [
+            1595
+          ],
+          "error": null
+        },
+        {
+          "frame": 2154,
+          "match_frame": 2154,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": null,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 4,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": null,
+          "owner_note": "goes into the net, near team scores",
+          "owner_raw": "Far team serve at f2154, goes into the net, near team scores",
+          "owner_extra_match_frames": null,
+          "error": {
+            "type": "serve_into_net",
+            "team": "B",
+            "text": "goes into the net, near team scores"
+          }
+        },
+        {
+          "frame": 2575,
+          "match_frame": 2575,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": 2,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 5,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": 2,
+          "owner_note": "goes wide to the side and lands out of bounds, far team scores",
+          "owner_raw": "Near team P2 serve at f2575, goes wide to the side and lands out of bounds, far team scores",
+          "owner_extra_match_frames": null,
+          "error": {
+            "type": "serve_out",
+            "team": "A",
+            "text": "goes wide to the side and lands out of bounds, far team scores"
+          }
+        },
+        {
+          "frame": 3038,
+          "match_frame": 3038,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": 3,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 6,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 3,
+          "owner_note": null,
+          "owner_raw": "Far team P3 serve at f3038",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 3071,
+          "match_frame": 3071,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 2,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 6,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": 2,
+          "owner_note": null,
+          "owner_raw": "Near team P2 dig at f3071",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 3131,
+          "match_frame": 3131,
+          "final_action": "overpass",
+          "action": "overpass",
+          "player_id": 4,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 2,
+          "point": 6,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": 4,
+          "owner_note": "overpasses",
+          "owner_raw": "Near team P4 set f3131 overpasses",
+          "owner_extra_match_frames": null,
+          "error": null,
+          "gesture": "set",
+          "owner_interpretation_flag": {
+            "rule": "overpass_wording_with_gesture_keyword",
+            "raw_action_label": "set",
+            "gesture": "set",
+            "why": "OWNER INTERPRETATION (needs ratification): the owner line states the ball went over ('overpass'), so the pipeline taxonomy (ActionContextResolver: overpass = ball sent over WITHOUT an attack) makes this a final_action='overpass' with gesture='set' -- the gesture is kept as 'set' because that is the touch the owner described. Raw wording: Near team P4 set f3131 overpasses"
+          }
+        },
+        {
+          "frame": 3172,
+          "match_frame": 3172,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 1,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 6,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 1,
+          "owner_note": null,
+          "owner_raw": "Far team P1 digs at f3172",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 3228,
+          "match_frame": 3228,
+          "final_action": "set",
+          "action": "set",
+          "player_id": 3,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 2,
+          "point": 6,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 3,
+          "owner_note": "slips hands and loses point, near team scores",
+          "owner_raw": "Far team P3 set f3228 slips hands and loses point, near team scores",
+          "owner_extra_match_frames": null,
+          "error": {
+            "type": "set_slip_off_hands",
+            "team": "B",
+            "text": "slips hands and loses point, near team scores"
+          }
+        },
+        {
+          "frame": 3747,
+          "match_frame": 3747,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": null,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 7,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": null,
+          "owner_note": "(the previous attributed serve is just the player carrying the ball near another player)",
+          "owner_raw": "Near team serve at f3747 (the previous attributed serve is just the player carrying the ball near another player)",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 3782,
+          "match_frame": 3782,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 4,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 7,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 4,
+          "owner_note": "the reception goes behind",
+          "owner_raw": "Far team P4 digs f3782, the reception goes behind",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 3852,
+          "match_frame": 3852,
+          "final_action": "set",
+          "action": "set",
+          "player_id": 1,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 2,
+          "point": 7,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 1,
+          "owner_note": "already outside of the court (attributed as a serve)",
+          "owner_raw": "Far team P1 sets f3852 already outside of the court (attributed as a serve)",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 3915,
+          "match_frame": 3915,
+          "final_action": "overpass",
+          "action": "overpass",
+          "player_id": 4,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 3,
+          "point": 7,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": 4,
+          "owner_note": null,
+          "owner_raw": "Far team P4 bump passes the ball f3915",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 3950,
+          "match_frame": 3950,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": 2,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 7,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near side",
+          "owner_track_id": 2,
+          "owner_note": null,
+          "owner_raw": "Near side P2 digs f3950",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 4002,
+          "match_frame": 4002,
+          "final_action": "set",
+          "action": "set",
+          "player_id": 3,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 2,
+          "point": 7,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near side",
+          "owner_track_id": 3,
+          "owner_note": null,
+          "owner_raw": "Near side P3 sets the ball f4002",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 4040,
+          "match_frame": 4040,
+          "final_action": "spike",
+          "action": "spike",
+          "player_id": 2,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 3,
+          "point": 7,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near side",
+          "owner_track_id": 2,
+          "owner_note": "middle wide court and scores",
+          "owner_raw": "Near side P2 spikes accelerated at f4040 middle wide court and scores",
+          "owner_extra_match_frames": null,
+          "error": null,
+          "spike_type": "hard",
+          "outcome": "kill"
+        },
+        {
+          "frame": 4770,
+          "match_frame": 4770,
+          "final_action": "serve",
+          "action": "serve",
+          "player_id": null,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 8,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": null,
+          "owner_note": null,
+          "owner_raw": "Far team serves f4770",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 4800,
+          "match_frame": 4800,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": null,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 1,
+          "point": 8,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": null,
+          "owner_note": null,
+          "owner_raw": "Near team dig at f4800",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 4842,
+          "match_frame": 4842,
+          "final_action": "set",
+          "action": "set",
+          "player_id": null,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 2,
+          "point": 8,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": null,
+          "owner_note": null,
+          "owner_raw": "Near team set at f4842",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 4888,
+          "match_frame": 4888,
+          "final_action": "spike",
+          "action": "spike",
+          "player_id": null,
+          "player_team": "B",
+          "team_in_possession": "B",
+          "touch_number": 3,
+          "point": 8,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "near",
+          "owner_side_word": "near team",
+          "owner_track_id": null,
+          "owner_note": null,
+          "owner_raw": "Near team spikes ball to the side f4888",
+          "owner_extra_match_frames": null,
+          "error": null
+        },
+        {
+          "frame": 4910,
+          "match_frame": 4910,
+          "final_action": "dig",
+          "action": "dig",
+          "player_id": null,
+          "player_team": "A",
+          "team_in_possession": "A",
+          "touch_number": 1,
+          "point": 8,
+          "source": "owner_gt",
+          "status": "OWNER_DICTATED",
+          "source_detail": "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+          "frame_tolerance": 15,
+          "frame_tolerance_note": "owner frame estimates are COARSE (+-10-15f, contacts txt header); the frame is NOT frame-exact",
+          "owner_side": "far",
+          "owner_side_word": "far team",
+          "owner_track_id": null,
+          "owner_note": "and goes wide, ball falls to the ground f4950 and near team score.",
+          "owner_raw": "Far team hand digs the ball f4910 and goes wide, ball falls to the ground f4950 and near team score.",
+          "owner_extra_match_frames": [
+            4950
+          ],
+          "error": null
+        }
+      ]
+    }
+  },
+  "clip_container_frames": 4963,
+  "clip_decoded_frames": 4961
+}

@@ -413,6 +413,13 @@ survive across sessions; provenance in the archives.
 - No-touch blocks are physical GT events the pipeline cannot emit (no
   eval penalty mechanism).
 - Kill = direct fall OR dug-and-dies-without-a-set.
+- `ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt` (owner dictation
+  2026-09-29, session #33): contact-level GT for match points 1–8 with the
+  PLAYER TRACK ID + side at each contact. Player id = the id the track had AT
+  THE CONTACT FRAME (ids drift across occlusions/off-screen by design) — never
+  treat cross-point id drift as a GT contradiction. All 8 winners agree with
+  the point-level GT; P7 wording conflict (accelerated spike vs "poke spike").
+  Not yet wired to any script.
 - GT edits only via owner-ratified contact sheets; GT was dictated against
   base-model behavior — when a new model shifts streams, RE-ADJUDICATE
   before calling regressions (the v3 e4/e5 lesson: same failure modes on
@@ -468,6 +475,12 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- GT `touch_number` is PER-POSSESSION, never rally-global: serve = 1, the receiving team restarts at 1 (dig 1, set 2, spike/overpass 3) and the count resets on every side change (`ground_truth/README.md`, entreno_3 JSON). T2 contact GT now emits that; `possession_touch_numbers()` in `scripts/build_dev_clip_gt.py` is the reference.
+- In the pipeline taxonomy a set/dig that crosses the net is `final_action=overpass` (ActionContextResolver: overpass = sent over without an attack) with the gesture kept separately — T2 GT applies this to owner wording and flags it via `owner_interpretation_flag` for owner ratification.
+- Where owner-dictated CONTACTS exist they are the authoritative contact list: draft/suggested events are never appended to `events`, they move to `points[].superseded_draft_events` with the owner contact each duplicates (matched by same squad within the coarse ±15f window) so no prediction is lost.
+- 2026-09-29 **#34** — T2 contact-GT code review fixed (3 defects: rally-global → per-possession `touch_number`, draft/suggested duplicates moved to `superseded_draft_events` (15 of them, `events` == the 28 owner contacts), cross-net set → `overpass` + `owner_interpretation_flag`); +9 tests, suite 625.
+- 2026-09-29 **#33** — T2 contact-level GT wired: `scripts/build_dev_clip_gt.py` parses the owner's `20260920_match_ari_joan_contacts_p1_p8.txt` (28 contacts, P1–P8, coarse ±10–15f, side-switch after P7) and emits `video_ari_joan_8_first_points_annotations.json` with status OWNER_DICTATED, per-contact `frame_tolerance: 15`, owner track id/side/note kept raw; +6 parser tests, suite 612.
+- 2026-09-29 **#32** — T2 dev-clip GT BUILT (REVIEW, not ratified): offset map (identity, residual 0.0 at start/mid/end), `scripts/build_dev_clip_gt.py` (+25 tests), DRAFT GT for P1–P8 (8 owner serve anchors + 15 flagged suggestions + missing/fault report), ratification sheets in `output/t2_contact_sheet/`; the side switch is after P7, not P3–P4.
 - 2026-09-28 **#30** — documentation-only generalization assessment and staged G1/G2 roadmap: `docs/202609-28-astra-fix-pipeline.md`; count-vs-recall, GT-assisted interpretation, and dense-feature persistence gaps verified; implementation pending approval, no runtime changes.
 - 2026-09-28 **#28** — point 22 mechanism 3 SHIPPED: pass-2 serve re-labeling (`scripts/relabel_serves.py`, +29 tests); far prefix 2/8 → 8/8, serve-typed 20 → 31, all 17 owner verdicts mechanical, 13 team overrides flagged; suite 554 (Log below).
 - 2026-09-28 **#27** — architecture ratified: pass-2 interpretation layer over the stream (map → serve re-label → winner → fantasy); full-video two-pass REJECTED (live parity + no perception gain); point 22 mechanism 3 reframed (Log below).
