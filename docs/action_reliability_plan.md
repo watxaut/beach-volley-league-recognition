@@ -7,14 +7,15 @@ Status legend: `TODO` / `WIP` / `REVIEW` / `DONE` / `BLOCKED(owner)`.
 **Dev clip (fails today):** `resources/video_ari_joan_8_first_points.mp4` (1920x1080, VFR, 4963 frames, first 8
 match points; missed serves, serve-out, set slip, spike-into-net, side switch at 3–4).
 **Regression suite:** `resources/video_entreno_1..7.mp4` + `ground_truth/` (byte-identical gate for no-decision changes).
-**Held-out candidate (untouched until Stage 3):** `resources/full_videos/Entreno Vall Hebron i Partits - 05 05 2025.mp4`
-(1080p, 29.97 fps CFR — different setup/rate). Owner to confirm.
+**Held-out:** OPEN — need a second recording with a pinhole (non-fisheye) fixed camera in the supported long-axis
+scope, kept untouched until Stage 3. `Entreno Vall Hebron i Partits - 05 05 2025.mp4` is REJECTED as the held-out
+gate (fisheye breaks the 8-point homography; rain/lens drops) — at most a later 1–2-point *stress/unsupported* probe.
 
 ## Stage 0 — honest baseline (no production decision changes)
 
 | #  | Task | Deliverable | Gate | Status |
 |----|------|-------------|------|--------|
-| T1 | **Calibration/view readiness** | `src/main.py`: readiness report (calibration found, source-stem match, `frame_dimensions` vs actual video size, degraded outputs listed); missing/unmatched calibration = hard error unless `--allow-uncalibrated`; readiness block in `pipeline_output.json` metadata. Calibration for the dev clip (derived from the match calibration if same camera, scaled via `frame_dimensions`), owner verifies on a frame overlay. | Entreno action outputs byte-identical (only the new metadata key differs); tests for each readiness state; suite green. | DONE (568 tests, e1–e7 byte-identical; owner to eyeball `output/t1_calib_overlay.png` far corners) |
+| T1 | **Calibration/view readiness** | `src/main.py`: readiness report (calibration found, source-stem match, `frame_dimensions` vs actual video size, degraded outputs listed); missing/unmatched calibration = hard error unless `--allow-uncalibrated`; readiness block in `pipeline_output.json` metadata. Calibration for the dev clip (derived from the match calibration if same camera, scaled via `frame_dimensions`), owner verifies on a frame overlay. | Entreno action outputs byte-identical (only the new metadata key differs); tests for each readiness state; suite green. | DONE (568 tests, e1–e7 byte-identical; overlay owner-verified; probe scripts gated too — T1b, 581 tests) |
 | T2 | **Dev-clip GT** | Locate clip offset inside `20260920_match_ari_joan_lost_up1080.mp4`; translate match GT (actions + point start/end + serve anchors) for P1–P8 into `ground_truth/video_ari_joan_8_first_points_annotations.json`; contact sheet for owner ratification; tag error events (serve out, set slip, net spike) and side switch. | Owner-ratified sheet. | TODO |
 | T3 | **Time-matched evaluator** | `scripts/evaluate.py` (or sibling): one-to-one matching in seconds (±0.2 s, from PTS), separate contact / class / team / actor scores, FP per dead-time minute, duplicates; point intervals by overlap (not count ratio). Autonomous mode forbids GT-derived inputs (winners, anchors, pins). | Reproduces existing entreno F1 ordering on frame-exact data; unit tests. | TODO |
 | T4 | **Loss waterfall** | Diagnostic-only hooks (off by default) + `scripts/waterfall.py`: for each GT event on the dev clip, the first stage where it dies — raw detection → track admission → candidate → actor/team → gesture/context → point/scoring. | Outputs byte-identical with hooks off; table committed under `docs/`. | TODO |

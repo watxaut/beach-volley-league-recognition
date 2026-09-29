@@ -23,13 +23,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.detection.ball_detector import BallDetector
 from src.detection.player_detector import PlayerDetector
 from src.detection.court_calibration import CourtCalibration
+from src.detection.calibration_readiness import resolve_script_calibration
 from src.tracking.ball_tracker import BallTracker
 from src.tracking.player_tracker import PlayerTracker
 from src.recognition.pose_estimator import PoseEstimator
 from src.recognition.action_classifier import ActionClassifier
 from src.analysis.spike_analyzer import SpikeAnalyzer
 from src.output_gen import overlay
-from src.utils.video_upscale import resolve_source_stem
 
 
 def main():
@@ -46,6 +46,12 @@ def main():
                         help="MediaPipe pose model complexity. Default 0 matches the "
                              "Config default (lite; entreno_1/3 GT A/B showed identical "
                              "action output at 0 and 1, 0 is ~1.6x faster).")
+    parser.add_argument("--allow-uncalibrated", action="store_true",
+                        help="Run without a usable court calibration (missing file, stem "
+                             "mismatch or frame_dimensions that do not fit the video). "
+                             "Court-derived features (team attribution, near-net, "
+                             "serve-zone admission, spike zones) are DEGRADED -- the "
+                             "action log is NOT comparable with calibrated runs.")
     args = parser.parse_args()
 
     cap = cv2.VideoCapture(args.video)
@@ -58,13 +64,16 @@ def main():
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    # Load court calibration (auto-detect from calibrations/<video_name>.json)
-    court_path = args.court
-    if not court_path:
-        auto_path = Path(__file__).resolve().parent.parent / "calibrations" / f"{resolve_source_stem(args.video)}.json"
-        if auto_path.exists():
-            court_path = str(auto_path)
-            print(f"Auto-loaded court calibration: {court_path}")
+    # Court calibration + readiness gate. Every action number validated against
+    # ground_truth/ came from a CALIBRATED run, so an uncalibrated log must not
+    # be produced silently (it used to run degraded and be compared anyway).
+    # Calibration auto-detect keys on the SOURCE stem, so pointing this script at
+    # the cached <stem>_up1080.mp4 still finds calibrations/<source_stem>.json.
+    court_path = resolve_script_calibration(
+        args.video, args.court, args.allow_uncalibrated,
+        calibrations_dir=Path(__file__).resolve().parent.parent / "calibrations",
+        script_name=Path(__file__).name,
+    )
     court = CourtCalibration(court_path) if court_path else CourtCalibration()
 
     # Fine-tuned ball model (auto-detect from models/ if not given). Needed on

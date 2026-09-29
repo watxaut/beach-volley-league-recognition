@@ -21,8 +21,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.detection.ball_detector import BallDetector
 from src.detection.court_calibration import CourtCalibration
+from src.detection.calibration_readiness import resolve_script_calibration
 from src.tracking.ball_tracker import BallTracker
-from src.utils.video_upscale import resolve_source_stem
 
 
 def main():
@@ -32,6 +32,10 @@ def main():
     parser.add_argument("--output", default="output/tracking_test", help="Output directory")
     parser.add_argument("--max-frames", type=int, default=500, help="Max frames to process")
     parser.add_argument("--save-video", action="store_true", help="Save annotated video")
+    parser.add_argument("--allow-uncalibrated", action="store_true",
+                        help="Run without a usable court calibration (the court-bounds "
+                             "out-of-bounds ball reject is DEGRADED -- the track is NOT "
+                             "comparable with calibrated runs).")
     args = parser.parse_args()
 
     cap = cv2.VideoCapture(args.video)
@@ -44,13 +48,13 @@ def main():
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    # Load court calibration (auto-detect from calibrations/<video_name>.json)
-    court_path = args.court
-    if not court_path:
-        auto_path = Path(__file__).resolve().parent.parent / "calibrations" / f"{resolve_source_stem(args.video)}.json"
-        if auto_path.exists():
-            court_path = str(auto_path)
-            print(f"Auto-loaded court calibration: {court_path}")
+    # Court calibration + readiness gate (only court_bounds is used, but an
+    # unusable calibration is still a silent-degradation state).
+    court_path = resolve_script_calibration(
+        args.video, args.court, args.allow_uncalibrated,
+        calibrations_dir=Path(__file__).resolve().parent.parent / "calibrations",
+        script_name=Path(__file__).name,
+    )
     court = CourtCalibration(court_path) if court_path else CourtCalibration()
 
     detector = BallDetector(confidence_threshold=0.15)

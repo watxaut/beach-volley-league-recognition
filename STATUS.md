@@ -136,8 +136,8 @@ implementation backlog below remains unchanged.
 **Action-reliability track (session 31):** executable plan derived from the
 astra assessment lives in `docs/action_reliability_plan.md` (tasks T1–T15,
 status per task). Dev clip = `video_ari_joan_8_first_points.mp4` (had NO
-calibration → court signals silently dropped); T1 readiness report DONE
-(uncommitted, reviewed); next = T2 dev-clip GT.
+calibration → court signals silently dropped); T1 readiness DONE (main +
+probe scripts); held-out recording OPEN (fisheye Vall Hebron rejected); next = T2 dev-clip GT.
 
 **Active next (ranked, goal-driven — see North-star).** (1) **21.3 point
 winner/outcome layer** — G1's biggest missing signal; the anchored map +
@@ -349,7 +349,7 @@ point number in `docs/history/`.
 
 ## Learnings (standing)
 
-- Calibration `frame_dimensions` is (h,w) and is NOT a scale hint: points are used verbatim, only the court mask is sized from it — a smaller calibration on a bigger video silently drops near-half players. `src/main.py` now hard-errors on missing/mismatched calibration (`--allow-uncalibrated` to waive; T1, session 31). Probe scripts (`scripts/test_action_recognition.py`) bypass this check.
+- Calibration `frame_dimensions` is (h,w) and is NOT a scale hint: points are used verbatim, only the court mask is sized from it — a smaller calibration on a bigger video silently drops near-half players. `src/main.py` now hard-errors on missing/mismatched calibration (`--allow-uncalibrated` to waive; T1, session 31). Probe scripts share it via `src/detection/calibration_readiness.py` (T1b); they decode at native res, so point them at `_up1080` for sub-1080p sources.
 
 Protocol rules live in **AGENTS.md** (entreno validation, live-debug
 parity, diagnose-first, byte-identical A/B, `cv2.setRNGSeed(0)` per

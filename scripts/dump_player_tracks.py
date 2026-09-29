@@ -35,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.detection.player_detector import PlayerDetector
 from src.detection.ball_detector import BallDetector
 from src.detection.court_calibration import CourtCalibration
+from src.detection.calibration_readiness import resolve_script_calibration
 from src.tracking.player_tracker import PlayerTracker
 from src.utils.config import Config
 from src.utils.video_upscale import resolve_source_stem
@@ -74,6 +75,10 @@ def main():
                         help="Serve-zone depth behind each baseline in metres (default: config)")
     parser.add_argument("--no-serve-zone", action="store_true", help="Disable serve-zone admission")
     parser.add_argument("--save-video", action="store_true", help="Save annotated mp4")
+    parser.add_argument("--allow-uncalibrated", action="store_true",
+                        help="Run without a usable court calibration (court admission, "
+                             "serve-zone admission and the bystander guard are DEGRADED "
+                             "-- track dumps are NOT comparable with calibrated runs).")
     args = parser.parse_args()
 
     cap = cv2.VideoCapture(args.video)
@@ -87,13 +92,13 @@ def main():
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     n_frames = total if args.max_frames <= 0 else min(args.max_frames, total)
 
-    # Auto-load calibration
-    court_path = args.court
-    if not court_path:
-        auto = Path(__file__).resolve().parent.parent / "calibrations" / f"{resolve_source_stem(args.video)}.json"
-        if auto.exists():
-            court_path = str(auto)
-            print(f"Auto-loaded court calibration: {court_path}")
+    # Auto-load calibration + readiness gate: track dumps drive GT annotation,
+    # so an uncalibrated dump must not look like a calibrated one.
+    court_path = resolve_script_calibration(
+        args.video, args.court, args.allow_uncalibrated,
+        calibrations_dir=Path(__file__).resolve().parent.parent / "calibrations",
+        script_name=Path(__file__).name,
+    )
     court = CourtCalibration(court_path) if court_path else CourtCalibration()
 
     detector = PlayerDetector(confidence_threshold=PROD_PLAYER_CONFIDENCE)
