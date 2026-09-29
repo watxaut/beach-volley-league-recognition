@@ -149,3 +149,36 @@ venv/bin/python scripts/waterfall.py --diag output/t4/dev_diag.jsonl \
     --ground-truth ground_truth/video_ari_joan_8_first_points_annotations.json \
     --json output/t4/dev_waterfall.json --markdown docs/t4_loss_waterfall_dev_clip.md
 ```
+
+## After T5 step 2 (2026-09-29) — the same table, one detail string changed
+
+T5 step 2 implemented the two candidate serve-admission mechanisms behind
+default-OFF config keys and replayed them through the shared frame path
+(`scripts/probe_serve_mechanisms.py` + a real pipeline run with
+`--config output/t5b/backfill_on.yaml --diag-dump output/t5b/dev_on_diag.jsonl`).
+
+| run | pipeline output | evaluate_timed (F1 / class / team / dup / FP per dead-min) | waterfall stage counts | 5 far-serve `no_ball_sighting` counts |
+|---|---|---|---|---|
+| T4 baseline (mechanism OFF) | — | 0.597 / 0.706 / 0.706 / 1 / 2.703 | 0 / 0 / **6** / 5 / 5 / 4 / 8 | 23 · 27 · 20 · 21 · 21 |
+| T5 step 2, **B on** (backfill) | **byte-identical** to OFF (`scripts/compare_runs.py` → IDENTICAL) | 0.597 / 0.706 / 0.706 / 1 / 2.703 | 0 / 0 / **6** / 5 / 5 / 4 / 8 | **16 · 20 · 19 · 20 · 18** |
+| T5 step 2, A (weak tier) | not run end-to-end (refuted in replay) | — | — | 10 · 16 · 17 · 19 · 11 |
+
+So the only thing the shipped-candidate mechanism moves in the waterfall is the
+*evidence* line: with B the contact probe stops saying "I never saw the ball at
+the contact frame" (23→16 of 31 window frames at P1) and starts saying "I saw
+it and there is no contact geometry there" — the step-1 diagnosis is confirmed
+and fixed, and the 6 stage-3 deaths stay 6 because the contact probe's own
+serve signature refuses the far float toss. Points 6 matched / 2 missed /
+0 spurious, mean IoU 0.7074, and every per-contact row except those five
+detail strings are unchanged. Details and the decision:
+`docs/t5_serve_admission_diagnosis.md` (step-2 section).
+
+```bash
+venv/bin/python -m src.main resources/video_ari_joan_8_first_points.mp4 \
+    --output-dir output/t5b/dev_on --skip-visualization --device cpu \
+    --config output/t5b/backfill_on.yaml --diag-dump output/t5b/dev_on_diag.jsonl
+venv/bin/python scripts/waterfall.py --diag output/t5b/dev_on_diag.jsonl \
+    --predictions output/t5b/dev_on/pipeline_output.json \
+    --ground-truth ground_truth/video_ari_joan_8_first_points_annotations.json \
+    --json output/t5b/dev_waterfall.json --markdown output/t5b/dev_waterfall.md
+```

@@ -1898,3 +1898,61 @@ venv/bin/python -m pytest tests/ -o addopts=""
 # full pipeline on a video
 python -m src.main <video.mp4> --court calibrations/<name>.json
 ```
+
+### 2026-09-28 (twenty-eighth session) — open point 22 mechanism 3 SHIPPED: pass-2 serve re-labeling; far prefix 2/8 → 8/8; all owner verdicts reproduce mechanically
+
+- **Scope:** the layer ratified in #27 (AGENTS §6): two passes over the
+  STREAM, one over the video. Pure post-hoc — inputs are the anchored
+  episode→point map, the posegate pipeline JSON, and the ratified serve
+  anchors; zero `src/` changes, so entreno neutrality holds by
+  construction (verified: `git status` shows only the new script +
+  tests).
+- **Diagnose first:** evidence tables over all 33 TRUE windows before
+  any code. The dead-ball gap (frames since the previous action of ANY
+  kind) splits cleanly: serve-position window openers 153-1206f
+  (anchored prefix 219-853f or video start); the largest NON-opening t1
+  gap anywhere is 134f (P19 f13758 mid-rally possession change). GAP_
+  SERVE_MIN = 143 = chasm midpoint; below-threshold openers degrade to
+  report_only/anchor_only, never to a wrong serve. The contact-half
+  projection is evidence-only (the known airborne bias swamps it — 16
+  of 17 prefix windows read far).
+- **Shipped (`scripts/relabel_serves.py`, +29
+  tests/test_serve_relabel.py):** per TRUE window: live actions (owner
+  FALSE/OFFGAME excluded) → opener = first live action; t1 + gap +
+  adoptable action type → emitted / relabeled (bump-serve class,
+  `actions_pass2` carries pass2_action/pass2_team/pass2_source beside
+  the untouched original); rejected opener + anchor → anchor_only (P5,
+  P7 — the owner SAW the serve, nothing was emitted); no anchor →
+  report_only. Precedence learned in-build: (1) FALSE@3650 covers
+  3595A+3856B via the map's adjudicated false-candidate notes, not
+  exact frames; (2) owner TRACKED/MISCLASSIFIED verdicts outrank the
+  gap veto (a real emitted serve can follow a false one closely) AND
+  the fault-description guard (P12: desc says fault, owner says the
+  serve was emitted — desc yields); (3) P32-class guard: fault desc +
+  post-serve rally + no owner verdict → report_only, never forced;
+  (4) P20 owner-pinned to 14516A (round-2 q5 verbatim, structured in
+  OWNER_PINNED_SERVES — the DP window must not swallow the opener);
+  (5) 6928A stays report-only (structural map note, no owner verdict).
+- **Gates (all measured on the real data):** far prefix census
+  **2/8 → 8/8** (target ≥6/8 ✓; before = P13, P15 only). Serve-typed
+  actions **20 → 31** = 20 − 6 demotions (1039, 2414, 3595, 3856,
+  5130 owner-FALSE; 14387 OFFGAME) + 17 re-labels (prefix: P1 dig@247,
+  P2 dig@930, P4 dig@2195, P6 dig@3070, P8 dig@4801, P9 spike@5496,
+  P10 spike@6034, P11 dig@7132, P12 spike@7780, P14 dig@9137; tail:
+  P21, P22, P24, P25, P26, P28, P29). The ~28 sanity anchor (v2
+  emitted 28) is overshot DELIBERATELY: 30/33 points now hold an
+  in-stream serve action (P5, P7 anchor-only; P32 pending) — each maps
+  to a distinct point, and 6928A remains in-stream un-demoted pending
+  its owner verdict. **All 17 owner round-1+2 verdicts reproduce
+  mechanically** (MISCLASSIFIED points land on the exact contact
+  frames: 5496, 6034, 7132, 7780). **13 team overrides flagged**
+  (emitted toucher team vs anchor/winner-serves): twelve A→B
+  (far-side width-band degradation, incl. emitted-fixes P23 17159A and
+  P31 22873A) + P24's mirror B→A — the structural squad is what the
+  fantasy layer will consume; `team_emitted` kept as provenance.
+- **Suite:** 525 → **554** (+29; all green incl. full suite). Tests pin
+  the gap chasm, anchor precedence, FALSE/OFFGAME demotions, the
+  P32/P12 fault-rule pair, the P20 pin, census scoping + gate math,
+  pass2 stream annotations, determinism.
+- Files: scripts/relabel_serves.py, tests/test_serve_relabel.py (+29),
+  output/serve_relabel.json (git-ignored), STATUS.md.

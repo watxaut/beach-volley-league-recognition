@@ -217,7 +217,11 @@ class ActionClassifier:
 
         # Ball trajectory of REAL (non-predicted) positions:
         # (frame, x, y, w, h) -- width feeds the near/far side estimate.
+        # ``_backfill_frames`` flags the frames whose point was retro-extended
+        # by the BallTracker's T5 backfill mechanism (flag only: a backfilled
+        # point is consumed exactly like a real sighting).
         self._ball_history: deque = deque(maxlen=120)
+        self._backfill_frames: set = set()
         self._last_contact_frame: int = -1000
 
         # Possession memory (attribution only; the context layer keeps its own
@@ -268,6 +272,7 @@ class ActionClassifier:
     def reset(self) -> None:
         """Reset all per-video state."""
         self._ball_history.clear()
+        self._backfill_frames.clear()
         self._player_pose_history.clear()
         self._last_contact_frame = -1000
         self._last_touch_team = None
@@ -534,6 +539,38 @@ class ActionClassifier:
     def _real_points(self, lo: int, hi: int) -> List[Tuple]:
         """Real ball points (frame, x, y, w, h) with frame in [lo, hi]."""
         return [p for p in self._ball_history if lo <= p[0] <= hi]
+
+    def add_ball_sightings(self, points: List[Dict[str, Any]]) -> None:
+        """Insert PAST ball sightings (tracker backfill) into the history.
+
+        T5 mechanism B: when the ball tracker locks it can be several frames
+        AFTER the contact, so the pre-contact history the contact probe needs
+        was never emitted in real time. The tracker retro-extends it from the
+        raw detections of frames it has already seen and hands it over here as
+        ``(frame, x, y, w, h)`` tuples; they are consumed exactly like real
+        sightings (the frame stamps are what the geometry reads) and flagged in
+        ``_backfill_frames`` for diagnostics.
+
+        Insertion keeps the history sorted by frame and never overwrites a
+        point that already exists for that frame, so every window helper
+        (``left[0]``, ``right[-1]``, ``before[-1]``) keeps its meaning.
+        """
+        if not points:
+            return
+        have = {p[0] for p in self._ball_history}
+        fresh = []
+        for p in points:
+            frame = int(p["frame"])
+            if frame in have:
+                continue
+            have.add(frame)
+            fresh.append((frame, float(p["x"]), float(p["y"]),
+                          float(p.get("w", 0.0)), float(p.get("h", 0.0))))
+            self._backfill_frames.add(frame)
+        if not fresh:
+            return
+        merged = sorted(list(self._ball_history) + fresh, key=lambda t: t[0])
+        self._ball_history = deque(merged, maxlen=self._ball_history.maxlen)
 
     def _ball_stale_frames(self, frame_number: int) -> int:
         """Frames since the last REAL ball sighting in history (inf if none)."""

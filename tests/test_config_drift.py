@@ -79,6 +79,17 @@ CTOR_PARITY = [
     ("ball_boot_low_conf_floor", BallTracker, "boot_low_conf_floor"),
     ("ball_static_suspect_frac", BallDetector, "static_suspect_frac"),
     ("ball_selection_conf_window", BallTracker, "selection_conf_window"),
+    # T5 serve-admission mechanisms (A weak tier, B backfill) -- the script
+    # path (bare ctor) must run exactly what DEFAULT_CONFIG describes.
+    ("ball_weak_min_speed", BallTracker, "weak_min_speed"),
+    ("ball_weak_max_width", BallTracker, "weak_max_width"),
+    ("ball_backfill_lookback", BallTracker, "backfill_lookback"),
+    ("ball_backfill_radius", BallTracker, "backfill_radius"),
+    ("ball_backfill_radius_growth", BallTracker, "backfill_radius_growth"),
+    ("ball_backfill_max_gap", BallTracker, "backfill_max_gap"),
+    ("ball_backfill_max_width", BallTracker, "backfill_max_width"),
+    ("ball_backfill_min_conf", BallTracker, "backfill_min_conf"),
+    ("ball_backfill_skip_suspect", BallTracker, "backfill_skip_suspect"),
     # PlayerDetector
     ("player_confidence", PlayerDetector, "confidence_threshold"),
     ("player_imgsz", PlayerDetector, "imgsz"),
@@ -328,7 +339,61 @@ def test_inline_fallbacks_match_defaults():
 
 
 # ---------------------------------------------------------------------------
-# 5. Diagnostic-capture keys (T4): the flags must exist and default OFF
+# 5. T5 serve-admission keys: they exist, and BOTH mechanisms are inert at
+#    their defaults (a mechanism that silently defaults ON would move every
+#    validated stream).
+# ---------------------------------------------------------------------------
+
+T5_KEYS = [
+    "ball_weak_min_speed", "ball_weak_max_width",
+    "ball_backfill_lookback", "ball_backfill_radius",
+    "ball_backfill_radius_growth", "ball_backfill_max_gap",
+    "ball_backfill_max_width", "ball_backfill_min_conf",
+    "ball_backfill_skip_suspect",
+]
+
+T5_CTOR_PARITY = {
+    "ball_weak_min_speed": ("weak_min_speed", 0.0),
+    "ball_weak_max_width": ("weak_max_width", 0.0),
+    "ball_backfill_lookback": ("backfill_lookback", 0),
+    "ball_backfill_radius": ("backfill_radius", 30.0),
+    "ball_backfill_radius_growth": ("backfill_radius_growth", 10.0),
+    "ball_backfill_max_gap": ("backfill_max_gap", 2),
+    "ball_backfill_max_width": ("backfill_max_width", 0.0),
+    "ball_backfill_min_conf": ("backfill_min_conf", 0.15),
+    "ball_backfill_skip_suspect": ("backfill_skip_suspect", False),
+}
+
+
+def test_t5_mechanism_keys_exist_and_default_off():
+    for key in T5_KEYS:
+        assert key in DEFAULTS, f"missing DEFAULT_CONFIG key: {key}"
+    for key, (param, off_value) in T5_CTOR_PARITY.items():
+        assert DEFAULTS[key] == off_value, (
+            f"{key} must default to {off_value!r} (the OFF value) -- got "
+            f"{DEFAULTS[key]!r}"
+        )
+        ctor = inspect.signature(BallTracker.__init__).parameters[param].default
+        assert ctor == off_value, (
+            f"BallTracker({param}=...) default {ctor!r} != {off_value!r}"
+        )
+
+
+def test_t5_backfill_buffer_inert_when_off():
+    """With backfill_lookback = 0 no raw-detection buffer is kept at all."""
+    tracker = BallTracker()
+    assert tracker.backfill_lookback == 0
+    for i in range(5):
+        out = tracker.update([
+            {"center": [100.0 + 20 * i, 200.0], "bbox": [90 + 20 * i, 190,
+                                                          110 + 20 * i, 210],
+             "confidence": 0.8}])
+    assert len(tracker._det_buffer) == 0
+    assert tracker.pop_backfill() == []
+
+
+# ---------------------------------------------------------------------------
+# 6. Diagnostic-capture keys (T4): the flags must exist and default OFF
 # ---------------------------------------------------------------------------
 # A diagnostic key that silently defaults ON would put the hooks on every
 # production/live/probe run, which is exactly the "divergent fast path" the

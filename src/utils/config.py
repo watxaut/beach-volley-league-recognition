@@ -56,6 +56,17 @@ class Config:
         # vs sand-backed 0.20 -- the 0.4 floor starved the track off-sky):
         "ball_locked_low_conf_floor": 0.15,  # LOCKED, only on frames with NO >=low_confidence_threshold candidate: accept the best non-suspect in-gate candidate >= this floor (0=off)
         "ball_boot_low_conf_floor": 0.15,    # UNLOCKED: motion-pair evidence may use sightings >= this floor when no high-tier pair exists (0=off)
+        # T5 serve-admission mechanisms (both OFF unless the keys below are set;
+        # see docs/t5_serve_admission_diagnosis.md for the A/B measurement):
+        "ball_weak_min_speed": 0.0,          # A: weaker UNLOCKED motion tier for far-band balls (0=off)
+        "ball_weak_max_width": 0.0,          # A: apparent-width ceiling (px) for the weak tier (0=off)
+        "ball_backfill_lookback": 0,         # B: frames a fresh lock may retro-extend backwards (0=off)
+        "ball_backfill_radius": 30.0,        # B: chain radius (px) at the frame before the lock
+        "ball_backfill_radius_growth": 10.0,  # B: extra chain radius per frame of age (px)
+        "ball_backfill_max_gap": 2,          # B: frames the chain may miss before it is abandoned
+        "ball_backfill_max_width": 0.0,      # B: apparent-width ceiling (px) for backfilled points (0=off)
+        "ball_backfill_min_conf": 0.15,      # B: confidence floor for a backfilled point
+        "ball_backfill_skip_suspect": False,  # B: also refuse stationary_suspect points in the chain
         "ball_selection_conf_window": 10.0,  # px: confidence breaks ties only within this
         # Detector-side stationarity: surviving detections at/above this
         # windowed persistence are flagged stationary_suspect for the tracker

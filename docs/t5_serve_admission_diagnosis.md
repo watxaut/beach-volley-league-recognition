@@ -913,3 +913,111 @@ venv/bin/python scripts/probe_serve_admission.py --diag output/t5/e7_diag.jsonl 
     --ground-truth - --serve-frames 22 --serve-labels e7-near \
     --json output/t5/e7_serve_admission.json --no-sweep
 ```
+
+---
+
+# T5 step 2 — A vs B replayed against the PRODUCTION classes, and the decision
+
+Both candidate mechanisms were implemented in `src/tracking/ball_tracker.py`
+behind config keys that default OFF, so the comparison runs the real code, not
+a re-implementation: `scripts/probe_serve_mechanisms.py` feeds the T4
+`--diag-dump` raw detections back into a real `BallTracker` and then drives the
+real `ActionClassifier` contact probe over the ball history the pipeline would
+have received (`FrameProcessor` semantics: append the real sighting, then test
+`c = frame - CONTACT_DELAY`).
+
+**Fidelity gate:** the `base` arm reproduces the dumped production
+`ball_track` state on **4968/4968 frames** and every emitted centre to 1e-6 —
+the replayed arms are the pipeline's own decisions.
+
+## A vs B (dev clip, 4968 frames, GT = the 28 owner contacts)
+
+| arm | far serves with a contact candidate | contact candidates | candidates outside every GT window | new bootstrap locks | probe fidelity |
+|---|---|---|---|---|---|
+| base (production) | 0/5 | 36 | 13 | 0 | 0 / 0 |
+| **A** weak tier (3 px/f, w<30) | **0/5** | 37 (+1) | 14 (+1: f488) | **19** | — (arm diverges by design) |
+| **B** backfill (lookback 20, w<30) | **0/5** | 37 (+1) | 14 (+1: f1019) | **0** | — (identical tracking) |
+
+Per-serve candidates: unchanged in every arm — the 3 near-side serves keep
+their candidates (P3 f1395 @+1, P5 f2575 @−3, P7 f3747 @0), the 5 far-side
+serves stay empty. A's 19 new locks (f202, 376, 481, 615, 786, 878, 1213, 1672,
+2150, 2277, 2731, 3036, 3357, 3444, 4094, 4551, 4571, 4638, 4758) confirm the
+step-1 estimate (~12–15 spurious) and buy **zero** candidates; B creates no
+lock opportunity at all and adds exactly one dead-time candidate (f1019, a
+2-point chain on a re-lock). B is insensitive to its parameters: dropping the
+width gate, tightening the radius (20 px + 6 px/frame), skipping
+`stationary_suspect` points, or shortening the look-back to 12 all give the
+identical 0/5 · 37 · 14.
+
+## B does exactly what it was built to do — and the loss moves one gate along
+
+Probe outcome inside each far-serve window (±15 f), base → B:
+
+| serve | base | B |
+|---|---|---|
+| P1 f210 | `no_ball_sighting` ×23, `no_contact_geometry` ×8 | `no_ball_sighting` ×16, `no_contact_geometry` ×15 |
+| P2 f880 | ×27 / ×4 | ×20 / ×11 |
+| P4 f2154 | ×20 / ×11 | ×19 / ×12 |
+| P6 f3038 | ×21 / ×10 | ×20 / ×11 |
+| P8 f4770 | ×21 / ×10 | ×18 / ×13 |
+
+B restores the pre-contact evidence the step-1 diagnosis identified: the
+`no_ball_sighting` rejections at the contact frame fall everywhere, and the
+18 backfill events (P1 f216 → 14 points f201–f215, P2 f890 → 13 points,
+P8 f4776 → 13 points f4757–f4775) put the contact frame itself into the probe's
+history. The contact then dies on the NEXT gate instead, and never for P4/P6/P8
+where the chain has 1 point: the detector produced **no toss sighting at all**
+for 10–15 frames before those contacts, so there is nothing to retro-extend.
+
+## Why the restored history still cannot host the contact (the second defect)
+
+With the full toss in the history, the far serve's contact (P1) measures, at
+the best candidate frame c=214: `vin = (0.8, 0.7)`, `vout = (6.5, −11.3)`,
+speed 13.1 px/f, `vin6 = (0.2, 0.3)`, `stays_down = False`, `pops_up = True`.
+Against the four branches of `_normal_contact_at`:
+
+* **bounce** — the toss apex is *before* the contact, so the ball never falls
+  into it; no 26 px prominence.
+* **redirect** — the far toss is vertical (`vin.x ≈ 0`); there is no sign flip.
+* **drive** — needs `stays_down` (a spike keeps the ball down/flat); a serve
+  keeps rising, so it refuses by construction.
+* **serve branch** — needs the ascent to be FED, `|vin3| ≥ |vin6| + 10`
+  (the e7 f25 signature: −42 vs −13). The far toss is a *decelerating float*
+  (2 → 0 px/f into the contact), so the margin is ≈ −9.6.
+
+A hypothetical "float toss → fast rise" signature (incoming ≤ 4 px/f, outgoing
+≥ 10 px/f rising) fires on **3 frames of the whole clip with B on and 0 with B
+off** (P1 f214/f215, P2 f889) — i.e. even a follow-up probe mechanism would
+recover at most **2 of the 5** far serves on this clip, because for P4/P6/P8 the
+detector never saw the toss. Recovering the far serves therefore needs
+(a) a contact-probe serve signature that does not require a fed ascent and
+(b) detection evidence on the far toss — a recognition+detection mechanism, not
+the ball-track admission T5 was approved for.
+
+**Structural limit of B itself:** the contact probe tests `c` exactly at
+`frame + CONTACT_DELAY` (7). A lock that arrives later than contact + 7 can
+never feed that contact — P2 locks at +10 f, so P2 is unreachable by
+construction even with a perfect chain. B's ceiling on this clip is 4/5.
+
+## Decision
+
+**B is the winner of the two** (no new lock opportunities, near-side byte
+identity by construction, one extra dead-time candidate; A costs 19 spurious
+locks for the same zero recovery), and it is the only half of the far-serve fix
+that is actually needed: it converts the step-1 finding ("the pre-contact
+history is missing") into a fixed evidence gap. **But it does not pass the
+recovery bar** (0/5 far serves, not ≥ 4/5), so it ships **DEFAULT OFF**
+(`ball_backfill_lookback = 0`) and is not adopted as the T5 mechanism. The
+finding it produced is the session's deliverable: the far-side serve loss is
+TWO defects — ball-track admission (closed by B, available on request) and the
+contact probe's serve signature (open, needs owner approval as a new mechanism).
+
+Reproduce:
+
+```bash
+venv/bin/python scripts/probe_serve_mechanisms.py \
+    --diag output/t4/dev_diag.jsonl \
+    --ground-truth ground_truth/video_ari_joan_8_first_points_annotations.json \
+    --calibration calibrations/video_ari_joan_8_first_points.json \
+    --json output/t5/dev_mechanisms.json --markdown docs/t5_mechanism_ab.md
+```

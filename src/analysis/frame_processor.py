@@ -126,6 +126,18 @@ class FrameProcessor:
                 selection_conf_window=self.config.get("ball_selection_conf_window", 10.0),
                 locked_low_conf_floor=self.config.get("ball_locked_low_conf_floor", 0.15),
                 boot_low_conf_floor=self.config.get("ball_boot_low_conf_floor", 0.15),
+                # T5 serve-admission mechanisms (A: weak-speed lock tier,
+                # B: backfill on a fresh lock). Both are inert at their
+                # default 0/False values.
+                weak_min_speed=self.config.get("ball_weak_min_speed", 0.0),
+                weak_max_width=self.config.get("ball_weak_max_width", 0.0),
+                backfill_lookback=self.config.get("ball_backfill_lookback", 0),
+                backfill_radius=self.config.get("ball_backfill_radius", 30.0),
+                backfill_radius_growth=self.config.get("ball_backfill_radius_growth", 10.0),
+                backfill_max_gap=self.config.get("ball_backfill_max_gap", 2),
+                backfill_max_width=self.config.get("ball_backfill_max_width", 0.0),
+                backfill_min_conf=self.config.get("ball_backfill_min_conf", 0.15),
+                backfill_skip_suspect=self.config.get("ball_backfill_skip_suspect", False),
             )
             # Set court bounds for out-of-bounds rejection
             if self.court_calibration.is_calibrated and self.court_calibration.court_bounds:
@@ -302,7 +314,20 @@ class FrameProcessor:
                 n_court_det=len(strict_players),
                 ball_position=ball_position,
             )
-            tracked_ball = self.ball_tracker.update(ball_detections)
+            tracked_ball = self.ball_tracker.update(ball_detections,
+                                                     frame_number=frame_index)
+            # T5 mechanism B (off by default): a fresh lock may hand over the
+            # pre-contact sightings it retro-extended from PAST frames; they go
+            # into the contact probe's ball history before the classifier runs
+            # on this frame, exactly like real sightings.
+            backfill = self.ball_tracker.pop_backfill()
+            if backfill:
+                self.action_classifier.add_ball_sightings([
+                    {"frame": frame_index + int(p["frame_offset"]),
+                     "x": p["center"][0], "y": p["center"][1],
+                     "w": p.get("width", 0.0), "h": p.get("height", 0.0)}
+                    for p in backfill
+                ])
 
             frame_result["tracked_players"] = tracked_players
             frame_result["tracked_ball"] = tracked_ball
