@@ -110,6 +110,10 @@ class JSONExporter:
                 "width": video_info.get("width"),
                 "height": video_info.get("height"),
                 "total_frames": video_info.get("total_frames"),
+                # Calibration / view readiness for this run (src/main.py).
+                # Optional (absent when the results were produced outside the
+                # CLI, e.g. by a script); the ingester ignores it.
+                "calibration_readiness": video_info.get("calibration_readiness"),
             },
             "processed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "pipeline_version": pipeline_version if pipeline_version is not None else git_version(),
