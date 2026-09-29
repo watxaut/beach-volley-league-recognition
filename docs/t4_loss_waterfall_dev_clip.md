@@ -156,6 +156,11 @@ T5 step 2 implemented the two candidate serve-admission mechanisms behind
 default-OFF config keys and replayed them through the shared frame path
 (`scripts/probe_serve_mechanisms.py` + a real pipeline run with
 `--config output/t5b/backfill_on.yaml --diag-dump output/t5b/dev_on_diag.jsonl`).
+**Superseded the same day (session 39): neither mechanism is shipped** — both
+were refuted as a recovery (0/5 far serves), so `src/` is restored to `185c6f0`
+and the mechanisms live only in the probe harness
+(`scripts/serve_mechanism_harness.py`); the table below is the historical
+measurement that justified the revert and stays reproducible from the harness.
 
 | run | pipeline output | evaluate_timed (F1 / class / team / dup / FP per dead-min) | waterfall stage counts | 5 far-serve `no_ball_sighting` counts |
 |---|---|---|---|---|
@@ -163,7 +168,7 @@ default-OFF config keys and replayed them through the shared frame path
 | T5 step 2, **B on** (backfill) | **byte-identical** to OFF (`scripts/compare_runs.py` → IDENTICAL) | 0.597 / 0.706 / 0.706 / 1 / 2.703 | 0 / 0 / **6** / 5 / 5 / 4 / 8 | **16 · 20 · 19 · 20 · 18** |
 | T5 step 2, A (weak tier) | not run end-to-end (refuted in replay) | — | — | 10 · 16 · 17 · 19 · 11 |
 
-So the only thing the shipped-candidate mechanism moves in the waterfall is the
+So the only thing the shipped-candidate mechanism (as measured that day) moves in the waterfall is the
 *evidence* line: with B the contact probe stops saying "I never saw the ball at
 the contact frame" (23→16 of 31 window frames at P1) and starts saying "I saw
 it and there is no contact geometry there" — the step-1 diagnosis is confirmed

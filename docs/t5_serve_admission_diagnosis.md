@@ -918,17 +918,51 @@ venv/bin/python scripts/probe_serve_admission.py --diag output/t5/e7_diag.jsonl 
 
 # T5 step 2 — A vs B replayed against the PRODUCTION classes, and the decision
 
-Both candidate mechanisms were implemented in `src/tracking/ball_tracker.py`
-behind config keys that default OFF, so the comparison runs the real code, not
-a re-implementation: `scripts/probe_serve_mechanisms.py` feeds the T4
-`--diag-dump` raw detections back into a real `BallTracker` and then drives the
-real `ActionClassifier` contact probe over the ball history the pipeline would
-have received (`FrameProcessor` semantics: append the real sighting, then test
-`c = frame - CONTACT_DELAY`).
+**Outcome (2026-09-29, reviewer-confirmed): NEITHER mechanism is adopted.
+`src/` is UNCHANGED** (`git diff 185c6f0 -- src/` is empty; the `ball_*`
+config keys and the config-drift rows they needed are gone). Both mechanisms
+live only in the probe harness, `scripts/serve_mechanism_harness.py`, as
+default-off subclasses of `BallTracker` / `ActionClassifier` — a refuted
+mechanism does not belong in `src/`.
 
-**Fidelity gate:** the `base` arm reproduces the dumped production
-`ball_track` state on **4968/4968 frames** and every emitted centre to 1e-6 —
-the replayed arms are the pipeline's own decisions.
+The comparison still runs the real classes, not a re-implementation:
+`scripts/probe_serve_mechanisms.py` feeds the T4 `--diag-dump` raw detections
+back into a real `BallTracker` and then drives the real `ActionClassifier`
+contact probe over the ball history the pipeline would have received
+(`FrameProcessor` semantics: append the real sighting, then test
+`c = frame - CONTACT_DELAY`). The harness subclasses contribute only the two
+mechanism branches, both inert at their defaults.
+
+**Fidelity gate:** the `base` arm (harness defaults = production
+`BallTracker`) reproduces the dumped production `ball_track` state on
+**4968/4968 frames** and every emitted centre to 1e-6 — the replayed arms are
+the pipeline's own decisions.
+
+**T5 is REFUTED at the tracker level:** admission was the hypothesis, and A
+(both variants) plus B (all four parameter settings) recover **0/5** far serves
+against a recovery bar of ≥ 4/5. A is out on its own cost (19 spurious
+bootstrap locks for zero candidates); B is out because it does not pass the
+bar either. So neither is adopted, neither reaches `src/`, and the T5 mechanism
+slot is closed. The A/B table stays reproducible from the harness (numbers
+below are byte-identical after the move out of `src/`).
+
+B's negative result is still the session's deliverable: the far-side serve loss
+is TWO defects, and the tracker-level half is now provably NOT the blocker.
+
+1. **Ball-track admission** — real, and B closes its evidence gap
+   (`no_ball_sighting` rejections fall), but recovery stays 0/5: better history
+   is necessary, not sufficient.
+2. **The contact probe's serve-branch geometry** — THE ROOT BLOCKER. The serve
+   branch demands a *fed* ascent (`|vin3| ≥ |vin6| + 10`, the e7 f25 pattern)
+   while the far toss is a *decelerating float* (margin ≈ −9.6). A hypothetical
+   non-fed float-serve signature reaches at most 2/5 here, because for
+   **P4/P6/P8 the detector never saw the toss at all** (10–15 frames with no
+   sighting) — a detection gap, not an admission one.
+
+Both remaining items are recognition/detection work, outside what T5 was
+approved for: **owner decision required** before anything is built (candidate:
+a float-serve contact signature plus far-toss detection coverage, to be
+validated the same way — dev clip A/B + entreno e1–e7 byte identity).
 
 ## A vs B (dev clip, 4968 frames, GT = the 28 owner contacts)
 
@@ -1001,16 +1035,19 @@ construction even with a perfect chain. B's ceiling on this clip is 4/5.
 
 ## Decision
 
-**B is the winner of the two** (no new lock opportunities, near-side byte
-identity by construction, one extra dead-time candidate; A costs 19 spurious
-locks for the same zero recovery), and it is the only half of the far-serve fix
-that is actually needed: it converts the step-1 finding ("the pre-contact
-history is missing") into a fixed evidence gap. **But it does not pass the
-recovery bar** (0/5 far serves, not ≥ 4/5), so it ships **DEFAULT OFF**
-(`ball_backfill_lookback = 0`) and is not adopted as the T5 mechanism. The
-finding it produced is the session's deliverable: the far-side serve loss is
-TWO defects — ball-track admission (closed by B, available on request) and the
-contact probe's serve signature (open, needs owner approval as a new mechanism).
+**Neither is adopted and `src/` is untouched.** A loses on cost (19 spurious
+locks, zero recovery); B loses on the recovery bar (0/5 far serves, not ≥ 4/5)
+even though it is the only half that does what it was built for — it converts
+the step-1 finding ("the pre-contact history is missing") into a fixed evidence
+gap. B is therefore **not** "shipped default off" any more: it is not shipped
+at all, and lives only in `scripts/serve_mechanism_harness.py` so the A/B
+replay stays reproducible.
+
+The finding the session produced is the deliverable: **T5 far-serve admission
+is REFUTED at the tracker level**, and the remaining blocker is the contact
+probe's serve-branch geometry (fed-ascent demand vs the far decelerating float)
+plus the missing toss detections on P4/P6/P8 — recognition/detection work that
+needs an **owner decision**, not another tracker mechanism.
 
 Reproduce:
 

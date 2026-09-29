@@ -54,24 +54,6 @@ ball it still SEES:
   <= ``lock_max_jump``, pair gap <= ``lock_max_pair_gap``) may use
   sightings >= this floor. Static spares still can never bootstrap
   (stationary_suspect excluded, motion still required).
-
-T5 serve admission (2026-09-29, both DEFAULT OFF -- measured, not adopted;
-see ``docs/t5_serve_admission_diagnosis.md``):
-
-- ``weak_min_speed`` / ``weak_max_width`` (mechanism A): a second, WEAKER
-  motion tier for far-band balls while UNLOCKED, so a far-side serve toss
-  (1.6-6.7 px/f, 3-4x slower in pixels than a near-side one) can lock. Refuted
-  as a recovery mechanism: ~19 new bootstrap locks per 4968 dev-clip frames and
-  still no far-serve contact candidate.
-- ``backfill_lookback`` and friends (mechanism B): on a FRESH lock, walk the
-  recent RAW-detection buffer backwards from the lock point, frame by frame,
-  taking the nearest plausible detection inside a radius that grows with age.
-  This gives the contact probe the pre-contact history the lock arrived too
-  late to observe, and creates NO new lock opportunity (it is purely additive
-  and never touches the trajectory the locked path gates on). It closes the
-  step-1 evidence gap (the probe's ``no_ball_sighting`` rejections at the far
-  serves) but the contact probe's own serve signature still refuses the far
-  float toss, so the mechanism ships OFF.
 """
 
 from typing import List, Dict, Any, Optional, Tuple
@@ -108,24 +90,6 @@ class BallTracker:
         selection_conf_window: float = 10.0,
         locked_low_conf_floor: float = 0.15,
         boot_low_conf_floor: float = 0.15,
-        # --- T5 serve-admission mechanisms (both 0/False = OFF) ---
-        # (A) weak-speed lock tier: while UNLOCKED, a far-band candidate
-        # (apparent width < ``weak_max_width``) may bootstrap the track on a
-        # SLOWER motion pair (``weak_min_speed`` px/f) than the fast
-        # ``lock_min_speed`` bar. Off unless ``weak_min_speed`` > 0.
-        weak_min_speed: float = 0.0,
-        weak_max_width: float = 0.0,
-        # (B) backfill on a FRESH lock: retro-extend the track backwards
-        # through the recent raw-detection buffer so the contact probe gets the
-        # PRE-contact history a far-side toss never locked in real time.
-        # ``backfill_lookback`` frames back (0 = off).
-        backfill_lookback: int = 0,
-        backfill_radius: float = 30.0,
-        backfill_radius_growth: float = 10.0,
-        backfill_max_gap: int = 2,
-        backfill_max_width: float = 0.0,
-        backfill_min_conf: float = 0.15,
-        backfill_skip_suspect: bool = False,
     ):
         """Initialize the ball tracker.
 
@@ -156,26 +120,6 @@ class BallTracker:
                 probe). 0 disables.
             boot_low_conf_floor: UNLOCKED motion-pair floor when no high-tier
                 pair exists (same geometric gates). 0 disables.
-            weak_min_speed: T5 mechanism A -- a second, WEAKER motion tier for
-                the UNLOCKED bootstrap, so a far-side serve toss (1.6-6.7 px/f,
-                3-4x slower in pixels than a near-side one) can lock before
-                contact. 0 disables the tier entirely.
-            weak_max_width: apparent pixel width ceiling for the weak tier
-                (far band). 0 disables the width gate.
-            backfill_lookback: T5 mechanism B -- how many PAST frames a fresh
-                lock may retro-extend through the raw-detection buffer. 0 = off.
-            backfill_radius: chain-association radius (px) for the frame right
-                before the lock point.
-            backfill_radius_growth: extra radius (px) per frame of age, so the
-                slow pre-contact toss (and the direction change at contact) can
-                still be followed.
-            backfill_max_gap: frames the chain may pass with no plausible
-                detection before it is abandoned.
-            backfill_max_width: apparent width ceiling for a backfilled point
-                (far band). 0 disables the width gate.
-            backfill_min_conf: confidence floor for a backfilled point.
-            backfill_skip_suspect: also refuse ``stationary_suspect`` points
-                (detector persist >= ``static_suspect_frac``) in the chain.
         """
         self.max_missing_frames = max_missing_frames
         self.trajectory_smoothing = trajectory_smoothing
@@ -191,16 +135,6 @@ class BallTracker:
         self.selection_conf_window = selection_conf_window
         self.locked_low_conf_floor = locked_low_conf_floor
         self.boot_low_conf_floor = boot_low_conf_floor
-
-        self.weak_min_speed = weak_min_speed
-        self.weak_max_width = weak_max_width
-        self.backfill_lookback = backfill_lookback
-        self.backfill_radius = backfill_radius
-        self.backfill_radius_growth = backfill_radius_growth
-        self.backfill_max_gap = backfill_max_gap
-        self.backfill_max_width = backfill_max_width
-        self.backfill_min_conf = backfill_min_conf
-        self.backfill_skip_suspect = backfill_skip_suspect
 
         # State
         self.locked = False
@@ -223,17 +157,6 @@ class BallTracker:
         self._await_reentry = False
         self._reentry_anchor: Optional[List[float]] = None
 
-        # T5 mechanism B state. ``_det_buffer`` keeps the RAW detections of the
-        # last ``backfill_lookback`` frames (the only history a fresh lock is
-        # allowed to reach back into -- strictly past frames, so the mechanism
-        # stays causal and live-debug parity is untouched). ``_backfill_out``
-        # holds the chain produced by the most recent fresh lock until the
-        # caller takes it.
-        self._frame_seq = 0
-        self._current_frame: int = 0
-        self._det_buffer: deque = deque(maxlen=max(2, backfill_lookback + 1))
-        self._backfill_out: List[Dict[str, Any]] = []
-
         # T4 diagnostics: OFF by default. `update` records the branch it took
         # (lock / admission / coast / gate miss / re-entry wait) in
         # `_diag_reason`; `pop_diag` hands the mirror to FrameProcessor. Pure
@@ -252,21 +175,12 @@ class BallTracker:
         """
         self.court_bounds = bounds
 
-    def update(self, detections: List[Dict[str, Any]],
-               frame_number: Optional[int] = None
-               ) -> Optional[Dict[str, Any]]:
+    def update(self, detections: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """Update tracker with new detections (thin diagnostic wrapper).
 
-        ``frame_number`` is the caller's frame index (the shared
-        ``FrameProcessor.process_frame`` path passes it); when omitted an
-        internal per-update counter is used, so bare callers (tests, probe
-        scripts) keep working. It is only consumed by the T5 backfill
-        mechanism (OFF by default), which labels the raw-detection buffer it
-        may reach back into.
+        The body lives in :meth:`_update` unchanged; this wrapper only mirrors
+        the state/reason when ``diag_enabled`` (off by default).
         """
-        self._current_frame = (self._frame_seq if frame_number is None
-                               else int(frame_number))
-        self._frame_seq += 1
         self._diag_reason = "locked" if self.locked else "unlocked"
         result = self._update(detections)
         if self.diag_enabled:
@@ -280,7 +194,6 @@ class BallTracker:
                 "center": (result or {}).get("center"),
                 "conf": (result or {}).get("confidence"),
                 "reason": self._diag_reason,
-                "backfill": len(self._backfill_out),
             }
         return result
 
@@ -288,17 +201,6 @@ class BallTracker:
         """Take the diagnostic mirror of the last update (None when diag off)."""
         last, self._diag_last = self._diag_last, None
         return last
-
-    def pop_backfill(self) -> List[Dict[str, Any]]:
-        """Take the backfilled past sightings of the last fresh lock.
-
-        Each entry is ``{"frame_offset", "center", "width", "height",
-        "confidence", "source": "backfill"}`` where ``frame_offset`` is
-        negative (frames before the lock frame). Empty when the mechanism is
-        off or the chain found nothing.
-        """
-        out, self._backfill_out = self._backfill_out, []
-        return out
 
     def _update(self, detections: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """Update tracker with new detections.
@@ -314,11 +216,6 @@ class BallTracker:
                  if d.get("confidence", 0.0) >= self.low_confidence_threshold]
         boot_low = self._tier(detections, self.boot_low_conf_floor)
         lock_low = self._tier(detections, self.locked_low_conf_floor)
-
-        # T5 mechanism B: keep this frame's RAW detections (only while the
-        # mechanism is on) so a fresh lock can retro-extend through them.
-        if self.backfill_lookback > 0:
-            self._det_buffer.append((self._current_frame, list(detections)))
 
         if not self.locked:
             out = self._try_lock(valid, boot_low)
@@ -409,69 +306,17 @@ class BallTracker:
             hit = self._scan_motion_pair(low_plausible, low_history)
             if hit is not None:
                 return self._bootstrap_detection(*hit)
-
-        # T5 mechanism A -- WEAK-SPEED TIER (off unless weak_min_speed > 0).
-        # A far-side toss rises 1.6-6.7 px/f (the same toss is 7-17 px/f near
-        # the camera), so the fast 8 px/f bar -- measured on near-side balls --
-        # is above what a far serve can ever produce and the contact probe
-        # loses its pre-contact history. This tier adds NO geometry the fast
-        # path lacks, only a lower bar, gated on the far apparent-width band
-        # so near-side behaviour is untouched.
-        if self.weak_min_speed > 0 and self.weak_min_speed < self.lock_min_speed:
-            weak_candidates = [d for d in (plausible + (low_plausible if low_scan else []))
-                               if self._width_ok(d, self.weak_max_width)]
-            weak_history = (history if not low_scan else
-                            self._merge_history(history,
-                                                list(self._recent_centers_low)[:-1]))
-            hit = self._scan_motion_pair(
-                weak_candidates, weak_history, min_speed=self.weak_min_speed)
-            if hit is not None:
-                return self._bootstrap_detection(*hit)
         return None
-
-    @staticmethod
-    def _merge_history(high: List[List[List[float]]],
-                       low: List[List[List[float]]]
-                       ) -> List[List[List[float]]]:
-        """Union two same-length sighting windows, oldest first.
-
-        The high and low bootstrap windows advance one entry per frame, so they
-        align index-wise; concatenating them would put empty low-tier frames
-        between real high-tier ones and MIS-AGE the motion pairs (a pair two
-        entries apart reads as half the speed).
-        """
-        if not low:
-            return high
-        if not high:
-            return low
-        n = min(len(high), len(low))
-        merged: List[List[List[float]]] = []
-        for i in range(len(high) - n, len(high)):
-            merged.append(list(high[i]) + list(low[i - (len(high) - n)]))
-        return merged
-
-    @staticmethod
-    def _width_ok(det: Dict[str, Any], max_width: float) -> bool:
-        """Apparent-width band gate (0 = disabled)."""
-        if not max_width or max_width <= 0:
-            return True
-        bbox = det.get("bbox") or []
-        if len(bbox) < 4:
-            return True
-        return (float(bbox[2]) - float(bbox[0])) <= max_width
 
     def _scan_motion_pair(
             self, plausible: List[Dict[str, Any]],
-            history: List[List[List[float]]],
-            min_speed: Optional[float] = None,
+            history: List[List[List[float]]]
     ) -> Optional[Tuple[Dict[str, Any], List[float], int]]:
         """First (det, old_sighting, gap) proving >= lock_min_speed motion.
 
         Shared by the high-tier and low-floor bootstrap scans; the caller owns
         the candidate window (``history`` excludes the current frame).
-        ``min_speed`` overrides the bar (T5 mechanism A's weak tier).
         """
-        bar = self.lock_min_speed if min_speed is None else min_speed
         for det in sorted(plausible, key=lambda d: d.get("confidence", 0.0),
                           reverse=True):
             c = det["center"]
@@ -483,7 +328,7 @@ class BallTracker:
                     dist = float(np.hypot(c[0] - old[0], c[1] - old[1]))
                     if dist <= self.lock_max_jump:
                         speed = dist / age
-                        if speed >= bar:
+                        if speed >= self.lock_min_speed:
                             return det, old, age
                     # A jump this large means the oldest matching sighting
                     # does not belong to this candidate; keep scanning older
@@ -519,86 +364,8 @@ class BallTracker:
             "ball_state": self._classify_state(),
             "is_predicted": False,
         })
-        # T5 mechanism B: retro-extend through the raw-detection buffer so the
-        # contact probe sees the pre-contact history this lock arrived too late
-        # to observe. Purely ADDITIVE and off by default; it never touches the
-        # trajectory the locked path gates on, so no tracking decision moves.
-        if self.backfill_lookback > 0:
-            self._backfill_out = self._chain_backfill(self._current_frame, det)
         self.logger.debug("Ball tracker locked (speed %.1f px/f)", mag)
         return result
-
-    # ------------------------------------------------------------------
-    # T5 mechanism B -- backfill on a fresh lock
-    # ------------------------------------------------------------------
-
-    def _chain_backfill(self, lock_frame: int,
-                        lock_det: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Walk the raw-detection buffer BACKWARDS from a fresh lock point.
-
-        The lock proves the ball moved fast AFTER the contact; what the contact
-        probe needs is the slow toss BEFORE it. The chain therefore does not
-        extrapolate the post-contact line (a serve reverses direction at the
-        contact) -- it walks frame by frame, each step taking the detection
-        NEAREST the point accepted before it, inside a radius that grows with
-        age (so a 2-7 px/f toss and the direction change are both reachable).
-
-        Stops at the first stretch of ``backfill_max_gap`` frames with no
-        plausible detection. Detections the detector removed as static
-        (``persist >= ball_static_persist``) never reach the tracker, and
-        ``backfill_skip_suspect`` additionally refuses the flagged ones.
-
-        Causal by construction: only frames already seen are consulted.
-        """
-        lookback = int(self.backfill_lookback)
-        if lookback <= 0:
-            return []
-        anchor = list(lock_det["center"])
-        chain: List[Tuple[int, Dict[str, Any]]] = []
-        misses = 0
-        entries = list(self._det_buffer)          # oldest first
-        for frame, dets in reversed(entries):
-            age = lock_frame - frame
-            if age <= 0:
-                continue                           # the lock frame itself
-            if age > lookback:
-                break
-            radius = self.backfill_radius + self.backfill_radius_growth * (age - 1)
-            best = None
-            for det in dets:
-                if det.get("confidence", 0.0) < self.backfill_min_conf:
-                    continue
-                if self.backfill_skip_suspect and det.get("stationary_suspect"):
-                    continue
-                if not self._width_ok(det, self.backfill_max_width):
-                    continue
-                c = det["center"]
-                dist = float(np.hypot(c[0] - anchor[0], c[1] - anchor[1]))
-                if dist <= radius and (best is None or dist < best[0]):
-                    best = (dist, det)
-            if best is None:
-                misses += 1
-                if misses > self.backfill_max_gap:
-                    break
-                continue
-            misses = 0
-            chain.append((frame, best[1]))
-            anchor = list(best[1]["center"])
-
-        out: List[Dict[str, Any]] = []
-        for frame, det in reversed(chain):        # oldest first
-            bbox = det.get("bbox") or []
-            w = float(bbox[2] - bbox[0]) if len(bbox) >= 4 else 0.0
-            h = float(bbox[3] - bbox[1]) if len(bbox) >= 4 else 0.0
-            out.append({
-                "frame_offset": frame - lock_frame,
-                "center": [float(det["center"][0]), float(det["center"][1])],
-                "width": w,
-                "height": h,
-                "confidence": float(det.get("confidence", 0.0)),
-                "source": "backfill",
-            })
-        return out
 
     # ------------------------------------------------------------------
     # Locked-state candidate selection
@@ -849,12 +616,8 @@ class BallTracker:
         self.logger.debug("Ball tracker reset (unlocked; waiting for motion)")
 
     def reset(self) -> None:
-        """Public reset method (per-video)."""
+        """Public reset method."""
         self._reset_tracker()
-        self._det_buffer.clear()
-        self._backfill_out = []
-        self._frame_seq = 0
-        self._current_frame = 0
 
     def get_trajectory(self) -> List[List[float]]:
         """Get full trajectory."""

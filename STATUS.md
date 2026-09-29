@@ -17,9 +17,26 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-29 (thirty-eighth session — action-reliability T5
-step 2 DONE: the approved mechanism is **REFUTED as a recovery**, and the
-real blocker is elsewhere. A (weak 3 px/f tier) and B (backfill on a
+**Last updated:** 2026-09-29 (thirty-ninth session — **T5 revert/cleanup,
+docs+tests only, NO production change**: the reviewer ruled that both T5
+mechanisms (A weak 3 px/f tier, B backfill on a fresh lock) recover **0/5**
+far serves and therefore must not live in `src/`. `src/` is restored exactly
+to `185c6f0` — `git diff 185c6f0 -- src/` is EMPTY, the `ball_weak_*` /
+`ball_backfill_*` DEFAULT_CONFIG keys and their config-drift rows are gone.
+The mechanisms now live ONLY in the probe harness,
+`scripts/serve_mechanism_harness.py`, as default-off subclasses of
+`BallTracker` / `ActionClassifier`, so `scripts/probe_serve_mechanisms.py`
+still reproduces `docs/t5_mechanism_ab.md` **byte-for-byte** (base 36/13/0,
+A 37/14/19, B 37/14/0, 0/5 recovered, base fidelity 4968/4968). **T5
+far-serve admission is REFUTED at the tracker level.** The root blocker is the
+CONTACT PROBE's serve-branch geometry — it demands a FED ascent (|vin3| ≥
+|vin6|+10, the e7 f25 pattern) while the far toss is a DECELERATING float —
+plus **no toss detection at all** on P4/P6/P8; both are recognition/detection
+work and need an **owner decision**.
+
+**Previous (thirty-eighth session — action-reliability T5 step 2 DONE: the
+approved mechanism is **REFUTED as a recovery**, and the real blocker is
+elsewhere. A (weak 3 px/f tier) and B (backfill on a
 fresh lock) were both implemented default-OFF and replayed through the
 PRODUCTION classes (`scripts/probe_serve_mechanisms.py`; the base arm
 reproduces the dumped production track on 4968/4968 frames): **both
@@ -34,10 +51,10 @@ the far serve's contact measures vin=(0.8,0.7) vout=(6.5,-11.3) and the
 probe's serve branch demands a FED ascent (|vin3| ≥ |vin6|+10, the e7
 f25 pattern) while the far toss is a DECELERATING float; a hypothetical
 float-serve signature would reach at most 2/5 (P4/P6/P8 have NO toss
-detection to backfill). **So: B ships DEFAULT OFF** (`ball_backfill_lookback
-= 0`, keys in DEFAULT_CONFIG + ctor defaults + drift guard), A is kept
-off-by-default only so the A/B stays reproducible. Entreno e1–e7
-byte-identical in both arms; dev evaluate_timed unchanged (F1 0.597).
+detection to backfill). **(SUPERSEDED the same day by session 39: B is no
+longer "shipped DEFAULT OFF" — neither mechanism is shipped at all; `src/`
+is back at `185c6f0` and both live in the probe harness only.)**
+Entreno e1–e7 byte-identical in both arms; dev evaluate_timed unchanged (F1 0.597).
 +28 tests, suite 736.
 
 **Previous (thirty-seventh session — action-reliability T5
@@ -214,9 +231,12 @@ converts the far-serve probe rejections from `no_ball_sighting` (23/27/20/21/21
 of 31 window frames) to `no_contact_geometry` — the missing pre-contact history
 of the step-1 diagnosis is supplied and the loss moves one gate along. The
 blocker is the CONTACT PROBE's serve signature (a fed ascent, |vin3| ≥
-|vin6|+10; the far toss is a decelerating float), not ball-track admission —
-a recognition mechanism that needs owner approval. B therefore ships **default
-OFF** behind `ball_backfill_lookback` (evidence in
+|vin6|+10; the far toss is a decelerating float) + the absent far-toss
+detections on P4/P6/P8 — recognition/detection mechanisms, not ball-track
+admission. **NEITHER mechanism is shipped** (session 39): `src/` is back at
+`185c6f0` (`git diff 185c6f0 -- src/` empty) and A + B live only in
+`scripts/serve_mechanism_harness.py` as default-off subclasses, so the A/B
+replay is reproducible with the same numbers (evidence in
 `docs/t5_serve_admission_diagnosis.md` step-2 section,
 `docs/t5_mechanism_ab.md`, `docs/t4_loss_waterfall_dev_clip.md` "After T5").
 Next = **owner decision on the far-side serve follow-up**: (a) contact-probe
@@ -226,9 +246,10 @@ pass-2 layer (point 22 mechanism 3 already relabels 8/8).
 
 **Active next (ranked, goal-driven - see North-star).** (1) **Owner call on
 the far-side serve follow-up** (T5 handed it back): the ball-track half is
-built and available off (`ball_backfill_lookback`), the binding defect is the
-contact probe's serve signature + the missing far-toss detections — a
-recognition/detection mechanism, so it needs approval before code. (2) **21.3
+REFUTED (0/5; kept reproducible in the probe harness, not in `src/`), the
+binding defects are the contact probe's serve signature + the missing
+far-toss detections — a recognition/detection mechanism, so it needs
+approval before code. (2) **21.3
 point winner/outcome layer** - G1's biggest missing signal; the anchored map +
 serve resolutions now give TRUE windows with openers to validate against the 33
 dictiated winners. (3) Round-3 owner queue (no code): P32's serve verdict,
@@ -600,11 +621,13 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - GT `touch_number` is PER-POSSESSION, never rally-global: serve = 1, the receiving team restarts at 1 (dig 1, set 2, spike/overpass 3) and the count resets on every side change (`ground_truth/README.md`, entreno_3 JSON). T2 contact GT now emits that; `possession_touch_numbers()` in `scripts/build_dev_clip_gt.py` is the reference.
 - In the pipeline taxonomy a set/dig that crosses the net is `final_action=overpass` (ActionContextResolver: overpass = sent over without an attack) with the gesture kept separately — T2 GT applies this to owner wording and flags it via `owner_interpretation_flag` for owner ratification.
 - Where owner-dictated CONTACTS exist they are the authoritative contact list: draft/suggested events are never appended to `events`, they move to `points[].superseded_draft_events` with the owner contact each duplicates (matched by same squad within the coarse ±15f window) so no prediction is lost.
-- 2026-09-29 **#38** — T5 step 2: A (weak tier) vs B (backfill on a fresh lock) implemented default-OFF and replayed through the REAL `BallTracker` + `ActionClassifier` (`scripts/probe_serve_mechanisms.py`; base arm reproduces the dumped production track 4968/4968 frames). **BOTH recover 0/5 far serves**; A costs 19 new bootstrap locks, B none. B does close the step-1 evidence gap (`no_ball_sighting` 23/27/20/21/21 → 16/20/19/20/18 of 31 window frames; dev waterfall detail strings only, pipeline output byte-identical) and the loss moves to `no_contact_geometry`. Root cause of the residue: the contact probe's serve branch demands a FED ascent (|vin3| ≥ |vin6|+10, e7 f25) while the far toss is a DECELERATING float; and P4/P6/P8 have no toss detection at all to restore. Shipped DEFAULT OFF, +28 tests, suite 736 (Log below).
+- 2026-09-29 **#39** — T5 revert/cleanup (docs + tests only, no production change): reviewer ruled both mechanisms refuted (0/5 far serves) ⇒ `src/` restored exactly to `185c6f0` (`git diff 185c6f0 -- src/` empty; `ball_weak_*` / `ball_backfill_*` DEFAULT_CONFIG keys and their config-drift rows removed) and A + B moved to `scripts/serve_mechanism_harness.py` as default-off `BallTracker` / `ActionClassifier` subclasses; A/B replay reproduces `docs/t5_mechanism_ab.md` unchanged (base 36/13/0, A 37/14/19, B 37/14/0). A test now greps `src/` so a refuted mechanism cannot re-enter. Suite 736.
+- 2026-09-29 **#38** — T5 step 2: A (weak tier) vs B (backfill on a fresh lock) implemented default-OFF and replayed through the REAL `BallTracker` + `ActionClassifier` (`scripts/probe_serve_mechanisms.py`; base arm reproduces the dumped production track 4968/4968 frames). **BOTH recover 0/5 far serves**; A costs 19 new bootstrap locks, B none. B does close the step-1 evidence gap (`no_ball_sighting` 23/27/20/21/21 → 16/20/19/20/18 of 31 window frames; dev waterfall detail strings only, pipeline output byte-identical) and the loss moves to `no_contact_geometry`. Root cause of the residue: the contact probe's serve branch demands a FED ascent (|vin3| ≥ |vin6|+10, e7 f25) while the far toss is a DECELERATING float; and P4/P6/P8 have no toss detection at all to restore. Shipped DEFAULT OFF, +28 tests, suite 736 — **SUPERSEDED by #39: neither mechanism is shipped; both live in the probe harness only** (Log below).
 - A `--diag-dump` JSONL replays the PRODUCTION ball tracker exactly: feeding its `ball_dets` back into a real `BallTracker` (with the calibration's court bounds) reproduces `ball_track.locked` and every emitted centre on 4968/4968 dev-clip frames. Tracker/probe counterfactuals therefore need no re-implementation (`scripts/probe_serve_mechanisms.py`, session 38).
 - Restoring the missing ball history is only half of a lost contact: the contact probe's own geometry can refuse it anyway. The far-side serve dies at `no_ball_sighting` (track) AND at `no_contact_geometry` (probe): a far toss is a DECELERATING float into the contact, while the probe's serve branch only accepts a FED ascent (|vin3| ≥ |vin6| + 10, the e7 f25 pattern). Session 38.
 - `CONTACT_DELAY` bounds any lock-time backfill: the probe tests contact frame `c` exactly at `c + 7`, so a lock later than contact + 7 can never feed that contact (dev P2 locks at +10 f). Session 38.
-- Concatenating the high-tier and low-tier bootstrap sighting windows mis-ages motion pairs (empty low-tier frames land between real high-tier ones and halve the measured speed); union them index-wise instead (`BallTracker._merge_history`). Session 38.
+- Concatenating the high-tier and low-tier bootstrap sighting windows mis-ages motion pairs (empty low-tier frames land between real high-tier ones and halve the measured speed); union them index-wise instead (`serve_mechanism_harness.merge_history`). Session 38.
+- A refuted mechanism must not live in `src/`, even default-OFF behind config keys: the config surface, the ctor signature and the drift guard all carry it forever, and it invites a later "just enable it". Keep it in the probe harness as a default-off subclass; the A/B replay then reproduces byte-for-byte (`git diff <pre-mechanism> -- src/` empty). Session 39.
 - The action-script record and the production path differ on e2 today: `scripts/test_action_recognition.py` measures F1 0.571 (spike at f167), `src.main` measures 0.400 (dig at f167 + 2 extra predictions). Pre-existing, not caused by session 38's change (its OFF run is byte-identical to the T4 HEAD baseline). Session 38.
 - 2026-09-29 **#37** — T5 mechanism APPROVED by the owner (serve-time ball-track (re-)admission) + step 1 diagnosis ONLY (`scripts/probe_serve_admission.py` + `docs/t5_serve_admission_diagnosis.md`, no `src/` change): all 5 lost serves are far-side, the failing condition is `speed_below_lock_min_speed`, a 3 px/f weak tier recovers 5/5 at latency 0 for ~12 extra locks and no geometry gate removes them; owner RATIFIED the P6 f3131 overpass reading via a generic `OWNER_RATIFICATIONS` table in `scripts/build_dev_clip_gt.py`; +23 tests, suite 708 (Log below).
 - 2026-09-29 **#36** — T4 loss waterfall SHIPPED: off-by-default `--diag-dump` capture in the shared frame path (`src/utils/diagnostics.py`) + `scripts/waterfall.py` + `scripts/compare_runs.py`; dev clip F1 0.597, 5 of 6 candidate deaths are serves lost to `unlocked_no_motion`; byte-identical on dev/e3/e1 with hooks off and on; +37 tests, suite 685 (Log below).
@@ -653,6 +676,39 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+### 2026-09-29 (thirty-ninth session) — T5 revert: neither mechanism ships; `src/` back to `185c6f0`, A + B live in the probe harness only
+
+**What was asked:** the reviewer ruled that both T5 mechanisms recover 0/5 far
+serves and therefore belong nowhere near production. Restore `src/` (and the
+src-facing config) exactly to `185c6f0`, keep the A/B reproducible outside
+`src/`, rerun it, fix the docs.
+
+**What was done.** (1) `git checkout 185c6f0 -- src/ tests/test_config_drift.py`
+— `git diff 185c6f0 -- src/` is now EMPTY, including the `ball_weak_*` /
+`ball_backfill_*` DEFAULT_CONFIG keys and the config-drift rows (ctor-parity +
+default-off) that pinned them. (2) The mechanisms moved to
+`scripts/serve_mechanism_harness.py` as default-off subclasses:
+`ServeMechanismBallTracker(weak_*=, backfill_*=)` overrides `_try_lock`
+(weak tier, tried only AFTER production's own scan so a production lock always
+wins), `_scan_motion_pair_with_bar` (the production loop with the speed bar
+parameterised), `_update`/`_bootstrap_detection`/`_chain_backfill` (mechanism B)
+and `ProbeClassifier.add_ball_sightings`. `scripts/probe_serve_mechanisms.py`
+now imports the harness instead of the src hooks. (3) Replay rerun with the
+documented command: **every number in `docs/t5_mechanism_ab.md` is unchanged**
+— base 36/13/0, A_weak3_w30 37/14/19, A_weak3_nowidth 37/14/26, all four
+B arms 37/14/0, **0/5 far serves recovered**, base fidelity 4968/4968 frames.
+(4) `tests/test_serve_backfill.py` retargeted at the harness (24 tests) plus a
+guard that greps `src/` for the mechanism tokens so a refuted mechanism cannot
+re-enter; config-drift back to its T4 form. (5) Docs corrected
+(`t5_mechanism_ab.md`, `t5_serve_admission_diagnosis.md`, plan T5 row,
+STATUS).
+
+**Conclusion (unchanged, now shippable as a verdict): T5 far-serve admission is
+REFUTED at the tracker level.** The root blocker is the contact probe's
+serve-branch geometry (fed-ascent demand vs a far decelerating float) plus the
+complete absence of toss detections on P4/P6/P8 — recognition/detection work
+that needs an owner decision. Suite green (736).
+
 ### 2026-09-29 (thirty-eighth session) — T5 step 2: A vs B replayed through the production classes; both refuted as a recovery; B shipped default OFF; the far-side serve's real blocker is the contact probe
 
 **What was asked:** compare mechanism A (weak-speed lock tier, as proposed in
@@ -714,13 +770,18 @@ an action). (3) Waterfall rerun on the B-on diag dump: identical stage counts
 "After T5 step 2" section. (4) `pytest tests/` → **736 passed** (+17 mechanism
 tests, +2 drift-guard tests).
 
-**Shipped.** Mechanism B in `BallTracker` (`backfill_lookback` and friends) +
-`ActionClassifier.add_ball_sightings` + the `FrameProcessor` wiring
-(`update(..., frame_number=)`, `pop_backfill()`), all **DEFAULT OFF**
-(`ball_backfill_lookback = 0`), causal (past frames only) and on the shared
-frame path, so live-debug parity is untouched. Mechanism A
-(`weak_min_speed`/`weak_max_width`) ships off-by-default, documented as
-refuted, so the A/B stays reproducible. Config-drift guard extended.
+**Shipped.** ~~Mechanism B in `BallTracker` …~~ **SUPERSEDED the same day by
+session 39: nothing of this reached `src/` — `src/` is back at `185c6f0` and
+both mechanisms live only in `scripts/serve_mechanism_harness.py` as
+default-off subclasses, so the A/B replay is still reproducible with the same
+numbers.** (As implemented on this day, mechanism B was in `BallTracker`
+(`backfill_lookback` and friends) + `ActionClassifier.add_ball_sightings` +
+the `FrameProcessor` wiring (`update(..., frame_number=)`,
+`pop_backfill()`), all **DEFAULT OFF** (`ball_backfill_lookback = 0`), causal
+(past frames only) and on the shared frame path, so live-debug parity is
+untouched. Mechanism A (`weak_min_speed`/`weak_max_width`) shipped
+off-by-default, documented as refuted, so the A/B stayed reproducible.
+Config-drift guard extended.)
 
 **Owner hand-off:** the far-side serve needs (a) a contact-probe serve
 signature that does not require a fed ascent and (b) detection evidence on the

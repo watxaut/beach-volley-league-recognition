@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """T5 step 2: replay A (weak-speed lock tier) vs B (backfill on a fresh lock).
 
-Both candidate mechanisms for the far-side serve admission live in
-``src/tracking/ball_tracker.py`` behind config keys that default OFF, so this
-harness measures the PRODUCTION classes, not a re-implementation: it feeds the
-per-frame raw ball detections of a T4 ``--diag-dump`` JSONL back into a real
-``BallTracker`` and then drives the real ``ActionClassifier`` contact probe over
-the ball history the pipeline would have seen. (Fidelity gate: the ``baseline``
+Both candidate mechanisms for the far-side serve admission were REFUTED as a
+recovery (0/5 far serves each, see ``docs/t5_mechanism_ab.md``), so they live
+OUTSIDE ``src/`` in ``scripts/serve_mechanism_harness.py`` as default-off
+subclasses of the production components. This harness therefore measures the
+PRODUCTION classes plus a measured delta: it feeds the per-frame raw ball
+detections of a T4 ``--diag-dump`` JSONL back into the real ``BallTracker``
+and then drives the real ``ActionClassifier`` contact probe over the ball
+history the pipeline would have seen. (Fidelity gate: the ``baseline``
 arm reproduces the dumped ``ball_track`` state/centres on every frame.)
 
 For each arm it reports, on the dev clip:
@@ -37,10 +39,13 @@ from typing import Any, Dict, List, Optional, Tuple
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.detection.court_calibration import CourtCalibration  # noqa: E402
-from src.recognition.action_classifier import ActionClassifier  # noqa: E402
-from src.tracking.ball_tracker import BallTracker  # noqa: E402
 from src.utils.config import Config  # noqa: E402
 from src.utils.diagnostics import load_diag  # noqa: E402
+
+# The refuted mechanisms live here, not in src/ (both 0/5 far serves).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from serve_mechanism_harness import (  # noqa: E402
+    ProbeClassifier, ServeMechanismBallTracker)
 
 # Tracker construction: exactly the FrameProcessor wiring (config keys), so a
 # replayed arm is the pipeline's tracker.
@@ -79,10 +84,10 @@ ARMS: Dict[str, Dict[str, Any]] = {
 
 
 def make_tracker(cfg: Config, extra: Dict[str, Any],
-                 court_bounds: Optional[tuple]) -> BallTracker:
+                 court_bounds: Optional[tuple]) -> ServeMechanismBallTracker:
     kwargs = {param: cfg.get(key, default) for param, key, default in TRACKER_KEYS}
     kwargs.update(extra)
-    tracker = BallTracker(**kwargs)
+    tracker = ServeMechanismBallTracker(**kwargs)
     if court_bounds:
         tracker.set_court_bounds(court_bounds)
     return tracker
@@ -115,8 +120,8 @@ def replay_arm(frames: Dict[int, Dict[str, Any]], cfg: Config,
     """Run one arm: real BallTracker over the dumped detections, then the real
     contact probe over the ball history the classifier would have received."""
     tracker = make_tracker(cfg, extra, court_bounds)
-    classifier = ActionClassifier(pose_estimator=None,
-                                  court_calibration=calibration)
+    classifier = ProbeClassifier(pose_estimator=None,
+                                 court_calibration=calibration)
     classifier.diag_enabled = True
     candidates: List[Dict[str, Any]] = []
     locks: List[int] = []
@@ -324,6 +329,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 def markdown(report: Dict[str, Any]) -> str:
     lines = [
         "# T5 step 2 - mechanism A vs B (replay)",
+        "",
+        "Both mechanisms were REFUTED as a recovery (0/5 far serves) and live",
+        "OUTSIDE `src/`, in `scripts/serve_mechanism_harness.py` as",
+        "default-off subclasses; `src/` is unchanged.",
         "",
         f"Replay of `{report['diag']}` ({report['frames']} frames) through the real",
         "`BallTracker` + `ActionClassifier` contact probe, against",

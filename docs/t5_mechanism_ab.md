@@ -1,5 +1,9 @@
 # T5 step 2 - mechanism A vs B (replay)
 
+Both mechanisms were REFUTED as a recovery (0/5 far serves) and live
+OUTSIDE `src/`, in `scripts/serve_mechanism_harness.py` as
+default-off subclasses; `src/` is unchanged.
+
 Replay of `output/t4/dev_diag.jsonl` (4968 frames) through the real
 `BallTracker` + `ActionClassifier` contact probe, against
 `ground_truth/video_ari_joan_8_first_points_annotations.json`.
