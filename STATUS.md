@@ -627,6 +627,29 @@ survive across sessions; provenance in the archives.
   provider-agnostic (shared prompts/extensions only). zai harness =
   `~/.pi/agent`, openrouter harness = `~/.pi-openroute` (note the
   spelling) — both read this repo's shared `.pi/`.
+- Three-tier agent setup (2026-09-29): tier-1 COORDINATOR
+  (`.pi/prompts/coordinator-prompt.md`, cheap model, routine sessions) →
+  tier-1 WORKER delegated as a pi **subagent** (`subagent({agent: "worker",
+  ...})` from the `pi-subagents` package in the zai agent-dir; GLM 5.3 /
+  5.3 flash) → tier-2 ARCHITECT (`.pi/prompts/architect.md`, frontier,
+  stateless, escalation-only, advisory decision memo). `scripts/run_task.sh`
+  (`pi -p`) is now only the FALLBACK delegation path. Fresh sessions expose
+  just `subagents_enable` — the coordinator prompt authorizes delegation so
+  the full `subagent` schema activates on the next model request. The
+  coordinator prompt's token-discipline section was REPLACED by the cheap-tier
+  safeguards: the worker self-reports the 6-point checklist in its log, a
+  host-run `acceptance`/`gate` verifies the objective part, and the coordinator
+  verifies each remaining claim against `git diff` slices (claims are
+  unverified inputs). Tier-2 triggers: mechanism design, ambiguous/refuted
+  A/B, protocol changes, conflicting evidence, owner-gate mechanism
+  approval — never mechanical fixes, evidence gathering, or refutation
+  cleanups.
+- Subagent runs default to ASYNC/background with a 30-min `timeoutMs` default;
+  a dev-clip pipeline run exceeds it, so raise `timeoutMs` AND `toolTimeoutMs`
+  and collect with `bg_wait`. `pi-subagents` docs: `models.md` (per-run
+  `provider/id:thinking` override; the `thinking` field is ignored on
+  dispatch), `tool-reference.md` (params, `acceptance`/`gate`), `agents.md`
+  (builtin agents; project agents live in `.pi/agents/`).
 
 ## Session index (one line each)
 
