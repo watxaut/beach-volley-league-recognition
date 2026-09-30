@@ -1,0 +1,59 @@
+STATUS.md
+  s_3c41c2f8f79de8::t_550d86d52c1de8 20-43,284-296,302-327,548-552,732,734,776-826
+scripts/probe_departure_removals.py
+  s_3148d7dc722df6::t_deb044bbf295a9 1-74
+scripts/waterfall.py
+  s_7f23215896301a::t_3528b054c22d44 75
+docs/history/status_log_archive.md
+  s_3c41c2f8f79de8::t_7ad27df21bbfd8 2141-2219
+scripts/departure_gate_harness.py
+  s_3148d7dc722df6::t_f93c92b1c4846d 1-86
+scripts/action_evidence.py
+  s_7f23215896301a::t_f2ec96681813e6 305-307,347,388-390,401,430-431,436-478
+  s_7f23215896301a::t_02025f44ff7eec 817,827-833
+  s_3148d7dc722df6::t_19755b7a8fdd0c 49
+  s_7f23215896301a::t_0fbf13a751ff8e 264
+  s_3148d7dc722df6::t_73131d9030c102 256-258
+  s_7f23215896301a::t_32a6008adc1d8b 215-255,259-263,265-272
+  s_7f23215896301a::t_9612b6c470578d 273-274
+  s_7f23215896301a::t_be9d740d9a34d3 479-480
+scripts/probe_owner_verdicts.py
+  s_3148d7dc722df6::t_52d51f1dfa960b 1-102
+docs/g3_r1_departure_gate.md
+  s_3148d7dc722df6::t_d4c3368c81f1d9 17-131,225-250,254-276
+  s_3148d7dc722df6::t_aa3292bd552b8e 251-253
+  s_3148d7dc722df6::t_6fadaf4233a422 132-224
+  s_3148d7dc722df6::t_462b306a68c70e 1-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "127d07dd8ee1382bee79f84deb154051bc11c9da",
+  "prompts": {},
+  "sessions": {
+    "s_3148d7dc722df6": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0ef1e-227e-7153-9191-7cdd75cad2fa",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    },
+    "s_3c41c2f8f79de8": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0ef18-aed8-7093-a823-6c0abfc110f9",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    },
+    "s_7f23215896301a": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0eec9-e18c-75f2-aaf3-3c71bb29642b",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
