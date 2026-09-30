@@ -1,0 +1,23 @@
+tests/test_point_winners.py
+  s_8121ec1e4f69f2::t_3dc83f7611e3dd 1-397
+  s_8121ec1e4f69f2::t_b5e4cf525c1dc4 398
+scripts/resolve_point_winners.py
+  s_8121ec1e4f69f2::t_99dd77a6c38a75 1-51,54-70,72-85,92-139,189-214,217-275,277-324,327-336,338-340,343-349,351-609,611-619,622-637
+  s_8121ec1e4f69f2::t_e7d8c3479a0dd0 52-53,71,86-91,140-188,215-216,276,325-326,337,341-342,350,610,620-621
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "4379dbdc38841bf2ac452dd84a01f9e4cb66a7e7",
+  "prompts": {},
+  "sessions": {
+    "s_8121ec1e4f69f2": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0f196-b5aa-77c6-af8c-e8ab5443d755",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
