@@ -17,7 +17,28 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-30 (forty-fourth session — **G3 plan S1, the
+**Last updated:** 2026-09-30 (forty-fifth session — **G3 plan S0b DONE:
+the pass-2 serve stream scored at CONTACT level against the owner P1–P8
+contact GT. `scripts/score_pass2_contacts.py` + `tests/test_pass2_contact_score.py`
+(28 tests) + `docs/g3_s0b_pass2_contact_score.md`; no `src/` change, no
+decode, output `output/pass2_contacts/`. The perception arm reproduces the T4
+dev-clip baseline EXACTLY (P 0.586 / R 0.607 / F1 0.597, 1 dup, 2.703
+FP/dead-min) under the padded region scope, which validates the scope; the
+pass-2 arm is P 0.640 / R 0.571 / **F1 0.604 (+0.007)** with class accuracy
+**0.706 → 0.562 (−0.143)**. FAR SERVES **0/5** at contact level (relabeled
+contacts +31..+50 f = 5.4-8.6x the ±0.52 s effective tolerance; 3 of the 5 are
+the GT receptions f245/3071/4800), and only **1/8** GT serves is matched at
+all — f2575/f3747 (`anchor_only`) have NO action within ±80 f, so the "far
+prefix census 8/8" counts ANCHORS, not contacts. Pass-2 changes exactly 4
+contacts: 3 correct dig labels BROKEN (f245/3071/4800) and 1 TP LOST (the
+f3856 owner-FALSE demotion). Verdict: the point-level serve story does not
+survive contact scoring; the "park at pass-2" option for point 22 is closed
+and pass-2 must not be consumed as a label source by S4 as it stands. Suite
+**839**. Next = owner: S0 (P9–P33 contact GT) + the far-serve lever decision;
+worker-side next = S3 (pass-2 squad/side-switch layer), which is independent of
+the far-serve gap.
+
+**Previous (forty-fourth session — **G3 plan S1, the
 far-side serve LOOMING probe: diagnose-only, REFUTED at kill 2 (no separable
 `L` gap).** `scripts/probe_far_serve_looming.py` +
 `tests/test_far_serve_looming.py` (29 tests) + `docs/g3_far_serve_looming.md`;
@@ -296,15 +317,25 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
-**G3 S1 far-serve looming probe — diagnosed and REFUTED (44th session).**
-`scripts/probe_far_serve_looming.py` (+29 tests, `docs/g3_far_serve_looming.md`)
-measured whether the far serve's post-contact loom separates it from every
-new-rally non-serve ball: kill 1 passes at the boundary (4/5 dev far serves
-have ≥5 far-band tracked sightings in `[c, c+0.5 s]` — the flight is detected),
-but kill 2 FIRES (lowest far-serve `L` 0.338 < highest new-rally non-serve `L`
-0.945; no empty gap). No `src/` change, no threshold fit; match replay parity
-exact (0/26068). The far-serve CONTACT (open point 22) stays open; S2 is not
-triggered.
+**G3 S0b pass-2 contact-level score — DONE (45th session); the far-serve
+CONTACT is confirmed missing and the pass-2 substitute is refuted.**
+`scripts/score_pass2_contacts.py` (+28 tests, `docs/g3_s0b_pass2_contact_score.md`,
+`output/pass2_contacts/`) scores `actions_pass2` against the owner P1–P8
+contact GT with `evaluate_timed`'s matcher (imported, not re-implemented).
+Scope = the 8 GT point windows padded ±90 f (f126–f4910): the raw windows are
+NOT rally-inclusive (7 of 28 owner contacts fall outside, P1's f210 serve
+among them), and the padded scope is validated by exact parity of the
+perception arm with the T4 dev-clip baseline. **perception P 0.586 / R 0.607 /
+F1 0.597 / class 0.706 / team 0.706 / 2.703 FP per dead-min; pass2 P 0.640 /
+R 0.571 / F1 0.604 / class 0.562 / team 0.625 / 1.351** → contact F1 +0.007,
+class **−0.143**. **Far serves 0/5** (deltas +31..+50 f = 5.4–8.6× the ±0.52 s
+effective tolerance; 3 are the GT receptions f245/3071/4800); only **1/8** GT
+serves is matched (f1395); f2575 and f3747 are `anchor_only` with NO action
+within ±80 f. Pass-2 touches exactly 4 contacts: 3 correct dig labels broken,
+1 true positive lost to the f3856 owner-FALSE demotion. No `src/` change, no
+decode; `--autonomous` intentionally not used (GT-derived-input audit recorded
+instead, 69 findings). Point 22 stays open on the perception side; S1 (looming)
+was refuted in #44 and S2 is therefore not triggered.
 
 **Production state (as of 2026-09-28; unchanged by #30's documentation-only
 assessment — #28 shipped the pass-2 serve re-label layer over existing
@@ -416,10 +447,15 @@ last. One mechanism per session; each step's kill criteria are pre-registered.
   `docs/video_recording_guide.md` — controlling the input domain is the
   cheapest generalization lever; 59.8 fps `video_david` is the first
   out-of-spec file.
-- **S0b (worker, script only) —** score `actions_pass2` (`output/serve_relabel.json`)
+- **S0b (worker, script only) — [#45 DONE 2026-09-30]** score `actions_pass2`
   at CONTACT level against the dev GT P1–P8 with `scripts/evaluate_timed.py`
-  (NOT `--autonomous`: pass-2 carries owner inputs) and record it. Expected
-  from the hand check: far serves 0/5.
+  (NOT `--autonomous`: pass-2 carries owner inputs; the GT-input audit is
+  recorded instead): `scripts/score_pass2_contacts.py` +
+  `tests/test_pass2_contact_score.py` + `docs/g3_s0b_pass2_contact_score.md`.
+  Result: far serves **0/5**; GT serves matched **1/8**; pass-2 contact F1
+  0.597 → 0.604 with class accuracy 0.706 → **0.562** (3 correct dig labels
+  broken, 1 TP lost). Scope must be the point windows padded ±90 f, and the
+  perception arm must reproduce the T4 baseline (asserted in-script).
 - **S1 (diagnose only, no `src/`) — [#44 DONE 2026-09-30, REFUTED at kill 2
   (no separable `L` gap; see Log + Open point 22); S2 NOT triggered] far-side
   serve looming probe:**
@@ -453,7 +489,7 @@ last. One mechanism per session; each step's kill criteria are pre-registered.
   serves within tolerance vs the S0 GT. Refuted ⇒ `git checkout 185c6f0 --
   src/ tests/test_config_drift.py` and the band moves to a default-off
   `scripts/*_harness.py` subclass (T5/R1 precedent).
-- **S3 — pass-2 squad/side-switch layer (open point 21.4):** squad = side ×
+- **S3 (next worker-side item, #45) — pass-2 squad/side-switch layer (open point 21.4):** squad = side ×
   switch parity (beach rule: switch every 7 points), cross-checked by all four
   players crossing the net in dead time; target exactly the 4 GT switches
   (after P7/14/21/28). Should fix 4 of the 5 dev stage-5 team errors (all P8).
@@ -518,6 +554,17 @@ point number in `docs/history/`.
     far-serve lever: targeted far-flight detector mining (#42's kill-1 branch
     does NOT apply since kill 1 passed) vs another contact-proposal mechanism.
     S0 GT + capture spec remain the highest-value async inputs.]**
+    **[#45: S0b measured the whole pass-2 stream at CONTACT level
+    (`scripts/score_pass2_contacts.py`, `docs/g3_s0b_pass2_contact_score.md`):
+    far serves 0/5 with deltas +31..+50 f = 5.4-8.6x the effective ±0.52 s
+    tolerance, and only 1/8 GT serves matched at all — f2575/f3747 are
+    `anchor_only` with NO action within ±80 f, so the "far prefix census 8/8"
+    counts ANCHORS, not contacts. Pass-2 contact F1 0.597 → 0.604 (flat) but
+    class accuracy 0.706 → 0.562: it breaks 3 correct dig labels (f245/3071/
+    4800) and loses 1 TP to the f3856 demotion. The "park at pass-2" option
+    is CLOSED, and pass-2 must not be consumed as a LABEL source by S4 until
+    the real serve contact exists. Far-serve CONTACT work stays owner-gated on
+    S0.]**
     **Status (as of 28th session): MECHANISMS 1+2+3 DONE (mech 3 shipped
     09-28, 28th session).** Mechanism 3 = pass-2 serve re-labeling
     (`scripts/relabel_serves.py`, +29 tests): per TRUE map window, the
@@ -807,6 +854,23 @@ survive across sessions; provenance in the archives.
   its honest 18/33 becomes a GT-bought 21/33. `pipeline_output.json` carries
   no ball-death side/in-out, so kill/ace endings cannot be disambiguated from
   artifacts alone. Session 43, `docs/point_winner_layer.md`.
+- Pass-2 point census vs contact reality: `relabel_serves.py`'s "far prefix
+  8/8" counts owner ANCHORS, not emitted actions — 2 of the 8 P1–P8 points are
+  `anchor_only` with no action within ±80 f of the GT serve, and the pass-2
+  stream matches 1/8 GT serves at contact level. Score every pass-2 layer at
+  contact level with the padded-region scope (below). Session 45.
+- Contact-level scope trap: the point windows in
+  `video_ari_joan_8_first_points_annotations.json` are NOT rally-inclusive —
+  7 of the 28 owner contacts fall outside them (a serve precedes its window,
+  the rally tail follows it). Score inside a region padded by
+  `rally_reset_gap` (90 f) and assert parity: the perception arm must
+  reproduce the T4 dev-clip baseline (P 0.586 / R 0.607 / F1 0.597) or the
+  numbers are not comparable with the recorded record
+  (`scripts/score_pass2_contacts.py`, session 45).
+- The pass-2 relabel decisions are net-negative on gesture labels
+  (−0.143 class accuracy on P1–P8) because the far-serve opener candidates
+  ARE the receiver's dig in 3/5 cases; a relabel gate would need "no nearby
+  reception contact", which is pass-2 bookkeeping, not perception. Session 45.
 - Entreno e1–e7 are ONE recording session: a regression / byte-identity
   suite, not a match-domain validation set (held-out correct rate dev 0.276
   vs entreno 0.56–1.00; the R2 gesture tier reverses dev↔entreno). A leave-one-
@@ -937,6 +1001,7 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- 2026-09-30 **#45** — G3 plan S0b: pass-2 stream scored at CONTACT level on the owner P1–P8 GT (`scripts/score_pass2_contacts.py` + 28 tests + `docs/g3_s0b_pass2_contact_score.md`; no `src/` change, no decode): padded-region scope validated by exact T4 parity; far serves **0/5** (deltas 5.4–8.6× tolerance), GT serves matched 1/8, pass-2 F1 0.597→0.604 but class 0.706→**0.562**; "park at pass-2" closed; suite 839.
 - 2026-09-30 **#44** — G3 plan S1 far-side serve looming probe (diagnose only, no `src/` change, suite 811): `scripts/probe_far_serve_looming.py` + 29 tests + `docs/g3_far_serve_looming.md`; post-contact tracked loom `L` = OLS slope ln(width) vs s over 0.5 s from the new-rally far-band onset; **REFUTED at kill 2** (lowest far-serve L 0.338 < highest new-rally non-serve L 0.945, no empty gap), kill 1 passed at 4/5 (flight detected), kill 3 vacuous, kill 4 pending S0; match replay parity 0/26068; the far-serve CONTACT stays open, S2 not triggered.
 - 2026-09-30 **#43** — open point 21.3 point winner/outcome layer SHIPPED as a pass-2 script (`scripts/resolve_point_winners.py` + 27 tests + `docs/point_winner_layer.md`; no `src/` change, no decode): fault prior over the terminal touch, 33/33 decided, **18/33 (54.5%)** vs the 33 dictated winners after the validate-only side→squad mapping; GT-serve-override inheritance (21/33) explicitly not shipped; fixed 3 test-side defects left by an unreviewed draft; suite 782.
 - 2026-09-30 **#42** — architect strategy review of the "detector v4 → normalise → learned gestures" proposal (docs-only, no `src/` change, suite 755): order NOT adopted; pass-2 far serves are 0/5 at contact level (census 8/8 was point-level); plan S0–S4 (owner P9–P33 contact GT → far-serve looming probe → side-switch layer → winner/fantasy), deferrals with triggers; proposed AGENTS.md wording pending ratification; #39 Log entry archived (Log below).
