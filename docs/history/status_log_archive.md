@@ -7,6 +7,39 @@
 > `status_where_we_are_archive.md` (same directory); the one-line-per-session
 > index is in STATUS.md. Nothing was edited or deleted.
 
+### 2026-09-29 (thirty-ninth session) — T5 revert: neither mechanism ships; `src/` back to `185c6f0`, A + B live in the probe harness only
+
+**What was asked:** the reviewer ruled that both T5 mechanisms recover 0/5 far
+serves and therefore belong nowhere near production. Restore `src/` (and the
+src-facing config) exactly to `185c6f0`, keep the A/B reproducible outside
+`src/`, rerun it, fix the docs.
+
+**What was done.** (1) `git checkout 185c6f0 -- src/ tests/test_config_drift.py`
+— `git diff 185c6f0 -- src/` is now EMPTY, including the `ball_weak_*` /
+`ball_backfill_*` DEFAULT_CONFIG keys and the config-drift rows (ctor-parity +
+default-off) that pinned them. (2) The mechanisms moved to
+`scripts/serve_mechanism_harness.py` as default-off subclasses:
+`ServeMechanismBallTracker(weak_*=, backfill_*=)` overrides `_try_lock`
+(weak tier, tried only AFTER production's own scan so a production lock always
+wins), `_scan_motion_pair_with_bar` (the production loop with the speed bar
+parameterised), `_update`/`_bootstrap_detection`/`_chain_backfill` (mechanism B)
+and `ProbeClassifier.add_ball_sightings`. `scripts/probe_serve_mechanisms.py`
+now imports the harness instead of the src hooks. (3) Replay rerun with the
+documented command: **every number in `docs/t5_mechanism_ab.md` is unchanged**
+— base 36/13/0, A_weak3_w30 37/14/19, A_weak3_nowidth 37/14/26, all four
+B arms 37/14/0, **0/5 far serves recovered**, base fidelity 4968/4968 frames.
+(4) `tests/test_serve_backfill.py` retargeted at the harness (24 tests) plus a
+guard that greps `src/` for the mechanism tokens so a refuted mechanism cannot
+re-enter; config-drift back to its T4 form. (5) Docs corrected
+(`t5_mechanism_ab.md`, `t5_serve_admission_diagnosis.md`, plan T5 row,
+STATUS).
+
+**Conclusion (unchanged, now shippable as a verdict): T5 far-serve admission is
+REFUTED at the tracker level.** The root blocker is the contact probe's
+serve-branch geometry (fed-ascent demand vs a far decelerating float) plus the
+complete absence of toss detections on P4/P6/P8 — recognition/detection work
+that needs an owner decision. Suite green (736).
+
 ### 2026-09-29 (thirty-seventh session) - T5 DECIDED (owner: serve-time ball-track (re-)admission) + step 1 diagnosis, diagnose only
 
 - **Owner decisions recorded:** (a) T5 mechanism = serve-time ball-track

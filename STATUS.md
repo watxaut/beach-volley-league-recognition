@@ -17,7 +17,29 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-30 (forty-first session — **G3 R1 departure
+**Last updated:** 2026-09-30 (forty-second session — **architect strategy
+review of the "detector v4 → normalise → learned gestures" generalization
+proposal; docs-only, NO `src/` change (`src/` still exactly `185c6f0`),
+suite 755.** The proposed order is NOT adopted — each step conflicts with a
+measurement already in the repo: detection loses 0/28 dev contacts (the
+detector fires at conf 0.74–0.87 at all 5 lost serves); R1 was already
+width-normalised and died on the held-out match (a far serve travels along
+the camera axis, so its image-plane speed is small in any unit); labelled
+contacts total 91 (63 entreno = ONE session + 28 dev) and R2's
+leave-one-clip-out already showed pooled AUC 0.172 vs 0.551 (dev correct
+rate 0.276 vs entreno 0.56–1.00); the largest dev loss is contact PROPOSAL
+(6 candidate + 5 reach gate = 11/28), not the gesture label (4/28). NEW
+FINDING (`output/serve_relabel.json` vs dev GT, P1–P8): the pass-2
+far-serve census "8/8" is POINT-level bookkeeping — at CONTACT level it is
+**0/5**: the relabeled serves sit at f247/930/2195/3070/4801 vs GT serves
+f210/880/2154/3038/4770 (31–50 f late, outside ±15 f); three (247, 3070,
+4801) are the GT receptions (245, 3071, 4800) turned into serves, the other
+two (930, 2195) are dev in-point-spurious digs. The far-serve CONTACT is the
+gap G3 and G1 share. New plan **S0–S4** in *Active next* (first mechanism =
+S1, a diagnose-only far-serve looming probe, kill criteria pre-registered);
+proposed `AGENTS.md` wording is in the Log and awaits owner ratification.)
+
+**Previous (forty-first session — **G3 R1 departure
 gate: implemented, fully validated, REFUTED on the held-out match — NOT
 shipped.** The owner-approved mechanism (session 40 task2, found
 uncommitted after that session died mid-run) was finished by a delegated
@@ -250,6 +272,11 @@ implementation backlog below remains unchanged.
   points carry a serve resolution (P32 report_only, round 3); P20
   owner-pinned to 14516A (q5). All 17 owner verdicts reproduce
   mechanically. 13 team overrides flagged (far-side width-band class).
+  **CAVEAT (#42): the 8/8 census and the 31 serve-typed are POINT-level;
+  at CONTACT level P1–P8's far serves are 0/5 (relabeled contact 31–50 f
+  late, 3 of 5 are GT receptions) — the "width-band class" attribution of
+  the overrides is unverified (P1 f247 / P6 f3070 are correct-team near
+  receptions: the override masks a missing serve contact).**
 - **Match (20260920 — the only real match):** **31/33 GT points confirmed
   (0.939)**; actions 207 (dig 84 / spike 45 / set 42 / serve 20 /
   overpass 9 / block 7) at the perception layer — the pass-2 layer
@@ -304,43 +331,94 @@ mechanism parked reproducible (`scripts/departure_gate_harness.py` +
 `action_evidence.py` + `probe_departure_removals.py`/`probe_owner_verdicts.py`;
 banner + tables in `docs/g3_r1_departure_gate.md`); suite 755. Revisit
 only as a width-band-aware mechanism after T8.
-Next = **owner decision on the far-side serve follow-up**: (a) contact-probe
-serve signature that does not require a fed ascent + (b) detection evidence on
-the far toss (P4/P6/P8 have none), or (c) park the far-side serve at the
-pass-2 layer (point 22 mechanism 3 already relabels 8/8).
+Next = the far-side serve follow-up is now decided by the 42nd-session
+architect review: option (c) "park at pass-2" is REJECTED (pass-2 is 0/5 at
+contact level — point 22), (a)/(b) are replaced by ONE diagnose-only probe
+first (S1, looming onset — post-contact flight exists at all 5 dev serves
+while the toss exists at only ~2/5). See *Active next* S0–S4.
 
-**Active next (ranked, goal-driven - see North-star; G3 first).** (0)
-**Owner call on the far-side serve follow-up** (T5 handed it back): the
-ball-track half is REFUTED (0/5; kept reproducible in the probe harness,
-not in `src/`), the binding defects are the contact probe's serve
-signature + the missing far-toss detections — a recognition/detection
-mechanism, so it needs approval before code. (1) **21.3 point
-winner/outcome layer** - G1's biggest missing signal; the anchored map +
-serve resolutions now give TRUE windows with openers to validate against
-the 33 dictated winners. (2) Round-3 owner queue (no code): P32's serve
-verdict, 6928A's verdict, P18-P20 anchors, ep45's nature, P23 17159A +
-P31 22873A team-fix confirmation - each flips one flag in
-`serve_relabel.json` when ratified. (3) Fantasy scoring module + web
-points table (14e); assist ships with it (no perception needed) - the
-pass-2 `actions_pass2` stream is the intended input. (4) T6-T10 of the
-action-reliability plan (feature sidecar, perturbation suite, width-band
-`unreliable` state, PTS time windows, camera profile) - the evidence
-layer the next perception mechanism should be built on; **T8's width-band
-split is also the prerequisite for any departure-gate revisit (R1 refuted
-2026-09-30: width-normalised departure conflates dead balls with far
-float serves — `docs/g3_r1_departure_gate.md`; its dev-side precision
-pool is real: 7 FPs, zero collateral).** (5) R2 calibrated per-action
-confidence — **REFUTED at diagnosis (41st session)**: the planned
-continuity × gesture-tier LOCO score loses to the hand-set constants
-(pooled AUC 0.172 vs 0.551; tiers reverse per clip; fold base rates
-anti-correlate). Motivation stands (`action_confidence=0.3` is INERT — min
-emitted 0.45; constants uncalibrated, ECE ~0.16); any revival needs the
-owner-gated preconditions in `docs/g3_r2_confidence_calibration.md` §6
-(match-side per-prediction labels + clip-type-aware base rates).
-`track_frac_15f` remains the one within-clip-stable ordinal (review-UI
-flag candidate, not a calibrated replacement). (6) e4/e5/e6 re-adjudication sheets; the
-e2 production-vs-script F1 gap (0.400 vs the 0.571 script record,
-pre-existing, f167 gesture flip).
+**Active next (ranked, goal-driven - see North-star; G3 first) — RE-RANKED by
+the 42nd-session architect review (Log #42).** The "detector v4 → normalise →
+learned gestures" order was NOT adopted. Order = measure in-domain → fix the
+contact proposal where the loss is → pass-2 layers on real contacts → learn
+last. One mechanism per session; each step's kill criteria are pre-registered.
+
+- **S0 (OWNER, async, no code) — held-out contact GT for match P9–P33** in the
+  P1–P8 dictation format (`ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt`;
+  ~90 contacts, 12 of them far-serve points). It is the held-out set for every
+  perception mechanism below AND R2's precondition 1 (match-side labels);
+  until it lands, held-out checks are a point-level proxy (open point 24).
+  Same lane: pin the capture spec (30 fps, 1080p, long-axis, fixed height) in
+  `docs/video_recording_guide.md` — controlling the input domain is the
+  cheapest generalization lever; 59.8 fps `video_david` is the first
+  out-of-spec file.
+- **S0b (worker, script only) —** score `actions_pass2` (`output/serve_relabel.json`)
+  at CONTACT level against the dev GT P1–P8 with `scripts/evaluate_timed.py`
+  (NOT `--autonomous`: pass-2 carries owner inputs) and record it. Expected
+  from the hand check: far serves 0/5.
+- **S1 (diagnose only, no `src/`) — far-side serve looming probe:**
+  `scripts/probe_far_serve_looming.py` + `docs/g3_far_serve_looming.md`. In the
+  new-rally state (no emitted contact within `RALLY_RESET_GAP`), a ball segment
+  whose onset width is ≤26 px (below the 26–35 abstain band) and whose
+  L = OLS slope of ln(bbox width) vs time in SECONDS over [onset, onset+0.5 s]
+  is high = candidate far serve, contact placed at onset (T5 measured first
+  sighting 2–4 f after contact). Secondary feature declared NOW: nearest
+  far-team player `is_behind_baseline` at onset. L* = midpoint of the empty gap
+  between the lowest dev far-serve L and the highest dev new-rally non-serve L.
+  Inputs = existing dumps: `output/t4/dev_diag.jsonl`,
+  `output/g3r1/match_bw03_diag.jsonl` (replay its `ball_dets` through
+  `BallTracker` first; require `locked` + centre identity on 26068/26068
+  frames or stop), `output/g3/e1..e7_diag.jsonl`. Base arm must reproduce T4
+  (P 0.586 / R 0.607 / F1 0.597; the 5 far serves die at `3_candidate`).
+  **KILLS:** (1) <4/5 dev far serves (f210/880/2154/3038/4770) have ≥5 far-band
+  sightings in [c, c+0.5 s] → the far flight is undetected and the lever flips
+  to detection (targeted far-flight mining for v4, not a general v4); (2) no
+  empty gap on dev, or gap ratio <1.5×; (3) any fire on e1–e7 (all entreno
+  serves are near-side); (4) match P9–P33 with L* frozen: must fire in ≥9/12
+  far-serve windows before the pass-2 reception, and precision ≥0.75 over all
+  new-rally fires (fires on the 7 owner-FALSE serve frames / 4 OFFGAME ranges
+  are FPs). No `PlayerTracker` is created ⇒ no `cv2.setRNGSeed` needed.
+- **S2 (OWNER-GATED, only if S1 survives) —** new contact band in
+  `src/recognition/action_classifier.py` next to `_reentry_contact`, config key
+  + drift-guard rows. Gates: dev recall ≥0.714 (+3/28) with precision ≥0.586;
+  e1–e7 byte-identical (`scripts/compare_runs.py`, baselines from untouched
+  HEAD, `--device cpu`); match action-set diff = additions at fire frames only;
+  pass-2 chain holds (17/17 owner verdicts, 31/33 points); ≥9/12 held-out far
+  serves within tolerance vs the S0 GT. Refuted ⇒ `git checkout 185c6f0 --
+  src/ tests/test_config_drift.py` and the band moves to a default-off
+  `scripts/*_harness.py` subclass (T5/R1 precedent).
+- **S3 — pass-2 squad/side-switch layer (open point 21.4):** squad = side ×
+  switch parity (beach rule: switch every 7 points), cross-checked by all four
+  players crossing the net in dead time; target exactly the 4 GT switches
+  (after P7/14/21/28). Should fix 4 of the 5 dev stage-5 team errors (all P8).
+  Deterministic pass-2, independent of S1.
+- **S4 — 21.3 winner/outcome layer → 13 (ace / serve fault / assist) → fantasy
+  module + points table (14e)**, consuming `actions_pass2` after S1–S3 so aces,
+  faults and receptions hang on real serve contacts. (Untracked
+  `scripts/resolve_point_winners.py` + `tests/test_point_winners.py` are in the
+  tree — not part of the 42nd-session review; the next session that touches
+  21.3 must decide their status.)
+- **Round-3 owner queue (no code, unchanged):** P32's serve, 6928A's verdict,
+  P18–P20 anchors, ep45's nature, P23 17159A + P31 22873A team-fix
+  confirmation — each flips one flag in `serve_relabel.json` when ratified.
+- **Queued behind S1:** the reach-gate bucket (5/28: P5 f2575, P7
+  f3747/3782/3950/4002 — near-side, so tracking diagnosis BEFORE any
+  normalisation); the label bucket (4/28, 3 of them overpass — cf. open point
+  9); e4/e5/e6 re-adjudication sheets; the e2 production-vs-script F1 gap
+  (0.400 vs the 0.571 script record, pre-existing, f167 gesture flip).
+- **DEFERRED, each with an explicit trigger (do not start earlier):**
+  detector v4 → second-venue footage exists OR S1 kill 1 fires; T9 PTS time
+  windows → mandatory before any footage outside 25–31 fps; T7 perturbation
+  suite / T10 camera profile → before a second camera; T6 feature sidecar →
+  when T12 fires (`--diag-dump` covers every probe until then); T8 width-band
+  `unreliable` state → prerequisite for any departure-gate (R1) revisit, its
+  "team overrides" motivation RE-SCOPED (see Learnings); T12 learned
+  contact/gesture head → only when contact GT spans ≥3 recording sessions,
+  validated leave-one-SESSION-out (e1–e7 = one fold); R2 calibrated confidence
+  (REFUTED at diagnosis, 41st session) → parked behind its owner-gated
+  preconditions (`docs/g3_r2_confidence_calibration.md` §6; S0 supplies
+  precondition 1). `track_frac_15f` remains the one within-clip-stable ordinal
+  (review-UI flag candidate, not a calibrated replacement).
 
 ## Open points
 
@@ -351,7 +429,19 @@ point number in `docs/history/`.
 
 ### Active
 
-22. **Far-side serves** — **Status: MECHANISMS 1+2+3 DONE (mech 3 shipped
+22. **Far-side serves** — **[#42 RE-SCOPE] POINT-level DONE, CONTACT-level
+    OPEN.** Measured 09-30 (`output/serve_relabel.json` vs dev GT P1–P8):
+    the 5 relabeled far "serves" (f247/930/2195/3070/4801) are 31–50 f after
+    the GT serves (f210/880/2154/3038/4770) = 0/5 at contact level; three are
+    the GT receptions (245/3071/4800) relabeled, two (930, 2195) are dev
+    in-point-spurious digs; 12 of the 16 far serves carry a team override.
+    Every "8/8", "31 serve-typed" and "13 team overrides = width-band class"
+    below is a POINT-level statement. Consequence: the receiver's dig is
+    consumed and the true serve contact (aces, serve faults, who served) is
+    still missing — the gap G3 and G1 share. Next = S1 far-serve looming probe
+    (Active next), validated on the S0 GT (open point 24); T5 (tracker) and
+    R1 (departure gate) already refuted; option "park at pass-2" rejected.
+    **Status (as of 28th session): MECHANISMS 1+2+3 DONE (mech 3 shipped
     09-28, 28th session).** Mechanism 3 = pass-2 serve re-labeling
     (`scripts/relabel_serves.py`, +29 tests): per TRUE map window, the
     rally-opening contact is re-labeled serve by structural prior (t1 +
@@ -393,6 +483,8 @@ point number in `docs/history/`.
     sequentially.**
 
 21. **Owner's match-feedback backlog** (agreed order; GT exists for all).
+    **[#42 order: (4) side-switch = S3, then (3) winner = S4 — both after S1's
+    far-serve contact work so serve/reception contacts are real.]**
     (1) *Point count:* ball half SHIPPED (conf floors + v3); point-layer
     windows now binding at 31/33 — re-tune group_gap/contact_chain/confirm
     jointly on the game-state video + the 25.7fps match; emit every rally
@@ -482,6 +574,22 @@ point number in `docs/history/`.
     admission only, never existing tracks). (d) A rolling-window fraction
     would fire ~27f earlier — deliberately not built (lifetime is simpler
     and occlusion-safe).
+
+24. **Match-domain contact GT + contact-level scoring of pass-2 (new, #42)** —
+    **Status: OPEN, owner-gated.** Problem: every perception mechanism this
+    project has refuted (T5, R1, R2) died on a held-out MATCH check that only
+    existed as proxies (17 owner verdicts, point counts, 33 winners); labelled
+    contacts are 91 total (63 entreno = one session, 28 dev = match P1–P8),
+    dev correct rate 0.276 vs entreno 0.56–1.00, so entreno cannot stand in
+    for match performance, and pass-2's point-level census hid a 0/5
+    contact-level result (point 22). Next: (a) OWNER dictates contacts for
+    P9–P33 (S0; ~90 contacts, 12 far-serve points; folded by
+    `scripts/build_dev_clip_gt.py`-style tooling into a match GT); (b) S0b
+    contact-level score of `actions_pass2` on P1–P8 via `evaluate_timed.py`;
+    (c) from then on every pass-2 layer is scored at contact level, and any
+    threshold fit on dev P1–P8 must hold on P9–P33 before it ships. The
+    dictated anchors are too coarse for contact timing (P8 anchor f4700 vs GT
+    serve f4770), so they cannot substitute. Also feeds R2 precondition 1.
 
 ### Parked / conditional
 
@@ -600,6 +708,26 @@ survive across sessions; provenance in the archives.
   read A, P24's near-side serve read B, P23/P31 emitted-fixes) —
   downstream layers consume `pass2_team`, keep `team_emitted` as
   provenance (28th session).
+- CORRECTION (#42) to the line above: on the dev clip, P1 f247 and P6 f3070
+  (emitted team A) are correct-team near-side RECEPTIONS (GT digs f245/f3071,
+  team A) that pass-2 relabeled as the far serve — the override hides a
+  missing serve contact rather than fixing a width-band error. P8 f4801's
+  team flag comes from the post-P7 side switch (stage-5 loss), a different
+  mechanism. Do not attribute the 13 overrides to the width-band class
+  (T8) without contact-level GT.
+- Pass-2 layers must be scored at CONTACT level (`evaluate_timed.py` on
+  `actions_pass2`), not by point census alone: "far prefix census 8/8" is
+  0/5 at contact level on P1–P8 (relabeled contact 31–50 f late, outside ±15 f).
+  Session 42.
+- Entreno e1–e7 are ONE recording session: a regression / byte-identity
+  suite, not a match-domain validation set (held-out correct rate dev 0.276
+  vs entreno 0.56–1.00; the R2 gesture tier reverses dev↔entreno). A leave-one-
+  clip-out over them is one fold. Labelled contacts: 91 = 63 entreno + 28 dev
+  (the "207 match actions" are PREDICTIONS, not labels). Session 42.
+- Dev loss budget (28 GT contacts, T4): proposal 11 (6 candidate + 5 reach
+  gate) > team/actor 5 (4 = post-P7 side switch) > label 4 > survives 8;
+  detection 0. The gesture label is the SMALLEST bucket, so a learned
+  gesture head cannot move G3 by itself. Session 42.
 - Device caveat: MPS jitter can flip a gesture label (e.g. e6 f309
   block vs spike); the script path (deterministic) is the reference.
 
@@ -721,6 +849,8 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- 2026-09-30 **#42** — architect strategy review of the "detector v4 → normalise → learned gestures" proposal (docs-only, no `src/` change, suite 755): order NOT adopted; pass-2 far serves are 0/5 at contact level (census 8/8 was point-level); plan S0–S4 (owner P9–P33 contact GT → far-serve looming probe → side-switch layer → winner/fantasy), deferrals with triggers; proposed AGENTS.md wording pending ratification; #39 Log entry archived (Log below).
+
 - `evaluate_timed.py`'s contact F1 is CLASS-AGNOSTIC and its tolerance is a
   TIME, not a frame count: at `evaluate.py`'s effective ±15f window (0.5 s @
   30 fps) the two reproduce the same 7/7 entreno F1s; at 0.2 s only e3 changes
@@ -795,6 +925,97 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+### 2026-09-30 (forty-second session) — architect strategy review: G3 generalization plan re-ranked; far-serve CONTACT is the shared gap (docs-only, `src/` at `185c6f0`)
+
+**Asked:** an external LLM proposed that generalization pain is structural
+(pixel-constant Layer 1) and prescribed detector v4 → scale-free
+normalisation → learned gestures, keeping contact triggering and the
+resolver as-is, with G1/G2 then unblocked by pass-2. The owner asked the
+tier-2 architect to challenge it against STATUS/tried-and-failed and give a
+strategy that achieves G3 and enables G1/G2. Output = decision memo; this
+entry records it.
+
+**Verified against the repo (each hinges a rejection).**
+- *Detection first:* T4 waterfall stage-1 = 0/28; detector conf 0.74–0.87 at
+  all 5 lost dev serves, ≥0.86 at every anchored match serve; no second-venue
+  footage exists and v2 was already rejected. Only the pre-contact toss is
+  absent on P4/P6/P8; even a perfect history restore (T5-B) only moved the
+  loss to `no_contact_geometry`.
+- *Normalise, then retune:* R1 already used ball-widths/frame and was refuted
+  on the held-out match (P11 f7132 at 0.285 bw/f). The far serve moves along
+  the camera axis (image-plane speed small in any unit); "retune jointly" =
+  fit 7 clips of one session. Normalisation stays worth doing as a
+  perturbation-tested invariance property (T7/T9/T10), not as a retune.
+- *Learned gestures:* labelled contacts = 91 (63 entreno + 28 dev); the 207
+  match actions are predictions. R2 (LOCO, 2 features) already failed: pooled
+  AUC 0.172 vs 0.551. The label bucket is the smallest dev loss (4/28).
+- *Keep contact triggering as-is:* wrong — contact proposal is the largest
+  loss (11/28).
+- *"G1/G2 are pass-2 and need no visual generalization":* wrong at contact
+  level — see below.
+
+**New finding (hand-checked, `output/serve_relabel.json` vs
+`ground_truth/video_ari_joan_8_first_points_annotations.json`, identity offset
+0):**
+
+| point | GT serve | pass-2 "serve" (was) | Δ frames | what the relabeled contact really is |
+|---|---:|---:|---:|---|
+| P1 | 210 | 247 (dig) | +37 | GT reception f245 (dig, team A) |
+| P2 | 880 | 930 (dig) | +50 | dev in-point-spurious dig |
+| P4 | 2154 | 2195 (dig) | +41 | dev in-point-spurious dig |
+| P6 | 3038 | 3070 (dig) | +32 | GT reception f3071 (dig, team A) |
+| P8 | 4770 | 4801 (dig) | +31 | GT reception f4800 (dig; team flag = post-switch loss) |
+
+0/5 within tolerance. So the point-level far census 8/8 (and 31 serve-typed)
+is bookkeeping: G1's ace / serve-fault / who-served and the receiver's dig
+are wrong for these points. (Match-wide 12 of 16 far serves carry a team
+override; whether P13/P15/P27, emitted as `serve`, are real serve contacts is
+unknown until S0.)
+
+**Decision (memo):** do NOT adopt the proposed order. Strategy = measure
+in-domain (S0 owner contact GT P9–P33, S0b contact-level score) → fix the
+contact proposal where the loss is (S1 diagnose-only far-serve looming probe
+with pre-registered kills; S2 owner-gated mechanism only if it survives) →
+pass-2 layers on real contacts (S3 side-switch squad layer, S4 winner →
+ace/assist → fantasy) → learn last (T12 only at ≥3 recording sessions of
+contact GT, leave-one-SESSION-out). Full S1 spec and kill criteria: *Active
+next*. Deferrals with triggers (detector v4, T6, T7, T8, T9, T10, T12, R2):
+*Active next*. Owner-side lever: pin the capture spec in
+`docs/video_recording_guide.md`.
+
+**PROPOSED `AGENTS.md` wording — NOT applied, owner ratification pending:**
+- §1 add: "Entreno e1–e7 are the regression/neutrality suite, not a
+  match-domain validation set (all seven are one session; R2 held-out correct
+  rate dev 0.276 vs entreno 0.56–1.00). A threshold or model fit on dev
+  P1–P8 ships only after it holds on data it was not fit on — contact-level
+  match GT P9–P33 once dictated."
+- §6 append: "Pass-2 layers are scored at CONTACT level (`evaluate_timed.py`
+  on `actions_pass2`), not only by point census: far census 8/8 is 0/5 at
+  contact level on P1–P8, three being GT receptions relabeled as serves."
+- new §7: "Learned heads (plan T12) wait for contact GT spanning ≥3 recording
+  sessions; validation is leave-one-SESSION-out (e1–e7 = one fold)."
+- Also pending: `docs/action_reliability_plan.md` (T11's first instance =
+  S1; T6/T7/T9/T10/T12 triggers) and a `ground_truth/README.md` line for the
+  P9–P33 contact file when it lands.
+
+**Uncertainties recorded by the architect:** 5 dev positives make the S1 gap
+fragile (how R1 died); width noise at 13–17 px is ~±7%/px and the expected
+growth over 0.5 s depends on an unmeasured camera distance; dead-time
+throw-backs may loom like a serve (point 14a refuted a crossing-based serve
+detector on practice footage) — hence the secondary feature is declared
+before any held-out look; emission latency ≈ 0.5 s + `CONTACT_DELAY` (causal,
+needs a live-debug check); if S1 kill 1 fires the detector-mining lever wins,
+narrowly and targeted. P8's letter/side convention in `serve_relabel.json`
+(expected B far vs GT serve team A after the switch) was NOT resolved here —
+check when S3 lands.
+
+**Housekeeping:** the 39th-session Log entry moved VERBATIM to
+`docs/history/status_log_archive.md`. No code, GT, or `AGENTS.md` edits.
+Suite unchanged (755).
+
+**Next:** owner: S0 (P9–P33 contact dictation) + capture-spec doc + ratify
+the AGENTS.md wording; worker: S0b, then S1 (one session each).
+
 ### 2026-09-30 (forty-first session) — G3 R1 departure gate: full validation cycle; REFUTED on the held-out match; parked T5-style (`src/` back at `185c6f0`)
 
 **Asked:** continue session 40's uncommitted R1 work (the owner-approved
@@ -886,36 +1107,3 @@ width-normalised; `SPEED_F` pinned to `ActionClassifier.CONTACT_DELAY`
 (causal at confirmation). Caveats: n=85, all 6 R1 hits on dev; entreno
 GTs have no point windows (their FPs are all `fp_in_point`). Suite 754
 (732 + 22). **Next:** owner approval of R1 before any `src/` change.
-
-### 2026-09-29 (thirty-ninth session) — T5 revert: neither mechanism ships; `src/` back to `185c6f0`, A + B live in the probe harness only
-
-**What was asked:** the reviewer ruled that both T5 mechanisms recover 0/5 far
-serves and therefore belong nowhere near production. Restore `src/` (and the
-src-facing config) exactly to `185c6f0`, keep the A/B reproducible outside
-`src/`, rerun it, fix the docs.
-
-**What was done.** (1) `git checkout 185c6f0 -- src/ tests/test_config_drift.py`
-— `git diff 185c6f0 -- src/` is now EMPTY, including the `ball_weak_*` /
-`ball_backfill_*` DEFAULT_CONFIG keys and the config-drift rows (ctor-parity +
-default-off) that pinned them. (2) The mechanisms moved to
-`scripts/serve_mechanism_harness.py` as default-off subclasses:
-`ServeMechanismBallTracker(weak_*=, backfill_*=)` overrides `_try_lock`
-(weak tier, tried only AFTER production's own scan so a production lock always
-wins), `_scan_motion_pair_with_bar` (the production loop with the speed bar
-parameterised), `_update`/`_bootstrap_detection`/`_chain_backfill` (mechanism B)
-and `ProbeClassifier.add_ball_sightings`. `scripts/probe_serve_mechanisms.py`
-now imports the harness instead of the src hooks. (3) Replay rerun with the
-documented command: **every number in `docs/t5_mechanism_ab.md` is unchanged**
-— base 36/13/0, A_weak3_w30 37/14/19, A_weak3_nowidth 37/14/26, all four
-B arms 37/14/0, **0/5 far serves recovered**, base fidelity 4968/4968 frames.
-(4) `tests/test_serve_backfill.py` retargeted at the harness (24 tests) plus a
-guard that greps `src/` for the mechanism tokens so a refuted mechanism cannot
-re-enter; config-drift back to its T4 form. (5) Docs corrected
-(`t5_mechanism_ab.md`, `t5_serve_admission_diagnosis.md`, plan T5 row,
-STATUS).
-
-**Conclusion (unchanged, now shippable as a verdict): T5 far-serve admission is
-REFUTED at the tracker level.** The root blocker is the contact probe's
-serve-branch geometry (fed-ascent demand vs a far decelerating float) plus the
-complete absence of toss detections on P4/P6/P8 — recognition/detection work
-that needs an owner decision. Suite green (736).

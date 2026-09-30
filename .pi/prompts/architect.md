@@ -94,7 +94,9 @@ RISKS + WHAT I AM UNCERTAIN ABOUT: <the honest weak points; the measurement
   the probe harness as default-off subclasses.
 - **Diagnose before designing.** If the brief's premise is itself unverified
   (e.g. "detection gap" that was never probed against raw detector output),
-  the decision is *probe it first*, and the memo says so.
+  the decision is *probe it first*, and the memo says so. To diagnose, 
+  feel free to use scripts/run_task.sh with GLM 5.3 to explore the code base 
+  if needed, do not read or diagnose large parts of the codebase on your own. 
 - **Stay inside the measured camera geometry** (fixed camera on the court's
   long axis): the safety-critical distinctions are in `AGENTS.md` §5 — image-plane
   ball side is unusable, apparent ball width + possession alternation is the
