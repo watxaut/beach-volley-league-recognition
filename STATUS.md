@@ -17,7 +17,28 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-30 (forty-second session — **architect strategy
+**Last updated:** 2026-09-30 (forty-third session — **open point 21.3:
+the point winner/outcome layer SHIPPED as a pass-2 script.**
+`scripts/resolve_point_winners.py` + `tests/test_point_winners.py` (27
+tests) + `docs/point_winner_layer.md`; pure observer over the existing
+artifacts (`episode_point_map.json` + `pipeline_output.json` +
+`results_game_state.csv` + `serve_relabel.json`) — no video decode, no
+`src/` change, entreno-neutral by construction. Mechanism = fault prior over
+the terminal LIVE touch (its side loses), owner-verdict demotions excluded,
+structural-only abstains, and a projection-level GT-leakage guard (the 13
+winner-serves-derived `team_resolved` overrides are FLAGGED, never
+inherited). Validation vs the 33 dictated winners: 33/33 decided, **18/33 =
+54.5%** after the validate-only side→squad mapping. Miss taxonomy: 8
+terminal-touch attribution (the point-22 far-serve/side gap) + 3 kill/ace
+(ball-death in/out absent from every artifact) + 3 serve-team misattribution
++ 1 owner-pinned-outside-window; inheriting the GT overrides would buy 21/33
+and is explicitly not shipped. Fixed 3 test-side defects in the inherited
+untracked draft (session-42 left it unreviewed); the script reproduces
+`output/point_winners.json` + the report byte-identically. Suite **782**.
+This is an honest baseline, NOT fantasy-grade — consume it after S1–S3 so
+the terminal touch and serving side are real.)
+
+**Previous (forty-second session — **architect strategy
 review of the "detector v4 → normalise → learned gestures" generalization
 proposal; docs-only, NO `src/` change (`src/` still exactly `185c6f0`),
 suite 755.** The proposed order is NOT adopted — each step conflicts with a
@@ -277,6 +298,15 @@ implementation backlog below remains unchanged.
   late, 3 of 5 are GT receptions) — the "width-band class" attribution of
   the overrides is unverified (P1 f247 / P6 f3070 are correct-team near
   receptions: the override masks a missing serve contact).**
+- **Pass-2 winner layer SHIPPED (43rd session, open point 21.3):**
+  `scripts/resolve_point_winners.py` (+27 tests, `docs/point_winner_layer.md`)
+  — fault prior over the terminal live touch, side-letter winner, explicit
+  GT-leakage projection guard (13 winner-serves overrides flagged, never
+  inherited). 33/33 decided, **18/33 (54.5%)** vs the 33 dictated winners
+  after the validate-only side→squad mapping; 8 misses are the point-22
+  terminal-touch/far-serve attribution gap, 3 kill/ace (ball-death side not
+  in any artifact), 3 serve-team, 1 pinned-outside-window. Honest baseline;
+  consume after S1–S3. No `src/` change, no decode.
 - **Match (20260920 — the only real match):** **31/33 GT points confirmed
   (0.939)**; actions 207 (dig 84 / spike 45 / set 42 / serve 20 /
   overpass 9 / block 7) at the perception layer — the pass-2 layer
@@ -394,10 +424,13 @@ last. One mechanism per session; each step's kill criteria are pre-registered.
   Deterministic pass-2, independent of S1.
 - **S4 — 21.3 winner/outcome layer → 13 (ace / serve fault / assist) → fantasy
   module + points table (14e)**, consuming `actions_pass2` after S1–S3 so aces,
-  faults and receptions hang on real serve contacts. (Untracked
-  `scripts/resolve_point_winners.py` + `tests/test_point_winners.py` are in the
-  tree — not part of the 42nd-session review; the next session that touches
-  21.3 must decide their status.)
+  faults and receptions hang on real serve contacts. **21.3 DONE (#43)** as a
+  pass-2 script: `scripts/resolve_point_winners.py` + `tests/test_point_winners.py`
+  + `docs/point_winner_layer.md` — 33/33 decided, **18/33 (54.5%)** vs the 33
+  dictated winners; miss sources = terminal-touch attribution (8, point 22),
+  ball-death in/out (3), serve-team overrides (3); GT-bought 21/33 explicitly
+  not inherited. The remaining S4 work (13 ace/fault/assist + fantasy module)
+  still waits on S1–S3 for real serve contacts and squad letters.
 - **Round-3 owner queue (no code, unchanged):** P32's serve, 6928A's verdict,
   P18–P20 anchors, ep45's nature, P23 17159A + P31 22873A team-fix
   confirmation — each flips one flag in `serve_relabel.json` when ratified.
@@ -495,7 +528,11 @@ point number in `docs/history/`.
     n_actions + confidences + tracked fraction + serve presence; incl.
     live badge. (3) *Point winner/score layer:* pure observer — ball-death
     side + last-touch team + kill/out; validate vs all 33 dictated
-    winners; feeds aces (13). (4) *Side-switch layer:* persistent
+    winners; feeds aces (13). **[#43] SHIPPED as `scripts/resolve_point_winners.py`
+    (fault prior over the terminal touch; 33/33 decided, 18/33 vs the dictated
+    winners — 54.5%; `docs/point_winner_layer.md`). Ball-death side/in-out is
+    absent from every artifact, so kill/ace endings (3 misses) stay honest
+    fault-prior misses; 8 misses are terminal-touch attribution (→ 22).** (4) *Side-switch layer:* persistent
     all-player side flip between points (majority + serve-side evidence),
     cross-checked vs score expectation; ALL team fields become squad
     identity; overlay labels must swap; target = exactly the 4 GT switches
@@ -719,6 +756,13 @@ survive across sessions; provenance in the archives.
   `actions_pass2`), not by point census alone: "far prefix census 8/8" is
   0/5 at contact level on P1–P8 (relabeled contact 31–50 f late, outside ±15 f).
   Session 42.
+- A pass-2 point-WINNER layer speaks SIDE letters (A near / B far,
+  `CourtCalibration.get_team`), so squad scoring needs the GT/21.4 switch
+  schedule (validate-only). `serve_relabel.json`'s `team_resolved` is
+  winner-serves-derived GT: a winner layer must project it out (flag only) or
+  its honest 18/33 becomes a GT-bought 21/33. `pipeline_output.json` carries
+  no ball-death side/in-out, so kill/ace endings cannot be disambiguated from
+  artifacts alone. Session 43, `docs/point_winner_layer.md`.
 - Entreno e1–e7 are ONE recording session: a regression / byte-identity
   suite, not a match-domain validation set (held-out correct rate dev 0.276
   vs entreno 0.56–1.00; the R2 gesture tier reverses dev↔entreno). A leave-one-
@@ -849,6 +893,7 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- 2026-09-30 **#43** — open point 21.3 point winner/outcome layer SHIPPED as a pass-2 script (`scripts/resolve_point_winners.py` + 27 tests + `docs/point_winner_layer.md`; no `src/` change, no decode): fault prior over the terminal touch, 33/33 decided, **18/33 (54.5%)** vs the 33 dictated winners after the validate-only side→squad mapping; GT-serve-override inheritance (21/33) explicitly not shipped; fixed 3 test-side defects left by an unreviewed draft; suite 782.
 - 2026-09-30 **#42** — architect strategy review of the "detector v4 → normalise → learned gestures" proposal (docs-only, no `src/` change, suite 755): order NOT adopted; pass-2 far serves are 0/5 at contact level (census 8/8 was point-level); plan S0–S4 (owner P9–P33 contact GT → far-serve looming probe → side-switch layer → winner/fantasy), deferrals with triggers; proposed AGENTS.md wording pending ratification; #39 Log entry archived (Log below).
 
 - `evaluate_timed.py`'s contact F1 is CLASS-AGNOSTIC and its tolerance is a
@@ -925,6 +970,53 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+### 2026-09-30 (forty-third session) — open point 21.3 point winner/outcome layer SHIPPED as a pass-2 script (no `src/` change)
+
+**Asked:** continue open point 21.3 (the owner's match-feedback backlog item 3
+/ G1 critical path): a post-hoc point winner/outcome layer over
+`episode_point_map.json` + `serve_relabel.json` + `pipeline_output.json`, no
+video decode, no `src/` change, validated against the 33 dictated winners. A
+draft (`scripts/resolve_point_winners.py` + `tests/test_point_winners.py`)
+had been left in the tree untracked and unreviewed; the 42nd STATUS said the
+next session touching 21.3 must decide its status.
+
+**Reviewed + landed.** Mechanism: a fault prior over the terminal LIVE touch —
+the side of the last in-window pipeline action (minus the serve layer's
+owner-verdict demotions) loses the point; winner = the other COURT SIDE (A
+near / B far, the perception stack's letters). Structural-only abstains;
+doubt = `confidence: low` + flags. GT-leakage is prevented structurally by
+field projections: the map contributes `point`/`window_frames` only, the serve
+layer `team_emitted` + override FLAGS only; the 13 winner-serves-derived
+`team_resolved` overrides are never inherited (inheriting them would buy 3
+points -> 21/33, not shipped). Ball-death side/in-out is absent from every
+artifact, so kill/ace endings stay misses, not guesses; spike outcomes are
+reported as evidence only (4/10 as a rule).
+
+**Result vs the 33 dictated winners:** 33/33 decided, **18/33 correct =
+54.5%** after the `--validate`-only side->squad mapping (GT switch schedule
+[7,14,21,28]). Misses: 8 terminal-touch attribution (the same far-serve/side
+gap as point 22), 3 kill/ace (ball-death absent), 3 serve_team_misattribution
+(far serves emitted with the wrong side; pass-2 override refused), 1
+owner-pinned serve outside the window (P20 ep45 family). Full table +
+taxonomy: `docs/point_winner_layer.md` (raw run in
+`logs/point_winner_report.md`, git-ignored).
+
+**Verification.** Found and fixed 3 test-side defects in the inherited draft
+(a `None`-window fixture that could not construct; an outcome-signal fixture
+whose resolution frame sat outside its own window; a game-state death-frame
+off-by-one contradicting the file's own `test_ball_death_from_game_on_run`).
+`venv/bin/python scripts/resolve_point_winners.py --validate
+ground_truth/20260920_match_points.json` reproduces `output/point_winners.json`
+and `logs/point_winner_report.md` byte-identically; full suite **782** (755 +
+27). No `src/` edit, no decode, entreno-neutral by construction.
+
+**Verdict / next:** P2/P4/P6/P8 are exactly the 0/5 far-serve points from
+#42 — the winner layer makes the consequence explicit (its terminal touch is
+the receiver's dig). The layer is the G1 plumbing for 13 (ace / serve-fault /
+assist); it ships as an honest baseline and should be consumed only after
+S1–S3 make the terminal touch and the serving side real. The dominant miss
+class is terminal-touch attribution, not winner logic — no winner-layer
+heuristic can fix it.
 ### 2026-09-30 (forty-second session) — architect strategy review: G3 generalization plan re-ranked; far-serve CONTACT is the shared gap (docs-only, `src/` at `185c6f0`)
 
 **Asked:** an external LLM proposed that generalization pain is structural
@@ -1087,23 +1179,3 @@ collateral); R2 is parked behind its owner-gated preconditions (match-side
 per-prediction labels + clip-type-aware base rates) — the cheapest G3
 work that is NOT owner-gated is now T6 (feature sidecar).
 
-### 2026-09-29 (fortieth session) — G3 per-action evidence diagnosis (diagnose only)
-
-**Asked:** owner added G3 (action accuracy/confidence) as the top goal;
-coordinator picked the next needle-mover and delegated to GLM (pi -p),
-then reviewed. **Done:** 8 `--device cpu --diag-dump` runs (e1–e7 fresh
-under `output/g3/eN`; dev re-run byte-identical to T4). New
-`scripts/action_evidence.py` imports `evaluate_timed.match_events` and
-waterfall's FP classes; per prediction outcome + ~28 features →
-`output/g3/evidence.json`, `docs/g3_action_evidence.md` (precision tables,
-single-split separability, calibration of the hand-set confidence,
-per-clip consistency). **Result:** 85 predictions, 54 correct; confidence
-constants uncalibrated; `speed_out` < ~0.3 bw/f flags 6/14 FPs at zero
-collateral (gap 0.198→0.423 bw/f), `frames_since_prev > 90` holds all 4
-serve FPs but costs 2 correct, `track_frac_15f` monotone and
-clip-consistent. **Review fix:** delegate's first R1 used raw px/f (×1.26
-margin, dev dup/FP inside the gap, far-biased) → reworked to
-width-normalised; `SPEED_F` pinned to `ActionClassifier.CONTACT_DELAY`
-(causal at confirmation). Caveats: n=85, all 6 R1 hits on dev; entreno
-GTs have no point windows (their FPs are all `fp_in_point`). Suite 754
-(732 + 22). **Next:** owner approval of R1 before any `src/` change.

@@ -7,6 +7,27 @@
 > `status_where_we_are_archive.md` (same directory); the one-line-per-session
 > index is in STATUS.md. Nothing was edited or deleted.
 
+### 2026-09-29 (fortieth session) — G3 per-action evidence diagnosis (diagnose only)
+
+**Asked:** owner added G3 (action accuracy/confidence) as the top goal;
+coordinator picked the next needle-mover and delegated to GLM (pi -p),
+then reviewed. **Done:** 8 `--device cpu --diag-dump` runs (e1–e7 fresh
+under `output/g3/eN`; dev re-run byte-identical to T4). New
+`scripts/action_evidence.py` imports `evaluate_timed.match_events` and
+waterfall's FP classes; per prediction outcome + ~28 features →
+`output/g3/evidence.json`, `docs/g3_action_evidence.md` (precision tables,
+single-split separability, calibration of the hand-set confidence,
+per-clip consistency). **Result:** 85 predictions, 54 correct; confidence
+constants uncalibrated; `speed_out` < ~0.3 bw/f flags 6/14 FPs at zero
+collateral (gap 0.198→0.423 bw/f), `frames_since_prev > 90` holds all 4
+serve FPs but costs 2 correct, `track_frac_15f` monotone and
+clip-consistent. **Review fix:** delegate's first R1 used raw px/f (×1.26
+margin, dev dup/FP inside the gap, far-biased) → reworked to
+width-normalised; `SPEED_F` pinned to `ActionClassifier.CONTACT_DELAY`
+(causal at confirmation). Caveats: n=85, all 6 R1 hits on dev; entreno
+GTs have no point windows (their FPs are all `fp_in_point`). Suite 754
+(732 + 22). **Next:** owner approval of R1 before any `src/` change.
+
 ### 2026-09-29 (thirty-ninth session) — T5 revert: neither mechanism ships; `src/` back to `185c6f0`, A + B live in the probe harness only
 
 **What was asked:** the reviewer ruled that both T5 mechanisms recover 0/5 far
