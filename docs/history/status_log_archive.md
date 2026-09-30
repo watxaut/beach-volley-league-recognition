@@ -7,6 +7,97 @@
 > `status_where_we_are_archive.md` (same directory); the one-line-per-session
 > index is in STATUS.md. Nothing was edited or deleted.
 
+### 2026-09-30 (forty-second session) — architect strategy review: G3 generalization plan re-ranked; far-serve CONTACT is the shared gap (docs-only, `src/` at `185c6f0`)
+
+**Asked:** an external LLM proposed that generalization pain is structural
+(pixel-constant Layer 1) and prescribed detector v4 → scale-free
+normalisation → learned gestures, keeping contact triggering and the
+resolver as-is, with G1/G2 then unblocked by pass-2. The owner asked the
+tier-2 architect to challenge it against STATUS/tried-and-failed and give a
+strategy that achieves G3 and enables G1/G2. Output = decision memo; this
+entry records it.
+
+**Verified against the repo (each hinges a rejection).**
+- *Detection first:* T4 waterfall stage-1 = 0/28; detector conf 0.74–0.87 at
+  all 5 lost dev serves, ≥0.86 at every anchored match serve; no second-venue
+  footage exists and v2 was already rejected. Only the pre-contact toss is
+  absent on P4/P6/P8; even a perfect history restore (T5-B) only moved the
+  loss to `no_contact_geometry`.
+- *Normalise, then retune:* R1 already used ball-widths/frame and was refuted
+  on the held-out match (P11 f7132 at 0.285 bw/f). The far serve moves along
+  the camera axis (image-plane speed small in any unit); "retune jointly" =
+  fit 7 clips of one session. Normalisation stays worth doing as a
+  perturbation-tested invariance property (T7/T9/T10), not as a retune.
+- *Learned gestures:* labelled contacts = 91 (63 entreno + 28 dev); the 207
+  match actions are predictions. R2 (LOCO, 2 features) already failed: pooled
+  AUC 0.172 vs 0.551. The label bucket is the smallest dev loss (4/28).
+- *Keep contact triggering as-is:* wrong — contact proposal is the largest
+  loss (11/28).
+- *"G1/G2 are pass-2 and need no visual generalization":* wrong at contact
+  level — see below.
+
+**New finding (hand-checked, `output/serve_relabel.json` vs
+`ground_truth/video_ari_joan_8_first_points_annotations.json`, identity offset
+0):**
+
+| point | GT serve | pass-2 "serve" (was) | Δ frames | what the relabeled contact really is |
+|---|---:|---:|---:|---|
+| P1 | 210 | 247 (dig) | +37 | GT reception f245 (dig, team A) |
+| P2 | 880 | 930 (dig) | +50 | dev in-point-spurious dig |
+| P4 | 2154 | 2195 (dig) | +41 | dev in-point-spurious dig |
+| P6 | 3038 | 3070 (dig) | +32 | GT reception f3071 (dig, team A) |
+| P8 | 4770 | 4801 (dig) | +31 | GT reception f4800 (dig; team flag = post-switch loss) |
+
+0/5 within tolerance. So the point-level far census 8/8 (and 31 serve-typed)
+is bookkeeping: G1's ace / serve-fault / who-served and the receiver's dig
+are wrong for these points. (Match-wide 12 of 16 far serves carry a team
+override; whether P13/P15/P27, emitted as `serve`, are real serve contacts is
+unknown until S0.)
+
+**Decision (memo):** do NOT adopt the proposed order. Strategy = measure
+in-domain (S0 owner contact GT P9–P33, S0b contact-level score) → fix the
+contact proposal where the loss is (S1 diagnose-only far-serve looming probe
+with pre-registered kills; S2 owner-gated mechanism only if it survives) →
+pass-2 layers on real contacts (S3 side-switch squad layer, S4 winner →
+ace/assist → fantasy) → learn last (T12 only at ≥3 recording sessions of
+contact GT, leave-one-SESSION-out). Full S1 spec and kill criteria: *Active
+next*. Deferrals with triggers (detector v4, T6, T7, T8, T9, T10, T12, R2):
+*Active next*. Owner-side lever: pin the capture spec in
+`docs/video_recording_guide.md`.
+
+**PROPOSED `AGENTS.md` wording — NOT applied, owner ratification pending:**
+- §1 add: "Entreno e1–e7 are the regression/neutrality suite, not a
+  match-domain validation set (all seven are one session; R2 held-out correct
+  rate dev 0.276 vs entreno 0.56–1.00). A threshold or model fit on dev
+  P1–P8 ships only after it holds on data it was not fit on — contact-level
+  match GT P9–P33 once dictated."
+- §6 append: "Pass-2 layers are scored at CONTACT level (`evaluate_timed.py`
+  on `actions_pass2`), not only by point census: far census 8/8 is 0/5 at
+  contact level on P1–P8, three being GT receptions relabeled as serves."
+- new §7: "Learned heads (plan T12) wait for contact GT spanning ≥3 recording
+  sessions; validation is leave-one-SESSION-out (e1–e7 = one fold)."
+- Also pending: `docs/action_reliability_plan.md` (T11's first instance =
+  S1; T6/T7/T9/T10/T12 triggers) and a `ground_truth/README.md` line for the
+  P9–P33 contact file when it lands.
+
+**Uncertainties recorded by the architect:** 5 dev positives make the S1 gap
+fragile (how R1 died); width noise at 13–17 px is ~±7%/px and the expected
+growth over 0.5 s depends on an unmeasured camera distance; dead-time
+throw-backs may loom like a serve (point 14a refuted a crossing-based serve
+detector on practice footage) — hence the secondary feature is declared
+before any held-out look; emission latency ≈ 0.5 s + `CONTACT_DELAY` (causal,
+needs a live-debug check); if S1 kill 1 fires the detector-mining lever wins,
+narrowly and targeted. P8's letter/side convention in `serve_relabel.json`
+(expected B far vs GT serve team A after the switch) was NOT resolved here —
+check when S3 lands.
+
+**Housekeeping:** the 39th-session Log entry moved VERBATIM to
+`docs/history/status_log_archive.md`. No code, GT, or `AGENTS.md` edits.
+Suite unchanged (755).
+
+**Next:** owner: S0 (P9–P33 contact dictation) + capture-spec doc + ratify
+the AGENTS.md wording; worker: S0b, then S1 (one session each).
+
 ### 2026-09-30 (forty-first session) — G3 R1 departure gate: full validation cycle; REFUTED on the held-out match; parked T5-style (`src/` back at `185c6f0`)
 
 **Asked:** continue session 40's uncommitted R1 work (the owner-approved

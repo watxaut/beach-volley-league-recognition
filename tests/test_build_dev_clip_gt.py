@@ -417,24 +417,180 @@ def test_owner_contacts_file_parses_end_to_end():
     assert sum(1 for e in events if e["player_id"] is None) == 8
 
 
-def test_owner_contacts_p9_p33_dialect_is_not_parsed_yet():
-    """Session 46 state: the headers parse, the dialect-B contact lines do not.
+# --- dialect B (owner P9-P33 dictation, G0) --------------------------------
 
-    G0 (the next worker task) extends `parse_contact_gt` for dialect B; when it
-    lands, THIS test is the thing that must change, and it should change to
-    "every P9-P33 point has contacts" -- not to a smaller number.
-    """
+#: contacts per point P9..P33 as dictated (2026-09-30); 211 contacts total
+#: with P1-P8.  When the owner appends more contacts, this list is updated
+#: deliberately, never loosened.
+P9_P33_COUNTS = [2, 12, 6, 1, 4, 4, 4, 8, 2, 16, 18, 1, 5, 9, 7, 7, 18, 11,
+                 4, 4, 6, 19, 10, 1, 4]
+
+
+def test_owner_contacts_p9_p33_all_points_parsed():
+    """G0: every P9-P33 point is machine-readable (dialect B)."""
     doc = mod.parse_contact_gt(str(_CONTACTS_TXT))
-    late = [p for p in doc["points"] if p["point"] >= 9]
-    assert late, "P9-P33 headers must be found"
-    assert {p["point"] for p in late} == set(range(9, 34))
+    pts = {p["point"]: p for p in doc["points"]}
+    assert sorted(pts) == list(range(1, 34))
+    # the duplicated empty "Point 21" header is merged, not emitted twice
+    assert [p["point"] for p in doc["points"]].count(21) == 1
+    assert [len(pts[k]["contacts"]) for k in range(9, 34)] == P9_P33_COUNTS
+    assert sum(len(p["contacts"]) for p in doc["points"]) == 211
     # all four side switches (after P7/14/21/28) are read
     assert [p["point"] for p in doc["points"] if p["side_switch_after"]] == [7, 14,
                                                                              21, 28]
-    # ...but no contact of P9+ is machine-readable yet
-    assert sum(len(p["contacts"]) for p in late) == 0
-    # the duplicated "Point 21" header the owner's dictation contains
-    assert [p["point"] for p in doc["points"]].count(21) == 2
+
+
+def test_dialect_b_regression_p1_p8_unchanged():
+    """P1-P8 dialect-A contacts are byte-identical to the committed dev GT.
+
+    Only `raw_line_no` is excluded: the owner added 3 header lines to the txt
+    after the committed dev GT was built, so physical line numbers shifted by
+    +3 while every owner field is unchanged.
+    """
+    doc = mod.parse_contact_gt(str(_CONTACTS_TXT))
+    pts = {p["point"]: p for p in doc["points"]}
+    gt = json.loads((ROOT / "ground_truth" /
+                     "video_ari_joan_8_first_points_annotations.json").read_text())
+    n = 0
+    for pd in gt["points"]:
+        cur = pts[pd["point"]]["contacts"]
+        assert len(cur) == len(pd["owner_contacts"])
+        for a, b in zip(cur, pd["owner_contacts"]):
+            a2 = {k: v for k, v in a.items() if k != "raw_line_no"}
+            b2 = {k: v for k, v in b.items() if k != "raw_line_no"}
+            assert a2 == b2, f"P{pd['point']} contact drifted from the dev GT"
+            n += 1
+    assert n == 28
+
+
+def test_side_switch_parity_maps_squads():
+    """4 switches return `near` to Team A (P29) -- parity, not last-switch."""
+    assert mod._side_to_team("near", 0) == "A"
+    assert mod._side_to_team("near", 1) == "B"
+    assert mod._side_to_team("near", 2) == "A"
+    assert mod._side_to_team("far", 3) == "A"
+    assert mod._side_to_team("far", 4) == "B"
+    doc = mod.parse_contact_gt(str(_CONTACTS_TXT))
+    pts = {p["point"]: p for p in doc["points"]}
+    for k in (8, 14, 22, 28):       # odd switches: near = B
+        assert all(c["team"] == ("B" if c["side"] == "near" else "A")
+                   for c in pts[k]["contacts"])
+    for k in (15, 21, 29, 33):      # even switches: near = A
+        assert all(c["team"] == ("A" if c["side"] == "near" else "B")
+                   for c in pts[k]["contacts"])
+
+
+def test_dialect_b_shapes_are_transcribed(tmp_path):
+    doc = _contacts(tmp_path, """
+Point 8
+From now on NT -> Near Team
+FT -> Far Team
+Point 9
+NT serve f5496 P3 (attributed as a spike)
+f5530 FT P4 returns it on first touch, goes wide outside court
+Point 10
+FT bump set f6104 (player not tracked)
+NT dig f6166 missatributed to P2, but its P4
+FT poke on second touch f6320
+NT dig 20951
+FT set 13709 - a person passes in front of the camera
+NT dig (occluded and attributed wrong) f16078
+NT set that overpasses f7320 and scores the point
+FT spike hard f20080
+""")
+    pts = {p["point"]: p for p in doc["points"]}
+    cs = pts[9]["contacts"]
+    assert len(cs) == 2
+    # NT abbreviation -> near; player id AFTER the frame; parenthetical note
+    assert cs[0]["side"] == "near" and cs[0]["side_word"] == "nt"
+    assert cs[0]["action"] == "serve" and cs[0]["player_id"] == 3
+    assert cs[0]["note"] == "(attributed as a spike)"
+    # frame-first form: f5530 FT P4 returns ... -> dig on the far side
+    # (no Side switch in this fixture, so far = Team B at match start)
+    assert cs[1]["match_frame"] == 5530 and cs[1]["action"] == "dig"
+    assert cs[1]["player_id"] == 4 and cs[1]["team"] == "B"
+    c = pts[10]["contacts"]
+    # "bump set" is a set ("bump pass" is an overpass)
+    assert c[0]["action"] == "set" and c[0]["note"] == "(player not tracked)"
+    # "missatributed to P2, but its P4": the TRUE id is P4, kept verbatim
+    assert c[1]["player_id"] == 4 and "but its P4" in c[1]["note"]
+    # poke = soft attack (pipeline spike/touch); the touch counter stays a note
+    assert c[2]["action"] == "spike" and c[2]["spike_type"] == "touch"
+    assert c[2]["note"] == "on second touch"
+    # missing `f` prefix (bare frame)
+    assert c[3]["match_frame"] == 20951 and c[3]["action"] == "dig"
+    assert c[4]["match_frame"] == 13709 and c[4]["action"] == "set"
+    assert c[4]["note"] == "a person passes in front of the camera"
+    # parenthetical BEFORE the frame survives verbatim as the note
+    assert c[5]["note"] == "(occluded and attributed wrong)"
+    # owner's blanket rule: "All actions that overpass label as overpass"
+    assert c[6]["action"] == "overpass" and c[6]["gesture"] == "set"
+    assert c[6]["owner_interpretation_flag"]["owner_ratified"] is True
+    # "hard" is the owner's word for a hard spike
+    assert c[7]["action"] == "spike" and c[7]["spike_type"] == "hard"
+    # the legend lines are notes, never contacts
+    assert any("Near Team" in n["line"] for n in doc["notes"])
+
+
+def test_dialect_b_wrapped_line_and_prose_not_contacts():
+    doc = mod.parse_contact_gt(str(_CONTACTS_TXT))
+    pts = {p["point"]: p for p in doc["points"]}
+    # P20: the parenthetical wraps across two physical lines; joined verbatim
+    p20 = pts[20]["contacts"]
+    assert len(p20) == 1 and p20[0]["match_frame"] == 14518
+    assert "there are two serves) and goes wide" in p20[0]["note"]
+    assert p20[0]["error"] == {"type": mod.ERROR_SERVE_OUT}
+    # P15 f10180 is prose (open point 25): it must NOT become a dig contact
+    assert {c["match_frame"] for c in pts[15]["contacts"]} == {10044, 10072,
+                                                               10110, 10158}
+    assert not any(c["match_frame"] == 10180 for p in doc["points"]
+                   for c in p["contacts"])
+    # the P18 prose block stayed prose too
+    assert any("engine to decide" in n["line"] for n in doc["notes"])
+
+
+def test_dialect_b_malformed_vs_prose(tmp_path):
+    doc = _contacts(tmp_path, "Point 1\n"
+                              "NT dig no frame here\n"
+                              "FT -> Far Team\n"
+                              "NT flurbles f10\n")
+    # an action with no frame is a malformed contact -> unparsed
+    assert any("without any f<frame>" in u["reason"] for u in doc["unparsed"])
+    # a side word with neither action nor frame is prose -> a note
+    assert any("-> Far Team" in n["line"] for n in doc["notes"])
+    # side + frame + NO action and no touch wording: malformed, NOT an
+    # unlabelled contact (only the owner's explicit "touches" earns that)
+    assert any("no known action" in u["reason"] for u in doc["unparsed"])
+    assert doc["points"][0]["contacts"] == []
+
+
+def test_dialect_b_unknown_touch_without_inventing_a_label():
+    doc = mod.parse_contact_gt(str(_CONTACTS_TXT))
+    pts = {p["point"]: p for p in doc["points"]}
+    c = next(c for c in pts[30]["contacts"] if c["match_frame"] == 23545)
+    assert c["action"] is None and c["owner_action_unspecified"] is True
+    assert c["team"] == "A" and c["player_id"] is None
+    assert c["note"] == "touches ball but falls to ground near team loses point"
+
+
+def test_owner_file_lines_are_all_accounted_for():
+    """No owner line is silently dropped: every content line is a header,
+    switch, contact, note or unparsed entry."""
+    path = str(_CONTACTS_TXT)
+    logical = mod._join_continuations(
+        Path(path).read_text(encoding="utf-8").splitlines())
+    doc = mod.parse_contact_gt(path)
+    n_headers = sum(1 for _ln, raw in logical
+                    if mod._CONTACT_POINT_RE.match(raw.strip()))
+    n_switch = sum(1 for _ln, raw in logical
+                   if mod._CONTACT_SWITCH_RE.match(raw.strip()))
+    n_contacts = sum(len(p["contacts"]) for p in doc["points"])
+    n_blank_comment = sum(1 for _ln, raw in logical
+                          if not raw.strip() or raw.strip().startswith("#"))
+    assert n_headers == 34            # P1..P33 + the duplicated empty P21
+    assert n_switch == 4
+    assert (n_contacts + n_headers + n_switch + len(doc["notes"])
+            + len(doc["unparsed"]) + n_blank_comment) == len(logical)
 
 
 # --- touch_number: per-POSSESSION, not rally-global -----------------------

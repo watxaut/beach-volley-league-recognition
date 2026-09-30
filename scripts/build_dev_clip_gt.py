@@ -284,14 +284,24 @@ def match_to_clip(offset_map: Dict[str, Any], match_frame: int) -> Optional[int]
 
 # --- contact-level GT parser (owner-dictated, coarse frames) --------------
 #
-# File format (ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt):
-#     <side> team|side P<k> <action> at f<frame>[  <- verbatim owner note]
+# File format (ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt), now
+# carrying the WHOLE match P1..P33 in TWO owner dialects:
+#
+#   dialect A (P1..P8, owner 2026-09-28):
+#       <side> team|side P<k> <action> at f<frame>[  <- verbatim owner note]
+#   dialect B (P9..P33, owner 2026-09-30, documented in ground_truth/README):
+#       NT|FT <action> [<frame> [P<k>]][ <- owner note]   (NT = near, FT = far)
+#       f|bare <frame> NT|FT ...                          (frame-first form)
+#       "FT is close to a dig in f10180 ..." is PROSE, not a contact (open
+#       point 25: the owner says that ball must NOT count as a dig).
+#
 # with `side` in {near, far} = the court half the player stood on at the
 # moment of the contact, "near = Team A at match start, far = Team B at match
-# start" and a `Side switch (near team now is far team)` marker line inverting
-# that mapping for every LATER point. The player number is the PIPELINE TRACK
-# id valid at the contact frame (the owner changes it when the track is lost),
-# and it is OPTIONAL — several dictated contacts name no player at all.
+# start" and `Side switch (near team now is far team)` marker lines inverting
+# that mapping for the LATER points (parity matters — see _side_to_team). The
+# player number is the PIPELINE TRACK id valid at the contact frame (the owner
+# changes it when the track is lost), and it is OPTIONAL — several dictated
+# contacts name no player at all.
 
 _CONTACT_POINT_RE = re.compile(r"^\s*Point\s+(\d+)\s*$", re.I)
 _CONTACT_SWITCH_RE = re.compile(r"^\s*side\s+switch\b\s*(\(.*\))?\s*$", re.I)
@@ -299,14 +309,38 @@ _CONTACT_SIDE_RE = re.compile(r"^\s*(near|far)\s+(team|side)\b(.*)$", re.I)
 _CONTACT_FRAME_RE = re.compile(r"\bf\s*(\d+)\b", re.I)
 _CONTACT_PLAYER_RE = re.compile(r"\bP\s*(\d+)\b")
 
+# --- dialect B: the owner's P9+ notation (appended 2026-09-30) -------------
+# Separate grammar so the P1..P8 dialect-A output stays byte-identical.
+_CONTACT_SIDE_B_RE = re.compile(r"^\s*(NT|FT)\b(.*)$", re.I)
+_CONTACT_FRAME_FIRST_B_RE = re.compile(r"^\s*f?\s*(\d{2,6})\s+(NT|FT)\b(.*)$", re.I)
+_CONTACT_BARE_FRAME_RE = re.compile(r"(?<!\w)(\d{2,6})(?!\w)")
+_BUMP_SET_RE = re.compile(r"\bbump\w*\s+sets?\b", re.I)
+_BUMP_PASS_RE = re.compile(r"\bbump\w*\s+pass(?:es|ing|ed)?\s*(?:the\s+)?(?:ball\b)?",
+                           re.I)
+#: words that may legitimately sit between the side abbreviation and the verb
+#: ("upper hand dig", "over hand dig", "hard spike") — anything ELSE in that
+#: slot means the side word started a prose sentence, not a contact.
+_DIALECT_B_MODIFIERS = {"upper", "over", "hand", "overhand", "hard",
+                        "accelerated", "rainbow", "low", "high"}
+_CONTACT_BUT_ITS_RE = re.compile(r"\bbut\s+its?\s+P\s*(\d+)\b", re.I)
+_CONTACT_ATTRIB_PREFIX_RE = re.compile(r"(?:missatr\w*|attribut\w*)\s+(?:to\s+)?$",
+                                       re.I)
+#: a side+frame line with NO action keyword is only accepted as a contact when
+#: the owner's wording says it was a touch (P30 f23545); anything else is a
+#: malformed line, not an excuse to emit an unlabelled contact.
+_CONTACT_UNSPECIFIED_TOUCH_RE = re.compile(r"\btouch\w*\b", re.I)
+
 # First occurrence in the line wins (the owner writes the dominant gesture
 # first: "set f3131 overpasses" -> set, "bump overpass at f1543" -> overpass).
+# Dialect B adds the owner's attack variants: `poke` is the soft attack the
+# pipeline scores as a spike, and `returns` a serve reception -> dig.
 _CONTACT_ACTIONS: Tuple[Tuple[str, re.Pattern], ...] = (
     ("serve", re.compile(r"\bserves?\b|\bserving\b", re.I)),
-    ("dig", re.compile(r"\bdigs?\b|\bdigging\b|\bdigged\b", re.I)),
+    ("dig", re.compile(r"\bdigs?\b|\bdigging\b|\bdigged\b|\breturns?\b", re.I)),
     ("set", re.compile(r"\bsets?\b|\bsetting\b", re.I)),
     ("overpass", re.compile(r"\boverpass\w*\b|\bbump\w*\b", re.I)),
-    ("spike", re.compile(r"\bspikes?\b|\bspiking\b|\bspiked\b", re.I)),
+    ("spike", re.compile(r"\bspikes?\b|\bspiking\b|\bspiked\b|\bpokes?\b|\bpoked\b",
+                          re.I)),
 )
 # "overpass/bump" is ONE action in the owner's vocabulary; the pipeline label
 # for a bump pass is `overpass`.
@@ -316,8 +350,18 @@ _CONTACT_SERVE_WIDE_RE = re.compile(r"\bwide\b|\bout of bounds?\b|\boutside\b", 
 _CONTACT_SERVE_NET_RE = re.compile(r"\b(into|in) the net\b", re.I)
 _CONTACT_SET_SLIP_RE = re.compile(r"\bslip\w*\b|\bfalls? (off )?the hands?\b|\bloses point\b",
                                   re.I)
-_CONTACT_ACCEL_RE = re.compile(r"\baccelerated\b|\bacceleration\b|\bdriven\b", re.I)
-_CONTACT_SCORES_RE = re.compile(r"\bscores\b", re.I)
+_CONTACT_ACCEL_RE = re.compile(r"\baccelerated\b|\bacceleration\b|\bdriven\b|\bhard\b",
+                               re.I)
+#: owner wording for a SOFT attack (pipeline spike_type `touch`). Deliberately
+#: requires `poke` or the bigram "spike touch": a bare "touch" is also the
+#: owner's possession counter ("poke on second touch") and a verb ("touches
+#: ball"), so it must not be read as intensity on its own.
+_CONTACT_SOFT_RE = re.compile(r"\bpoke\w*\b|\bspikes?\s+touch\b|\brainbow\b", re.I)
+#: owner wording that states a spike went OUT (never inferred from the score).
+_CONTACT_SPIKE_OUT_RE = re.compile(
+    r"\bwide\b|\bout of (the )?court\b|\bout of bounds?\b|\boutside\b|"
+    r"\bloses? (the )?point\b|\bloses? match\b", re.I)
+_CONTACT_SCORES_RE = re.compile(r"\bscores\b|\bwins? (the )?point\b", re.I)
 # "set f3131 overpasses" / "dig bump overpass at f1543": the line names a
 # set/dig GESTURE and states the ball was sent OVER. In the pipeline taxonomy
 # (src/recognition ActionContextResolver) a ball sent over without an attack is
@@ -352,6 +396,18 @@ OWNER_RATIFICATIONS = {
     },
 }
 
+# The owner's own blanket rule, stated verbatim in the footer of the contact
+# dictation (2026-09-30): "All actions that overpass label as overpass".
+# It ratifies every dialect-B overpass flag without inventing anything; a
+# point/frame-specific OWNER_RATIFICATIONS row (like P6 f3131) still wins.
+OVERPASS_CONVENTION = {
+    "owner_ratified": True,
+    "date": "2026-09-30",
+    "statement": "All actions that overpass label as overpass",
+    "source": "owner footer, "
+              "ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt",
+}
+
 
 def _ratification(point: Optional[int], frame: Optional[int],
                   gesture: Optional[str]) -> Optional[Dict[str, Any]]:
@@ -364,13 +420,16 @@ def _ratification(point: Optional[int], frame: Optional[int],
 
 def _contact_interpretation(action: str, token: str, remainder: str,
                             raw: str, point: Optional[int] = None,
-                            frame: Optional[int] = None
+                            frame: Optional[int] = None,
+                            dialect: str = "A"
                             ) -> Tuple[str, Optional[str], Optional[Dict[str, Any]]]:
     """(final_action, gesture, owner_interpretation_flag) for one contact line.
 
     A set/dig keyword co-occurring with "overpass" wording is a cross-net send
     without an attack => `overpass`, with the keyword kept as the gesture.
-    Everything else is returned unchanged.
+    Everything else is returned unchanged. Dialect-B flags are ratified by the
+    owner's blanket footer rule (OVERPASS_CONVENTION) unless a specific
+    OWNER_RATIFICATIONS row applies.
     """
     if not _CONTACT_OVERPASS_RE.search(remainder or ""):
         return action, None, None
@@ -388,6 +447,8 @@ def _contact_interpretation(action: str, token: str, remainder: str,
             "gesture": gesture,
             "why": OVERPASS_FLAG_TEMPLATE.format(gesture=gesture, raw=raw)}
     rat = _ratification(point, frame, gesture)
+    if rat is None and dialect == "B":
+        rat = OVERPASS_CONVENTION
     if rat is not None:
         flag["owner_ratified"] = True
         flag["owner_ratification_date"] = rat["date"]
@@ -433,56 +494,287 @@ def _contact_error(action: str, note: str) -> Optional[Dict[str, Any]]:
 
 
 def _contact_outcome(action: str, note: str) -> Optional[str]:
-    """Spike outcome only when the dictation states it ("scores" / into net)."""
+    """Spike outcome only when the dictation states it.
+
+    "into the net" and the owner's out-of-court wording ("goes wide", "out of
+    court", "loses point") are STATED outcomes, never inferred from the score;
+    anything the dictation does not state stays None.
+    """
     if action != "spike":
         return None
-    if _CONTACT_SERVE_NET_RE.search(note or ""):
+    n = note or ""
+    if _CONTACT_SERVE_NET_RE.search(n):
         return "out"
-    if _CONTACT_SCORES_RE.search(note or ""):
+    if _CONTACT_SCORES_RE.search(n):
         return "kill"
+    if _CONTACT_SPIKE_OUT_RE.search(n):
+        return "out"
     return None
 
 
+# --- dialect-B line grammar -------------------------------------------------
+
+def _join_continuations(raw_lines: Sequence[str]) -> List[Tuple[int, str]]:
+    """Physical lines -> logical lines, joining the owner's line wraps.
+
+    The owner's P20 dictation wraps inside a parenthetical across two physical
+    lines (an unbalanced '(' at the end of one); joining while parens are
+    unbalanced is the only wrap shape in the file, checked by
+    tests/test_build_dev_clip_gt.py.
+    """
+    out: List[Tuple[int, str]] = []
+    for i, raw in enumerate(raw_lines, start=1):
+        if out and out[-1][1].count("(") > out[-1][1].count(")"):
+            out[-1] = (out[-1][0], out[-1][1].rstrip() + " " + raw.strip())
+        else:
+            out.append((i, raw))
+    return out
+
+
+def _paren_intervals(text: str) -> List[Tuple[int, int]]:
+    """Character intervals INSIDE parentheses — kept verbatim, never stripped."""
+    spans: List[Tuple[int, int]] = []
+    depth = start = 0
+    for i, ch in enumerate(text):
+        if ch == "(":
+            if depth == 0:
+                start = i + 1
+            depth += 1
+        elif ch == ")" and depth:
+            depth -= 1
+            if depth == 0:
+                spans.append((start, i))
+    if depth:                       # unbalanced: protect the rest
+        spans.append((start, len(text)))
+    return spans
+
+
+def _span_inside(spans: Sequence[Tuple[int, int]], span: Tuple[int, int]) -> bool:
+    a, b = span
+    return any(s < b and a < e for s, e in spans)
+
+
+def _blank_spans(text: str, spans: Sequence[Tuple[int, int]]) -> str:
+    chars = list(text)
+    for a, b in spans:
+        for i in range(max(0, a), min(b, len(chars))):
+            chars[i] = " "
+    return "".join(chars)
+
+
+def _span_adjacent(a: Tuple[int, int], b: Tuple[int, int], text: str) -> bool:
+    lo, hi = (a[1], b[0]) if a[1] <= b[0] else (b[1], a[0])
+    return text[lo:hi].strip() == ""
+
+
+def _dialect_b_action(body: str) -> Optional[Tuple[str, str, Tuple[int, int]]]:
+    """(canonical action, verbatim token, span) for one dialect-B line body.
+
+    "bump set" is a SET (the bump names the technique); "bump pass(es)" is an
+    OVERPASS; otherwise the earliest action keyword wins, exactly as in
+    dialect A.
+    """
+    m = _BUMP_SET_RE.search(body)
+    if m:
+        return "set", m.group(0).lower(), m.span()
+    m = _BUMP_PASS_RE.search(body)
+    if m:
+        return "overpass", m.group(0).lower(), m.span()
+    best: Optional[Tuple[int, str, str, Tuple[int, int]]] = None
+    for action, rx in _CONTACT_ACTIONS:
+        mm = rx.search(body)
+        if mm and (best is None or mm.start() < best[0]):
+            token = mm.group(0).lower().strip()
+            best = (mm.start(), action, token, mm.span())
+    if best is None:
+        return None
+    _, action, token, span = best
+    return _CONTACT_ALIASES.get(token, action), token, span
+
+
+def _dialect_b_player(body: str) -> Tuple[Optional[int], Optional[Tuple[int, int]]]:
+    """(track id, span-to-strip) for one dialect-B body.
+
+    The owner corrects a mis-attribution inside the note ("missatributed to P2,
+    but its P4"): the TRUE track id is the one after "but its", and the whole
+    correction stays verbatim in the note (span None). A P<k> inside an
+    attribution clause ("to P2") is the pipeline's WRONG id, never the GT.
+    """
+    m = _CONTACT_BUT_ITS_RE.search(body)
+    if m:
+        return int(m.group(1)), None
+    for pm in _CONTACT_PLAYER_RE.finditer(body):
+        if _CONTACT_ATTRIB_PREFIX_RE.search(body[:pm.start()][-40:]):
+            continue
+        return int(pm.group(1)), pm.span()
+    return None, None
+
+
+def _dialect_b_note(body: str, spans: Sequence[Tuple[int, int]]) -> Optional[str]:
+    """Owner note = the body with the structural tokens blanked.
+
+    Parenthetical text is protected by the caller (it is never in `spans`), so
+    every owner parenthetical survives verbatim; only whitespace and leading /
+    trailing connective punctuation are normalised.
+    """
+    text = _blank_spans(body, spans)
+    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"^(?:it|and|that|at)\s+", "", text, flags=re.I)
+    return text.strip(" ,;:->") or None
+
+
+def _dialect_b_contact(side_word: str, body: str, raw: str, line_no: int,
+                       point: int, switches_before: int,
+                       explicit_frame: Optional[int] = None
+                       ) -> Tuple[Optional[Dict[str, Any]], Optional[str], str]:
+    """One dialect-B line -> (contact, reason, kind), kind in {note, unparsed}.
+
+    contact=None means the line was refused: `kind` says whether it is owner
+    prose (a note, deliberately not a contact — e.g. P15 f10180, open point 25)
+    or a malformed contact line.
+    """
+    side = "near" if side_word.upper() == "NT" else "far"
+    action = _dialect_b_action(body)
+    if action is not None:
+        # the action must sit in the structural slot; only the known technique
+        # modifiers may precede it. "FT is close to a dig in f10180 ..." fails
+        # here on "is" and is kept as a note (never a dig contact).
+        pre = re.sub(r"^\s*P\s*\d+\b", " ", body[:action[2][0]])
+        words = re.findall(r"[A-Za-z]+", pre)
+        if any(w.lower() not in _DIALECT_B_MODIFIERS for w in words):
+            return None, ("side word followed by a sentence, not a contact "
+                          "(owner prose)"), "note"
+    frames = [int(x) for x in _CONTACT_FRAME_RE.findall(body)]
+    if explicit_frame is not None:
+        frames = [explicit_frame] + [f for f in frames if f != explicit_frame]
+    bare_span: Optional[Tuple[int, int]] = None
+    if not frames:
+        bm = _CONTACT_BARE_FRAME_RE.search(body)
+        if bm:
+            frames, bare_span = [int(bm.group(1))], bm.span()
+    if action is None and not frames:
+        return None, "owner prose (no action and no frame)", "note"
+    if not frames:
+        return None, "contact line without any f<frame>", "unparsed"
+    if action is None and not _CONTACT_UNSPECIFIED_TOUCH_RE.search(body):
+        return None, "contact line with no known action", "unparsed"
+
+    final_action: Optional[str] = None
+    gesture: Optional[str] = None
+    flag: Optional[Dict[str, Any]] = None
+    action_span: Optional[Tuple[int, int]] = None
+    action_token: Optional[str] = None
+    if action is not None:
+        final_action, action_token, action_span = action
+        final_action, gesture, flag = _contact_interpretation(
+            final_action, action_token or "", body, raw.strip(),
+            point=point, frame=frames[0], dialect="B")
+    player_id, player_span = _dialect_b_player(body)
+
+    protected = _paren_intervals(body)
+    remove: List[Tuple[int, int]] = []
+
+    def _rm(span: Optional[Tuple[int, int]]) -> None:
+        if span and not _span_inside(protected, span) and span not in remove:
+            remove.append(span)
+
+    _rm(action_span)
+    for fm in _CONTACT_FRAME_RE.finditer(body):
+        _rm(fm.span())
+        if player_span and _span_adjacent(player_span, fm.span(), body):
+            _rm(player_span)
+    _rm(bare_span)
+    if action_span is not None and player_span and \
+            _span_adjacent(player_span, action_span, body):
+        _rm(player_span)
+    note = _dialect_b_note(body, remove)
+
+    contact: Dict[str, Any] = {
+        "point": point,
+        "side": side,
+        "side_word": side_word.lower(),
+        "team": _side_to_team(side, switches_before),
+        "player_id": player_id,
+        "action": final_action,
+        "action_token": action_token,
+        "gesture": gesture,
+        "owner_interpretation_flag": flag,
+        "match_frame": frames[0],
+        "extra_match_frames": frames[1:],
+        "note": note,
+        "frame_tolerance": CONTACT_FRAME_TOLERANCE,
+        "spike_type": ("hard" if final_action == "spike"
+                       and _CONTACT_ACCEL_RE.search(body)
+                       else "touch" if final_action == "spike"
+                       and _CONTACT_SOFT_RE.search(body) else None),
+        "outcome": _contact_outcome(final_action, body),
+        "error": _contact_error(final_action, body),
+        "raw": raw.strip(),
+        "raw_line_no": line_no,
+    }
+    if final_action is None:
+        # the owner described a touch without naming an action (P30 f23545);
+        # the contact is still GT, the label is honestly left unspecified
+        contact["owner_action_unspecified"] = True
+    return contact, None, "contact"
+
+
 def parse_contact_gt(path: str) -> Dict[str, Any]:
-    """Parse the owner-dictated contact-level GT txt.
+    """Parse the owner-dictated contact-level GT txt (dialects A and B).
 
     Returns
         {"path", "frame_tolerance", "points": [{"point", "side_switch_after",
-         "contacts": [...]}], "unparsed": [{"line", "line_no", "reason"}]}
+         "contacts": [...]}], "unparsed": [{"line", "line_no", "reason"}],
+         "notes": [{"line", "line_no", "reason"}]}
 
     Contacts carry the OWNER fields verbatim (side word, optional track id,
     free-text note, every frame the line mentions) alongside the derived
     team/action. Frames are MATCH frames (same numbering as the serve anchors).
+    `unparsed` is for malformed/contact-like lines; `notes` collects the
+    owner's prose (legend, note blocks, sentences that merely start with a side
+    word) so nothing is silently dropped.
     """
     raw_lines = Path(path).read_text(encoding="utf-8").splitlines()
+    logical = _join_continuations(raw_lines)
     points: List[Dict[str, Any]] = []
     unparsed: List[Dict[str, Any]] = []
+    notes: List[Dict[str, Any]] = []
     cur: Optional[Dict[str, Any]] = None
-    switch_after: Optional[int] = None
-    seen_points = False
+    switches = 0
 
-    for line_no, raw in enumerate(raw_lines, start=1):
+    def _record(raw: str, line_no: int, reason: str, kind: str) -> None:
+        entry = {"line": raw, "line_no": line_no, "reason": reason}
+        (notes if kind == "note" else unparsed).append(entry)
+
+    for line_no, raw in logical:
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
         m = _CONTACT_POINT_RE.match(line)
         if m:
-            seen_points = True
-            cur = {"point": int(m.group(1)), "side_switch_after": False, "contacts": []}
+            k = int(m.group(1))
+            if cur is not None and cur["point"] == k and not cur["contacts"]:
+                # the dictation carries a duplicated empty "Point 21" header:
+                # re-open the same point instead of emitting it twice
+                continue
+            cur = {"point": k, "side_switch_after": False, "contacts": []}
             points.append(cur)
             continue
         m = _CONTACT_SWITCH_RE.match(line)
         if m:
             # the marker closes the point it follows: every LATER point is
-            # played on switched halves
+            # played on switched halves (parity — see _side_to_team)
             if cur is not None:
                 cur["side_switch_after"] = True
-                switch_after = cur["point"]
-            else:
-                switch_after = 0
+            switches += 1
+            continue
+        if cur is None:
+            _record(raw, line_no,
+                    "before the first 'Point <k>' header (verbatim preamble)",
+                    "unparsed")
             continue
         m = _CONTACT_SIDE_RE.match(line)
-        if m and cur is not None:
+        if m:
             side = m.group(1).lower()
             remainder = m.group(3).strip()
             frames = [int(x) for x in _CONTACT_FRAME_RE.findall(remainder)]
@@ -491,25 +783,22 @@ def parse_contact_gt(path: str) -> Dict[str, Any]:
                                  "reason": "contact line without any f<frame>"})
                 continue
             action, token = _contact_action(remainder)
-            final_action, gesture, flag = (None, None, None)
-            if action is not None:
-                final_action, gesture, flag = _contact_interpretation(
-                    action, token or "", remainder, raw.strip(),
-                    point=cur["point"], frame=frames[0])
             if action is None:
                 unparsed.append({"line": raw, "line_no": line_no,
                                  "reason": "contact line with no known action"})
                 continue
+            final_action, gesture, flag = _contact_interpretation(
+                action, token or "", remainder, raw.strip(),
+                point=cur["point"], frame=frames[0])
             pm = _CONTACT_PLAYER_RE.search(remainder)
             # note = the free text AFTER the first dictated frame
             tail = remainder[_CONTACT_FRAME_RE.search(remainder).end():]
             note = tail.strip(" ,->:;")
-            team = _side_to_team(side, switch_after, cur["point"])
             contact = {
                 "point": cur["point"],
                 "side": side,
                 "side_word": f"{m.group(1).lower()} {m.group(2).lower()}",
-                "team": team,
+                "team": _side_to_team(side, switches),
                 "player_id": int(pm.group(1)) if pm else None,
                 "action": final_action,
                 "action_token": token,
@@ -523,7 +812,9 @@ def parse_contact_gt(path: str) -> Dict[str, Any]:
                 # ("spike accelerated into the net f345"), so the whole line
                 # body is classified, not just the trailing note.
                 "spike_type": ("hard" if final_action == "spike"
-                               and _CONTACT_ACCEL_RE.search(remainder) else None),
+                               and _CONTACT_ACCEL_RE.search(remainder)
+                               else "touch" if final_action == "spike"
+                               and _CONTACT_SOFT_RE.search(remainder) else None),
                 "outcome": _contact_outcome(final_action, remainder),
                 "error": _contact_error(final_action, remainder),
                 "raw": raw.strip(),
@@ -531,14 +822,29 @@ def parse_contact_gt(path: str) -> Dict[str, Any]:
             }
             cur["contacts"].append(contact)
             continue
-        unparsed.append({
-            "line": raw, "line_no": line_no,
-            "reason": "before the first 'Point <k>' header (verbatim preamble)"
-                      if not seen_points else "not a point header / switch / contact line",
-        })
+        m = _CONTACT_SIDE_B_RE.match(line)
+        if m:
+            contact, reason, kind = _dialect_b_contact(
+                m.group(1), m.group(2).strip(), raw, line_no, cur["point"], switches)
+            if contact is not None:
+                cur["contacts"].append(contact)
+            else:
+                _record(raw, line_no, reason or "unclassified line", kind)
+            continue
+        m = _CONTACT_FRAME_FIRST_B_RE.match(line)
+        if m:
+            contact, reason, kind = _dialect_b_contact(
+                m.group(2), m.group(3).strip(), raw, line_no, cur["point"], switches,
+                explicit_frame=int(m.group(1)))
+            if contact is not None:
+                cur["contacts"].append(contact)
+            else:
+                _record(raw, line_no, reason or "unclassified line", kind)
+            continue
+        _record(raw, line_no, "owner prose / note (not a contact line)", "note")
 
     return {"path": str(path), "frame_tolerance": CONTACT_FRAME_TOLERANCE,
-            "points": points, "unparsed": unparsed}
+            "points": points, "unparsed": unparsed, "notes": notes}
 
 
 def possession_touch_numbers(contacts: Sequence[Dict[str, Any]]) -> List[int]:
@@ -562,11 +868,13 @@ def possession_touch_numbers(contacts: Sequence[Dict[str, Any]]) -> List[int]:
     return out
 
 
-def _side_to_team(side: str, switch_after: Optional[int], point: int) -> str:
+def _side_to_team(side: str, switches_before: int) -> str:
     """Owner header convention: near = Team A at match start, far = Team B at
-    match start; the `Side switch` marker inverts it for every later point
-    (squads are fixed, only their half changes)."""
-    near_is_a = not (switch_after is not None and point > switch_after)
+    match start; every `Side switch` marker inverts the mapping for the LATER
+    points (squads are fixed, only their half changes). Parity matters: after an
+    EVEN number of switches — the 4 of the 20260920 match — `near` is Team A
+    again, so a single "last switch frame" comparison is not enough."""
+    near_is_a = (int(switches_before) % 2 == 0)
     if side == "near":
         return "A" if near_is_a else "B"
     return "B" if near_is_a else "A"
@@ -624,6 +932,8 @@ def contact_events(clip_frames: int, offset_map: Dict[str, Any],
                 ev["gesture"] = c["gesture"]
             if c.get("owner_interpretation_flag"):
                 ev["owner_interpretation_flag"] = c["owner_interpretation_flag"]
+            if c.get("owner_action_unspecified"):
+                ev["owner_action_unspecified"] = True
             if c["spike_type"]:
                 ev["spike_type"] = c["spike_type"]
             if c["outcome"]:

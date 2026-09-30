@@ -6,12 +6,14 @@ Annotations are stored as JSON files in this directory. Each video gets one JSON
 
 The owner dictates rally CONTACTS in plain text; the file is the source of
 truth and `scripts/build_dev_clip_gt.py::parse_contact_gt` transcribes it.
-**The 20260920 match file now carries the WHOLE match (P1–P33) in TWO line
+**The 20260920 match file carries the WHOLE match (P1–P33) in TWO line
 dialects** — the P1–P8 dialect (session 33) and the P9–P33 dialect (owner,
-2026-09-30) — and only the first is machine-readable today (STATUS open
-point 24).
+2026-09-30) — and **both are machine-readable since G0 (2026-10-01)**: 211
+contacts (28 P1–P8 + 183 P9–P33). The dev-clip GT
+(`video_ari_joan_8_first_points_annotations.json`) is built from dialect A;
+the match GT (`20260920_match_contacts.json`, below) from both.
 
-Dialect A (P1–P8) — parsed today:
+Dialect A (P1–P8):
 
 ```
 Point 1
@@ -20,8 +22,8 @@ Near team P4 dig at f245
 Side switch            <- closes the point it follows
 ```
 
-Dialect B (P9–P33) — **NOT parsed yet**; every line below currently lands in
-`unparsed`. Record the shapes here so the parser extension is mechanical:
+Dialect B (P9–P33) — every shape below is parsed by the same
+`parse_contact_gt`:
 
 ```
 From now on NT -> Near Team          <- legend prose (ignore)
@@ -36,7 +38,30 @@ NT dig 20951                             missing `f` prefix (3+ lines)
 FT dig (occluded and attributed wrong) f16078      parenthetical BEFORE the frame
 FT poke on second touch f6320            attack variant wording
 NT dig f12160 and overpasses -> overpass            explicit `-> overpass` relabel
+NT f23545 touches ball but falls to ground ...      a touch with NO action label
+FT is close to a dig in f10180 but the ball falls first ...  PROSE, not a contact
 ```
+
+Mechanical transcription rules (no owner wording is re-decided):
+
+- `poke` = the soft attack -> GT action `spike` with `spike_type: "touch"`
+  (also `spike touch` / `rainbow`); `hard` / `accelerated` -> `spike_type:
+  "hard"`.
+- `bump set` -> `set` (the bump names the technique); `bump pass(es) (the) ball`
+  -> `overpass`; `returns` (a serve reception) -> `dig`.
+- Player id: the `P<k>` in the structural slot (after the frame, or before the
+  verb in the frame-first form). `"... missatributed to P2, but its P4"`
+  yields the TRUE id P4, and the correction stays verbatim in `note` (a
+  `P<k>` inside an attribution clause is the pipeline's WRONG id, never GT).
+- A frame without the `f` prefix is read as the frame (`NT dig 20951`).
+- A line whose side word starts a sentence instead of a verb
+  (`FT is close to a dig in f10180 ...`) is owner prose -> `notes`, never a
+  contact (open point 25: the owner says that ball must NOT count as a dig).
+- `NT f23545 touches ball ...` names a touch but no action: the contact is
+  kept with `action: null` + `owner_action_unspecified: true` — a label is
+  never invented.
+- A wrapped parenthetical (P20 f14518) is joined before parsing; the duplicated
+  empty `Point 21` header is merged into P21.
 
 Owner conventions stated in that file (verbatim intent):
 
@@ -51,9 +76,34 @@ Owner conventions stated in that file (verbatim intent):
 - Frames are MATCH frames (same numbering as the serve anchors), coarse ±10–15 f.
 - A `player id` is the track id the owner saw AT that contact frame (optional in
   dialect B; absent when "player not tracked").
-- Three `Side switch` markers (after P14, P21, P28) plus P7's in dialect A match
-  the ratified schedule; dialect B has a duplicated `Point 21` header (the
-  first one is empty).
+- Four `Side switch` markers (after P7/14/21/28) match the ratified schedule.
+  Team mapping is by PARITY (`_side_to_team`): after the 4 switches `near` is
+  Team A again from P29.
+
+## Match contact GT (`20260920_match_contacts.json`, match-contacts-v1)
+
+`scripts/build_match_contact_gt.py` transcribes the whole dictation into a
+machine-readable GT JSON on the **MATCH frame axis** (no clip offset: frames
+are identical to the serve anchors and every pipeline `frame_number`), plus
+`output/match_contact_sheet/P<n>.png` grids and a README index.
+
+```bash
+venv/bin/python scripts/build_match_contact_gt.py              # JSON + sheets
+venv/bin/python scripts/build_match_contact_gt.py --no-sheets  # JSON only
+```
+
+- `points[].contacts` — the parser's verbatim owner fields (side word, track
+  id, note, raw line, optional gesture / interpretation flag / spike_type /
+  outcome / error).
+- `annotated_frames.actions.events` — the evaluator-shaped event list, one per
+  contact, `source=owner_gt`, `frame == match_frame`, coarse
+  `frame_tolerance=15`; the P30 unknown touch carries `action=null` +
+  `owner_action_unspecified=true`.
+- `points[].match_start_frame/end_frame` — the episode map's **PREDICTIONS**
+  (`window_is_prediction: true`), never ground truth; `--episode-map ""`
+  removes them.
+- `provenance` carries the 3 preamble `unparsed` lines and the 9 owner
+  `notes` lines, so nothing the owner wrote is silently dropped.
 
 ## Match Points Ground Truth (`<stem>_match_points.json`, match-points-v1)
 
