@@ -38,7 +38,17 @@ to exactly `185c6f0`, mechanism PARKED reproducible scripts-side
 (`scripts/departure_gate_harness.py` verbatim helper + `action_evidence.py`
 + `probe_departure_removals.py`/`probe_owner_verdicts.py`; banner +
 tables in `docs/g3_r1_departure_gate.md`). Suite **755**. Revisit only as
-a width-band-aware mechanism after T8.)
+a width-band-aware mechanism after T8. Same-session R2 DIAGNOSIS (negative
+result, no `src/` change): the planned calibrated confidence (continuity ×
+gesture tier, leave-one-clip-out) is REFUTED at diagnosis — pooled AUC
+0.172 vs 0.551 for the emitted hand-set constant, no variant wins; the
+gesture tier reverses across clips (clip-type-driven) and fold base rates
+anti-correlate with held-out rates. Motivation STANDS: hand-set constants
+uncalibrated (ECE 0.154/0.164) and the `action_confidence=0.3` emission
+filter is INERT (min emitted constant 0.45 — it never rejects anything).
+Doc: `docs/g3_r2_confidence_calibration.md` (revival preconditions are
+owner-gated: match-side per-prediction labels + clip-type-aware base
+rates).)
 
 **Previous (fortieth session — **G3 per-action evidence
 diagnosis, diagnose only, NO `src/` change.** Owner added **G3 (action
@@ -319,10 +329,16 @@ layer the next perception mechanism should be built on; **T8's width-band
 split is also the prerequisite for any departure-gate revisit (R1 refuted
 2026-09-30: width-normalised departure conflates dead balls with far
 float serves — `docs/g3_r1_departure_gate.md`; its dev-side precision
-pool is real: 7 FPs, zero collateral).** (5) R2: replace the hand-set
-gesture confidence with a calibrated per-action confidence (continuity ×
-gesture tier, leave-one-clip-out) - the hand-set values are uncalibrated
-(`docs/g3_action_evidence.md`). (6) e4/e5/e6 re-adjudication sheets; the
+pool is real: 7 FPs, zero collateral).** (5) R2 calibrated per-action
+confidence — **REFUTED at diagnosis (41st session)**: the planned
+continuity × gesture-tier LOCO score loses to the hand-set constants
+(pooled AUC 0.172 vs 0.551; tiers reverse per clip; fold base rates
+anti-correlate). Motivation stands (`action_confidence=0.3` is INERT — min
+emitted 0.45; constants uncalibrated, ECE ~0.16); any revival needs the
+owner-gated preconditions in `docs/g3_r2_confidence_calibration.md` §6
+(match-side per-prediction labels + clip-type-aware base rates).
+`track_frac_15f` remains the one within-clip-stable ordinal (review-UI
+flag candidate, not a calibrated replacement). (6) e4/e5/e6 re-adjudication sheets; the
 e2 production-vs-script F1 gap (0.400 vs the 0.571 script record,
 pre-existing, f167 gesture flip).
 
@@ -550,6 +566,12 @@ survive across sessions; provenance in the archives.
   dev+e1-e7, but the match's real far serves (e.g. P11 f7132, 0.285)
   sit inside the dev FP band — width-derived thresholds need held-out
   validation before shipping (`docs/g3_r1_departure_gate.md`).
+- `action_confidence=0.3` is INERT as an emission filter: the emitted
+  resolver confidence is hand-set per gesture tier with minimum 0.45
+  (measured over all 85 evidence rows) — the filter never rejects
+  anything. Any real confidence work must first decide whether the
+  threshold is supposed to bind (and re-cut it) or stay cosmetic
+  (`docs/g3_r2_confidence_calibration.md`).
 - Diag scripts must mirror `src.main`'s auto-detection (a dump once ran
   the COCO yolov8n fallback → different track, different stream;
   provenance is now recorded in diag outputs).
@@ -729,7 +751,7 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-09-29 **#35** — T3 time-matched evaluator SHIPPED: `scripts/evaluate_timed.py` (+23 tests, suite 648); optimal one-to-one assignment in seconds, PTS-aware time base, separate contact/class/team/actor scores + duplicates + FP-per-dead-minute + point IoU, `--autonomous` GT-input guard; entreno gate reproduces `evaluate.py`'s F1s at the same tolerance window.
 - 2026-09-29 **#34** — T2 contact-GT code review fixed (3 defects: rally-global → per-possession `touch_number`, draft/suggested duplicates moved to `superseded_draft_events` (15 of them, `events` == the 28 owner contacts), cross-net set → `overpass` + `owner_interpretation_flag`); +9 tests, suite 625.
 - 2026-09-29 **#33** — T2 contact-level GT wired: `scripts/build_dev_clip_gt.py` parses the owner's `20260920_match_ari_joan_contacts_p1_p8.txt` (28 contacts, P1–P8, coarse ±10–15f, side-switch after P7) and emits `video_ari_joan_8_first_points_annotations.json` with status OWNER_DICTATED, per-contact `frame_tolerance: 15`, owner track id/side/note kept raw; +6 parser tests, suite 612.
-- 2026-09-30 **#33** — G3 R1 departure gate validated end-to-end and REFUTED on the held-out match (P11 owner serve f7132 @ 0.285 bw/f removed; verdicts broken, 31/33→28/33, census 8/8→7/8); dev clean (P 0.586→0.739, e4→1.000); NOT shipped per owner option (a): src/ at 185c6f0, parked in scripts/ harness; suite 755 (Log below).
+- 2026-09-30 **#33** — G3 R1 departure gate validated end-to-end and REFUTED on the held-out match (P11 owner serve f7132 @ 0.285 bw/f removed; verdicts broken, 31/33→28/33, census 8/8→7/8); dev clean (P 0.586→0.739, e4→1.000); NOT shipped per owner option (a): src/ at 185c6f0, parked in scripts/ harness; suite 755. Same session: R2 calibration diagnosed and REFUTED (LOCO AUC 0.172 vs 0.551; `action_confidence=0.3` found INERT, min emitted 0.45) (Log below).
 - 2026-09-29 **#32** — T2 dev-clip GT BUILT (REVIEW, not ratified): offset map (identity, residual 0.0 at start/mid/end), `scripts/build_dev_clip_gt.py` (+25 tests), DRAFT GT for P1–P8 (8 owner serve anchors + 15 flagged suggestions + missing/fault report), ratification sheets in `output/t2_contact_sheet/`; the side switch is after P7, not P3–P4.
 - 2026-09-29 (38th session, archived) — T5 step 2: A/B replay of the serve-admission mechanisms through the production classes — both refuted as a recovery (0/5); blocker = the contact probe's fed-ascent serve signature + missing far-toss detections; B briefly default-OFF (reverted next session).
 - 2026-09-28 **#30** — documentation-only generalization assessment and staged G1/G2 roadmap: `docs/202609-28-astra-fix-pipeline.md`; count-vs-recall, GT-assisted interpretation, and dense-feature persistence gaps verified; implementation pending approval, no runtime changes.
@@ -819,10 +841,30 @@ Evidence doc bannered NOT SHIPPED, tables intact:
 `docs/g3_r1_departure_gate.md`; runs under `output/g3r1/` (git-ignored).
 Suite **755** (772 − 15 gate tests − 2 restored drift rows).
 
+**R2 diagnosis (same session, worker + coordinator-verified).** The
+plan's R2 candidate — replace the hand-set gesture confidence with a
+LOCO-calibrated continuity × gesture-tier score — is **REFUTED at
+diagnosis**: pooled AUC **0.172** vs **0.551** for the emitted constant
+(within-clip 0.265; no variant — per-cell, gesture-only, continuity-only
+— wins). Causes measured: the gesture tier REVERSES across clips (dev
+low-tier 0/11 vs entreno 4/4 — clip-type-driven, NOT near/far) and fold
+base rates anti-correlate with held-out rates (dev 0.276↔fit 0.821).
+Side-finding: **`action_confidence=0.3` is INERT** — min emitted constant
+0.45, so the filter keeps 85/85; on a calibrated scale, matched precision
+⇒ keep-all and precision decays monotonically to 0 at θ=0.9. Motivation
+stands (ECE 0.154/0.164, monotonicity violated); `track_frac_15f` is the
+only within-clip-stable ordinal (decomposition AUC 0.636). New:
+`scripts/confidence_calibration.py` +
+`docs/g3_r2_confidence_calibration.md` (revival preconditions + the R1
+battery for any future threshold change, §6). No `src/` change; suite
+755.
+
 **Next:** Active-next re-ranked — the far-side serve owner call is on
 top; the departure gate is revisitable ONLY as a width-band-aware
 mechanism after T8 (its dev-side precision pool is real: 7 FPs at zero
-collateral).
+collateral); R2 is parked behind its owner-gated preconditions (match-side
+per-prediction labels + clip-type-aware base rates) — the cheapest G3
+work that is NOT owner-gated is now T6 (feature sidecar).
 
 ### 2026-09-29 (fortieth session) — G3 per-action evidence diagnosis (diagnose only)
 
