@@ -17,7 +17,29 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-30 (forty-third session — **open point 21.3:
+**Last updated:** 2026-09-30 (forty-fourth session — **G3 plan S1, the
+far-side serve LOOMING probe: diagnose-only, REFUTED at kill 2 (no separable
+`L` gap).** `scripts/probe_far_serve_looming.py` +
+`tests/test_far_serve_looming.py` (29 tests) + `docs/g3_far_serve_looming.md`;
+no `src/` change, no config key. Mechanism measured: after the contact the far
+serve flies toward the long-axis camera, so its tracked bbox width grows; in
+the new-rally state (no emitted contact within `RALLY_RESET_GAP=90`) a far-band
+(onset width ≤26 px) production-tracked segment gets `L` = OLS slope of
+`ln(width)` vs seconds over `[onset, onset+0.5 s]`. RESULT: **kill 1 passes at
+the boundary** — 4/5 dev far serves (f210/2154/3038/4770) have ≥5 far-band
+tracked sightings in `[c, c+0.5 s]`; f880 has 3 — the far flight IS detected.
+**Kill 2 FIRES:** lowest far-serve `L` **0.338** (P4 f2159) vs highest
+new-rally non-serve `L` **0.945** (dead-time f1673; 0.495 at f4581) → overlap,
+no empty gap, ratio 0.36× (need ≥1.5×); three new-rally non-serve segments
+loom at/above the weakest far serve. Kill 3 vacuous (`L*` undefined); kill 4
+pending owner S0. Match replay parity exact (0 locked / 0 centre mismatches
+over 26068 frames; 55 far-band new-rally segments). Verdict: **the far-serve
+looming lever is REFUTED at diagnosis** — same class as T5/R1; no threshold
+tuned on 5 dev points. Suite **811**. Next = owner: S0 (P9–P33 contact GT) +
+S0b contact-level scoring + decide the next far-serve lever (targeted detector
+mining vs another mechanism).
+
+**Previous (forty-third session — **open point 21.3:
 the point winner/outcome layer SHIPPED as a pass-2 script.**
 `scripts/resolve_point_winners.py` + `tests/test_point_winners.py` (27
 tests) + `docs/point_winner_layer.md`; pure observer over the existing
@@ -274,6 +296,16 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
+**G3 S1 far-serve looming probe — diagnosed and REFUTED (44th session).**
+`scripts/probe_far_serve_looming.py` (+29 tests, `docs/g3_far_serve_looming.md`)
+measured whether the far serve's post-contact loom separates it from every
+new-rally non-serve ball: kill 1 passes at the boundary (4/5 dev far serves
+have ≥5 far-band tracked sightings in `[c, c+0.5 s]` — the flight is detected),
+but kill 2 FIRES (lowest far-serve `L` 0.338 < highest new-rally non-serve `L`
+0.945; no empty gap). No `src/` change, no threshold fit; match replay parity
+exact (0/26068). The far-serve CONTACT (open point 22) stays open; S2 is not
+triggered.
+
 **Production state (as of 2026-09-28; unchanged by #30's documentation-only
 assessment — #28 shipped the pass-2 serve re-label layer over existing
 artifacts, zero src/ changes).** The proposed generalization roadmap in
@@ -361,11 +393,13 @@ mechanism parked reproducible (`scripts/departure_gate_harness.py` +
 `action_evidence.py` + `probe_departure_removals.py`/`probe_owner_verdicts.py`;
 banner + tables in `docs/g3_r1_departure_gate.md`); suite 755. Revisit
 only as a width-band-aware mechanism after T8.
-Next = the far-side serve follow-up is now decided by the 42nd-session
-architect review: option (c) "park at pass-2" is REJECTED (pass-2 is 0/5 at
-contact level — point 22), (a)/(b) are replaced by ONE diagnose-only probe
-first (S1, looming onset — post-contact flight exists at all 5 dev serves
-while the toss exists at only ~2/5). See *Active next* S0–S4.
+Next = the far-side serve follow-up. The 42nd-session architect review chose a
+diagnose-only S1 looming probe first; **#44 ran it and it was REFUTED at kill 2**
+(no separable `L` gap; see Log + open point 22). T5 (tracker admission) and R1
+(departure gate) were already refuted; the pass-2 relabel option stays rejected.
+The next far-serve lever is an OWNER call (targeted far-flight detector mining
+vs another contact-proposal mechanism); S2 is NOT triggered. Owner-side S0
+(P9–P33 contact GT + capture spec) remains the highest-value async input.
 
 **Active next (ranked, goal-driven - see North-star; G3 first) — RE-RANKED by
 the 42nd-session architect review (Log #42).** The "detector v4 → normalise →
@@ -386,7 +420,9 @@ last. One mechanism per session; each step's kill criteria are pre-registered.
   at CONTACT level against the dev GT P1–P8 with `scripts/evaluate_timed.py`
   (NOT `--autonomous`: pass-2 carries owner inputs) and record it. Expected
   from the hand check: far serves 0/5.
-- **S1 (diagnose only, no `src/`) — far-side serve looming probe:**
+- **S1 (diagnose only, no `src/`) — [#44 DONE 2026-09-30, REFUTED at kill 2
+  (no separable `L` gap; see Log + Open point 22); S2 NOT triggered] far-side
+  serve looming probe:**
   `scripts/probe_far_serve_looming.py` + `docs/g3_far_serve_looming.md`. In the
   new-rally state (no emitted contact within `RALLY_RESET_GAP`), a ball segment
   whose onset width is ≤26 px (below the 26–35 abstain band) and whose
@@ -474,6 +510,14 @@ point number in `docs/history/`.
     still missing — the gap G3 and G1 share. Next = S1 far-serve looming probe
     (Active next), validated on the S0 GT (open point 24); T5 (tracker) and
     R1 (departure gate) already refuted; option "park at pass-2" rejected.
+    **[#44: S1 RAN and was REFUTED at kill 2 — the dev far-serve `L`
+    (0.338 lowest) overlaps the new-rally non-serve `L` (0.945 highest), so no
+    looming threshold admits all 5 without false fires; kill 1 passed at the
+    boundary (4/5 far serves detected), i.e. the far flight IS in the track.
+    `src/` untouched; S2 not triggered. Next = owner decision on the next
+    far-serve lever: targeted far-flight detector mining (#42's kill-1 branch
+    does NOT apply since kill 1 passed) vs another contact-proposal mechanism.
+    S0 GT + capture spec remain the highest-value async inputs.]**
     **Status (as of 28th session): MECHANISMS 1+2+3 DONE (mech 3 shipped
     09-28, 28th session).** Mechanism 3 = pass-2 serve re-labeling
     (`scripts/relabel_serves.py`, +29 tests): per TRUE map window, the
@@ -893,6 +937,7 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- 2026-09-30 **#44** — G3 plan S1 far-side serve looming probe (diagnose only, no `src/` change, suite 811): `scripts/probe_far_serve_looming.py` + 29 tests + `docs/g3_far_serve_looming.md`; post-contact tracked loom `L` = OLS slope ln(width) vs s over 0.5 s from the new-rally far-band onset; **REFUTED at kill 2** (lowest far-serve L 0.338 < highest new-rally non-serve L 0.945, no empty gap), kill 1 passed at 4/5 (flight detected), kill 3 vacuous, kill 4 pending S0; match replay parity 0/26068; the far-serve CONTACT stays open, S2 not triggered.
 - 2026-09-30 **#43** — open point 21.3 point winner/outcome layer SHIPPED as a pass-2 script (`scripts/resolve_point_winners.py` + 27 tests + `docs/point_winner_layer.md`; no `src/` change, no decode): fault prior over the terminal touch, 33/33 decided, **18/33 (54.5%)** vs the 33 dictated winners after the validate-only side→squad mapping; GT-serve-override inheritance (21/33) explicitly not shipped; fixed 3 test-side defects left by an unreviewed draft; suite 782.
 - 2026-09-30 **#42** — architect strategy review of the "detector v4 → normalise → learned gestures" proposal (docs-only, no `src/` change, suite 755): order NOT adopted; pass-2 far serves are 0/5 at contact level (census 8/8 was point-level); plan S0–S4 (owner P9–P33 contact GT → far-serve looming probe → side-switch layer → winner/fantasy), deferrals with triggers; proposed AGENTS.md wording pending ratification; #39 Log entry archived (Log below).
 
@@ -970,6 +1015,57 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+### 2026-09-30 (forty-fourth session) — G3 plan S1 far-side serve looming probe: diagnose only; REFUTED at kill 2 (`src/` untouched)
+
+**Asked:** execute the owner-approved G3 plan S1 (STATUS #42, Active next):
+a diagnose-only far-side serve LOOMING probe, with pre-registered kill
+criteria, no `src/` change. Chosen over S0b because S0 is owner-only and S0b's
+expected result (far serves 0/5 at contact level) was already hand-measured;
+S1 is the first concrete far-serve perception mechanism and unblocks the
+S3/S4 pass-2 layers that wait on real serve contacts.
+
+**Mechanism measured (spec frozen by #42, not tuned).** After the contact the
+far serve flies toward the fixed long-axis camera, so its apparent bbox width
+grows; the pre-contact toss is absent at ~3/5 dev far serves (T5). In the
+new-rally state (no emitted contact within `RALLY_RESET_GAP=90`), a ball
+SEGMENT is a run of production-tracked sightings merged across gaps ≤
+`ball_max_missing` (10 f, the identity horizon); its ONSET is the first
+tracked frame and must be far-band (width ≤26 px, below the 26–35 abstain
+band); `L` = OLS slope of `ln(width)` vs time in SECONDS over
+`[onset, onset+0.5 s]`. Dev/e1–e7 use the dumped production `ball_track`;
+the match dump is replayed through the production `BallTracker` (imported from
+`scripts/probe_serve_mechanisms.py`, never re-implemented) with a hard parity
+stop. Secondary feature `nearest far-team player is_behind_baseline at onset`
+declared before any held-out look, reported only, never fit.
+
+**Result.** Kill 1 (far flight detected?): **passes at the boundary** — 4/5
+far serves have ≥5 far-band tracked sightings in `[c, c+0.5 s]` (f210 7,
+f2154 10, f3038 9, f4770 9; f880 only 3). Kill 2 (does `L` separate?):
+**FIRES** — lowest far-serve `L` **0.338** (P4 f2159) vs highest new-rally
+non-serve `L` **0.945** (dead-time throw-back f1673, width 26; also f4581
+0.495, f3390 0.364), so `L*` is undefined and no threshold admits all five
+without false fires. Robust to the segment-merge choice: maxgap 0/2/5/10 all
+overlap (non-serve max 1.29/1.18/1.18/0.945). Kill 3 (entreno neutrality)
+vacuous (`L*` undefined); census only (e1/e2/e4/e6/e7 have 1 far-band
+new-rally segment each). Kill 4 (match P9–P33) **pending owner S0** — the
+match replay is exact (0 locked / 0 centre mismatches over 26068 frames; 55
+far-band new-rally segments). **Verdict: the far-serve looming lever is
+REFUTED at diagnosis** — same class as T5 and R1; no threshold was tuned on
+the 5 dev points.
+
+**Deliberately NOT done.** No kill-1 detector-mining branch (kill 1 passed);
+no `src/` mechanism band (S2 is owner-gated and not triggered); the
+`behind_baseline` secondary was not used to move `L*`. The far-serve CONTACT
+(open point 22) stays open; the next lever (targeted far-flight detector
+mining vs another contact-proposal mechanism) is an owner call.
+
+**Artifacts.** `scripts/probe_far_serve_looming.py` (+29 pure-mechanism
+tests), `docs/g3_far_serve_looming.md`, `output/s1/far_serve_looming.json`
+(git-ignored). T4 base anchors re-confirmed: `output/t4/dev_timed.json`
+contact P 0.586 / R 0.607 / F1 0.597 and `dev_waterfall.json` stage
+`3_candidate` = 6 (the committed T4 baseline; no src change to re-measure).
+Suite **811** (782 + 29).
+
 ### 2026-09-30 (forty-third session) — open point 21.3 point winner/outcome layer SHIPPED as a pass-2 script (no `src/` change)
 
 **Asked:** continue open point 21.3 (the owner's match-feedback backlog item 3
@@ -1107,75 +1203,3 @@ Suite unchanged (755).
 
 **Next:** owner: S0 (P9–P33 contact dictation) + capture-spec doc + ratify
 the AGENTS.md wording; worker: S0b, then S1 (one session each).
-
-### 2026-09-30 (forty-first session) — G3 R1 departure gate: full validation cycle; REFUTED on the held-out match; parked T5-style (`src/` back at `185c6f0`)
-
-**Asked:** continue session 40's uncommitted R1 work (the owner-approved
-departure gate; implementation was in the tree, validation had never
-run). Delegated to the worker subagent; the coordinator verified every
-gate against raw artifacts.
-
-**Validated (all `--device cpu`).** Offline re-measure on the
-classifier's OWN history held: 7/85 flagged (5 `fp_in_point` + 2
-`fp_dead_time`), 0 correct, max flagged 0.287 / min unflagged-correct
-0.383 bw/f. Entreno: 6/7 byte-identical; e4 0.933→1.000 via FP f388
-(0.287) — record F1s equal everywhere (e2's src.main 0.400 vs script
-0.571 = the pre-existing gap, open point 6). Dev (`evaluate_timed
---ignore-player`): contact P 0.586→**0.739**, R 0.607 unchanged, F1
-0.597→**0.667**, FP/dead-min 2.703→1.351, exactly the 6 flagged FPs
-(f2195/f2414/f2445/f2494/f3265/f3639), 0 additions; points matched 6→5
-(the game-state observer losing a window a dead-time FP had kept alive —
-reported, not tuned); waterfall shows `low_departure` at
-4_candidate_gate. Match (held-out; arms = same code, yaml-only
-`contact_min_departure_bw` 0 vs 0.3): **bw0 ≡ production** (207 actions,
-action-set identical to the posegate run; pass-2 chain reproduces 8/8
-far census, 31 serve-typed, 17/17 owner verdicts, 31/33 points). **bw03
-REFUTES**: 22 net removals including **P11's owner-confirmed serve f7132
-(0.285 bw/f)**, 6928A, and P11's rally cluster (7160–7345) → owner
-verdicts broken (P11 resolves at f7160), points **31/33→28/33** (P29–31
-lost), far census **8/8→7/8** → STOP reported per spec; threshold NOT
-tuned to the match. P1–P8 removals all ≥37f from GT contacts.
-
-**Root cause.** Width-normalised departure conflates the dead/lost-ball
-FP class with far-side float serves (a far toss is a slow float in bw/f —
-the same physics that refuted T5). The dev-fitted empty gap does not
-transfer to the match domain.
-
-**Owner decision (option (a), T5 precedent 8140711): NOT shipped.**
-`src/` (+ `contact_min_departure_bw` key, drift rows, 15 gate tests,
-script kwarg) restored to exactly `185c6f0`; `scripts/waterfall.py`
-keeps the inert `low_departure` mapping so the committed g3r1 diag dumps
-render. Parked reproducible: `scripts/departure_gate_harness.py` (helper
-VERBATIM; `action_evidence.py` re-derives `evidence_r1.json`'s
-`departure_gate_check` byte-identically), `scripts/probe_departure_removals.py`
-(22 removals / 0 additions) + `scripts/probe_owner_verdicts.py` (bw0
-17/17, bw03 regression) with the g3r1 artifact paths as defaults.
-Evidence doc bannered NOT SHIPPED, tables intact:
-`docs/g3_r1_departure_gate.md`; runs under `output/g3r1/` (git-ignored).
-Suite **755** (772 − 15 gate tests − 2 restored drift rows).
-
-**R2 diagnosis (same session, worker + coordinator-verified).** The
-plan's R2 candidate — replace the hand-set gesture confidence with a
-LOCO-calibrated continuity × gesture-tier score — is **REFUTED at
-diagnosis**: pooled AUC **0.172** vs **0.551** for the emitted constant
-(within-clip 0.265; no variant — per-cell, gesture-only, continuity-only
-— wins). Causes measured: the gesture tier REVERSES across clips (dev
-low-tier 0/11 vs entreno 4/4 — clip-type-driven, NOT near/far) and fold
-base rates anti-correlate with held-out rates (dev 0.276↔fit 0.821).
-Side-finding: **`action_confidence=0.3` is INERT** — min emitted constant
-0.45, so the filter keeps 85/85; on a calibrated scale, matched precision
-⇒ keep-all and precision decays monotonically to 0 at θ=0.9. Motivation
-stands (ECE 0.154/0.164, monotonicity violated); `track_frac_15f` is the
-only within-clip-stable ordinal (decomposition AUC 0.636). New:
-`scripts/confidence_calibration.py` +
-`docs/g3_r2_confidence_calibration.md` (revival preconditions + the R1
-battery for any future threshold change, §6). No `src/` change; suite
-755.
-
-**Next:** Active-next re-ranked — the far-side serve owner call is on
-top; the departure gate is revisitable ONLY as a width-band-aware
-mechanism after T8 (its dev-side precision pool is real: 7 FPs at zero
-collateral); R2 is parked behind its owner-gated preconditions (match-side
-per-prediction labels + clip-type-aware base rates) — the cheapest G3
-work that is NOT owner-gated is now T6 (feature sidecar).
-

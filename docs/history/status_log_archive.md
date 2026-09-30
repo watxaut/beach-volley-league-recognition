@@ -7,6 +7,77 @@
 > `status_where_we_are_archive.md` (same directory); the one-line-per-session
 > index is in STATUS.md. Nothing was edited or deleted.
 
+### 2026-09-30 (forty-first session) — G3 R1 departure gate: full validation cycle; REFUTED on the held-out match; parked T5-style (`src/` back at `185c6f0`)
+
+**Asked:** continue session 40's uncommitted R1 work (the owner-approved
+departure gate; implementation was in the tree, validation had never
+run). Delegated to the worker subagent; the coordinator verified every
+gate against raw artifacts.
+
+**Validated (all `--device cpu`).** Offline re-measure on the
+classifier's OWN history held: 7/85 flagged (5 `fp_in_point` + 2
+`fp_dead_time`), 0 correct, max flagged 0.287 / min unflagged-correct
+0.383 bw/f. Entreno: 6/7 byte-identical; e4 0.933→1.000 via FP f388
+(0.287) — record F1s equal everywhere (e2's src.main 0.400 vs script
+0.571 = the pre-existing gap, open point 6). Dev (`evaluate_timed
+--ignore-player`): contact P 0.586→**0.739**, R 0.607 unchanged, F1
+0.597→**0.667**, FP/dead-min 2.703→1.351, exactly the 6 flagged FPs
+(f2195/f2414/f2445/f2494/f3265/f3639), 0 additions; points matched 6→5
+(the game-state observer losing a window a dead-time FP had kept alive —
+reported, not tuned); waterfall shows `low_departure` at
+4_candidate_gate. Match (held-out; arms = same code, yaml-only
+`contact_min_departure_bw` 0 vs 0.3): **bw0 ≡ production** (207 actions,
+action-set identical to the posegate run; pass-2 chain reproduces 8/8
+far census, 31 serve-typed, 17/17 owner verdicts, 31/33 points). **bw03
+REFUTES**: 22 net removals including **P11's owner-confirmed serve f7132
+(0.285 bw/f)**, 6928A, and P11's rally cluster (7160–7345) → owner
+verdicts broken (P11 resolves at f7160), points **31/33→28/33** (P29–31
+lost), far census **8/8→7/8** → STOP reported per spec; threshold NOT
+tuned to the match. P1–P8 removals all ≥37f from GT contacts.
+
+**Root cause.** Width-normalised departure conflates the dead/lost-ball
+FP class with far-side float serves (a far toss is a slow float in bw/f —
+the same physics that refuted T5). The dev-fitted empty gap does not
+transfer to the match domain.
+
+**Owner decision (option (a), T5 precedent 8140711): NOT shipped.**
+`src/` (+ `contact_min_departure_bw` key, drift rows, 15 gate tests,
+script kwarg) restored to exactly `185c6f0`; `scripts/waterfall.py`
+keeps the inert `low_departure` mapping so the committed g3r1 diag dumps
+render. Parked reproducible: `scripts/departure_gate_harness.py` (helper
+VERBATIM; `action_evidence.py` re-derives `evidence_r1.json`'s
+`departure_gate_check` byte-identically), `scripts/probe_departure_removals.py`
+(22 removals / 0 additions) + `scripts/probe_owner_verdicts.py` (bw0
+17/17, bw03 regression) with the g3r1 artifact paths as defaults.
+Evidence doc bannered NOT SHIPPED, tables intact:
+`docs/g3_r1_departure_gate.md`; runs under `output/g3r1/` (git-ignored).
+Suite **755** (772 − 15 gate tests − 2 restored drift rows).
+
+**R2 diagnosis (same session, worker + coordinator-verified).** The
+plan's R2 candidate — replace the hand-set gesture confidence with a
+LOCO-calibrated continuity × gesture-tier score — is **REFUTED at
+diagnosis**: pooled AUC **0.172** vs **0.551** for the emitted constant
+(within-clip 0.265; no variant — per-cell, gesture-only, continuity-only
+— wins). Causes measured: the gesture tier REVERSES across clips (dev
+low-tier 0/11 vs entreno 4/4 — clip-type-driven, NOT near/far) and fold
+base rates anti-correlate with held-out rates (dev 0.276↔fit 0.821).
+Side-finding: **`action_confidence=0.3` is INERT** — min emitted constant
+0.45, so the filter keeps 85/85; on a calibrated scale, matched precision
+⇒ keep-all and precision decays monotonically to 0 at θ=0.9. Motivation
+stands (ECE 0.154/0.164, monotonicity violated); `track_frac_15f` is the
+only within-clip-stable ordinal (decomposition AUC 0.636). New:
+`scripts/confidence_calibration.py` +
+`docs/g3_r2_confidence_calibration.md` (revival preconditions + the R1
+battery for any future threshold change, §6). No `src/` change; suite
+755.
+
+**Next:** Active-next re-ranked — the far-side serve owner call is on
+top; the departure gate is revisitable ONLY as a width-band-aware
+mechanism after T8 (its dev-side precision pool is real: 7 FPs at zero
+collateral); R2 is parked behind its owner-gated preconditions (match-side
+per-prediction labels + clip-type-aware base rates) — the cheapest G3
+work that is NOT owner-gated is now T6 (feature sidecar).
+
 ### 2026-09-29 (fortieth session) — G3 per-action evidence diagnosis (diagnose only)
 
 **Asked:** owner added G3 (action accuracy/confidence) as the top goal;
