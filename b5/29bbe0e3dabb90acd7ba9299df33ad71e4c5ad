@@ -1,0 +1,38 @@
+docs/g3_r2_confidence_calibration.md
+  s_8732de68dfbcb5::t_bf160eec0d378d 1-126,128-130,132,135-143,145,147,149,151,153,170,182-262,267-297
+  s_8732de68dfbcb5::t_18032566c6f488 127,131,133-134,144,146,148,150,152,154-169,263-266
+  s_8732de68dfbcb5::t_da66df72f08e08 171-181
+scripts/confidence_calibration.py
+  s_8732de68dfbcb5::t_4ad7f0c7270c94 1-289,291-343,345-349,353-354,356-357,359-368,379,381-383,385-389,391-546,556-558,566-568,572-573,575-577,588-652,657-798
+  s_8732de68dfbcb5::t_ff1db4eecda4b1 290
+  s_8732de68dfbcb5::t_30b8a967deeae6 578-587
+  s_8732de68dfbcb5::t_d9b55dca7640cf 344,350-352,355,358
+  s_8732de68dfbcb5::t_4df58451b2570b 547-555,559-565,569-571,574,653-656
+  s_8732de68dfbcb5::t_b35145a874bce6 369-378,380,384,390
+STATUS.md
+  s_3c41c2f8f79de8::t_a7f7dc9ebda47c 41-51,332-341,569-574,754,844-861,865-867
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "b529bbe0e3dabb90acd7ba9299df33ad71e4c5ad",
+  "prompts": {},
+  "sessions": {
+    "s_3c41c2f8f79de8": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0ef18-aed8-7093-a823-6c0abfc110f9",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    },
+    "s_8732de68dfbcb5": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0f11e-acfa-70d8-a798-6e755fd70e32",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
