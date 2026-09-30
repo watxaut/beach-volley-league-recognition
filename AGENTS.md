@@ -121,6 +121,31 @@ Component invariants that bite if ignored:
   export) is the annotation tool for detector retrains
   (`scripts/import_roboflow_coco.py`).
 
+### 7. Recording domain (owner-stated 2026-09-30)
+
+Durable facts about how the footage is captured. They are HARDWARE/setup
+realities, not tuning opportunities:
+
+- **One camera for every video except `video_david`** (a different camera,
+  portrait 1564x2978, ~59.8 fps — out of spec, never validate on it).
+- **Always long axis: the camera sits in front of the net, outside the court,
+  net facing the lens.** It never moves mid-session. The tripod is re-set
+  between videos, so **HEIGHT MAY CHANGE from video to video** (it is much
+  higher at the practice venue than on the beach) — calibration is per video,
+  and so is the meaning of every px threshold: the court projects 206 px deep
+  on the beach vs 464–479 px at the practice venue, a 2.3x difference, which
+  is why px-space constants are venue-coupled.
+- **The camera DROPS frame rate on its own under low light or high
+  temperature.** The 20260920 match is 25.67 avg fps inside a 30.12 VFR
+  container; the 2026-09-28 practice video is ~30.1. Variable fps is therefore
+  EXPECTED: never ask the owner to "fix" it at capture time, handle it in the
+  timebase (PTS) and treat frame-based windows as approximate wall time.
+- The 20260920 match is natively **1280x720**; `src/main` upscales it once to
+  `_up1080`. All other footage is native 1920x1080.
+- `docs/video_recording_guide.md` still prescribes a PERPENDICULAR-TO-NET
+  camera — **STALE, it contradicts the validated geometry.** Rewrite it to the
+  long-axis spec (open point 29) rather than moving the camera.
+
 ## Project memory
 
 ### 1. entreno validation protocol

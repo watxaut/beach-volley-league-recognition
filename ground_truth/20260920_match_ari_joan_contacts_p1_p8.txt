@@ -34,8 +34,11 @@
 # work (see STATUS open point 22, round-3 owner queue).
 # -------------------------------------------------------------------------
 
-Some players change number when occlusions happen or they go outside the screen, I used the one that they had
-at the moment of the contact with the ball
+
+
+
+Some players change number when occlusions happen or they go outside the screen, I used the one that they had at
+the moment of the contact with the ball
 
 GT 8 points match
 Point 1
@@ -83,4 +86,257 @@ Near team dig at f4800
 Near team set at f4842
 Near team spikes ball to the side f4888
 Far team hand digs the ball f4910 and goes wide, ball falls to the ground f4950 and near team score.
+
+From now on NT -> Near Team
+FT -> Far Team
+Point 9
+NT serve f5496 P3 (attributed as a spike)
+f5530 FT P4 returns it on first touch, goes wide outside court
+
+Point 10
+NT serve f6035 P2 attributed as spike
+FT dig f6065 P4
+FT bump set f6104 (player not tracked)
+FT spike f6145 P4 (action not tracked)
+NT dig f6166 missatributed to P2, but its P4
+NT set f6200 missatributed to P1, but its P3
+NT spike touch f6240
+FT dig f6266
+FT poke on second touch f6320
+NT dig f6330
+NT set f6369
+NT spike f6416 touches net and falls to sand, scores point
+
+Point 11
+NT serve f7147 missatributed as a dig
+FT dig f7162 missatr as a set
+FT set f7207 missatr as a dig
+FT poke touch f7248
+NT dig f7264
+NT set that overpasses f7320 and scores the point
+
+Point 12
+NT serves f7777, goes outside bounds
+
+Point 13
+FT serves f8506
+NT dig f8550
+NT set f8586
+NT spike f8620 accelerated goes outside bounds
+
+Point 14
+FT serve f9103
+NT dig f9138
+NT set f9181
+NT spike touch f9220 and scores
+
+Side switch
+
+Point 15
+FT serve f10044
+NT dig f10072
+NT set f10110 (missatributed to the FT)
+NT spike f10158 (with a block on the FT). The block is attributed to the player that spikes.
+FT is close to a dig in f10180 but the ball falls to the ground first (if the ball falls after a dig or before it it should not be counted as a dig, flag as an open point)
+
+Point 16
+NT serve f10541
+FT dig f10574
+FT set f10623
+FT bump passes the ball f10656
+NT digs f10703 (this dig gets attributed to two people, this cannot happen, flag it as an open point)
+NT set f10751
+NT bump pass f10793
+FT dig f10827 and goes wide and FT loses the point
+
+Point 17
+NT serve f11412
+FT dig f11439 completely occluded goes wide and ball falls to sand
+
+Point 18
+NT serve f11995
+FT dig f12027
+FT set f12075
+FT bump pass f12118
+NT dig f12160 and overpasses -> overpass
+FT dig f12195
+FT set f12235
+FT spike touch f12295
+NT dig f12315
+NT spike f12343 (missatt as block)
+FT upper hand dig f12358
+FT set f12390
+FT spike touch f12433
+NT dig f12466 (missattr)
+NT set f12510 (missattr)
+NT spike f12570 touches the net and falls and scores
+
+In this point the two missattr actions happened to the FT when the ball was in the NT field, and into the same player.
+We probably need an engine to decide when there are players together to which player attribute the action based on the
+past and based on the ball field. Set it as an open point.
+
+Point 19
+NT serve f13074 (gets attributed to two players)
+FT dig f13110
+FT set f13158
+FT bump pass f13202 (bump pass from the back with the two hands up)
+NT digs f13236 -> overpass
+FT digs f13267 -> another overpass
+NT digs f13315
+NT sets f13356
+NT spikes touch f13397 (missattr as a block)
+FT digs f13415
+FT set 13467
+FT spike accelerated f13505
+NT digs f13523
+NT sets f13571
+NT bump passes the ball f13626
+FT digs f13666
+FT set 13709 - a person passes in front of the camera
+FT spike f13752 into the net
+
+Point 20
+NT serve f14518 (sometimes the serve moves in live debug from player to player, this is an example and there are two
+serves) and goes wide
+
+Point 21
+
+Point 21
+FT serve f15145
+NT dig f15169
+NT set f15211
+NT spike hard f15247
+FT dig f15280 and ball falls to sand
+
+Side switch
+
+Point 22
+FT serve f15925
+NT dig f15955
+NT set f15998
+NT spike touch f16037
+FT dig (occluded and attributed wrong) f16078
+FT set f16102
+FT spike accelerated f16139
+NT dig f16158
+NT set on the end line of the court f16205 and ball falls to ground
+
+Point 23
+FT serve f16659
+NT dig f16687
+NT set f16734
+NT spike poke f16776
+FT hand dig f16796
+FT set f16829
+FT bump pass f16877 and goes wide
+
+Point 24
+NT serve f18135
+FT dig f18165
+FT set f18208
+FT spike touch f18249
+NT dig f18271 (missatr)
+NT set f18314 (missatr)
+NT spike touch f18359 goes wide and loses point
+
+Point 25
+FT serve f18840
+NT dig f18869
+NT set f18926
+NT spike hard f18962
+FT dig f18985
+FT set f19034
+FT spike hard f19075
+NT over hand dig f19100 -> overpass
+FT dig f19132
+FT poke atack f19162
+NT dig f19183
+NT set f19227
+NT spike touch f19262
+FT dig f19288
+FT set f19330
+FT poke touch f19360
+NT dig f19380
+NT spike on 2 f19414 and goes wide
+
+Point 26
+FT serve f19832
+NT dig f19862
+NT set on the end line f19916
+NT bump passes f19966
+FT over hand digs f20001
+FT set f20037
+FT hard spike f20080
+NT dig f20094 -> overpass
+FT dig f20133
+FT set f20168
+FT poke touch f20212 and wins the point
+
+Point 27
+FT serve f20922
+NT dig 20951
+NT set f20984
+NT bump passes ball f21021 goes wide
+
+Point 28
+FT serve f21356
+NT dig f21385
+NT set f21430
+NT spike touch f21468 but falls on Near field, loses point
+
+Side switch
+
+Point 29
+NT serve f22150
+FT dig f22180 -> overpass
+NT dig f22223 -> overpass
+FT dig f22273
+FT set f22315
+FT spike rainbow f22361 goes wide
+
+Point 30
+NT serve f22874
+FT dig partly occluded f22912
+FT set f22954
+FT bump pass f23011
+NT dig f23038 (missatr)
+NT set f23086 (missatr)
+NT spike accelerated f23122
+FT dig f23144
+FT set f23188
+FT spike rainbow f23230
+NT dig f23261
+NT set f23305
+NT spike accelerated f23341
+FT overhand dig f23363
+FT set f23403
+FT poke long mid f23445
+NT overhand dig f23463
+NT set f23501 goes wide
+NT f23545 touches ball but falls to ground near team loses point
+
+Point 31
+FT serve f24543
+NT dig f24671
+NT set f24710
+NT spike hard f24755
+FT overhand dig f24773
+FT set f24803
+FT spike f24845
+NT overhand dig f24870
+NT set f24893
+NT bump passes ball f24948 into the net and loses point
+
+Point 32
+FT serve f25375 into the net and loses point
+
+Point 33
+NT serve f25807
+FT dig f25840
+FT set f25885
+FT spike accelerated f25928 out of court, FT loses match
+
+All actions that overpass label as overpass
+Some actions I labelel with missatribution (missatr), but that does not mean some others that I didnt are not
+missatributed.
 

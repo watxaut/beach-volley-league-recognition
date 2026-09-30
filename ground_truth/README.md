@@ -2,6 +2,59 @@
 
 Annotations are stored as JSON files in this directory. Each video gets one JSON file.
 
+## Owner contact dictation (`20260920_match_ari_joan_contacts_*.txt`)
+
+The owner dictates rally CONTACTS in plain text; the file is the source of
+truth and `scripts/build_dev_clip_gt.py::parse_contact_gt` transcribes it.
+**The 20260920 match file now carries the WHOLE match (P1–P33) in TWO line
+dialects** — the P1–P8 dialect (session 33) and the P9–P33 dialect (owner,
+2026-09-30) — and only the first is machine-readable today (STATUS open
+point 24).
+
+Dialect A (P1–P8) — parsed today:
+
+```
+Point 1
+Far team P2 serve at f210
+Near team P4 dig at f245
+Side switch            <- closes the point it follows
+```
+
+Dialect B (P9–P33) — **NOT parsed yet**; every line below currently lands in
+`unparsed`. Record the shapes here so the parser extension is mechanical:
+
+```
+From now on NT -> Near Team          <- legend prose (ignore)
+FT -> Far Team
+Point 9
+NT serve f5496 P3 (attributed as a spike)      side abbrev, player AFTER frame
+f5530 FT P4 returns it on first touch, goes wide     FRAME first, action in prose
+FT dig f6065 P4                          side, action, frame, player id
+FT bump set f6104 (player not tracked)   player unknown
+NT set that overpasses f7320 and scores the point  implicit overpass
+NT dig 20951                             missing `f` prefix (3+ lines)
+FT dig (occluded and attributed wrong) f16078      parenthetical BEFORE the frame
+FT poke on second touch f6320            attack variant wording
+NT dig f12160 and overpasses -> overpass            explicit `-> overpass` relabel
+```
+
+Owner conventions stated in that file (verbatim intent):
+
+- "All actions that overpass label as overpass" — `overpasses` / `-> overpass`
+  on a set or dig line makes the GT action `overpass`.
+- **"missatr" markers are NOT exhaustive** — a contact without a mis-attribution
+  note may still be mis-attributed; never read an unmarked contact as
+  guaranteed-correct.
+- A **no-touch block is attributed to the player that spikes** (P15 f10158,
+  P19 f13397 "missatt as block") — consistent with the standing convention that
+  no-touch blocks are physical events the pipeline cannot emit.
+- Frames are MATCH frames (same numbering as the serve anchors), coarse ±10–15 f.
+- A `player id` is the track id the owner saw AT that contact frame (optional in
+  dialect B; absent when "player not tracked").
+- Three `Side switch` markers (after P14, P21, P28) plus P7's in dialect A match
+  the ratified schedule; dialect B has a duplicated `Point 21` header (the
+  first one is empty).
+
 ## Match Points Ground Truth (`<stem>_match_points.json`, match-points-v1)
 
 For full-match videos the owner dictates a plain-text GT

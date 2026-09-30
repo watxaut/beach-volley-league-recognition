@@ -391,14 +391,23 @@ def test_build_gt_status_draft_without_contacts(tmp_path):
 
 
 def test_owner_contacts_file_parses_end_to_end():
-    """The real owner file: 8 points, 28 contacts, 3 preamble lines."""
+    """The real owner file, P1-P8 (dialect A): 8 points, 28 contacts, 3 preamble lines.
+
+    The file now also carries the owner's P9-P33 dictation in dialect B
+    (session 46); only its headers parse, and the coverage of that half is
+    pinned by test_owner_contacts_p9_p33_dialect_is_not_parsed_yet. P1-P8
+    stays the regression anchor: it must rebuild identically no matter how
+    much the owner appends below it.
+    """
     doc = mod.parse_contact_gt(str(_CONTACTS_TXT))
-    assert [p["point"] for p in doc["points"]] == [1, 2, 3, 4, 5, 6, 7, 8]
-    assert [len(p["contacts"]) for p in doc["points"]] == [4, 1, 4, 1, 1, 5, 7, 5]
-    assert doc["points"][6]["side_switch_after"] is True
+    pts = [p for p in doc["points"] if p["point"] <= 8]
+    assert [p["point"] for p in pts] == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert [len(p["contacts"]) for p in pts] == [4, 1, 4, 1, 1, 5, 7, 5]
+    assert pts[6]["side_switch_after"] is True
     assert all(len(p["contacts"]) == len({c["match_frame"] for c in p["contacts"]})
-               for p in doc["points"])
-    assert len(doc["unparsed"]) == 3
+               for p in pts)
+    assert len([u for u in doc["unparsed"]
+                if u["reason"].startswith("before the first")]) == 3
     om = {"segments": [{"clip_start": 0, "clip_end": 4960, "match_offset": 0}]}
     events, unm = mod.contact_events(4961, om, doc, [1, 2, 3, 4, 5, 6, 7, 8])
     assert unm == [] and len(events) == 28
@@ -406,6 +415,26 @@ def test_owner_contacts_file_parses_end_to_end():
     assert {e["final_action"] for e in events} == {"serve", "dig", "set",
                                                   "overpass", "spike"}
     assert sum(1 for e in events if e["player_id"] is None) == 8
+
+
+def test_owner_contacts_p9_p33_dialect_is_not_parsed_yet():
+    """Session 46 state: the headers parse, the dialect-B contact lines do not.
+
+    G0 (the next worker task) extends `parse_contact_gt` for dialect B; when it
+    lands, THIS test is the thing that must change, and it should change to
+    "every P9-P33 point has contacts" -- not to a smaller number.
+    """
+    doc = mod.parse_contact_gt(str(_CONTACTS_TXT))
+    late = [p for p in doc["points"] if p["point"] >= 9]
+    assert late, "P9-P33 headers must be found"
+    assert {p["point"] for p in late} == set(range(9, 34))
+    # all four side switches (after P7/14/21/28) are read
+    assert [p["point"] for p in doc["points"] if p["side_switch_after"]] == [7, 14,
+                                                                             21, 28]
+    # ...but no contact of P9+ is machine-readable yet
+    assert sum(len(p["contacts"]) for p in late) == 0
+    # the duplicated "Point 21" header the owner's dictation contains
+    assert [p["point"] for p in doc["points"]].count(21) == 2
 
 
 # --- touch_number: per-POSSESSION, not rally-global -----------------------

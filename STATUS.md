@@ -17,7 +17,37 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-30 (forty-fifth session — **G3 plan S0b DONE:
+**Last updated:** 2026-09-30 (forty-sixth session — **RECORD-ONLY session:
+S0 GT LANDED for the whole 20260920 match (owner dictated P9–P33 contacts
+into the existing file), a NEW practice video + calibration arrived, and the
+camera domain was pinned down. No `src/` change; no new mechanism.** The
+owner added ~200 contact lines for P9–P33 to
+`ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt` in a SECOND dialect;
+measured with the existing parser: the `Point` headers and all 4 `Side switch`
+markers (after P7/14/21/28) parse, but **0 of the ~196 new contact lines do** —
+all 34 point records appear yet only the 28 P1–P8 contacts come out, and the
+file has a duplicated `Point 21` header. So S0's *owner* half is DONE and its
+*worker* half (dialect-B parser → match-level GT JSON) is now the top next
+step, not a worksheet. The dialect shapes + the owner's three new conventions
+(overpass-labelled-as-overpass; **"missatr" markers are NOT exhaustive**; a
+no-touch block is attributed to the spiking player) are recorded in
+`ground_truth/README.md`. New footage: **`resources/full_videos/20290928_entreno_vall_dhebron.mp4`**
+(1920x1080 native, 695 s, 20939 frames, ~30.1 fps VFR-ish, practice venue,
+same camera, fewer points, teams keep changing) + `calibrations/20290928_entreno_vall_dhebron.json`
+— **not ingested, no GT, no prediction run.** Camera facts pinned in
+AGENTS.md §7: one camera for everything except `video_david`; always long
+axis in front of the net outside the court, never moving mid-session but
+**height changes per video** (court projects 206 px deep on the beach vs
+464–479 px at the practice venue = 2.3x, so px constants are venue-coupled);
+**the camera drops fps by itself in low light / high heat** (that is the
+25.67 fps match, not a capture mistake — nothing to fix at capture time); the
+match is natively 720p and is upscaled once to `_up1080`. The owner raised
+FOUR new GT-semantics/attribution questions (open points 25, 26 and the
+extension of point 5). Suite **840** (+1 parser-coverage test), mechanisms
+unchanged. Next steps re-ranked below: GT-build for P9–P33 → first HELD-OUT
+contact score → then the far-serve lever decision with real labels.
+
+**Previous (forty-fifth session — **G3 plan S0b DONE:
 the pass-2 serve stream scored at CONTACT level against the owner P1–P8
 contact GT. `scripts/score_pass2_contacts.py` + `tests/test_pass2_contact_score.py`
 (28 tests) + `docs/g3_s0b_pass2_contact_score.md`; no `src/` change, no
@@ -317,25 +347,39 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
-**G3 S0b pass-2 contact-level score — DONE (45th session); the far-serve
-CONTACT is confirmed missing and the pass-2 substitute is refuted.**
-`scripts/score_pass2_contacts.py` (+28 tests, `docs/g3_s0b_pass2_contact_score.md`,
-`output/pass2_contacts/`) scores `actions_pass2` against the owner P1–P8
-contact GT with `evaluate_timed`'s matcher (imported, not re-implemented).
-Scope = the 8 GT point windows padded ±90 f (f126–f4910): the raw windows are
-NOT rally-inclusive (7 of 28 owner contacts fall outside, P1's f210 serve
-among them), and the padded scope is validated by exact parity of the
-perception arm with the T4 dev-clip baseline. **perception P 0.586 / R 0.607 /
-F1 0.597 / class 0.706 / team 0.706 / 2.703 FP per dead-min; pass2 P 0.640 /
-R 0.571 / F1 0.604 / class 0.562 / team 0.625 / 1.351** → contact F1 +0.007,
-class **−0.143**. **Far serves 0/5** (deltas +31..+50 f = 5.4–8.6× the ±0.52 s
-effective tolerance; 3 are the GT receptions f245/3071/4800); only **1/8** GT
-serves is matched (f1395); f2575 and f3747 are `anchor_only` with NO action
-within ±80 f. Pass-2 touches exactly 4 contacts: 3 correct dig labels broken,
-1 true positive lost to the f3856 owner-FALSE demotion. No `src/` change, no
-decode; `--autonomous` intentionally not used (GT-derived-input audit recorded
-instead, 69 findings). Point 22 stays open on the perception side; S1 (looming)
-was refuted in #44 and S2 is therefore not triggered.
+**Record-only session (#46): the held-out GT EXISTS, a new practice video
+exists, and the camera domain is finally pinned. Nothing is machine-readable
+yet.**
+
+- **S0 owner half DONE** — the 20260920 match now has owner-dictated contacts
+  for **P1–P33** in one file, including the 12 far-serve points that G3 needs.
+  But it is in a second line dialect: `parse_contact_gt` reads the `Point`
+  headers and all 4 `Side switch` markers (after P7/14/21/28, matching the
+  ratified schedule) and **none** of the ~196 new contact lines (NT/FT
+  abbreviations, frame-before-side form, player id after the frame, `-> overpass`
+  relabels, a few missing `f` prefixes, wrapped parentheticals, prose blocks, a
+  duplicated `Point 21`). Formats + owner conventions documented in
+  `ground_truth/README.md`; tests will pin each shape.
+- **New footage** `resources/full_videos/20290928_entreno_vall_dhebron.mp4`
+  (1080p, 695 s, 20939 frames, ~30.1 fps) at the practice venue with its own
+  calibration. It is the **first second recording session** at a venue where we
+  already have 7 clips, and the fastest full video in the repo (~21k frames at
+  68–85 ms/f). Candidate for: a first pipeline run, the second fold of any
+  leave-one-SESSION-out work, and — only if the owner dictates the side
+  switches — the footage open point 2 has been blocked on.
+- **Camera domain pinned (AGENTS.md §7)**: one camera everywhere except
+  `video_david`; always long axis, in front of the net, outside the court;
+  never moves mid-session; height changes per video (beach court 206 px deep vs
+  practice 464–479 px); fps drops by itself under low light / heat (the match is
+  25.67 fps because of that); the match is natively 720p.
+- **Four new owner-flagged questions** recorded as open points 25 (a dig
+  simultaneous with the ball death — is it a dig?), 26 (one contact attributed
+  to TWO players: P16 f10703, P19 f13074 serve), plus the extension of point 5
+  (the owner's "engine to decide when there are players together … based on the
+  past and based on the ball field", P18).
+- S0b (#45) stands: far serves 0/5 at contact level, pass-2 class accuracy
+  −0.143, "park at pass-2" closed. The far-serve CONTACT work is now
+  **unblocked by data** but still has no agreed mechanism (T5, R1, S1 refuted).
 
 **Production state (as of 2026-09-28; unchanged by #30's documentation-only
 assessment — #28 shipped the pass-2 serve re-label layer over existing
@@ -433,20 +477,54 @@ vs another contact-proposal mechanism); S2 is NOT triggered. Owner-side S0
 (P9–P33 contact GT + capture spec) remains the highest-value async input.
 
 **Active next (ranked, goal-driven - see North-star; G3 first) — RE-RANKED by
-the 42nd-session architect review (Log #42).** The "detector v4 → normalise →
-learned gestures" order was NOT adopted. Order = measure in-domain → fix the
+the 42nd-session architect review (Log #42) and again in #46 now that the S0
+GT exists.** The "detector v4 → normalise → learned gestures" order was NOT
+adopted. Order = make the labels machine-readable → measure held-out → fix the
 contact proposal where the loss is → pass-2 layers on real contacts → learn
 last. One mechanism per session; each step's kill criteria are pre-registered.
 
-- **S0 (OWNER, async, no code) — held-out contact GT for match P9–P33** in the
-  P1–P8 dictation format (`ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt`;
-  ~90 contacts, 12 of them far-serve points). It is the held-out set for every
-  perception mechanism below AND R2's precondition 1 (match-side labels);
-  until it lands, held-out checks are a point-level proxy (open point 24).
-  Same lane: pin the capture spec (30 fps, 1080p, long-axis, fixed height) in
-  `docs/video_recording_guide.md` — controlling the input domain is the
-  cheapest generalization lever; 59.8 fps `video_david` is the first
-  out-of-spec file.
+- **G0 (worker, next) — make the P9–P33 contacts machine-readable.** Extend
+  `parse_contact_gt` (`scripts/build_dev_clip_gt.py`) with dialect B (shapes
+  enumerated in `ground_truth/README.md`): NT/FT side abbreviations, the
+  frame-first form (`f5530 FT P4 returns it on first touch`), the player id
+  after the frame, `-> overpass` / `overpasses` relabels, missing `f` prefixes,
+  the prose legend and note blocks, wrapped parentheticals, and the duplicated
+  `Point 21` header. Then emit a **match-level GT JSON** for P1–P33
+  (no clip offset needed: match frames are the GT frame axis) and a per-point
+  contact sheet. Gates: the 8 P1–P8 points must rebuild **byte-identically**
+  (they are already machine-readable — this is the regression anchor); every
+  contact line lands in `events` with `source=owner_gt`; the 4 `Side switch`
+  flags stay after P7/14/21/28; the owner's parentheticals are preserved
+  verbatim as `owner_note` (they carry the mis-attribution and occlusion facts
+  we will want as features). Do NOT re-decide any owner wording.
+- **G1 (worker, after G0) — the first HELD-OUT contact score.** Score the
+  perception stream (and `actions_pass2` as a second arm) on P9–P33 with
+  `scripts/score_pass2_contacts.py`'s scope discipline (point windows padded
+  ±90 f, `--ignore-player`, `evaluate_timed` matcher) into
+  `docs/g3_heldout_p9_p33.md`. This is the number every future mechanism must
+  beat, and the first real measurement of the 12 far-serve contacts. Read the
+  miss buckets first (candidate / reach gate / actor-team / label / survives
+  via `scripts/waterfall.py` on a dump) and re-rank the dev loss budget
+  (11 proposal / 5 actor-team / 4 label) against held-out reality before
+  proposing any mechanism.
+- **G2 (owner decision, after G1) — the far-serve lever.** T5 (tracker
+  admission), R1 (departure gate), S1 (looming) and pass-2 are all refuted;
+  with 12 held-out far-serve contacts now available the choice can finally be
+  made on data: targeted far-flight detector mining vs another
+  contact-proposal mechanism. Any candidate must ship with the G1 number as
+  its baseline and the P9–P33 set as its held-out check.
+- **G3-footage (worker, parallel, cheap) — first run of the new practice video**
+  `20290928_entreno_vall_dhebron.mp4` (`make run VIDEO=…`, ~21k frames, the
+  fastest full video here): sanity-check the pipeline on a second recording
+  session at a known venue, then use it as the **second fold** for anything
+  leave-one-session (T12's precondition) and as the side-change subject IF the
+  owner dictates which points had side switches (open point 2). Do not spend
+  effort here before G0/G1 — it has no labels.
+- **S0 (OWNER, async, no code) — [#46 LANDED]** held-out contact GT for match
+  P9–P33: **DONE** — the owner appended ~200 contact lines to
+  `ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt` (2026-09-30) in a
+  second dialect, covering the 12 far-serve points. Not machine-readable yet
+  (0 of the new lines parse; the worker half is G0 above).
 - **S0b (worker, script only) — [#45 DONE 2026-09-30]** score `actions_pass2`
   at CONTACT level against the dev GT P1–P8 with `scripts/evaluate_timed.py`
   (NOT `--autonomous`: pass-2 carries owner inputs; the GT-input audit is
@@ -489,7 +567,7 @@ last. One mechanism per session; each step's kill criteria are pre-registered.
   serves within tolerance vs the S0 GT. Refuted ⇒ `git checkout 185c6f0 --
   src/ tests/test_config_drift.py` and the band moves to a default-off
   `scripts/*_harness.py` subclass (T5/R1 precedent).
-- **S3 (next worker-side item, #45) — pass-2 squad/side-switch layer (open point 21.4):** squad = side ×
+- **S3 (queued behind G0/G1, was #45's next worker item) — pass-2 squad/side-switch layer (open point 21.4):** squad = side ×
   switch parity (beach rule: switch every 7 points), cross-checked by all four
   players crossing the net in dead time; target exactly the 4 GT switches
   (after P7/14/21/28). Should fix 4 of the 5 dev stage-5 team errors (all P8).
@@ -565,6 +643,10 @@ point number in `docs/history/`.
     is CLOSED, and pass-2 must not be consumed as a LABEL source by S4 until
     the real serve contact exists. Far-serve CONTACT work stays owner-gated on
     S0.]**
+    **[#46: the held-out labels now EXIST (owner dictated P9–P33 contacts,
+    12 of them far-serve), so this point is no longer data-starved — it is
+    mechanism-starved. Next = G0/G1 (transcribe + score held-out), then the
+    G2 owner decision on the lever.]**
     **Status (as of 28th session): MECHANISMS 1+2+3 DONE (mech 3 shipped
     09-28, 28th session).** Mechanism 3 = pass-2 serve re-labeling
     (`scripts/relabel_serves.py`, +29 tests): per TRUE map window, the
@@ -703,27 +785,78 @@ point number in `docs/history/`.
     would fire ~27f earlier — deliberately not built (lifetime is simpler
     and occlusion-safe).
 
-24. **Match-domain contact GT + contact-level scoring of pass-2 (new, #42)** —
-    **Status: OPEN, owner-gated.** Problem: every perception mechanism this
-    project has refuted (T5, R1, R2) died on a held-out MATCH check that only
-    existed as proxies (17 owner verdicts, point counts, 33 winners); labelled
-    contacts are 91 total (63 entreno = one session, 28 dev = match P1–P8),
-    dev correct rate 0.276 vs entreno 0.56–1.00, so entreno cannot stand in
-    for match performance, and pass-2's point-level census hid a 0/5
-    contact-level result (point 22). Next: (a) OWNER dictates contacts for
-    P9–P33 (S0; ~90 contacts, 12 far-serve points; folded by
-    `scripts/build_dev_clip_gt.py`-style tooling into a match GT); (b) S0b
-    contact-level score of `actions_pass2` on P1–P8 via `evaluate_timed.py`;
-    (c) from then on every pass-2 layer is scored at contact level, and any
-    threshold fit on dev P1–P8 must hold on P9–P33 before it ships. The
-    dictated anchors are too coarse for contact timing (P8 anchor f4700 vs GT
-    serve f4770), so they cannot substitute. Also feeds R2 precondition 1.
+24. **Match-domain contact GT + contact-level scoring of pass-2 — [#46: the
+    GT LANDED; the build is the blocker now]**
+    **Status: owner half DONE (2026-09-30), worker half OPEN.** The owner
+    dictated P9–P33 contacts into
+    `ground_truth/20260920_match_ari_joan_contacts_p1_p8.txt` (second dialect,
+    ~200 lines, 12 far-serve points). Measured: headers + all 4 `Side switch`
+    markers parse, 0 of the new contact lines do. Next: (a) G0 = dialect-B
+    parser + match-level GT JSON (P1–P33) with a byte-identical rebuild of the
+    8 P1–P8 points as the regression anchor; (b) G1 = the first held-out
+    contact score on P9–P33 (perception + pass-2 arms); (c) from then on every
+    pass-2 layer is scored at contact level, and any threshold fit on dev
+    P1–P8 must hold on P9–P33 before it ships. The dictated anchors are too
+    coarse for contact timing (P8 anchor f4700 vs GT serve f4770), so they
+    cannot substitute. Also feeds R2 precondition 1. The old problem — 91
+    labelled contacts, dev correct rate 0.276, entreno standing in for a match —
+    is now solved in principle: the labels exist and only need transcribing.
+
+25. **A dig simultaneous with the ball death (new, #46 — OWNER-FLAGGED).**
+    P15 f10180: "FT is close to a dig in f10180 but the ball falls to the
+    ground first (if the ball falls after a dig or before it it should not be
+    counted as a dig, flag as an open point)". Problem: at that frame the
+    stream emits (or nearly emits) a dig while the ball is dying, and the owner
+    says it is NOT a dig — so the evaluator would charge us a false positive
+    for a contact the GT does not contain. Next: decide the GT rule (a contact
+    whose ball dies within the same contact window is not a dig) and encode it
+    as an EXCLUSION in the contact GT build, not as a pipeline change; then
+    check how many of our FPs such a rule would remove (the "dig at the moment
+    of ball death" family is probably a chunk of the 3 dead-time FPs).
+
+26. **One contact attributed to TWO players (new, #46 — OWNER-FLAGGED).**
+    P16 f10703: "NT digs f10703 (this dig gets attributed to two people, this
+    cannot happen, flag it as an open point)"; P19 f13074 the serve "gets
+    attributed to two players"; P20 notes the serve flapping between players
+    in live debug ("there are two serves"). Problem: double emission for one
+    contact inflates FP and can steal a match from a real contact.
+    `evaluate_timed` already reports these as `duplicates` (the dev clip has
+    1) and T4 saw "1 dup"; now the GT names cases, so duplicates become
+    SCORABLE. Next: score duplicates against the GT in G1, and if they are a
+    real family, look at the emit path (one inflect, two actors) — likely the
+    same proximity ambiguity as open point 5, so measure both together.
+
+29. **Recording-domain docs are stale (new, #46).**
+    `docs/video_recording_guide.md` prescribes a camera PERPENDICULAR to the
+    net and "30 fps" as a requirement; the owner uses one camera ALWAYS in
+    front of the net outside the court, and the fps drops on its own under low
+    light / heat (that is the 25.67 fps match). The guide also cannot promise a
+    fixed height — it changes per video (court projects 206 px deep on the
+    beach vs 464–479 px at the practice venue). Problem: the doc contradicts
+    the validated geometry and asks the owner for something the hardware
+    cannot do. Next (docs-only, no code): rewrite it to the long-axis spec
+    with the measured consequences (px thresholds are venue-coupled; ball
+    px-width side signal; width-normalised speeds) and add a
+    `scripts/probe_capture_spec.py` pre-flight (ffprobe: CFR/VFR, effective
+    fps, resolution, resolution-change mid-file) that flags out-of-spec input
+    instead of asking for a different capture setup.
 
 ### Parked / conditional
 
 5.  **Same-team adjacent-player choice.** The team filter constrains the
     TEAM, not which teammate — e3 f69's dig goes to the wrong B player.
     Needs pose/reach signals, not team logic.
+    **[#46: the owner has now specified what that engine should use, and
+    supplied the evidence: "we probably need an engine to decide when there
+    are players together to which player attribute the action based on the
+    past and based on the ball field" (P18, where two NT mis-attributed
+    contacts both landed on the FT player while the ball was in the NT field,
+    same player). So the two signals are MOTION HISTORY (who was converging)
+    and BALL HALF. Note this is the same failure the P9–P33 GT annotates as
+    `missatr` throughout, and the owner states those marks are NOT exhaustive.
+    Not scored today (`--ignore-player` is the standing rule because GT
+    `player_id` is a per-frame track id); it becomes scoreable only once a
+    stable-identity GT exists (open point 2 / owner player labels).]**
 
 6.  **Phase 2: offline global stitch (conditional).** Post-processing that
     re-clusters all track fragments into exactly 4 identities. Build only
@@ -884,6 +1017,9 @@ survive across sessions; provenance in the archives.
   block vs spike); the script path (deterministic) is the reference.
 
 **GT conventions (owner-ratified)**
+- The contacts dictation has TWO dialects (P1–P8 parsed; P9–P33 added 09-30 and
+  NOT yet parsed) — shapes and owner conventions in `ground_truth/README.md`.
+  Measure parser coverage before building on a GT file.
 - `ground_truth/gt_point_start_end.txt` is the game-state VIDEO's GT —
   NOT match serve anchors (mispairing once produced fictional windows).
 - Match serve team = winner-of-previous (mechanical, 6/6 cross-checked);
@@ -944,6 +1080,31 @@ survive across sessions; provenance in the archives.
   3") are therefore measurable per frame WITHOUT re-running the pipeline -
   `scripts/probe_serve_admission.py` is the reference harness.
 
+**Video domain (owner-stated 2026-09-30 — see also AGENTS.md §7)**
+- The camera DROPS fps on its own under low light / high temperature: the
+  20260920 match is 25.67 avg fps in a 30.12 VFR container, the 2026-09-28
+  practice video ~30.1. Variable fps is hardware, not a capture error — never
+  ask the owner to change it; handle it in the timebase (PTS) and remember that
+  frame-based windows then stand for different wall time (the deferral in point
+  19a is now explained rather than mysterious).
+- The match is natively **1280x720** and is upscaled once to `_up1080`; every
+  other clip is native 1080p. `video_david` is a different camera (portrait
+  1564x2978, ~59.8 fps) and is out of spec — never validate on it.
+- Camera height changes between videos (tripod re-set; much higher at the
+  practice venue). The court's projected DEPTH differs by 2.3x (beach 206 px vs
+  practice 464-479 px in a 1920x1080 frame), so **px-space constants are
+  venue-coupled** — a threshold validated on the beach is not a threshold on the
+  practice venue, and any venue-general number should be expressed relative to
+  the per-video calibration.
+- Owner GT: a `player id` in the contacts file is the track id AT that contact
+  frame (optional, absent when "player not tracked"); `missatr` marks are
+  **NOT exhaustive**; a no-touch block is attributed to the spiking player; any
+  contact the owner calls an overpass is GT `overpass`.
+- A GT file landing is not a GT file *readable*: the 20260920 contacts file
+  gained ~200 owner lines in a second dialect and the existing parser still
+  reads 0 of them. Always MEASURE how many lines/points a parser actually
+  extracts before planning work on top of it (session 46).
+
 **Perf**
 - Pose gating SHIPPED in the shared classifier (staleness 30f + near-ball
   300px last-9f trail radius; occlusion window poses everyone): match
@@ -1001,6 +1162,7 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- 2026-09-30 **#46** — RECORD-ONLY session: owner dictated the **whole 20260920 match contact GT (P1–P33)** in a second dialect (0 of ~196 new lines parse yet; G0 queued) and delivered a new calibrated practice video `20290928_entreno_vall_dhebron.mp4` (1080p, 695 s, ~30.1 fps); camera domain pinned in AGENTS.md §7 (long axis always, fps drops by itself in heat/low light, height varies per video); 3 new open points (25 dig-vs-ball-death, 26 duplicate actor attribution, 29 stale recording docs) + point 5 extended with the owner's "past + ball field" attribution spec; suite 840.
 - 2026-09-30 **#45** — G3 plan S0b: pass-2 stream scored at CONTACT level on the owner P1–P8 GT (`scripts/score_pass2_contacts.py` + 28 tests + `docs/g3_s0b_pass2_contact_score.md`; no `src/` change, no decode): padded-region scope validated by exact T4 parity; far serves **0/5** (deltas 5.4–8.6× tolerance), GT serves matched 1/8, pass-2 F1 0.597→0.604 but class 0.706→**0.562**; "park at pass-2" closed; suite 839.
 - 2026-09-30 **#44** — G3 plan S1 far-side serve looming probe (diagnose only, no `src/` change, suite 811): `scripts/probe_far_serve_looming.py` + 29 tests + `docs/g3_far_serve_looming.md`; post-contact tracked loom `L` = OLS slope ln(width) vs s over 0.5 s from the new-rally far-band onset; **REFUTED at kill 2** (lowest far-serve L 0.338 < highest new-rally non-serve L 0.945, no empty gap), kill 1 passed at 4/5 (flight detected), kill 3 vacuous, kill 4 pending S0; match replay parity 0/26068; the far-serve CONTACT stays open, S2 not triggered.
 - 2026-09-30 **#43** — open point 21.3 point winner/outcome layer SHIPPED as a pass-2 script (`scripts/resolve_point_winners.py` + 27 tests + `docs/point_winner_layer.md`; no `src/` change, no decode): fault prior over the terminal touch, 33/33 decided, **18/33 (54.5%)** vs the 33 dictated winners after the validate-only side→squad mapping; GT-serve-override inheritance (21/33) explicitly not shipped; fixed 3 test-side defects left by an unreviewed draft; suite 782.
