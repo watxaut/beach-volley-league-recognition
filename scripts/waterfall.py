@@ -72,6 +72,7 @@ NO_CANDIDATE_REASONS = (
 GATE_REASON_TEXT = {
     "no_player_snapshot": "no player snapshot within NEIGH+2 frames of the contact",
     "reach": "ball-to-box distance above the reach gate",
+    "low_departure": "post-contact ball departure below contact_min_departure_bw (bw/f)",
     "context_confidence": "resolved action below the action_confidence threshold",
     "action_filtered": "emitted action dropped by the process_frame filter",
 }

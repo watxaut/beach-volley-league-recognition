@@ -46,6 +46,7 @@ from evaluate_timed import (  # noqa: E402
     resolve_timebase,
 )
 import waterfall  # noqa: E402  (FP source classification, imported not copied)
+from departure_gate_harness import departure_bw_per_frame  # noqa: E402  (parked R1 mechanism; src reverted to 185c6f0)
 from src.recognition.action_classifier import ActionClassifier  # noqa: E402
 from src.utils.diagnostics import load_diag  # noqa: E402
 
@@ -211,6 +212,66 @@ def _ball_speeds(frames: Dict[int, Dict[str, Any]], contact: int
     return speed(contact - SPEED_F, contact), speed(contact, contact + SPEED_F)
 
 
+def _classifier_history(frames: Dict[int, Dict[str, Any]]) -> Dict[int, Tuple[float, float, float, float]]:
+    """Reconstruct ``ActionClassifier._ball_history`` from a diag dump.
+
+    The classifier appends ``(frame, x, y, w, h)`` at the top of
+    ``classify_actions`` -- which ``FrameProcessor`` calls only when
+    ``tracked_players`` is non-empty -- and only for a non-predicted tracked
+    ball. Diag mirror equivalents: the frame record HAS a ``players`` list and
+    ``ball_track.state == "tracked"``. The width is the admitted detection's
+    bbox width: a tracked (non-predicted) tracker result is ``det.copy()``, so
+    ``ball_track.center`` is that detection's center verbatim and the raw det
+    is recoverable by center match (removed dets were never handed to the
+    tracker). This is the CLASSIFIER'S OWN data -- unlike ``_ball_speeds``
+    above, which reads diag tracker centres including coasted ones.
+    """
+    out: Dict[int, Tuple[float, float, float, float]] = {}
+    for f, rec in frames.items():
+        if not rec.get("players"):
+            continue  # classify_actions never ran: no history append
+        bt = rec.get("ball_track") or {}
+        c = bt.get("center")
+        if bt.get("state") != "tracked" or not c or c[0] is None:
+            continue  # predicted / lost / none: the classifier does not append
+        best = None
+        for d in rec.get("ball_dets", []) or []:
+            if d.get("removed") or not d.get("bbox") or not d.get("center"):
+                continue
+            dc = d["center"]
+            dist = math.hypot(dc[0] - c[0], dc[1] - c[1])
+            if best is None or dist < best[0]:
+                best = (dist, d)
+        if best is None or best[0] > 1e-6:
+            continue  # admitted det not identifiable: cannot recover the width
+        x1, _y1, x2, _y2 = best[1]["bbox"]
+        out[f] = (float(c[0]), float(c[1]), float(x2 - x1), 0.0)
+    return out
+
+
+def _departure_feature(history: Dict[int, Tuple[float, float, float, float]],
+                       contact: int) -> Dict[str, Any]:
+    """Departure in bw/f from the CLASSIFIER'S OWN history (shared helper).
+
+    Calls ``departure_bw_per_frame`` (the parked R1 helper,
+    ``scripts/departure_gate_harness.py`` — verbatim the function the g3r1
+    production gate used before src/ reverted to 185c6f0)
+    on the reconstructed ``_ball_history`` slice the classifier held at
+    confirmation time; also reports the abstain diagnostics.
+    """
+    window = ActionClassifier.CONTACT_DELAY
+    pts = [(f, *history[f]) for f in sorted(history)
+           if contact <= f <= contact + window]
+    n_post = sum(1 for f in history if contact < f <= contact + window)
+    width = next((history[f][2] for f in sorted(history, key=lambda g: abs(g - contact))
+                  if contact <= f <= contact + window and history[f][2] > 0), None)
+    return {
+        "clf_departure_bw_f": _round_opt(departure_bw_per_frame(pts, contact, window)),
+        "clf_departure_n_post": n_post,
+        "clf_departure_width_px": width,
+    }
+
+
 def _applicable_reach(kind: Optional[str], contact: int,
                       prev_accepted_frame: Optional[int]) -> float:
     """The gate the classifier actually applied (serve branch = wider reach)."""
@@ -241,7 +302,9 @@ def _round_opt(v: Optional[float], nd: int = 3) -> Optional[float]:
 def extract_features(frames: Dict[int, Dict[str, Any]], action: Dict[str, Any],
                      actions_sorted: List[Dict[str, Any]],
                      pred_intervals: List[Tuple[float, float]],
-                     prev_accepted_frame: Optional[int]) -> Dict[str, Any]:
+                     prev_accepted_frame: Optional[int],
+                     history: Optional[Dict[int, Tuple[float, float, float, float]]] = None
+                     ) -> Dict[str, Any]:
     """One prediction -> the feature dict (diag dump + pipeline output only)."""
     f = int(action["frame_number"])
     rec = frames.get(f, {})
@@ -281,7 +344,7 @@ def extract_features(frames: Dict[int, Dict[str, Any]], action: Dict[str, Any],
 
     in_point = any(a <= f <= b for a, b in pred_intervals)
 
-    return {
+    feats = {
         # emitted-stream fields (pipeline_output.json)
         "action": action.get("action"),
         "gesture": action.get("gesture") or acc.get("gesture"),
@@ -322,6 +385,9 @@ def extract_features(frames: Dict[int, Dict[str, Any]], action: Dict[str, Any],
         "frames_since_prev_action": frames_since_prev,
         "in_point_pred": in_point,
     }
+    if history is not None:
+        feats.update(_departure_feature(history, f))
+    return feats
 
 
 # --- rows -------------------------------------------------------------------
@@ -332,6 +398,7 @@ def build_rows(clips: Sequence[Dict[str, str]],
     for clip in clips:
         diag = load_diag(clip["diag"])
         frames = diag["frames"]
+        history = _classifier_history(frames)
         pred_blob, _used = load_predictions(clip["predictions"])
         actions = [a for a in (pred_blob.get("actions") or [])
                    if isinstance(a, dict) and a.get("frame_number") is not None]
@@ -360,9 +427,55 @@ def build_rows(clips: Sequence[Dict[str, str]],
                 "gt_action": lab.get("gt_action"), "gt_team": lab.get("gt_team"),
                 "delta_frames": lab.get("delta_frames"),
                 "features": extract_features(frames, a, actions_sorted,
-                                             pred_intervals, prev_of.get(f)),
+                                             pred_intervals, prev_of.get(f),
+                                             history=history),
             })
     return rows
+
+
+# --- G3 R1: the departure gate, re-measured on the CLASSIFIER'S OWN data ----
+
+def departure_gate_check(rows: List[Dict[str, Any]],
+                          threshold: float = 0.3) -> Dict[str, Any]:
+    """Would the R1 departure gate (threshold bw/f) hold on the classifier's
+    own history (``clf_departure_bw_f``, computed with the production helper
+    ``departure_bw_per_frame`` over the reconstructed ``_ball_history``)?
+
+    Reports the flagged rows per outcome class, the empty-gap bounds (max
+    flagged non-correct vs min unflagged correct), and the collateral.
+    """
+    flagged: List[Dict[str, Any]] = []
+    vals_correct: List[float] = []
+    max_flagged_noncorrect: Optional[float] = None
+    for r in rows:
+        v = r["features"].get("clf_departure_bw_f")
+        if v is None:
+            continue
+        if v < threshold:
+            flagged.append({"clip": r["clip"], "frame": r["frame"],
+                            "outcome": r["outcome"], "bw_f": v})
+            if r["outcome"] != CORRECT and (
+                    max_flagged_noncorrect is None or v > max_flagged_noncorrect):
+                max_flagged_noncorrect = v
+        elif r["outcome"] == CORRECT:
+            vals_correct.append(v)
+    min_correct = min(vals_correct) if vals_correct else None
+    n_flagged_correct = sum(1 for x in flagged if x["outcome"] == CORRECT)
+    n_abstain = sum(1 for r in rows
+                    if r["features"].get("clf_departure_bw_f") is None)
+    return {
+        "threshold_bw_f": threshold,
+        "n_rows": len(rows),
+        "n_flagged": len(flagged),
+        "flagged_by_outcome": dict(Counter(x["outcome"] for x in flagged)),
+        "flagged_correct": n_flagged_correct,
+        "n_abstain": n_abstain,
+        "max_flagged_noncorrect_bw_f": _round_opt(max_flagged_noncorrect),
+        "min_unflagged_correct_bw_f": _round_opt(min_correct),
+        "empty_gap": bool(max_flagged_noncorrect is not None and min_correct is not None
+                          and max_flagged_noncorrect < min_correct),
+        "flagged": flagged,
+    }
 
 
 # --- analysis ---------------------------------------------------------------
@@ -701,6 +814,7 @@ def main() -> int:
         "calibration": calibration_check(rows),
         "consistency": {f: per_clip_split_consistency(rows, label, keep)
                         for f, (label, keep) in CONSISTENCY_SPLITS.items()},
+        "departure_gate_check": departure_gate_check(rows),
         "rows": rows,
     }
     Path(args.json).parent.mkdir(parents=True, exist_ok=True)
@@ -710,6 +824,13 @@ def main() -> int:
     print(f"rows: {len(rows)} -> {args.json}, {args.markdown}")
     oc = res["outcome_counts"]["total"]
     print("outcomes:", {k: v for k, v in oc.items() if v})
+    dg = res["departure_gate_check"]
+    print("departure gate (classifier's own history, shared helper): "
+          f"flagged {dg['n_flagged']} ({dg['flagged_by_outcome']}), "
+          f"correct flagged {dg['flagged_correct']}, abstain {dg['n_abstain']}, "
+          f"max flagged non-correct {dg['max_flagged_noncorrect_bw_f']} "
+          f"vs min unflagged correct {dg['min_unflagged_correct_bw_f']} "
+          f"(empty gap: {dg['empty_gap']})")
     return 0
 
 

@@ -17,7 +17,30 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-09-29 (fortieth session — **G3 per-action evidence
+**Last updated:** 2026-09-30 (forty-first session — **G3 R1 departure
+gate: implemented, fully validated, REFUTED on the held-out match — NOT
+shipped.** The owner-approved mechanism (session 40 task2, found
+uncommitted after that session died mid-run) was finished by a delegated
+worker and coordinator-verified against raw artifacts. Gates (`--device
+cpu`): entreno 6/7 byte-identical + **e4 0.933→1.000** (its offline-flagged
+FP f388 removed; zero correct actions lost anywhere); dev contact **P
+0.586→0.739, R 0.607 unchanged, F1 0.597→0.667** — exactly the 6
+offline-flagged FPs removed, 0 additions; match arms (same code,
+yaml-only `contact_min_departure_bw` 0 vs 0.3): **bw0 ≡ production**
+(207/207 action-set identical to the posegate run; pass-2 reproduces 8/8
+far census, 31 serve-typed, 17/17 owner verdicts, 31/33 points) but
+**bw03 REFUTES: 22 removals incl. P11's owner-confirmed serve f7132
+(0.285 bw/f), 6928A and P11's rally cluster → 17/17 verdicts broken,
+points 31/33→28/33, far census 8/8→7/8** → STOP per spec, no threshold
+tuning. Root: width-normalised departure conflates dead balls with far
+float serves (T5 physics). Owner decision = option (a): `src/` restored
+to exactly `185c6f0`, mechanism PARKED reproducible scripts-side
+(`scripts/departure_gate_harness.py` verbatim helper + `action_evidence.py`
++ `probe_departure_removals.py`/`probe_owner_verdicts.py`; banner +
+tables in `docs/g3_r1_departure_gate.md`). Suite **755**. Revisit only as
+a width-band-aware mechanism after T8.)
+
+**Previous (fortieth session — **G3 per-action evidence
 diagnosis, diagnose only, NO `src/` change.** Owner added **G3 (action
 accuracy) as the top goal**. `scripts/action_evidence.py` labels every
 emitted action on dev + e1–e7 (85 predictions) against GT via
@@ -258,36 +281,50 @@ admission. **NEITHER mechanism is shipped** (session 39): `src/` is back at
 replay is reproducible with the same numbers (evidence in
 `docs/t5_serve_admission_diagnosis.md` step-2 section,
 `docs/t5_mechanism_ab.md`, `docs/t4_loss_waterfall_dev_clip.md` "After T5").
+**R1 attempted and REFUTED (41st session):** the confirmation-time
+departure gate passed its fitting domain cleanly (dev contact P
+0.586→0.739 / F1 0.597→0.667 with exactly the 6 offline-flagged FPs
+removed; e4 0.933→1.000; entreno otherwise byte-identical) but the
+held-out full match refuted it at 0.3: 22 removals incl. P11's
+owner-confirmed serve f7132 (0.285 bw/f) and 6928A → owner-verdict
+regression, points 31/33→28/33, far census 8/8→7/8. Width-normalised
+departure conflates dead balls with far float serves (T5 physics again).
+NOT shipped (owner option (a)): `src/` back at exactly `185c6f0`,
+mechanism parked reproducible (`scripts/departure_gate_harness.py` +
+`action_evidence.py` + `probe_departure_removals.py`/`probe_owner_verdicts.py`;
+banner + tables in `docs/g3_r1_departure_gate.md`); suite 755. Revisit
+only as a width-band-aware mechanism after T8.
 Next = **owner decision on the far-side serve follow-up**: (a) contact-probe
 serve signature that does not require a fed ascent + (b) detection evidence on
 the far toss (P4/P6/P8 have none), or (c) park the far-side serve at the
 pass-2 layer (point 22 mechanism 3 already relabels 8/8).
 
-**Active next (ranked, goal-driven - see North-star; G3 first).** (0) **G3
-R1 — owner approval needed (production action logic):** confirmation-time
-departure gate, reject a contact whose post-contact ball speed over the
-CONTACT_DELAY window is below ~0.3 ball-widths/frame (evidence: 6/14 FPs,
-0/54 correct, all 6 on dev — entreno has no instance, so the entreno gate
-proves neutrality only; dev contact P 0.586→~0.70 expected). Then R2:
-replace the hand-set gesture confidence with a calibrated per-action
-confidence (continuity × gesture tier, leave-one-clip-out). (1) **Owner call on
-the far-side serve follow-up** (T5 handed it back): the ball-track half is
-REFUTED (0/5; kept reproducible in the probe harness, not in `src/`), the
-binding defects are the contact probe's serve signature + the missing
-far-toss detections — a recognition/detection mechanism, so it needs
-approval before code. (2) **21.3
-point winner/outcome layer** - G1's biggest missing signal; the anchored map +
-serve resolutions now give TRUE windows with openers to validate against the 33
-dictiated winners. (3) Round-3 owner queue (no code): P32's serve verdict,
-6928A's verdict, P18-P20 anchors, ep45's nature, P23 17159A + P31 22873A
-team-fix confirmation - each flips one flag in `serve_relabel.json` when
-ratified. (4) Fantasy scoring module + web points table (14e); assist ships
-with it (no perception needed) - the pass-2 `actions_pass2` stream is the
-intended input. (5) T6-T10 of the action-reliability plan (feature sidecar,
-perturbation suite, width-band `unreliable` state, PTS time windows, camera
-profile) - the evidence layer the next perception mechanism should be built
-on. (6) e4/e5/e6 re-adjudication sheets; the e2 production-vs-script F1 gap
-(0.400 vs the 0.571 script record, pre-existing, f167 gesture flip).
+**Active next (ranked, goal-driven - see North-star; G3 first).** (0)
+**Owner call on the far-side serve follow-up** (T5 handed it back): the
+ball-track half is REFUTED (0/5; kept reproducible in the probe harness,
+not in `src/`), the binding defects are the contact probe's serve
+signature + the missing far-toss detections — a recognition/detection
+mechanism, so it needs approval before code. (1) **21.3 point
+winner/outcome layer** - G1's biggest missing signal; the anchored map +
+serve resolutions now give TRUE windows with openers to validate against
+the 33 dictated winners. (2) Round-3 owner queue (no code): P32's serve
+verdict, 6928A's verdict, P18-P20 anchors, ep45's nature, P23 17159A +
+P31 22873A team-fix confirmation - each flips one flag in
+`serve_relabel.json` when ratified. (3) Fantasy scoring module + web
+points table (14e); assist ships with it (no perception needed) - the
+pass-2 `actions_pass2` stream is the intended input. (4) T6-T10 of the
+action-reliability plan (feature sidecar, perturbation suite, width-band
+`unreliable` state, PTS time windows, camera profile) - the evidence
+layer the next perception mechanism should be built on; **T8's width-band
+split is also the prerequisite for any departure-gate revisit (R1 refuted
+2026-09-30: width-normalised departure conflates dead balls with far
+float serves — `docs/g3_r1_departure_gate.md`; its dev-side precision
+pool is real: 7 FPs, zero collateral).** (5) R2: replace the hand-set
+gesture confidence with a calibrated per-action confidence (continuity ×
+gesture tier, leave-one-clip-out) - the hand-set values are uncalibrated
+(`docs/g3_action_evidence.md`). (6) e4/e5/e6 re-adjudication sheets; the
+e2 production-vs-script F1 gap (0.400 vs the 0.571 script record,
+pre-existing, f167 gesture flip).
 
 ## Open points
 
@@ -508,6 +545,11 @@ survive across sessions; provenance in the archives.
   WHILE editing (each dump process imports at start — partially-edited
   baselines once faked a neutral A/B). Neutrality bar: 7/7 entreno action
   logs byte-identical + full match data CSVs byte-identical.
+- Width-normalised departure (bw/f) conflates dead balls with far float
+  serves: R1's dev-fitted gap (FPs ≤0.287, correct ≥0.383) was empty on
+  dev+e1-e7, but the match's real far serves (e.g. P11 f7132, 0.285)
+  sit inside the dev FP band — width-derived thresholds need held-out
+  validation before shipping (`docs/g3_r1_departure_gate.md`).
 - Diag scripts must mirror `src.main`'s auto-detection (a dump once ran
   the COCO yolov8n fallback → different track, different stream;
   provenance is now recorded in diag outputs).
@@ -687,7 +729,9 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-09-29 **#35** — T3 time-matched evaluator SHIPPED: `scripts/evaluate_timed.py` (+23 tests, suite 648); optimal one-to-one assignment in seconds, PTS-aware time base, separate contact/class/team/actor scores + duplicates + FP-per-dead-minute + point IoU, `--autonomous` GT-input guard; entreno gate reproduces `evaluate.py`'s F1s at the same tolerance window.
 - 2026-09-29 **#34** — T2 contact-GT code review fixed (3 defects: rally-global → per-possession `touch_number`, draft/suggested duplicates moved to `superseded_draft_events` (15 of them, `events` == the 28 owner contacts), cross-net set → `overpass` + `owner_interpretation_flag`); +9 tests, suite 625.
 - 2026-09-29 **#33** — T2 contact-level GT wired: `scripts/build_dev_clip_gt.py` parses the owner's `20260920_match_ari_joan_contacts_p1_p8.txt` (28 contacts, P1–P8, coarse ±10–15f, side-switch after P7) and emits `video_ari_joan_8_first_points_annotations.json` with status OWNER_DICTATED, per-contact `frame_tolerance: 15`, owner track id/side/note kept raw; +6 parser tests, suite 612.
+- 2026-09-30 **#33** — G3 R1 departure gate validated end-to-end and REFUTED on the held-out match (P11 owner serve f7132 @ 0.285 bw/f removed; verdicts broken, 31/33→28/33, census 8/8→7/8); dev clean (P 0.586→0.739, e4→1.000); NOT shipped per owner option (a): src/ at 185c6f0, parked in scripts/ harness; suite 755 (Log below).
 - 2026-09-29 **#32** — T2 dev-clip GT BUILT (REVIEW, not ratified): offset map (identity, residual 0.0 at start/mid/end), `scripts/build_dev_clip_gt.py` (+25 tests), DRAFT GT for P1–P8 (8 owner serve anchors + 15 flagged suggestions + missing/fault report), ratification sheets in `output/t2_contact_sheet/`; the side switch is after P7, not P3–P4.
+- 2026-09-29 (38th session, archived) — T5 step 2: A/B replay of the serve-admission mechanisms through the production classes — both refuted as a recovery (0/5); blocker = the contact probe's fed-ascent serve signature + missing far-toss detections; B briefly default-OFF (reverted next session).
 - 2026-09-28 **#30** — documentation-only generalization assessment and staged G1/G2 roadmap: `docs/202609-28-astra-fix-pipeline.md`; count-vs-recall, GT-assisted interpretation, and dense-feature persistence gaps verified; implementation pending approval, no runtime changes.
 - 2026-09-28 **#28** — point 22 mechanism 3 SHIPPED: pass-2 serve re-labeling (`scripts/relabel_serves.py`, +29 tests); far prefix 2/8 → 8/8, serve-typed 20 → 31, all 17 owner verdicts mechanical, 13 team overrides flagged; suite 554 (Log below).
 - 2026-09-28 **#27** — architecture ratified: pass-2 interpretation layer over the stream (map → serve re-label → winner → fantasy); full-video two-pass REJECTED (live parity + no perception gain); point 22 mechanism 3 reframed (Log below).
@@ -729,6 +773,57 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+### 2026-09-30 (forty-first session) — G3 R1 departure gate: full validation cycle; REFUTED on the held-out match; parked T5-style (`src/` back at `185c6f0`)
+
+**Asked:** continue session 40's uncommitted R1 work (the owner-approved
+departure gate; implementation was in the tree, validation had never
+run). Delegated to the worker subagent; the coordinator verified every
+gate against raw artifacts.
+
+**Validated (all `--device cpu`).** Offline re-measure on the
+classifier's OWN history held: 7/85 flagged (5 `fp_in_point` + 2
+`fp_dead_time`), 0 correct, max flagged 0.287 / min unflagged-correct
+0.383 bw/f. Entreno: 6/7 byte-identical; e4 0.933→1.000 via FP f388
+(0.287) — record F1s equal everywhere (e2's src.main 0.400 vs script
+0.571 = the pre-existing gap, open point 6). Dev (`evaluate_timed
+--ignore-player`): contact P 0.586→**0.739**, R 0.607 unchanged, F1
+0.597→**0.667**, FP/dead-min 2.703→1.351, exactly the 6 flagged FPs
+(f2195/f2414/f2445/f2494/f3265/f3639), 0 additions; points matched 6→5
+(the game-state observer losing a window a dead-time FP had kept alive —
+reported, not tuned); waterfall shows `low_departure` at
+4_candidate_gate. Match (held-out; arms = same code, yaml-only
+`contact_min_departure_bw` 0 vs 0.3): **bw0 ≡ production** (207 actions,
+action-set identical to the posegate run; pass-2 chain reproduces 8/8
+far census, 31 serve-typed, 17/17 owner verdicts, 31/33 points). **bw03
+REFUTES**: 22 net removals including **P11's owner-confirmed serve f7132
+(0.285 bw/f)**, 6928A, and P11's rally cluster (7160–7345) → owner
+verdicts broken (P11 resolves at f7160), points **31/33→28/33** (P29–31
+lost), far census **8/8→7/8** → STOP reported per spec; threshold NOT
+tuned to the match. P1–P8 removals all ≥37f from GT contacts.
+
+**Root cause.** Width-normalised departure conflates the dead/lost-ball
+FP class with far-side float serves (a far toss is a slow float in bw/f —
+the same physics that refuted T5). The dev-fitted empty gap does not
+transfer to the match domain.
+
+**Owner decision (option (a), T5 precedent 8140711): NOT shipped.**
+`src/` (+ `contact_min_departure_bw` key, drift rows, 15 gate tests,
+script kwarg) restored to exactly `185c6f0`; `scripts/waterfall.py`
+keeps the inert `low_departure` mapping so the committed g3r1 diag dumps
+render. Parked reproducible: `scripts/departure_gate_harness.py` (helper
+VERBATIM; `action_evidence.py` re-derives `evidence_r1.json`'s
+`departure_gate_check` byte-identically), `scripts/probe_departure_removals.py`
+(22 removals / 0 additions) + `scripts/probe_owner_verdicts.py` (bw0
+17/17, bw03 regression) with the g3r1 artifact paths as defaults.
+Evidence doc bannered NOT SHIPPED, tables intact:
+`docs/g3_r1_departure_gate.md`; runs under `output/g3r1/` (git-ignored).
+Suite **755** (772 − 15 gate tests − 2 restored drift rows).
+
+**Next:** Active-next re-ranked — the far-side serve owner call is on
+top; the departure gate is revisitable ONLY as a width-band-aware
+mechanism after T8 (its dev-side precision pool is real: 7 FPs at zero
+collateral).
+
 ### 2026-09-29 (fortieth session) — G3 per-action evidence diagnosis (diagnose only)
 
 **Asked:** owner added G3 (action accuracy/confidence) as the top goal;
@@ -782,82 +877,3 @@ REFUTED at the tracker level.** The root blocker is the contact probe's
 serve-branch geometry (fed-ascent demand vs a far decelerating float) plus the
 complete absence of toss detections on P4/P6/P8 — recognition/detection work
 that needs an owner decision. Suite green (736).
-
-### 2026-09-29 (thirty-eighth session) — T5 step 2: A vs B replayed through the production classes; both refuted as a recovery; B shipped default OFF; the far-side serve's real blocker is the contact probe
-
-**What was asked:** compare mechanism A (weak-speed lock tier, as proposed in
-the step-1 doc) against mechanism B (backfill on a fresh lock) in the replay
-harness, implement the winner behind a config key, and gate it on
-entreno e1–e7, the dev clip, the waterfall and the suite.
-
-**How it was measured.** Both mechanisms were implemented in
-`src/tracking/ball_tracker.py` behind config keys that default OFF, so the
-comparison runs production code: `scripts/probe_serve_mechanisms.py` (new)
-feeds the T4 `--diag-dump` raw detections back into a real `BallTracker` and
-then drives the real `ActionClassifier` contact probe over the ball history the
-pipeline would have received (FrameProcessor semantics: append the real
-sighting, then test `c = frame − CONTACT_DELAY`). **Fidelity gate: the `base`
-arm reproduces the dumped production `ball_track` state on 4968/4968 frames and
-every emitted centre to 1e-6** — the arms are the pipeline's own decisions.
-
-**A vs B (dev clip, 28 owner contacts).**
-
-| arm | far serves with a contact candidate | candidates | outside every GT window | new bootstrap locks |
-|---|---|---|---|---|
-| base | 0/5 | 36 | 13 | 0 |
-| A weak 3 px/f, w<30 | 0/5 | 37 (+1) | 14 (+1: f488) | **19** |
-| B backfill (20 f, w<30) | 0/5 | 37 (+1) | 14 (+1: f1019) | **0** |
-
-A confirms the step-1 estimate of ~12–19 spurious locks and buys nothing. B
-creates no lock opportunity at all and is insensitive to its parameters (no
-width gate / tighter radius / skip suspect / look-back 12: all identical).
-
-**Why nothing is recovered.** B does exactly what it was built to do: the
-probe's `no_ball_sighting` rejections at the far serves fall 23/27/20/21/21 →
-16/20/19/20/18 of 31 window frames (18 backfill events, e.g. P1 f216 → 14
-points f201–f215), and the loss moves to `no_contact_geometry`. With the full
-toss in the history the far serve's contact measures (P1, c=214) `vin =
-(0.8, 0.7)`, `vout = (6.5, −11.3)`, `vin6 = (0.2, 0.3)`: no bounce (the apex is
-before the contact), no redirect (the toss is vertical), the drive branch
-refuses because a serve keeps rising (`stays_down = False`), and the serve
-branch needs a FED ascent `|vin3| ≥ |vin6| + 10` while the far toss
-decelerates (margin ≈ −9.6). A hypothetical "float toss → fast rise" signature
-fires on 3 frames of the whole clip with B on and 0 with B off (P1 f214/f215,
-P2 f889) → at most 2/5, because for P4/P6/P8 the detector produced **no toss
-sighting at all** to retro-extend. Structural limit of B itself: the probe
-tests `c` at exactly `c + CONTACT_DELAY`, so P2 (lock at +10 f) is unreachable
-even with a perfect chain — B's ceiling is 4/5.
-
-**Gates (all `--device cpu`).** (1) Entreno e1–e7: action logs **byte-identical
-in both arms** (8/7/14/8/6/7/6 actions); `evaluate.py --ignore-player` F1/team
-unchanged (e1 .706, e2 .400, e3 1.0, e4 .933, e5 .923, e6 .933, e7 .75; teams
-1.0 except e6 .857). The OFF arm is byte-identical to the T4 HEAD baseline
-(`compare_runs.py` IDENTICAL on e1). The record's e2 .571 is the *action
-script* path; the production path has measured .400 before and after (pre-existing
-f167 gesture flip, noted in Learnings). (2) Dev clip with B on: pipeline output
-**byte-identical** to OFF, `evaluate_timed --ignore-player` unchanged (F1 .597,
-class .706, team .706, 1 dup, 2.703 FP/dead-min, 6/2/0 points) → serve recovery
-0/5, serve FPs unchanged (the one extra replay candidate, f1019, never becomes
-an action). (3) Waterfall rerun on the B-on diag dump: identical stage counts
-(0/0/**6**/5/5/4/8) and identical per-contact rows except the five
-`no_ball_sighting` counts; `docs/t4_loss_waterfall_dev_clip.md` gained an
-"After T5 step 2" section. (4) `pytest tests/` → **736 passed** (+17 mechanism
-tests, +2 drift-guard tests).
-
-**Shipped.** ~~Mechanism B in `BallTracker` …~~ **SUPERSEDED the same day by
-session 39: nothing of this reached `src/` — `src/` is back at `185c6f0` and
-both mechanisms live only in `scripts/serve_mechanism_harness.py` as
-default-off subclasses, so the A/B replay is still reproducible with the same
-numbers.** (As implemented on this day, mechanism B was in `BallTracker`
-(`backfill_lookback` and friends) + `ActionClassifier.add_ball_sightings` +
-the `FrameProcessor` wiring (`update(..., frame_number=)`,
-`pop_backfill()`), all **DEFAULT OFF** (`ball_backfill_lookback = 0`), causal
-(past frames only) and on the shared frame path, so live-debug parity is
-untouched. Mechanism A (`weak_min_speed`/`weak_max_width`) shipped
-off-by-default, documented as refuted, so the A/B stayed reproducible.
-Config-drift guard extended.)
-
-**Owner hand-off:** the far-side serve needs (a) a contact-probe serve
-signature that does not require a fed ascent and (b) detection evidence on the
-far toss. Both are recognition/detection mechanisms, outside the approved T5
-scope — decision needed before code.

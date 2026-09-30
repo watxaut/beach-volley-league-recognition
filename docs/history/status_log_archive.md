@@ -2138,3 +2138,82 @@ python -m src.main <video.mp4> --court calibrations/<name>.json
   pass2 stream annotations, determinism.
 - Files: scripts/relabel_serves.py, tests/test_serve_relabel.py (+29),
   output/serve_relabel.json (git-ignored), STATUS.md.
+
+### 2026-09-29 (thirty-eighth session) — T5 step 2: A vs B replayed through the production classes; both refuted as a recovery; B shipped default OFF; the far-side serve's real blocker is the contact probe
+
+**What was asked:** compare mechanism A (weak-speed lock tier, as proposed in
+the step-1 doc) against mechanism B (backfill on a fresh lock) in the replay
+harness, implement the winner behind a config key, and gate it on
+entreno e1–e7, the dev clip, the waterfall and the suite.
+
+**How it was measured.** Both mechanisms were implemented in
+`src/tracking/ball_tracker.py` behind config keys that default OFF, so the
+comparison runs production code: `scripts/probe_serve_mechanisms.py` (new)
+feeds the T4 `--diag-dump` raw detections back into a real `BallTracker` and
+then drives the real `ActionClassifier` contact probe over the ball history the
+pipeline would have received (FrameProcessor semantics: append the real
+sighting, then test `c = frame − CONTACT_DELAY`). **Fidelity gate: the `base`
+arm reproduces the dumped production `ball_track` state on 4968/4968 frames and
+every emitted centre to 1e-6** — the arms are the pipeline's own decisions.
+
+**A vs B (dev clip, 28 owner contacts).**
+
+| arm | far serves with a contact candidate | candidates | outside every GT window | new bootstrap locks |
+|---|---|---|---|---|
+| base | 0/5 | 36 | 13 | 0 |
+| A weak 3 px/f, w<30 | 0/5 | 37 (+1) | 14 (+1: f488) | **19** |
+| B backfill (20 f, w<30) | 0/5 | 37 (+1) | 14 (+1: f1019) | **0** |
+
+A confirms the step-1 estimate of ~12–19 spurious locks and buys nothing. B
+creates no lock opportunity at all and is insensitive to its parameters (no
+width gate / tighter radius / skip suspect / look-back 12: all identical).
+
+**Why nothing is recovered.** B does exactly what it was built to do: the
+probe's `no_ball_sighting` rejections at the far serves fall 23/27/20/21/21 →
+16/20/19/20/18 of 31 window frames (18 backfill events, e.g. P1 f216 → 14
+points f201–f215), and the loss moves to `no_contact_geometry`. With the full
+toss in the history the far serve's contact measures (P1, c=214) `vin =
+(0.8, 0.7)`, `vout = (6.5, −11.3)`, `vin6 = (0.2, 0.3)`: no bounce (the apex is
+before the contact), no redirect (the toss is vertical), the drive branch
+refuses because a serve keeps rising (`stays_down = False`), and the serve
+branch needs a FED ascent `|vin3| ≥ |vin6| + 10` while the far toss
+decelerates (margin ≈ −9.6). A hypothetical "float toss → fast rise" signature
+fires on 3 frames of the whole clip with B on and 0 with B off (P1 f214/f215,
+P2 f889) → at most 2/5, because for P4/P6/P8 the detector produced **no toss
+sighting at all** to retro-extend. Structural limit of B itself: the probe
+tests `c` at exactly `c + CONTACT_DELAY`, so P2 (lock at +10 f) is unreachable
+even with a perfect chain — B's ceiling is 4/5.
+
+**Gates (all `--device cpu`).** (1) Entreno e1–e7: action logs **byte-identical
+in both arms** (8/7/14/8/6/7/6 actions); `evaluate.py --ignore-player` F1/team
+unchanged (e1 .706, e2 .400, e3 1.0, e4 .933, e5 .923, e6 .933, e7 .75; teams
+1.0 except e6 .857). The OFF arm is byte-identical to the T4 HEAD baseline
+(`compare_runs.py` IDENTICAL on e1). The record's e2 .571 is the *action
+script* path; the production path has measured .400 before and after (pre-existing
+f167 gesture flip, noted in Learnings). (2) Dev clip with B on: pipeline output
+**byte-identical** to OFF, `evaluate_timed --ignore-player` unchanged (F1 .597,
+class .706, team .706, 1 dup, 2.703 FP/dead-min, 6/2/0 points) → serve recovery
+0/5, serve FPs unchanged (the one extra replay candidate, f1019, never becomes
+an action). (3) Waterfall rerun on the B-on diag dump: identical stage counts
+(0/0/**6**/5/5/4/8) and identical per-contact rows except the five
+`no_ball_sighting` counts; `docs/t4_loss_waterfall_dev_clip.md` gained an
+"After T5 step 2" section. (4) `pytest tests/` → **736 passed** (+17 mechanism
+tests, +2 drift-guard tests).
+
+**Shipped.** ~~Mechanism B in `BallTracker` …~~ **SUPERSEDED the same day by
+session 39: nothing of this reached `src/` — `src/` is back at `185c6f0` and
+both mechanisms live only in `scripts/serve_mechanism_harness.py` as
+default-off subclasses, so the A/B replay is still reproducible with the same
+numbers.** (As implemented on this day, mechanism B was in `BallTracker`
+(`backfill_lookback` and friends) + `ActionClassifier.add_ball_sightings` +
+the `FrameProcessor` wiring (`update(..., frame_number=)`,
+`pop_backfill()`), all **DEFAULT OFF** (`ball_backfill_lookback = 0`), causal
+(past frames only) and on the shared frame path, so live-debug parity is
+untouched. Mechanism A (`weak_min_speed`/`weak_max_width`) shipped
+off-by-default, documented as refuted, so the A/B stayed reproducible.
+Config-drift guard extended.)
+
+**Owner hand-off:** the far-side serve needs (a) a contact-probe serve
+signature that does not require a fed ascent and (b) detection evidence on the
+far toss. Both are recognition/detection mechanisms, outside the approved T5
+scope — decision needed before code.
