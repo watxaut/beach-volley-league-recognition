@@ -17,7 +17,37 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-01 (fifty-second session — **the possession signal
+**Last updated:** 2026-10-02 (fifty-third session — **the far serve is solved as
+EVIDENCE: 14/17 GT far serves at ZERO false positives, up from 0/17 in
+production.** The three checks ran in the order they were proposed. **M2 (opener
+gate) = strict win**: a serve opens a rally, so gating the G4 conjunction on
+60-240 f of emitted-contact silence takes precision 0.579 -> **1.000** with recall
+unchanged at 11/17, and the plateau is 60-240 f wide because the match separates
+openers (>=153 f) from mid-rally gaps (<=134 f) — so it is neither a fit nor a
+device-jitter artefact. **M1 (magnified far-end crop) = REFUTED, and it corrects
+the record**: the detector already sees the far ball in 14-31 of 31 frames at
+every serve except P31 f24543, so the long-standing "the far ball is seen on 0-1
+frames in 8/17 windows" was a **tracker** statement, not a detector one; the 4x
+crop recovers only P31 (2/31 -> 26/31) at +105 ms/frame and its median detection
+is 3.2 px of sand noise. **M3' (structural proposer) = measured frontier**: raw
+detections + a far-band occupant + a reach in bbox heights + the opener gate, with
+no tracker and no shape geometry, gives 11/17 at precision 1.00 (runway-only),
+15/17 at 0.94 (runway+court, reach 1.0, median |offset| **1 f**) and 17/17 at
+0.90; the two zero-FP rules fail on *different* windows, so their **union is
+14/17 with no false positive at all** across 24 mid-rally contacts and the 9 owner
+FALSE/OFFGAME moments. The two residual FPs are pre-serve ball handlings: no
+dead-time test can separate those, only the toss does, and the toss is exactly
+what the far-end geometry refuses. **A measurement defect was found and fixed on
+the way**: every windowed G4 probe seeks, and a seek on this VFR file lands
+**-28..+30 f** off, so the G4 score was really 11/17 (not 6/17) with offsets
+systematically -9 f; two new seek-free probes, a 648-combination offline sweep,
+`tests/test_vfr_seek_guard.py` (which also found that the owner-GT annotator can
+display an off-frame image) and `tests/test_structural_serve_rule.py` (13 tests).
+Suite **1008**, `src/` untouched. **Next = the owner picks the operating point
+(recommend 14/17 evidence) and S4 consumes it post-hoc; the label bucket
+(`overpass` 0/18) is still the largest held-out loss.**)
+
+**Previous (fifty-second session — **the possession signal
 (open point 9 enabler) was built, tested, and REFUTED as a needle-mover, then
 parked default-OFF in a harness.** Two mechanisms: a ball-field width TREND
 fallback in attribution (`_width_side_trend`: when the strict 26-35 px regime
@@ -39,7 +69,6 @@ repo concurrently and its commit collided with my stash mid-validation — never
 run two sessions on this repo at once.** **Next = the owner decides on the S4
 consume-the-serve-events step, or another possession attempt with a NON-ball
 signal (motion history alone was inert for team attribution).**)
-
 **Previous (fifty-first session — **G4: the two serve-EVIDENCE
 event emitters the owner asked for are built, scored and committed.** New
 `src/analysis/serve_events.py`: **E1 `far_flight`** (a ball whose apparent bbox
@@ -178,15 +207,27 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
-**G1 DONE (#48), S3 DONE (#49), overpass-crossing REFUTED (#50), serve-EVIDENCE
-events shipped + scored (#51), possession-signal REFUTED + parked (#52): the
-first held-out contact score exists, the team side-vs-squad confound is fixed,
-the overpass loss is measured as a rule (not geometry) problem, the far serve
-has two event emitters that surface 3/17 GT far serves at contact level (3/12
-held-out) where the action stream has 0/12, and the ball-field possession
-signal was built and measured to be redundant (base 121/157 → 122/157). Next
-owner action: consume the serve events post-hoc (S4) or push the ball side;
-S4/`pass2_squad` and the overpass rule/possession call remain open.**
+**The far serve is SOLVED as evidence (#53): 14/17 GT far serves at zero false
+positives, against 0/17 in the action stream.** The three levers the owner asked
+for were run in order and each returned a verdict: the **opener gate** is a
+strict win (precision 0.579 -> 1.000, recall unchanged, plateau 60-240 f wide);
+the **magnified far-end crop** is refuted and, more importantly, shows the far
+ball was never missing from the detector's point of view (14-31 of 31 frames at
+every serve but P31) — the old "0-1 tracked frames" line was the *tracker*; and
+the **structural proposer** measured as a clean frontier (11/17 @ 1.00, 15/17 @
+0.94, 17/17 @ 0.90, union of the two zero-FP rules 14/17), built on raw
+detections so it needs neither the tracker nor the px-space contact geometry.
+A measurement defect surfaced on the way: windowed G4 probes seek, and a seek on
+this VFR file lands -28..+30 f off, so the G4 score was really 11/17 with -9 f
+offsets, not 6/17 (`docs/g4_far_serve_alignment.md`, now guarded by a test).
+
+Everything here is **evidence**, not labels: `src/` is untouched, nothing is
+written to `events`/CSV, and per AGENTS.md §6 + the S0b lesson it is consumed
+post-hoc. Next owner action: pick the operating point (recommend the 14/17
+union) and let S4 consume it for who-served / aces / serve faults. Still open:
+S4's remaining work, the label bucket (`overpass` 0/18), the reach-gate and
+dig-vs-ball-death buckets, and the two seek defects the guard test surfaced
+(owner-GT annotator, thumbnail crops).
 
 - **Held-out score** — `scripts/score_heldout_contacts.py` scores P9–P33
   against `ground_truth/20260920_match_contacts.json` with the S0b scope
@@ -232,7 +273,7 @@ S4/`pass2_squad` and the overpass rule/possession call remain open.**
   implementable rules replayed offline through the imported resolver are ALL
   net-negative (baseline 85 → 71/80/82), so no `src/` change ships; the blocker
   is a reliable possession/next-toucher signal (34 genuine side errors).
-- **G4 serve-evidence events (#51)** — `src/analysis/serve_events.py` emits
+- **G4 serve-evidence events (#51, re-scored #53)** — `src/analysis/serve_events.py` emits
   `runway_occupant` / `far_flight` / `serve_candidate` from the shared frame path
   as pure observers, **default OFF** (`--serve-events`); `serve_events` appears
   in `pipeline_output.json` only when they run. Geometry is image-space from the
@@ -245,7 +286,41 @@ S4/`pass2_squad` and the overpass rule/possession call remain open.**
   `docs/g4_far_serve_failure_mode.md`; scorers `scripts/score_serve_events.py`,
   `scripts/probe_far_serve_{tracking,geometry}.py`. These are EVIDENCE — no
   consumer is wired, and the label bucket (`overpass` 0/18) is still the largest
-  held-out loss.
+  held-out loss. **[#53 those numbers are superseded — the windowed probes SEEK
+  and a seek on this VFR file lands -28..+30 f off
+  (`docs/g4_far_serve_alignment.md`). Seek-free the same conjunction scores
+  **11/17 with 8/24 control FPs (precision 0.579)**, and with the **opener gate**
+  **11/17 at 0/24 FPs — precision 1.000.** Keep the old figures only as
+  provenance.]**
+- **THE FAR SERVE IS SOLVED AS EVIDENCE (#53, `docs/g4_structural_serve.md`)** —
+  a structural proposer over the RAW detections (no tracker, no px-space shape
+  test): *no emitted contact for 60-240 f* + *a person in the far band* + *a
+  far-side ball-sized (8-60 px) raw detection within 30 f* + *the ball within R
+  bbox heights of that person*. Measured frontier on one seek-free pass (17 GT far
+  serves, 24 mid-rally controls, the 9 owner FALSE/OFFGAME moments):
+  runway-only @ reach 1.5-4.0 = **11/17, 0 FP of any kind**; runway+court @
+  reach 1.0 = **15/17, 1 owner FP** (f5130, ball handling after the point ended);
+  @ reach 2.5 = **17/17, 2 owner FPs** (adds f2414, walking to the serve line with
+  the ball in hands). Median |offset| **1 f** (the G4 conjunction's is -9 f). The
+  two zero-FP rules fail on *different* windows, so their **union is 14/17 with no
+  false positive at all** — the recommended operating point. Driver
+  `scripts/sweep_structural_serve.py` (648-combination offline sweep over the
+  recording, no decode), tests `tests/test_structural_serve_rule.py`. The
+  residual FPs are pre-serve handlings: no dead-time test separates them, only the
+  toss does, and the toss is what the far-end geometry refuses — which is why
+  this is evidence (post-hoc, AGENTS.md §6) and not a label source (S0b broke 3
+  correct dig labels).
+- **M1 magnified far-end pass REFUTED (#53, `docs/g4_far_ball_presence.md`)** —
+  the same production weights on a 4x-magnified square crop of the far band
+  (`scripts/probe_far_roi_ball.py`, tile 320, 3 tiles, tile geometry from the 8
+  calibration clicks): **0 of 17 windows were empty for the full-frame arm**, so
+  the "the far ball is too small to detect" premise is FALSE — the detector sees
+  15-21 px balls in 14-31 of 31 frames at every serve except P31 f24543 (2/31,
+  which the tiles recover to 26/31 at +105 ms/frame). The tiled arm's median
+  detection is 3.2 px of unscaled sand/line noise. Parked as a possible
+  P31-class fallback; not built. **This also corrects a long-standing claim: the
+  "0-1 tracked frames in 8/17 windows" figures in the STATUS/G4 docs are TRACKER
+  counts, not detector counts.**
 - **Scale-aware geometry REFUTED (#52, the owner's "lets try scale aware
   geometry")** — `scripts/scale_aware_harness.py` (subclass of the production
   `ActionClassifier`, OUTSIDE `src/` per the refuted-mechanism rule) +
@@ -421,15 +496,17 @@ last. One mechanism per session; each step's kill criteria are pre-registered.
   loss budget is re-ranked: the LABEL bucket dominates held-out (31%), not
   proposal (24%). Stage waterfall deferred (needs a production match diag
   dump). This is the baseline every future mechanism must beat.
-- **G2 (owner decision, now unblocked by G1) — the far-serve lever.** T5
+- **G2 (owner decision, ANSWERED #53 — pick the operating point).** T5
   (tracker admission), R1 (departure gate), S1 (looming) and pass-2 are all
   refuted; the 12 held-out far-serve contacts are now measured at **0/12**
-  (baseline F1 0.772), so the choice can be made on data: targeted far-flight
-  detector mining vs another contact-proposal mechanism. The G1 data also
-  re-ranks a THIRD candidate: the **gesture-label bucket is the single largest
-  held-out loss** (`overpass` 0/18), so a label mechanism may buy more than
-  the far serve. Any candidate ships with the G1 number as its baseline and
-the P9–P33 set as its held-out check. **[#50: the gesture-label lead was
+  (baseline F1 0.772), so the choice could be made on data.
+  **[#53 the far-serve lever is ANSWERED: it is neither "detector mining" nor
+  another px-space contact-proposal mechanism — the ball IS detected, so the
+  lever is a STRUCTURAL proposer over the raw detections with the opener gate,
+  scoring 14/17 at precision 1.00, 15/17 at 0.94, 17/17 at 0.90
+  (`docs/g4_structural_serve.md`). The G1 data's other lead (the gesture-label
+  bucket, `overpass` 0/18) was diagnosed at #50 and remains an owner/architect
+  call.]** **[#50: the gesture-label lead was
 diagnosed for its worst class — the ball-width net-crossing signal for
 `overpass` is REFUTED (3/18, no separation; not detection; next-team signal
 unusable). So the overpass lever is now an owner/architect call on a
@@ -441,21 +518,25 @@ instead of choosing: G4 delivers `far_flight` + `runway_occupant` +
 far serves: runway 15/17, conjunction 3/17 at +-15 f (3/12 held-out) vs
 production 0/12, with 1 FP in 24 non-serve control windows. The remaining choice
 is 'consume the events post-hoc (S4)' vs 'keep pushing the ball side'.]**
-- **G4 (owner decision, evidence now measured) — consume the serve events or
-  push the ball side.** `src/analysis/serve_events.py` + `docs/g4_serve_events.md`
-  emit `runway_occupant` / `far_flight` / `serve_candidate` (default OFF,
-  `--serve-events`, inert otherwise). Measured: the runway leg is strong (a
-  person is in the far band at 15/17 GT far serves, 10/12 held-out) but only
-  7/17 of them are genuinely OFF-court; the conjunction lands **3/17** contacts
-  (+-15 f) against production's **0/12**, with 1 FP in 24 mid-rally non-serve
-  control windows. So: (a) consume `serve_candidate` in the post-hoc layer as a
-  serve EVIDENCE record (never as a label — pass-2 proved the label-source route
-  at 0/5 with 3 correct dig labels broken), and/or (b) attack the bottleneck the
-  measurement exposes — a far ball is detected on ~1 frame in 4 and half the
-  far-serve windows have NO growing-width run at all, a detector/temporal
-  problem, not a gesture one. Any consumer ships with F1 0.772 / far-serve 0/12
-  as its baseline and P9–P33 as the held-out check; re-score with
-  `scripts/score_serve_events.py` (`--control` for the false-positive side).
+- **G4 (RESOLVED #53, was: consume the serve events or push the ball side).**
+  `src/analysis/serve_events.py` + `docs/g4_serve_events.md` emit
+  `runway_occupant` / `far_flight` / `serve_candidate` (default OFF,
+  `--serve-events`, inert otherwise). The owner's "check all in the order you
+  stated" resolved both branches at once: pushing the ball side is **refuted**
+  (M1: the far ball is detected in 14-31 of 31 frames at every serve — the
+  "1 frame in 4" premise was a COCO-detector artefact and the "0-1 tracked
+  frames" figures are TRACKER counts), while consuming the evidence is **now
+  strong enough to build on**: with the opener gate the existing conjunction
+  reaches 11/17 at precision 1.000, and a structural proposer over the raw
+  detections reaches **14/17 with zero false positives** (union of the two
+  zero-FP rules), or 15/17 at 0.94 / 17/17 at 0.90
+  (`docs/g4_structural_serve.md`). Any consumer ships post-hoc as a serve
+  EVIDENCE record, never as a label (pass-2 proved the label-source route at
+  0/5 with 3 correct dig labels broken), with F1 0.772 / far-serve 0/12 as its
+  baseline and P9–P33 as the held-out check. Re-score with the SEEK-FREE
+  `scripts/probe_serve_events_seq.py` (the old `score_serve_events.py` seeks
+  and is +-30 f unreliable) and sweep the rule frontier with
+  `scripts/sweep_structural_serve.py`.
   **[#51 the WHY is measured too — `docs/g4_far_serve_failure_mode.md`: the
   contact GEOMETRY is the signal that does not switch. Far-side contact tests
   reach 0 of 4 (no lowest vertex, 0 px horizontal flip, dvy +4 vs <= -8, dvx 2
@@ -569,8 +650,16 @@ point number in `docs/history/`.
 
 ### Active
 
-22. **Far-side serves** — **[#42 RE-SCOPE] POINT-level DONE, CONTACT-level
-    OPEN.** Measured 09-30 (`output/serve_relabel.json` vs dev GT P1–P8):
+22. **Far-side serves** — **[#53 SOLVED AS EVIDENCE: 14/17 at ZERO false
+    positives, from 0/17.]** Status: the mechanism is MEASURED and the owner
+    decision is the OPERATING POINT; the implementation step is a post-hoc
+    consumer (S4), not a `src/` label. T5 (tracker), R1 (departure gate), S1
+    (looming), scale-aware geometry (#52) and the magnified far-end pass (M1,
+    #53) are all refuted, each for a *measured* reason. The winner uses the raw
+    detections directly, so it is immune to both walls the earlier levers hit
+    (the tracker will not lock a far ball; the px-space contact tests cannot
+    reach their thresholds at the far end). **[#42 RE-SCOPE] POINT-level DONE,
+    CONTACT-level OPEN.** Measured 09-30 (`output/serve_relabel.json` vs dev GT P1–P8):
     the 5 relabeled far "serves" (f247/930/2195/3070/4801) are 31–50 f after
     the GT serves (f210/880/2154/3038/4770) = 0/5 at contact level; three are
     the GT receptions (245/3071/4800) relabeled, two (930, 2195) are dev
@@ -589,6 +678,22 @@ point number in `docs/history/`.
     far-serve lever: targeted far-flight detector mining (#42's kill-1 branch
     does NOT apply since kill 1 passed) vs another contact-proposal mechanism.
     S0 GT + capture spec remain the highest-value async inputs.]**
+    **[#53: the lever is found and measured — `docs/g4_structural_serve.md`.
+    Opener gate (M2) takes the G4 conjunction from 11/17 @ 0.579 to 11/17 @
+    1.000 (0/24 control FPs), with a 60-240 f plateau because the match
+    separates openers (>=153 f) from mid-rally gaps (<=134 f). The structural
+    proposer (M3') over raw detections measures 11/17 @ 1.00 (runway-only),
+    15/17 @ 0.94, 17/17 @ 0.90, and the union of the two zero-FP rules is
+    **14/17 with no false positive at all** across 24 mid-rally contacts and the
+    9 owner FALSE/OFFGAME moments, at median |offset| 1 f. M1 (4x far-end crop) is
+    REFUTED and corrects the record: the far ball is detected in 14-31 of 31
+    frames at every serve (the "0-1 tracked frames" figures are TRACKER counts).
+    Also fixed: the windowed G4 probes SEEK and a seek on this VFR file lands
+    -28..+30 f off, so the old 6/17 was really 11/17 with -9 f offsets
+    (`docs/g4_far_serve_alignment.md`, now guarded by `tests/test_vfr_seek_guard.py`).
+    **Next = the owner picks the operating point (recommend the 14/17 union),
+    then S4 consumes it post-hoc as a serve EVIDENCE record (never as a label —
+    S0b broke 3 correct dig labels).**]**
     **[#45: S0b measured the whole pass-2 stream at CONTACT level
     (`scripts/score_pass2_contacts.py`, `docs/g3_s0b_pass2_contact_score.md`):
     far serves 0/5 with deltas +31..+50 f = 5.4-8.6x the effective ±0.52 s
@@ -1114,6 +1219,34 @@ survive across sessions; provenance in the archives.
   same-team actor picks (0 team changes). Possession needs a NON-ball signal.
   Parked default-OFF in `scripts/possession_signal_harness.py`, session 52,
   `docs/g3_possession_signal.md`.
+- **`cv2.CAP_PROP_POS_FRAMES` is frame-UNRELIABLE on the 20260920 match** (VFR,
+  AGENTS.md §7): measured against a full sequential decode, seeks land
+  **-28..+30 frames** from the requested index (13 points, mean +8.5) — twice
+  the ±15 f tolerance every contact score uses. Every windowed probe that seeks
+  is measuring shifted frames, and the G4 serve-event score was one of them
+  (recorded 6/17, actually 11/17 with -9 f offsets). Decode SEQUENTIALLY and
+  index what you decoded; `tests/test_vfr_seek_guard.py` enforces it and its
+  allow-list records the two sites that still seek (the owner-GT annotator and
+  the UI thumbnail crops), session 53, `docs/g4_far_serve_alignment.md`.
+- **A far ball's "0-1 tracked frames" is a TRACKER count, not a detector
+  count.** The fine-tuned detector sees a 15-21 px far ball in **14-31 of 31
+  frames** at every GT far serve except P31 f24543 (2/31). So the far serve is
+  not a detection problem: the tracker will not lock the ball and the px-space
+  contact tests refuse it, and a 4x-magnified far-end crop buys only that one
+  window (+105 ms/frame). When a far-side signal "is not there", check the
+  detector's `raw_detections` before blaming resolution. Session 53,
+  `docs/g4_far_ball_presence.md`.
+- **A serve can be recovered structurally, without the tracker and without the
+  shape tests**: no emitted contact for 60-240 f (the match separates openers
+  ≥153 f from mid-rally gaps ≤134 f, so the gate plateau is structural, not
+  fitted) + a person in the far band + a far-side ball-sized raw detection
+  within reach in bbox heights. 11/17 at precision 1.00, 15/17 at 0.94, 17/17
+  at 0.90, union of the two zero-FP rules **14/17 with no false positive**,
+  median |offset| 1 f — against production's 0/17. The residual errors are
+  pre-serve ball handlings, which no dead-time test can separate from a serve;
+  only the toss does, and the toss is what the far-end geometry refuses. So this
+  belongs in the post-hoc evidence layer, never in the label stream. Session 53,
+  `docs/g4_structural_serve.md`, `scripts/sweep_structural_serve.py`.
 - Device caveat: MPS jitter can flip a gesture label (e.g. e6 f309
   block vs spike); the script path (deterministic) is the reference.
 
@@ -1258,7 +1391,8 @@ survive across sessions; provenance in the archives.
   (builtin agents; project agents live in `.pi/agents/`).
 
 ## Session index (one line each)
-- #51 G4 serve-evidence events (far flight + runway + conjunction): default-off observers in `process_frame`, scored 3/17 GT far serves at +-15 f vs production 0/12 — `docs/g4_serve_events.md`.
+- #53 the far serve SOLVED as evidence: 14/17 GT far serves at ZERO false positives (production 0/17) via the opener gate + a structural proposer over raw detections; M1 (magnified far-end crop) REFUTED and it corrects the detector-vs-tracker record; the VFR seek defect found and guarded — `docs/g4_structural_serve.md`.
+- #51 G4 serve-evidence events (far flight + runway + conjunction): default-off observers in `process_frame`, scored 3/17 GT far serves at +-15 f vs production 0/12 — `docs/g4_serve_events.md` (numbers superseded by #53's seek-free re-score: 11/17).
 Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
@@ -1351,6 +1485,98 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+### 2026-10-02 (fifty-third session) — the far serve SOLVED as evidence: 14/17 at ZERO false positives; the VFR seek defect found
+
+**Asked:** "so far what we tried to get the far serves did not work. What can we
+do to reliably get serves" — then, to the three proposed checks (M2 opener gate
+~15 min, M1 magnified far-ROI probe, M3 structural proposer): "check all in the
+order you stated". No `src/` change; the action stream is untouched.
+
+**Three verdicts.**
+
+**M2 — the opener gate: a strict win.** A serve opens a rally, so a
+`serve_candidate` should only count when no contact was emitted in the preceding
+N frames. Measured seek-free on the 17 GT far serves vs 24 mid-rally controls:
+no gate = 11/17 hits and 8/24 FPs (precision 0.579, recall 0.647); gate 30 = 4
+FPs; **gate 60 → 240 = 0 FPs at unchanged 11/17 (precision 1.000)**. Every
+control FP sits at a 2-58 f gap and every hit at 231-816 f, so the plateau is
+60-240 f wide — consistent with the session-28 measurement that openers follow
+>=153 f of dead time while the largest mid-rally gap is 134 f, and therefore
+neither a fitted threshold nor an MPS/CPU-jitter artefact. `GAME_OFF` gives
+identical numbers.
+
+**M1 — the magnified far-end pass: refuted, and it corrects the record.** The
+match is natively 720p, upscaled, and the ball detector runs at imgsz 1280, so
+a 14-28 px far ball is 9-19 px inside YOLO; running the same production weights
+on a 4x-magnified square crop of the far band (3 x 320 px, tile geometry from
+the 8 calibration clicks) should have recovered the "missing" detections.
+`scripts/probe_far_roi_ball.py`, one sequential pass over all 41 windows:
+**0 of 17 windows were empty for the full-frame arm** — the detector sees a
+15-21 px ball in 14-31 of 31 frames at every serve, P31 f24543 excepted (2/31,
+which the tiles lift to 26/31 at +105 ms/frame for 3 tiles). The tiled arm's
+median detection is 3.2 px of unscaled sand/line noise, because a magnified far
+band is mostly ground. **So the "the far ball is seen on 0-1 frames in 8/17
+windows" line repeated across STATUS and the G4 docs is a TRACKER count, not a
+detector count** — the detector was never the far-serve problem, which moves the
+blocker to the lock + the label, exactly where #51's geometry diagnosis said it
+was. Parked as a possible P31-class fallback; not built.
+
+**M3' — the structural proposer: the frontier, and the answer.** Rule over the
+RAW detections (no tracker, no shape test): *no emitted contact for 60-240 f* +
+*a person in the far band* + *a far-side ball-sized 8-60 px detection within
+30 f* + *the ball within R bbox heights of that person*. Swept 648 ways offline
+from one recording (`scripts/sweep_structural_serve.py`): runway-only at reach
+1.5-4.0 = **11/17 with 0 FP**; runway+court at reach 1.0 = **15/17 with 1 owner
+FP**; at reach 2.5 = **17/17 with 2**. Median |offset| **1 f** (the G4
+conjunction's is -9 f). The two zero-FP rules miss *different* windows, so their
+**union is 14/17 with no false positive at all** against 24 mid-rally contacts
+and the 9 owner FALSE/OFFGAME moments. The two residual FPs (f5130 "ball
+handling after the point ended", f2414 "walking to the serve line with the ball
+in hands") are pre-serve handlings: no dead-time test separates them from a
+serve, only the toss does, and the toss is the one signature the far-end
+geometry refuses — which is also why this is EVIDENCE (post-hoc, AGENTS.md §6)
+and never a label source (S0b broke 3 correct dig labels).
+
+**The measurement defect.** To score any of this I had to decode the match
+without seeks, and that exposed a defect in the existing numbers: on this VFR
+file (25.67 fps in a 30.12 container) `CAP_PROP_POS_FRAMES` lands **-28..+30
+frames** from the requested index (13 probe points, mean +8.5, measured against
+a full sequential decode). Every windowed G4 probe seeks, so the recorded
+"6/17 far serves, 4/24 FPs, precision 0.60" was computed on shifted windows:
+seek-free it is **11/17 with 8/24 FPs**, and the candidate offsets are
+systematically **-9 f** (the same sign as the mean seek error). Two seek-free
+probes replace them, `tests/test_vfr_seek_guard.py` (3 tests, AST-based so a
+docstring mention is not an offence, exceptions allow-listed with reasons and
+failing when stale) greps `scripts/`, `src/` and `tests/` — and its audit turned
+up two real defects outside the serve work: `scripts/annotate_player_gt.py` can
+show the OWNER a frame up to ~30 f from the requested one (a GT contact could be
+judged off its own moment; it wants a sequential-cursor fix before the next
+annotation pass) and `src/db/ingest.py` crops review-UI player thumbnails with
+the same seek (cosmetic). Both recorded as allow-list KNOWN ISSUES, not fixed
+here.
+
+**Also corrected:** the G4 doc's "a far ball is detected on ~1 frame in 4" was
+already known to be a COCO-detector artefact; the honest figure is a median gap
+of 1 frame, i.e. nearly every frame.
+
+**Not done, deliberately:** no `src/` change, no label emitted, no player
+identity (the server is a raw detection, not one of the 4 tracks), near side
+untouched by construction. The recommendation to the owner is the 14/17 union
+consumed post-hoc; the 17/17 point is available at 0.90 but its errors are
+systematic (pre-serve handlings), not random.
+
+Artifacts: `output/g4/serve_events_seq_recording.json` (the recording the sweep
+replays, so future rules cost no decode), `output/g4/{serve_events_seq,
+far_roi_ball,structural_serve_sweep,seek_offsets}.json`; docs
+`docs/g4_structural_serve.md`, `docs/g4_far_ball_presence.md`,
+`docs/g4_far_serve_alignment.md`; tests `tests/test_structural_serve_rule.py`
+(13), `tests/test_vfr_seek_guard.py` (3). Suite **1008**.
+
+**Next:** the owner picks the operating point (recommend 14/17) and S4 consumes
+the evidence post-hoc for who-served / aces / serve faults; the label bucket
+(`overpass` 0/18) is still the largest held-out perception loss; the
+owner-GT-annotator seek wants a fix before the next annotation pass.
+
 ### 2026-10-01 (fifty-second session) — possession signal built, REFUTED, parked default-OFF (`src/` untouched)
 
 **Asked:** create a possession signal (open point 9's enabler for overpass and
@@ -1510,48 +1736,3 @@ empty).
 any overpass rule; or the G2 far-serve decision / S4 (`pass2_squad`). The label
 bucket remains the largest held-out loss. Owner-side capture-spec rewrite
 (point 29) still open.
-
-### 2026-10-01 (forty-ninth session) — S3 DONE: pass-2 side-switch/squad layer; G1's raw team 0.518 corrected to 0.755 (`src/` untouched)
-
-**Asked:** continue with the next point that moves the needle for G3. G2
-(far-serve lever) is an owner decision, S2 is owner-gated and S1 refuted, so
-the next unblocked worker item was **S3 — the pass-2 side-switch/squad layer
-(open point 21.4)**.
-
-**Delivered.** `scripts/resolve_side_switches.py` + 25 tests
-(`tests/test_side_switches.py`) + `docs/g3_side_switch_layer.md`; no `src/`
-change, no video decode. The layer derives the beach switch cadence (change
-ends after every 7 points) from the POINT ORDER alone, maps each court-side
-letter to a squad letter by switch parity, and augments every `actions_pass2`
-entry with `pass2_squad` (+ `pass2_point`) for downstream fantasy/stat
-consumption. Output `output/side_switches.json`; report
-`logs/side_switch_report.md`.
-
-**The needle (a measurement confound found en route).** The perception stack
-speaks COURT-SIDE letters (A=near, B=far, `CourtCalibration.get_team`) while
-the owner/GT convention is SQUAD letters — so G1's recorded raw `team 0.518`
-is side-vs-squad, NOT a side-attribution failure. On the same 139 found
-contacts, mapping side→squad lifts team to **105/139 = 0.755** (identical to
-`pred side vs owner side`, what the stack actually emits), leaving **34
-genuine side errors** (clustered P10/P15/P18/P19/P22/P24–P26/P29–P30 — the
-near/far width-band attribution class). The T4 dev "5 stage-5 team errors, all
-P8" are the same confound at the first switch point.
-
-**Gates.** Derived switches `[7,14,21,28]` are an EXACT match to the owner
-`side_switch_after_point` (validate-only read); P9 f5496 (owner near/squad B)
-is the parity anchor test; 207/207 actions annotated.
-
-**Cross-check honest result.** The player-crossing cross-check (from the R1
-match diag dump, whose player tracking is independent of the ball departure
-gate) gives only **3/4 cadence switches with support AND 16/28 non-switch
-boundaries also supported** — it cannot place switches because tracker ids hop
-(open point 2). It is therefore EVIDENCE ONLY and explicitly NOT used; a
-position-based detector waits on stable identity GT.
-
-**Suite:** **897** (872 + 25). No `src/` change (`git diff 185c6f0 -- src/`
-empty).
-
-**Next:** S4 (consume `pass2_squad`; the winner layer's side→squad mapping can
-now use this schedule instead of GT) and/or the G2 owner decision on the
-far-serve lever (baseline F1 0.772 / far-serve 0/12); the label bucket
-(`overpass` 0/18) remains the largest held-out perception loss.

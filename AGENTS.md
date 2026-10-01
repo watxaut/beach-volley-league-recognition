@@ -259,3 +259,27 @@ state exists at start — once a "new" A/B arm silently ran without the tested
 changes. Serialize sessions, or give each session its own `git worktree`
 (with `models/` and `resources/` symlinked in), and re-check `git status`
 before any stash/checkout.
+
+### 9. Never position a probe window with a seek (owner-ratified 2026-10-02)
+
+The match is VFR (25.67 fps content in a 30.12 fps container, §7), so
+`cv2.CAP_PROP_POS_FRAMES` lands on a nearby keyframe, not the requested frame:
+measured against a full sequential decode it is off by **-28..+30 frames**,
+twice the ±15 f tolerance every contact score uses. A windowed probe that seeks
+reports exact numbers about the wrong frames — that is how the G4 far-serve
+score read 6/17 when it was really 11/17 with -9 f offsets.
+
+* Decode the span **sequentially** and index the frames you decoded; prefer ONE
+  continuous pass with one `FrameProcessor` over per-window replays (it is also
+  what `src/main.py` does, so it is strictly more production-faithful than
+  resetting the trackers per window).
+* `tests/test_vfr_seek_guard.py` enforces this over `scripts/`, `src/` and
+  `tests/`, parsing with `ast` so a docstring mention is not an offence and
+  failing on a stale allow-list entry. Two sites are allow-listed as KNOWN
+  ISSUES to fix, not to imitate: `scripts/annotate_player_gt.py` (can show the
+  OWNER a frame ~30 f away, so a GT contact can be judged off its own moment) and
+  `src/db/ingest.py` (UI thumbnail crops).
+* When a far-side signal looks absent, check the detector's `raw_detections`
+  before blaming the tracker or the resolution: the "0-1 tracked frames" figures
+  in the far-serve docs are tracker counts, and the detector sees the far ball
+  in 14-31 of 31 frames at every GT far serve except one.

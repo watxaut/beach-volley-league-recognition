@@ -2692,3 +2692,48 @@ empty).
 data with baseline F1 0.772 / far-serve 0/12; the G1 data also makes the
 gesture-label bucket (`overpass` 0/18) a first-class candidate for the next
 mechanism. The deferred production diag dump would give the stage waterfall.
+
+### 2026-10-01 (forty-ninth session) — S3 DONE: pass-2 side-switch/squad layer; G1's raw team 0.518 corrected to 0.755 (`src/` untouched)
+
+**Asked:** continue with the next point that moves the needle for G3. G2
+(far-serve lever) is an owner decision, S2 is owner-gated and S1 refuted, so
+the next unblocked worker item was **S3 — the pass-2 side-switch/squad layer
+(open point 21.4)**.
+
+**Delivered.** `scripts/resolve_side_switches.py` + 25 tests
+(`tests/test_side_switches.py`) + `docs/g3_side_switch_layer.md`; no `src/`
+change, no video decode. The layer derives the beach switch cadence (change
+ends after every 7 points) from the POINT ORDER alone, maps each court-side
+letter to a squad letter by switch parity, and augments every `actions_pass2`
+entry with `pass2_squad` (+ `pass2_point`) for downstream fantasy/stat
+consumption. Output `output/side_switches.json`; report
+`logs/side_switch_report.md`.
+
+**The needle (a measurement confound found en route).** The perception stack
+speaks COURT-SIDE letters (A=near, B=far, `CourtCalibration.get_team`) while
+the owner/GT convention is SQUAD letters — so G1's recorded raw `team 0.518`
+is side-vs-squad, NOT a side-attribution failure. On the same 139 found
+contacts, mapping side→squad lifts team to **105/139 = 0.755** (identical to
+`pred side vs owner side`, what the stack actually emits), leaving **34
+genuine side errors** (clustered P10/P15/P18/P19/P22/P24–P26/P29–P30 — the
+near/far width-band attribution class). The T4 dev "5 stage-5 team errors, all
+P8" are the same confound at the first switch point.
+
+**Gates.** Derived switches `[7,14,21,28]` are an EXACT match to the owner
+`side_switch_after_point` (validate-only read); P9 f5496 (owner near/squad B)
+is the parity anchor test; 207/207 actions annotated.
+
+**Cross-check honest result.** The player-crossing cross-check (from the R1
+match diag dump, whose player tracking is independent of the ball departure
+gate) gives only **3/4 cadence switches with support AND 16/28 non-switch
+boundaries also supported** — it cannot place switches because tracker ids hop
+(open point 2). It is therefore EVIDENCE ONLY and explicitly NOT used; a
+position-based detector waits on stable identity GT.
+
+**Suite:** **897** (872 + 25). No `src/` change (`git diff 185c6f0 -- src/`
+empty).
+
+**Next:** S4 (consume `pass2_squad`; the winner layer's side→squad mapping can
+now use this schedule instead of GT) and/or the G2 owner decision on the
+far-serve lever (baseline F1 0.772 / far-serve 0/12); the label bucket
+(`overpass` 0/18) remains the largest held-out perception loss.
