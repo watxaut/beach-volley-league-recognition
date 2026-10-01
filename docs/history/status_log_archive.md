@@ -7,6 +7,54 @@
 > `status_where_we_are_archive.md` (same directory); the one-line-per-session
 > index is in STATUS.md. Nothing was edited or deleted.
 
+### 2026-09-30 (forty-third session) — open point 21.3 point winner/outcome layer SHIPPED as a pass-2 script (no `src/` change)
+
+**Asked:** continue open point 21.3 (the owner's match-feedback backlog item 3
+/ G1 critical path): a post-hoc point winner/outcome layer over
+`episode_point_map.json` + `serve_relabel.json` + `pipeline_output.json`, no
+video decode, no `src/` change, validated against the 33 dictated winners. A
+draft (`scripts/resolve_point_winners.py` + `tests/test_point_winners.py`)
+had been left in the tree untracked and unreviewed; the 42nd STATUS said the
+next session touching 21.3 must decide its status.
+
+**Reviewed + landed.** Mechanism: a fault prior over the terminal LIVE touch —
+the side of the last in-window pipeline action (minus the serve layer's
+owner-verdict demotions) loses the point; winner = the other COURT SIDE (A
+near / B far, the perception stack's letters). Structural-only abstains;
+doubt = `confidence: low` + flags. GT-leakage is prevented structurally by
+field projections: the map contributes `point`/`window_frames` only, the serve
+layer `team_emitted` + override FLAGS only; the 13 winner-serves-derived
+`team_resolved` overrides are never inherited (inheriting them would buy 3
+points -> 21/33, not shipped). Ball-death side/in-out is absent from every
+artifact, so kill/ace endings stay misses, not guesses; spike outcomes are
+reported as evidence only (4/10 as a rule).
+
+**Result vs the 33 dictated winners:** 33/33 decided, **18/33 correct =
+54.5%** after the `--validate`-only side->squad mapping (GT switch schedule
+[7,14,21,28]). Misses: 8 terminal-touch attribution (the same far-serve/side
+gap as point 22), 3 kill/ace (ball-death absent), 3 serve_team_misattribution
+(far serves emitted with the wrong side; pass-2 override refused), 1
+owner-pinned serve outside the window (P20 ep45 family). Full table +
+taxonomy: `docs/point_winner_layer.md` (raw run in
+`logs/point_winner_report.md`, git-ignored).
+
+**Verification.** Found and fixed 3 test-side defects in the inherited draft
+(a `None`-window fixture that could not construct; an outcome-signal fixture
+whose resolution frame sat outside its own window; a game-state death-frame
+off-by-one contradicting the file's own `test_ball_death_from_game_on_run`).
+`venv/bin/python scripts/resolve_point_winners.py --validate
+ground_truth/20260920_match_points.json` reproduces `output/point_winners.json`
+and `logs/point_winner_report.md` byte-identically; full suite **782** (755 +
+27). No `src/` edit, no decode, entreno-neutral by construction.
+
+**Verdict / next:** P2/P4/P6/P8 are exactly the 0/5 far-serve points from
+#42 — the winner layer makes the consequence explicit (its terminal touch is
+the receiver's dig). The layer is the G1 plumbing for 13 (ace / serve-fault /
+assist); it ships as an honest baseline and should be consumed only after
+S1–S3 make the terminal touch and the serving side real. The dominant miss
+class is terminal-touch attribution, not winner logic — no winner-layer
+heuristic can fix it.
+
 ### 2026-09-30 (forty-second session) — architect strategy review: G3 generalization plan re-ranked; far-serve CONTACT is the shared gap (docs-only, `src/` at `185c6f0`)
 
 **Asked:** an external LLM proposed that generalization pain is structural

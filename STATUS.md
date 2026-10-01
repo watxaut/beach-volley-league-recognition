@@ -17,7 +17,27 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-01 (forty-seventh session — **G0 DONE: the whole
+**Last updated:** 2026-10-01 (forty-eighth session — **G1 DONE: the first
+HELD-OUT contact score on P9–P33.** `scripts/score_heldout_contacts.py`
+(+20 tests, `tests/test_heldout_contacts.py`) + `docs/g3_heldout_p9_p33.md`;
+no `src/` change, no video decode. On the 183 owner contacts of the 25 held-out
+points the production stream scores **P 0.785 / R 0.760 / F1 0.772**, class
+**0.590**, team **0.518**; pass-2 is flat on F1 (0.774) and again costs class
+(0.561). The re-rank: held-out contact *detection* is BETTER than dev
+(F1 0.772 vs 0.597), so the dev loss budget over-weighted proposal (39% vs
+24%) and under-weighted the gesture label (14% vs **31%** — 57 wrong-label /
+44 missed / 36 wrong-team of 183). `overpass` is never emitted correctly
+held-out (recall 0.000 across 18 contacts). The 12 held-out FAR serves are
+**0/12**: 8/12 have a nearby emitted "serve" (6 are the pass-2 re-labelled GT
+reception, 2 are production serves 26–28 f late with the opposite team), 4
+have nothing within ±80 f — the S0b dev finding reproduced on 12 independent
+contacts. The 44 missed are mostly not empty-stream (41/44 have an action
+within ±80 f, 7–69 f away). The stage waterfall is NOT reproduced (the only
+full-match diag dump is the R1 bw=0.3 run); recorded as unavailable, never
+faked. Suite **872** (+20). **Next = G2: the owner decision on the far-serve
+lever, now decidable on data with baseline F1 0.772 / far-serve 0/12.**)
+
+**Previous (forty-seventh session — **G0 DONE: the whole
 20260920 match contact GT (P1–P33, 211 contacts) is machine-readable.** The
 owner's second line dialect is parsed by `parse_contact_gt`, and
 `scripts/build_match_contact_gt.py` emits
@@ -363,30 +383,38 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
-**G0 DONE (#47): the held-out contact GT is machine-readable; G1 (the held-out
-contact score) is the next action.**
+**G1 DONE (#48): the first held-out contact score exists; G2 (the far-serve
+lever decision) is the next action.**
 
-- **Match contact GT built** — `ground_truth/20260920_match_contacts.json`:
-  33 points, **211 owner contacts** (28 P1–P8 + 183 P9–P33), one event each on
-  the MATCH frame axis (`frame == match_frame`, `source=owner_gt`, coarse
-  `frame_tolerance=15`). Builder `scripts/build_match_contact_gt.py`; dialect-B
-  parsing in `parse_contact_gt` (`scripts/build_dev_clip_gt.py`); sheets + index
-  in `output/match_contact_sheet/`; shapes/conventions in
-  `ground_truth/README.md`.
-- **Regression anchor proven** — the 8 P1–P8 points rebuild field-identical to
-  the committed dev GT (only physical `raw_line_no` shifted +3); every contact
-  line lands in `events`; the 4 `Side switch` flags stay after P7/14/21/28;
-  owner parentheticals verbatim. 852-test suite green; no `src/` change.
-- **Two transcription facts that will bite later** — (a) side→squad mapping is
-  switch PARITY: after the 4 switches P29–P33 `near` is Team A again (fixed a
-  last-switch bug that mislabelled P15–P21 and P29–P33); (b) the P30 f23545
-  touch has no owner action label and is kept as `action=null` +
-  `owner_action_unspecified=true` — contact scoring is class-agnostic, so it
-  still counts as a contact; never invent a label for it.
-- **The far-serve labels EXIST** — the 12 far-serve points P9–P33 carry GT
-  serve contacts (T5/R1/S1 were refuted without held-out labels; G2's lever
-  decision is now decidable on data). S0b (#45) still stands: far serves 0/5 at
-  contact level on P1–P8, pass-2 class −0.143, "park at pass-2" closed.
+- **Held-out score** — `scripts/score_heldout_contacts.py` scores P9–P33
+  against `ground_truth/20260920_match_contacts.json` with the S0b scope
+  discipline (region f5240–f26147 = the padded span of the emission windows;
+  a SCOPED GT copy so P1–P8 can't be charged as FN; `evaluate_timed` matcher,
+  `--ignore-player`, effective ±15 f). Production **P 0.785 / R 0.760 / F1
+  0.772**, class 0.590, team 0.518; pass-2 F1 0.774 / class 0.561 / team 0.561.
+  Doc `docs/g3_heldout_p9_p33.md`; artifacts `output/heldout_contacts/`.
+- **Miss taxonomy (perception, 183 contacts)** — 46 correct / **57
+  wrong_label** / 36 wrong_team / 44 missed. The largest bucket is the label,
+  not proposal. `overpass` 0/18 correct (13 found, all mislabelled); serve
+  recall 0.280 (far serves all missed). Only 3/44 missed have no action within
+  ±80 f.
+- **Far serves 0/12 held-out** — 6/8 with a nearby "serve" are the pass-2
+  re-labelled GT reception (+26…+34 f), 2 are production serves 26–28 f late
+  with the opposite team, 4 have no serve within ±80 f. The S0b dev finding
+  holds on 12 independent contacts; the far-serve CONTACT is measured, not
+  data-starved.
+- **Scope caveat** — the episode-map emission windows are PREDICTIONS and
+  only 12/25 cover their own owner contact range (P32 window f24614–f25085 vs
+  contact f25375); the contact P/R/F1 is window-independent, the dead-time /
+  points metrics inherit the drift.
+- **Stage waterfall gap** — `scripts/waterfall.py` needs a production match
+  diag dump; the only one is the R1 bw=0.3 run, whose gate decisions differ.
+  A fresh production dump is a follow-up decode.
+- **G0 facts stand** — match contact GT `20260920_match_contacts.json`: 33
+  points / **211 owner contacts** (28 P1–P8 + 183 P9–P33), match-frame axis,
+  all `source=owner_gt`; P1–P8 rebuild field-identical (only `raw_line_no`
+  +3); side→squad is switch PARITY; P30 f23545 `action=null` +
+  `owner_action_unspecified`. Builder `scripts/build_match_contact_gt.py`.
 - **New practice video** `20290928_entreno_vall_dhebron.mp4` still not run
   (cheap parallel G3-footage item; it has no labels).
 
@@ -499,22 +527,22 @@ last. One mechanism per session; each step's kill criteria are pre-registered.
   rebuild, every contact line in `events`, switches after P7/14/21/28,
   parentheticals verbatim (`raw_line_no` is the only dev-GT difference, +3 from
   the owner's later header lines). Open point 24(a) closed.
-- **G1 (worker, next) — the first HELD-OUT contact score.** Score the
-  perception stream (and `actions_pass2` as a second arm) on P9–P33 with
-  `scripts/score_pass2_contacts.py`'s scope discipline (point windows padded
-  ±90 f, `--ignore-player`, `evaluate_timed` matcher) into
-  `docs/g3_heldout_p9_p33.md`. This is the number every future mechanism must
-  beat, and the first real measurement of the 12 far-serve contacts. Read the
-  miss buckets first (candidate / reach gate / actor-team / label / survives
-  via `scripts/waterfall.py` on a dump) and re-rank the dev loss budget
-  (11 proposal / 5 actor-team / 4 label) against held-out reality before
-  proposing any mechanism.
-- **G2 (owner decision, after G1) — the far-serve lever.** T5 (tracker
-  admission), R1 (departure gate), S1 (looming) and pass-2 are all refuted;
-  with 12 held-out far-serve contacts now available the choice can finally be
-  made on data: targeted far-flight detector mining vs another
-  contact-proposal mechanism. Any candidate must ship with the G1 number as
-  its baseline and the P9–P33 set as its held-out check.
+- **G1 (worker) — [#48 DONE 2026-10-01] the first HELD-OUT contact score.**
+  `scripts/score_heldout_contacts.py` + `docs/g3_heldout_p9_p33.md`:
+  production F1 0.772 / class 0.590 / team 0.518; miss taxonomy 46 correct /
+  57 wrong-label / 36 wrong-team / 44 missed; far serves **0/12**. The dev
+  loss budget is re-ranked: the LABEL bucket dominates held-out (31%), not
+  proposal (24%). Stage waterfall deferred (needs a production match diag
+  dump). This is the baseline every future mechanism must beat.
+- **G2 (owner decision, now unblocked by G1) — the far-serve lever.** T5
+  (tracker admission), R1 (departure gate), S1 (looming) and pass-2 are all
+  refuted; the 12 held-out far-serve contacts are now measured at **0/12**
+  (baseline F1 0.772), so the choice can be made on data: targeted far-flight
+  detector mining vs another contact-proposal mechanism. The G1 data also
+  re-ranks a THIRD candidate: the **gesture-label bucket is the single largest
+  held-out loss** (`overpass` 0/18), so a label mechanism may buy more than
+  the far serve. Any candidate ships with the G1 number as its baseline and
+the P9–P33 set as its held-out check.
 - **G3-footage (worker, parallel, cheap) — first run of the new practice video**
   `20290928_entreno_vall_dhebron.mp4` (`make run VIDEO=…`, ~21k frames, the
   fastest full video here): sanity-check the pipeline on a second recording
@@ -648,8 +676,12 @@ point number in `docs/history/`.
     **[#46: the held-out labels now EXIST (owner dictated P9–P33 contacts,
     12 of them far-serve), so this point is no longer data-starved — it is
     mechanism-starved. #47: G0 (transcribe) DONE —
-    `ground_truth/20260920_match_contacts.json` (211 contacts, P1–P33). Next =
-    G1 (held-out contact score), then the G2 owner decision on the lever.]**
+    `ground_truth/20260920_match_contacts.json` (211 contacts, P1–P33). #48:
+    G1 held-out score DONE — far serves **0/12** on P9–P33 (8/12 have a
+    nearby emitted "serve": 6 are the pass-2 re-labelled GT reception +26…+34 f,
+    2 are production serves 26–28 f late with the opposite team; 4 have nothing
+    within ±80 f). Baseline F1 0.772 / class 0.590 / team 0.518
+    (`docs/g3_heldout_p9_p33.md`). Next = the G2 owner decision on the lever.]**
     **Status (as of 28th session): MECHANISMS 1+2+3 DONE (mech 3 shipped
     09-28, 28th session).** Mechanism 3 = pass-2 serve re-labeling
     (`scripts/relabel_serves.py`, +29 tests): per TRUE map window, the
@@ -799,15 +831,19 @@ point number in `docs/history/`.
     rebuild field-identical to the committed dev GT (only physical
     `raw_line_no` shifted +3); sheets in `output/match_contact_sheet/`.
     Next: (b) G1 = the first held-out contact score on P9–P33 (perception +
-    pass-2 arms); (c) from then on every pass-2 layer is scored at contact
-    level, and any threshold fit on dev P1–P8 must hold on P9–P33 before it
-    ships. The dictated anchors are too coarse for contact timing (P8 anchor
-    f4700 vs GT serve f4770), so they cannot substitute. Also feeds R2
-    precondition 1. Known scoring caveats for G1: the P30 f23545 event has
-    `action=null` (`owner_action_unspecified`) — class-agnostic contact scoring
-    handles it, class accuracy must skip it; the match methods
+    pass-2 arms) — **[#48 DONE 2026-10-01]**: production F1 0.772 / class
+    0.590 / team 0.518, pass-2 0.774 / 0.561 / 0.561; far serves **0/12**;
+    `scripts/score_heldout_contacts.py` + `docs/g3_heldout_p9_p33.md`; (c) from
+    then on every pass-2 layer is scored at contact level, and any threshold
+    fit on dev P1–P8 must hold on P9–P33 before it ships. The dictated anchors
+    are too coarse for contact timing (P8 anchor f4700 vs GT serve f4770), so
+    they cannot substitute. Also feeds R2 precondition 1. Known scoring
+    caveats for G1: the P30 f23545 event has `action=null`
+    (`owner_action_unspecified`) — class-agnostic contact scoring handles it,
+    class accuracy must skip it; the match methods
     `match_start_frame/end_frame` in that JSON are episode-map PREDICTIONS
-    (`window_is_prediction: true`), never GT.
+    (`window_is_prediction: true`), never GT (only 12/25 cover their own owner
+    contact range, so dead-time/points metrics inherit the drift).
 
 25. **A dig simultaneous with the ball death (new, #46 — OWNER-FLAGGED).**
     P15 f10180: "FT is close to a dig in f10180 but the ball falls to the
@@ -1018,8 +1054,32 @@ survive across sessions; provenance in the archives.
   (the "207 match actions" are PREDICTIONS, not labels). Session 42.
 - Dev loss budget (28 GT contacts, T4): proposal 11 (6 candidate + 5 reach
   gate) > team/actor 5 (4 = post-P7 side switch) > label 4 > survives 8;
-  detection 0. The gesture label is the SMALLEST bucket, so a learned
-  gesture head cannot move G3 by itself. Session 42.
+  detection 0. The gesture label is the SMALLEST dev bucket — but the HELD-OUT
+  budget runs the other way and supersedes it: over P9–P33 (183 contacts)
+  label 57 > missed 44 > team 36 > correct 46 (label 31% vs proposal 24%),
+  so the label is the single largest error class on held-out data. Read the
+  dev budget as clip-specific: the dev proposal gap was the outlier. Session 48.
+- Held-out match contact score (P9–P33, 183 owner contacts, effective
+  tolerance ±15 f): production P 0.785 / R 0.760 / F1 0.772, class 0.590,
+  team 0.518; `overpass` recall **0.000** (18 contacts, 13 found all
+  mislabelled dig/spike/set); serve recall 0.280. Detection F1 is HIGHER than
+  the dev clip (0.597) even though labels/team are lower. Session 48,
+  `docs/g3_heldout_p9_p33.md`.
+- The 12 held-out FAR serves score **0/12** at the effective ±15 f tolerance:
+  6/8 nearby emitted "serve"s are the pass-2 re-labelled GT RECEPTION
+  (+26…+34 f), 2 are production serves 26–28 f late with the opposite team, 4
+  have no serve within ±80 f. Reproduces S0b on independent contacts — the
+  far serve is both a proposal and a label loss. Session 48.
+- Held-out "missed" is mostly NOT an empty stream: only 3/44 missed contacts
+  have no action within ±80 f; the other 41 have a nearby action 7–69 f away
+  (25 a dig). Timing/placement + dense-rally matcher consumption, not absence.
+  Session 48.
+- Match-scoring scope: the episode-map emission windows in
+  `20260920_match_contacts.json` are PREDICTIONS and only 12/25 cover their own
+  owner contact range (P32 window f24614–f25085 vs contact f25375; P20 window
+  f15153 vs contact f14518). The padded span still covers every P9–P33
+  contact, so contact P/R/F1 is window-independent; dead-time/points metrics
+  inherit the drift. Session 48.
 - Device caveat: MPS jitter can flip a gesture label (e.g. e6 f309
   block vs spike); the script path (deterministic) is the reference.
 
@@ -1169,6 +1229,7 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- 2026-10-01 **#48** — G1 DONE: the first HELD-OUT contact score — `scripts/score_heldout_contacts.py` (+20 tests) + `docs/g3_heldout_p9_p33.md`, no `src/` change; P9–P33 (183 owner contacts, region f5240–f26147, effective ±15 f) production **P 0.785 / R 0.760 / F1 0.772**, class 0.590, team 0.518; pass-2 F1 0.774 / class 0.561 / team 0.561; miss taxonomy 46 correct / **57 wrong-label** / 36 wrong-team / 44 missed ⇒ the label bucket is the largest held-out loss (not proposal); `overpass` recall 0.000; far serves **0/12** (6/8 nearby "serves" = pass-2 re-labelled reception +26…+34 f); stage waterfall not reproduced (only match diag dump is R1 bw=0.3), flagged; suite 872.
 - 2026-10-01 **#47** — G0 DONE: the whole-match contact GT (P1–P33) is machine-readable — dialect-B `parse_contact_gt` + `scripts/build_match_contact_gt.py` → `ground_truth/20260920_match_contacts.json` (33 points, **211 owner contacts**: 28 P1–P8 + 183 P9–P33, match-frame axis, all `source=owner_gt`) + 33 contact sheets; P1–P8 rebuild field-identical (only physical `raw_line_no` +3); fixed side→squad mapping to switch PARITY (P29–P33 `near`=Team A again; old last-switch formula mislabelled P15–P21/P29–P33); P30 f23545 unlabelled touch kept `action=null` + `owner_action_unspecified`; no `src/` change; suite 852.
 - 2026-09-30 **#46** — RECORD-ONLY session: owner dictated the **whole 20260920 match contact GT (P1–P33)** in a second dialect (0 of ~196 new lines parse yet; G0 queued) and delivered a new calibrated practice video `20290928_entreno_vall_dhebron.mp4` (1080p, 695 s, ~30.1 fps); camera domain pinned in AGENTS.md §7 (long axis always, fps drops by itself in heat/low light, height varies per video); 3 new open points (25 dig-vs-ball-death, 26 duplicate actor attribution, 29 stale recording docs) + point 5 extended with the owner's "past + ball field" attribution spec; suite 840.
 - 2026-09-30 **#45** — G3 plan S0b: pass-2 stream scored at CONTACT level on the owner P1–P8 GT (`scripts/score_pass2_contacts.py` + 28 tests + `docs/g3_s0b_pass2_contact_score.md`; no `src/` change, no decode): padded-region scope validated by exact T4 parity; far serves **0/5** (deltas 5.4–8.6× tolerance), GT serves matched 1/8, pass-2 F1 0.597→0.604 but class 0.706→**0.562**; "park at pass-2" closed; suite 839.
@@ -1253,6 +1314,63 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+### 2026-10-01 (forty-eighth session) — G1 DONE: first HELD-OUT contact score on P9–P33; far serves 0/12; labels (not proposal) dominate the loss (`src/` untouched)
+
+**Asked:** execute G1 from *Active next*: score the perception stream (and
+`actions_pass2`) at contact level on the held-out match points P9–P33 with
+`score_pass2_contacts.py`'s scope discipline, and re-rank the dev loss budget
+against held-out reality.
+
+**Delivered.** `scripts/score_heldout_contacts.py` (+20 tests,
+`tests/test_heldout_contacts.py`) + `docs/g3_heldout_p9_p33.md`; artifacts
+`output/heldout_contacts/{gt_p9_p33.json,pred_perception.json,pred_pass2.json,g1.json}`.
+No `src/` change, no video decode. The script reuses the tested S0b helpers
+(arm construction, `evaluate_timed` matcher, serve-nearest table) and adds a
+SCOPED-GT writer so P1–P8 events can never be charged as false negatives, a
+contact-level miss taxonomy, and a per-side/per-class recall split.
+
+**Headline.** Region f5240–f26147 (padded span of the P9–P33 emission
+windows; covers all 183 owner contacts, no P1–P8 contact), effective tolerance
+±15 f at 25.67 fps. Production **P 0.785 / R 0.760 / F1 0.772**, class
+**0.590**, team **0.518** (38 FP / 44 FN / 2 dup). Pass-2 F1 0.774, class
+0.561, team 0.561 — again flat on contact and negative on class.
+
+**The re-rank (the point of G1).** Held-out contact DETECTION is BETTER than
+the dev clip (F1 0.772 vs 0.597), while class/team are similar or worse. The
+miss taxonomy over 183 contacts: **46 correct / 57 wrong-label / 36 wrong-team
+/ 44 missed**. Normalized vs the T4 dev waterfall (39% proposal / 18% team /
+14% label), the held-out loss is 24% missed / 20% team / **31% label** — the
+dev budget over-weighted proposal and under-weighted the gesture label. The
+single largest held-out error class is the LABEL, and `overpass` is never
+emitted correctly (recall 0.000 over 18 contacts; 13 found, all dig/spike/set).
+Only 3/44 missed contacts have no action within ±80 f; 41 have one 7–69 f away.
+
+**Far serves 0/12, reproduced on independent contacts.** 8/12 have a nearby
+emitted "serve": 6 are the GT reception the pass-2 layer re-labelled
+(+26…+34 f), 2 are production serves 26–28 f late with the opposite team; 4
+have nothing within ±80 f. Near serves 11/13; all serves 11/25 (serve recall
+0.280 — the far serve is the whole serve-recall hole). This is S0b's dev
+finding confirmed on 12 held-out contacts, and it closes the last excuse for
+leaving the far-serve contact open.
+
+**Honesty notes.** The episode-map emission windows are predictions and only
+12/25 cover their own owner contact range, so the contact P/R/F1 is
+window-independent but the dead-time/points metrics inherit the drift (flagged
+in the doc). The stage waterfall is NOT reproduced: the only full-match diag
+dump is the R1 `bw=0.3` run, whose gate decisions differ from production, so
+the script records `waterfall.available = false` rather than faking stage
+counts; a production diag dump is a follow-up decode. `--autonomous` is not
+used (the pass-2 stream carries owner anchors); the GT-derived-input audit is
+recorded.
+
+**Suite:** **872** (852 + 20). No `src/` change (`git diff 185c6f0 -- src/`
+empty).
+
+**Next:** G2 — the owner decision on the far-serve lever, now decidable on
+data with baseline F1 0.772 / far-serve 0/12; the G1 data also makes the
+gesture-label bucket (`overpass` 0/18) a first-class candidate for the next
+mechanism. The deferred production diag dump would give the stage waterfall.
+
 ### 2026-10-01 (forty-seventh session) — G0 DONE: the whole-match contact GT (P1–P33, 211 contacts) is machine-readable (`src/` untouched)
 
 **Asked:** execute G0 from *Active next*: extend `parse_contact_gt`
@@ -1363,51 +1481,3 @@ tests), `docs/g3_far_serve_looming.md`, `output/s1/far_serve_looming.json`
 contact P 0.586 / R 0.607 / F1 0.597 and `dev_waterfall.json` stage
 `3_candidate` = 6 (the committed T4 baseline; no src change to re-measure).
 Suite **811** (782 + 29).
-
-### 2026-09-30 (forty-third session) — open point 21.3 point winner/outcome layer SHIPPED as a pass-2 script (no `src/` change)
-
-**Asked:** continue open point 21.3 (the owner's match-feedback backlog item 3
-/ G1 critical path): a post-hoc point winner/outcome layer over
-`episode_point_map.json` + `serve_relabel.json` + `pipeline_output.json`, no
-video decode, no `src/` change, validated against the 33 dictated winners. A
-draft (`scripts/resolve_point_winners.py` + `tests/test_point_winners.py`)
-had been left in the tree untracked and unreviewed; the 42nd STATUS said the
-next session touching 21.3 must decide its status.
-
-**Reviewed + landed.** Mechanism: a fault prior over the terminal LIVE touch —
-the side of the last in-window pipeline action (minus the serve layer's
-owner-verdict demotions) loses the point; winner = the other COURT SIDE (A
-near / B far, the perception stack's letters). Structural-only abstains;
-doubt = `confidence: low` + flags. GT-leakage is prevented structurally by
-field projections: the map contributes `point`/`window_frames` only, the serve
-layer `team_emitted` + override FLAGS only; the 13 winner-serves-derived
-`team_resolved` overrides are never inherited (inheriting them would buy 3
-points -> 21/33, not shipped). Ball-death side/in-out is absent from every
-artifact, so kill/ace endings stay misses, not guesses; spike outcomes are
-reported as evidence only (4/10 as a rule).
-
-**Result vs the 33 dictated winners:** 33/33 decided, **18/33 correct =
-54.5%** after the `--validate`-only side->squad mapping (GT switch schedule
-[7,14,21,28]). Misses: 8 terminal-touch attribution (the same far-serve/side
-gap as point 22), 3 kill/ace (ball-death absent), 3 serve_team_misattribution
-(far serves emitted with the wrong side; pass-2 override refused), 1
-owner-pinned serve outside the window (P20 ep45 family). Full table +
-taxonomy: `docs/point_winner_layer.md` (raw run in
-`logs/point_winner_report.md`, git-ignored).
-
-**Verification.** Found and fixed 3 test-side defects in the inherited draft
-(a `None`-window fixture that could not construct; an outcome-signal fixture
-whose resolution frame sat outside its own window; a game-state death-frame
-off-by-one contradicting the file's own `test_ball_death_from_game_on_run`).
-`venv/bin/python scripts/resolve_point_winners.py --validate
-ground_truth/20260920_match_points.json` reproduces `output/point_winners.json`
-and `logs/point_winner_report.md` byte-identically; full suite **782** (755 +
-27). No `src/` edit, no decode, entreno-neutral by construction.
-
-**Verdict / next:** P2/P4/P6/P8 are exactly the 0/5 far-serve points from
-#42 — the winner layer makes the consequence explicit (its terminal touch is
-the receiver's dig). The layer is the G1 plumbing for 13 (ace / serve-fault /
-assist); it ships as an honest baseline and should be consumed only after
-S1–S3 make the terminal touch and the serving side real. The dominant miss
-class is terminal-touch attribution, not winner logic — no winner-layer
-heuristic can fix it.
