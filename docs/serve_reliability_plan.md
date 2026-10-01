@@ -229,7 +229,7 @@ SR3 (owner, async, start now) ─┘            SR7 when its trigger fires
 - **D1: APPROVED.** Run SR2. Production adoption still depends on its kills.
 - **D2: APPROVED, scoped down.** Label vall_dhebron only. The 05-05-2025 video
   is dropped because its conditions are too poor.
-- **D3 (owner, now):** ratify the per-point serve record (post-hoc) as THE serve
+- **D3: APPROVED.** (was: owner, now) ratify the per-point serve record (post-hoc) as THE serve
   product. Pursuing a far serve in the causal `ActionClassifier` stops. The
   production `serve` label becomes a secondary signal.
 

@@ -213,8 +213,9 @@ point number in `docs/history/`.
         `20290928_entreno_vall_dhebron.mp4` only. The 05-05-2025 video is DROPPED
         (bad conditions) and is being removed from the repo. The SR3 target becomes
         "every serve in vall_dhebron, both sides".
-      - **D3:** the post-hoc serve record becomes THE serve product, and the
-        causal far-serve contact chase stops.
+      - **D3: APPROVED.** The post-hoc per-point serve record (SR4 evidence for
+        when and which side, plus SR5 beach-rules decoding for who served) is THE
+        serve product. The causal far-serve contact chase stops.
 
 22. **Far-side serves** — **[#55: SUPERSEDED by point 30. The far-serve contact chase is STOPPED, and its runway/structural evidence is reused as SR4 inputs. The '14/17 at zero FP' figure is IN-SAMPLE (swept on all 17); the held-out binding is 4/12.]** **[#53 SOLVED AS EVIDENCE: 14/17 at ZERO false
     positives, from 0/17.]** Status: the mechanism is MEASURED and the owner
