@@ -2598,3 +2598,37 @@ contact sheet, with the P1–P8 rebuild as the regression anchor.
 windows from the episode map (the match GT's `match_start_frame/end_frame` are
 episode-map PREDICTIONS, flagged), then the G2 far-serve lever decision on real
 labels. Owner-side: capture-spec doc rewrite (point 29).
+
+
+**Previous (forty-seventh session — **G0 DONE: the whole
+20260920 match contact GT (P1–P33, 211 contacts) is machine-readable.** The
+owner's second line dialect is parsed by `parse_contact_gt`, and
+`scripts/build_match_contact_gt.py` emits
+`ground_truth/20260920_match_contacts.json` (211 events, all
+`source=owner_gt`, MATCH frame axis) plus 33 per-point contact sheets. Gates
+met: the 8 P1–P8 points rebuild FIELD-identical to the committed dev GT (only
+physical `raw_line_no` shifts +3 — the owner added header lines later); every
+one of the 211 contact lines lands in `events`; the 4 `Side switch` flags
+stay after P7/14/21/28; parentheticals survive verbatim as `owner_note`.
+Found and fixed en route: team mapping must be switch PARITY — after the 4
+switches P29–P33 `near` is Team A again (the old last-switch formula
+mislabelled P15–P21 and P29–P33). No `src/` change; suite **852** (+12 tests).
+**Next = G1: the first held-out contact score on P9–P33** → G2 far-serve
+lever on real labels.)
+
+
+**Previous (forty-seventh session — **G0 DONE: the whole
+20260920 match contact GT (P1–P33, 211 contacts) is machine-readable.** The
+owner's second line dialect is parsed by `parse_contact_gt`, and
+`scripts/build_match_contact_gt.py` emits
+`ground_truth/20260920_match_contacts.json` (211 events, all
+`source=owner_gt`, MATCH frame axis) plus 33 per-point contact sheets. Gates
+met: the 8 P1–P8 points rebuild FIELD-identical to the committed dev GT (only
+physical `raw_line_no` shifts +3 — the owner added header lines later); every
+one of the 211 contact lines lands in `events`; the 4 `Side switch` flags
+stay after P7/14/21/28; parentheticals survive verbatim as `owner_note`.
+Found and fixed en route: team mapping must be switch PARITY — after the 4
+switches P29–P33 `near` is Team A again (the old last-switch formula
+mislabelled P15–P21 and P29–P33). No `src/` change; suite **852** (+12 tests).
+**Next = G1: the first held-out contact score on P9–P33** → G2 far-serve
+lever on real labels.)

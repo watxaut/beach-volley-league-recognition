@@ -17,7 +17,33 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-01 (fiftieth session — **G3 overpass
+**Last updated:** 2026-10-01 (fifty-first session — **G4: the two serve-EVIDENCE
+event emitters the owner asked for are built, scored and committed.** New
+`src/analysis/serve_events.py`: **E1 `far_flight`** (a ball whose apparent bbox
+width GROWS is flying at the fixed long-axis camera = far-side flight) and **E2
+`runway_occupant`** (any raw person detection whose foot is behind the far line
+and inside the two sidelines CONTINUED TO INFINITY, never behind the near line),
+plus the owner's conjunction `serve_candidate` ("a player in that area, with the
+ball, and a contact"). Wired into `FrameProcessor.process_frame` as pure
+observers, **default OFF** (`--serve-events`), with two inert detector side
+channels (person boxes the play-area filter dropped; pre-static-suppression ball
+candidates). Geometry is image-space from the 8 calibration clicks because the
+far-end ground homography is off by ~10x, and the band STRADDLES the far line as
+a fraction of the court's projected depth. `scripts/score_serve_events.py`
+(+`--control`) + 45 tests + `docs/g4_serve_events.md`; suite **965**.
+Measured on the 17 GT far serves (windowed replay through the real
+`process_frame`): runway **15/17** (only 7/17 genuinely off-court), far flight
+**11/17** in window / **4/17** at +-15 f, conjunction **6/17** in window /
+**3/17** at +-15 f (**3/12 held-out**, offsets 6/6/13 f) against production's
+**0/12**; 24 mid-rally NON-serve control windows give **1** false positive at
++-15 f (4 in window). Verdict: the runway leg is strong, the conjunction is a
+real but thin signal — an evidence stream for the G2 decision, NOT a fix.
+**Next = the owner reads `docs/g4_serve_events.md` and decides whether to consume
+the events in the post-hoc layer (S4) or keep pushing the ball side (a far ball
+is detected ~1 frame in 4 and half the far-serve windows show no growing run at
+all); the label bucket (`overpass` 0/18) is still the largest held-out loss.**)
+
+**Previous (fiftieth session — **G3 overpass
 net-crossing diagnosis: the ball-width crossing signal is REFUTED.** Open
 point 9's "thread the crossing signal into the resolver" lever was probed
 diagnose-only (`scripts/probe_overpass_crossing.py` + 19 tests +
@@ -76,22 +102,6 @@ full-match diag dump is the R1 bw=0.3 run); recorded as unavailable, never
 faked. Suite **872** (+20). **Next = G2: the owner decision on the far-serve
 lever, now decidable on data with baseline F1 0.772 / far-serve 0/12.**)
 
-**Previous (forty-seventh session — **G0 DONE: the whole
-20260920 match contact GT (P1–P33, 211 contacts) is machine-readable.** The
-owner's second line dialect is parsed by `parse_contact_gt`, and
-`scripts/build_match_contact_gt.py` emits
-`ground_truth/20260920_match_contacts.json` (211 events, all
-`source=owner_gt`, MATCH frame axis) plus 33 per-point contact sheets. Gates
-met: the 8 P1–P8 points rebuild FIELD-identical to the committed dev GT (only
-physical `raw_line_no` shifts +3 — the owner added header lines later); every
-one of the 211 contact lines lands in `events`; the 4 `Side switch` flags
-stay after P7/14/21/28; parentheticals survive verbatim as `owner_note`.
-Found and fixed en route: team mapping must be switch PARITY — after the 4
-switches P29–P33 `near` is Team A again (the old last-switch formula
-mislabelled P15–P21 and P29–P33). No `src/` change; suite **852** (+12 tests).
-**Next = G1: the first held-out contact score on P9–P33** → G2 far-serve
-lever on real labels.)
-
 ## North-star goals (set session 24)
 
 Why this project exists — a service for the owner's beach-volley club:
@@ -143,12 +153,13 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
-**G1 DONE (#48), S3 DONE (#49), overpass-crossing diagnosis REFUTED (#50):
-the first held-out contact score exists, the team side-vs-squad confound is
-fixed, and the ball-width net-crossing signal for the worst label class is
-measured ABSENT — the overpass loss is a rule problem, not geometry. G2
-(far-serve lever) is the next owner action; S4 (consume `pass2_squad`) or an
-owner/architect call on an overpass lever the next worker one.**
+**G1 DONE (#48), S3 DONE (#49), overpass-crossing REFUTED (#50), serve-EVIDENCE
+events shipped + scored (#51): the first held-out contact score exists, the team
+side-vs-squad confound is fixed, the overpass loss is measured as a rule (not
+geometry) problem, and the far serve now has two event emitters that surface
+3/17 GT far serves at contact level (3/12 held-out) where the action stream has
+0/12. Next owner action: consume those events post-hoc (S4) or push the ball
+side; S4/`pass2_squad` and the overpass rule/possession call remain open.**
 
 - **Held-out score** — `scripts/score_heldout_contacts.py` scores P9–P33
   against `ground_truth/20260920_match_contacts.json` with the S0b scope
@@ -185,6 +196,18 @@ owner/architect call on an overpass lever the next worker one.**
   implementable rules replayed offline through the imported resolver are ALL
   net-negative (baseline 85 → 71/80/82), so no `src/` change ships; the blocker
   is a reliable possession/next-toucher signal (34 genuine side errors).
+- **G4 serve-evidence events (#51)** — `src/analysis/serve_events.py` emits
+  `runway_occupant` / `far_flight` / `serve_candidate` from the shared frame path
+  as pure observers, **default OFF** (`--serve-events`); `serve_events` appears
+  in `pipeline_output.json` only when they run. Geometry is image-space from the
+  8 calibration clicks (the far-end homography is ~10x wrong), laterally the two
+  sidelines continued to infinity, longitudinally a band straddling the far line
+  (`-0.15..+0.30` x court depth). Scored on the 17 GT far serves vs 24 mid-rally
+  non-serve control windows: runway **15/17** (only 7/17 genuinely off-court),
+  conjunction **3/17** at +-15 f (**3/12 held-out**) vs production **0/12**, FP
+  **1/24**. Doc `docs/g4_serve_events.md`, scorer `scripts/score_serve_events.py`.
+  These are EVIDENCE — no consumer is wired, and the label bucket (`overpass`
+  0/18) is still the largest held-out loss.
 - **Far serves 0/12 held-out** — 6/8 with a nearby "serve" are the pass-2
   re-labelled GT reception (+26…+34 f), 2 are production serves 26–28 f late
   with the opposite team, 4 have no serve within ±80 f. The S0b dev finding
@@ -335,7 +358,27 @@ diagnosed for its worst class — the ball-width net-crossing signal for
 unusable). So the overpass lever is now an owner/architect call on a
 gesture/touch-rule + possession-signal change, not a ball-geometry threshold;
 the rest of the label bucket (spike→block 7, set→dig 10, …) is still
-diagnosed only at the confusion-matrix level.]**
+diagnosed only at the confusion-matrix level.]** **[#51: the owner asked for the EVIDENCE to be emitted
+instead of choosing: G4 delivers `far_flight` + `runway_occupant` +
+`serve_candidate` (default OFF, `docs/g4_serve_events.md`). Scored on the 17 GT
+far serves: runway 15/17, conjunction 3/17 at +-15 f (3/12 held-out) vs
+production 0/12, with 1 FP in 24 non-serve control windows. The remaining choice
+is 'consume the events post-hoc (S4)' vs 'keep pushing the ball side'.]**
+- **G4 (owner decision, evidence now measured) — consume the serve events or
+  push the ball side.** `src/analysis/serve_events.py` + `docs/g4_serve_events.md`
+  emit `runway_occupant` / `far_flight` / `serve_candidate` (default OFF,
+  `--serve-events`, inert otherwise). Measured: the runway leg is strong (a
+  person is in the far band at 15/17 GT far serves, 10/12 held-out) but only
+  7/17 of them are genuinely OFF-court; the conjunction lands **3/17** contacts
+  (+-15 f) against production's **0/12**, with 1 FP in 24 mid-rally non-serve
+  control windows. So: (a) consume `serve_candidate` in the post-hoc layer as a
+  serve EVIDENCE record (never as a label — pass-2 proved the label-source route
+  at 0/5 with 3 correct dig labels broken), and/or (b) attack the bottleneck the
+  measurement exposes — a far ball is detected on ~1 frame in 4 and half the
+  far-serve windows have NO growing-width run at all, a detector/temporal
+  problem, not a gesture one. Any consumer ships with F1 0.772 / far-serve 0/12
+  as its baseline and P9–P33 as the held-out check; re-score with
+  `scripts/score_serve_events.py` (`--control` for the false-positive side).
 - **G3-footage (worker, parallel, cheap) — first run of the new practice video**
   `20290928_entreno_vall_dhebron.mp4` (`make run VIDEO=…`, ~21k frames, the
   fastest full video here): sanity-check the pipeline on a second recording
@@ -784,6 +827,25 @@ survive across sessions; provenance in the archives.
 **Measurement & eval conventions**
 - `evaluate_match_points.py`'s 31/33 ratio compares counts, not temporally matched recall; the episode map/serve relabel results use GT structure and owner corrections, so autonomous winner/scoring evaluation must exclude those inputs (#30 assessment).
 - Canonical `pipeline_output.json` persists events, point segments and sparse thumbnail snapshots, not the dense ball/player/pose sequence; temporal-model experiments need a feature sidecar, not just existing event JSON (`json_exporter.py`, #30 assessment).
+- The 4-corner ground homography is **badly wrong at the far end** of the beach
+  match: it predicts a 1.8 m person ~7 px tall at the far baseline where the
+  detector returns 90-160 px boxes (the assumed 16x8 m does not match the
+  projected court). Far-end regions must be defined in IMAGE space from the 8
+  calibration clicks, never in metres via `image_to_world` (#51).
+- A runway band must STRADDLE the far baseline: strictly behind it a person is
+  present at only 7/17 GT far serves, `-0.15..+0.30` x court depth at 17/17 —
+  far-side servers stand ON the line. Express such bands as a FRACTION of the
+  court's projected depth (venue coupling, AGENTS.md §7) (#51).
+- A foot-based ground gate is wrong for the BALL: the contact happens at hand
+  height and the ball is airborne afterwards (a far serve rises to y~306, above
+  the wedge apex at 504). Gate ball sightings on the NET line instead (#51).
+- A far ball is detected on roughly **1 frame in 4** (beach match); any
+  consecutive-frame run logic throws the flight away unless it tolerates ~3-frame
+  gaps (#51).
+- Detectors can expose INERT read-only side channels for observers (person boxes
+  the play-area filter dropped; pre-static-suppression ball candidates) without
+  touching the returned list — the serve emitters need exactly these
+  (`PlayerDetector.off_area_detections`, `BallDetector.raw_detections`) (#51).
 - Recorded action F1s REQUIRE `evaluate --ignore-player`: GT player_id is
   a per-frame L-R index; with player matching on, IDENTICAL streams score
   0.933 vs 0.133. GT id conventions: e1/e3 = L-R indices, e4/e5 =
@@ -1071,7 +1133,7 @@ survive across sessions; provenance in the archives.
   (builtin agents; project agents live in `.pi/agents/`).
 
 ## Session index (one line each)
-
+- #51 G4 serve-evidence events (far flight + runway + conjunction): default-off observers in `process_frame`, scored 3/17 GT far serves at +-15 f vs production 0/12 — `docs/g4_serve_events.md`.
 Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
@@ -1163,6 +1225,68 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+### 2026-10-01 (fifty-first session) — G4: serve-EVIDENCE event emitters (far flight + serve runway), scored against the 17 GT far serves
+
+**Asked:** (1) "add the far-flight detector as a new event that we can use to
+decide"; (2) the server "is sometimes not tracked because he is outside the
+court" -> "create an event emitter that includes any person that is inside the
+two side lines if they were to continue at infinitum, and outside of the court,
+that is behind the far line and in front of the near line"; "the serve must
+come from a player in this area with the ball and with a contact. With these 2
+together we might be able to detect more."
+
+**Diagnosed first (no `src/` touched).** Over the 17 GT far serves of the beach
+match with raw person detections: a STRICTLY-behind-the-far-line region sees a
+person at only **7/17**, because far-side servers often stand ON the line (and
+their 85-160 px boxes are what the detector returns, not the ~7 px the 4-corner
+homography predicts -> far-end metre gates are meaningless here). A band
+straddling the line sees one at **17/17**, so the band straddles and is
+expressed as a FRACTION of the court's projected depth (venue coupling,
+AGENTS.md §7). Raw ball detections show a growing-width far flight in the
+window at 10/17, and a far ball is detected on only ~1 frame in 4.
+
+**Delivered.** `src/analysis/serve_events.py` (`ServeRunway` image-space wedge
++ band, `FarFlightDetector`, `ServeRunwayWatcher`, `ServeEventEmitter`), wired
+into `FrameProcessor.process_frame` as pure observers behind
+`serve_events_enabled` (default OFF, `--serve-events`); inert read-only side
+channels `PlayerDetector.off_area_detections` (person boxes the play-area filter
+dropped) and `BallDetector.raw_detections` (pre-static-suppression ball
+candidates, the AGENTS.md §6 escalation path); `serve_events` key in
+`pipeline_output.json` only when they ran; `scripts/score_serve_events.py`
+(+`--control`), 45 tests, `docs/g4_serve_events.md`. Suite 965.
+
+**Two corrections the first scoring run forced.** The far-flight onset gate was
+the foot band, which rejects the contact itself (the ball is at hand height) and
+then rejects the whole flight (it rises to y~306, above the wedge apex at 504)
+-- it is now gated on the NET line. And runs were consecutive-only, which throws
+away a 1-frame-in-4 ball -- they now tolerate `far_flight_max_gap` (3).
+
+**Measured** (windowed replay through the real `process_frame`, GT far serves vs
+24 mid-rally non-serve control windows):
+
+| event | far serves (17) | held-out (12) | control (24) |
+|---|---|---|---|
+| `runway_occupant` near the serve | 15 | 10 | 18 |
+| ... genuinely off-court | 7 | 5 | 5 |
+| `far_flight` in window / at +-15 f | 11 / 4 | 9 / 3 | 14 / 8 |
+| `serve_candidate` in window / at +-15 f | 6 / **3** | 5 / **3** | 4 / **1** |
+
+Contact-level: **3 hits vs 1 false positive** (P25 d=13, P26 d=6, P32 d=6)
+where production scores **0/12** held-out. Honest read: E2 (runway) is the
+strong leg and it confirms the owner's premise (the server is usually DETECTED
+but not trackable); E1 alone is a weak discriminator (4/17 vs 8/24 control, S1's
+kill 2 reproduced held-out) and only pays off after E2; the conjunction is a
+real but thin signal, an evidence stream for the G2 decision, not a fix.
+
+**Workspace note:** an external `git reset --hard` in this repo reverted the
+tracked-file edits twice mid-session; the work is committed (5b678b2) and the
+patch is also kept at `/tmp/apply_serve_events.py` for re-application.
+
+**Next:** the owner decides between consuming `serve_candidate` as post-hoc
+serve EVIDENCE (never as a label) and pushing the ball side, where the measured
+bottleneck is detector/temporal (a far ball is seen 1 frame in 4; half the
+far-serve windows show no growing run at all).
+
 ### 2026-10-01 (fiftieth session) — G3 overpass net-crossing diagnosis: the ball-width crossing signal is REFUTED (`src/` untouched)
 
 **Asked:** continue the next point that moves the needle for G3 after the
