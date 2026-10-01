@@ -246,6 +246,26 @@ S4/`pass2_squad` and the overpass rule/possession call remain open.**
   `scripts/probe_far_serve_{tracking,geometry}.py`. These are EVIDENCE — no
   consumer is wired, and the label bucket (`overpass` 0/18) is still the largest
   held-out loss.
+- **Scale-aware geometry REFUTED (#52, the owner's "lets try scale aware
+  geometry")** — `scripts/scale_aware_harness.py` (subclass of the production
+  `ActionClassifier`, OUTSIDE `src/` per the refuted-mechanism rule) +
+  `scripts/probe_scale_aware_geometry.py` + `docs/g4_scale_aware_geometry.md`;
+  7 fidelity/inertness tests pin the `px` arm to `super()`. Arms over the SAME
+  recorded ball tracks (57 windows: 17 far serves, 16 near, 24 non-serve
+  controls; +-15 f): thresholds as `k x ball width` buy **+1 far contact
+  (held-out only, 0 on dev) for +4 control false positives** -> precision 0.40
+  -> 0.33; k=0.5 buys nothing and still costs a FP. A **mirror** arm (a
+  far-side serve is hit at the camera, so the ball PEAKS and descends — the
+  mirror of the `bounce` shape) adds nothing on top. The multiplier each test
+  would need says why (`--required-k`): bounce **8.2** ball widths, redirect
+  **2.4** (near-equivalents 4.5 / 1.3); the tests reachable at k~0 (drive decel,
+  serve fed ascent, mirrored peak) are reachable because they no longer
+  discriminate (any downward change / gravity arc / lob apex passes). Three
+  walls, none a threshold size: 8/17 far serves have **no usable vertex at all**
+  (0-1 tracked frames), the rest are **wrong shape/sign** (depth-dominated
+  motion), and the contacts that do fire are **wrong label** (attribution picks
+  the nearest tracked player). The G4 evidence path still dominates every arm
+  (6 hits / 4 FP = 0.60 precision, 0.35 recall). Nothing shipped.
 - **WHY the far serve dies (#51, the "which signal does not switch" answer)** —
   `docs/g4_far_serve_failure_mode.md`. The stage waterfall is nearly IDENTICAL
   far vs near (first failing stage: candidate 6/17 vs 7/16; probe reasons
@@ -440,10 +460,14 @@ is 'consume the events post-hoc (S4)' vs 'keep pushing the ball side'.]**
   contact GEOMETRY is the signal that does not switch. Far-side contact tests
   reach 0 of 4 (no lowest vertex, 0 px horizontal flip, dvy +4 vs <= -8, dvx 2
   vs >= 12, fed ascent +0..+4 vs >= 10) while near-side control reaches them and
-  fires 5/10. Two options, both owner-gated: (a) SCALE-AWARE geometry --
-  thresholds in ball widths / local court scale instead of absolute px, which
-  must ship with a near-side non-regression A/B and the non-serve controls; or
-  (b) consume `serve_candidate` post-hoc as evidence (never as a label).]**
+  fires 5/10. **Option (a) SCALE-AWARE geometry was tried and is REFUTED**
+  (#52): +1 far contact (held-out only, 0 on dev) for +4 control false
+  positives, precision 0.40 -> 0.33; a mirror arm adds nothing. Required-k
+  arithmetic in `docs/g4_scale_aware_geometry.md`: bounce would need 8.2 ball
+  widths, redirect 2.4 (near: 4.5 / 1.3), and the k~0-reachable tests are
+  reachable only because they stop discriminating. So option (b) is what
+  remains: consume `serve_candidate` post-hoc as evidence (never as a label),
+  plus the ball-PRESENCE question (8/17 far serves have no usable vertex).]**
 - **G3-footage (worker, parallel, cheap) — first run of the new practice video**
   `20290928_entreno_vall_dhebron.mp4` (`make run VIDEO=…`, ~21k frames, the
   fastest full video here): sanity-check the pipeline on a second recording
@@ -922,6 +946,14 @@ survive across sessions; provenance in the archives.
   motion is DEPTH-dominated (growing + descending toward the lens). Any far-serve
   fix must therefore add a depth cue (apparent-size growth = the G4
   `far_flight` event) or make the geometry scale-relative (#51).
+- Scale-aware contact geometry is **refuted for the far serve**, and the
+  arithmetic says why: where the ball is tracked, the tests would need a
+  threshold of 8.2 (bounce) / 2.4 (redirect) BALL WIDTHS vs near-side
+  equivalents of 4.5 / 1.3, and the tests reachable at k~0 are reachable only
+  because they stop discriminating (any downward velocity change, any gravity
+  arc, any lob apex). The far deficit is shape/sign (depth-dominated motion)
+  plus ball absence, never threshold size — do not re-attempt it as a k sweep
+  (#52, `docs/g4_scale_aware_geometry.md`).
 - **A probe that builds its config from `Config.default()` alone runs the COCO
   `yolov8n.pt` ball detector, not the fine-tuned model** `src/main.py`
   auto-loads — it under-reports the ball legs badly (far-flight at +-15 f 4/17 ->

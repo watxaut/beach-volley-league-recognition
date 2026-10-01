@@ -272,6 +272,68 @@ def summary_line(path: Path) -> str:
             f"pre_contact_speed_max={top:5.1f}/8 px-f")
 
 
+def required_k(path: Path) -> Dict[str, Any]:
+    """The multiplier k (in ball widths) each test would NEED to fire here.
+
+    This is the decisive number for a scale-aware mechanism: a test whose
+    required k is finite can in principle be reached by lowering the threshold
+    (at the cost of inventing contacts elsewhere); a test with required k = inf
+    has NO valid vertex at all, so no threshold can reach it and the lever is
+    arithmetically wrong for that window.
+    """
+    frame = int(path.stem.split("_f")[1])
+    side = gt_side(frame)
+    widths: Dict[int, int] = {}
+    history = []
+    for line in path.read_text().splitlines():
+        rec = json.loads(line)
+        f = int(rec.get("frame", -1))
+        for det in rec.get("ball_dets") or []:
+            bbox = det.get("bbox")
+            if bbox and len(bbox) == 4:
+                widths[f] = max(1, bbox[2] - bbox[0])
+        bt = rec.get("ball_track") or {}
+        if bt.get("state") != "tracked":
+            continue
+        center = bt.get("center")
+        if center and center[0] is not None:
+            history.append((f, float(center[0]), float(center[1])))
+    if not history:
+        return {"side": side, "frame": frame, "n": 0}
+    clf = classifier()
+    for f, x, y in history:
+        w = float(widths.get(f, 20))
+        clf._ball_history.append((f, x, y, w, w))
+    info = analyse([{"frame": f, "center": [x, y], "width": widths.get(f, 20),
+                     "height": widths.get(f, 20)} for f, x, y in history], frame)
+    nums = [n for f, n in info["per_frame"].items() if abs(f - frame) <= 15 and "vin" in n]
+    if not nums:
+        return {"side": side, "frame": frame, "n": len(history), "k": {}}
+    need: Dict[str, float] = {}
+
+    def best(fn, default=float("inf")):
+        vals = [v for v in (fn(n) for n in nums) if v is not None and v < float("inf")]
+        return min(vals) if vals else default
+
+    bw = lambda n: max(1.0, float(widths.get(n.get("frame", 0), 20)))  # noqa: E731
+    # bounce: a LOWEST vertex with the needed rise on both sides
+    need["bounce"] = best(lambda n: (max(n["rise_left"], n["rise_right"]) / bw(n))
+                          if n["is_lowest"] else None)
+    # redirect: a horizontal sign flip (structural) then the needed magnitude
+    need["redirect"] = best(lambda n: (max(abs(n["inc"][0]), abs(n["out"][0])) / bw(n))
+                            if n["inc"][0] * n["out"][0] < 0 else None)
+    # drive decel: dvy must be NEGATIVE (structural), then the magnitude
+    need["drive_decel"] = best(lambda n: (abs(n["dvy"]) / bw(n)) if n["dvy"] < 0 else None)
+    need["drive_impulse"] = best(lambda n: abs(n["dvx"]) / bw(n) if n["dvx"] else None)
+    # serve branch: pops_up and a POSITIVE fed ascent (structural), then magnitude
+    need["serve_fed"] = best(lambda n: (n["fed_ascent"] / bw(n))
+                             if n["pops_up"] and n["fed_ascent"] and n["fed_ascent"] > 0 else None)
+    # mirrored: a PEAK vertex with a drop on both sides (structural)
+    need["mirror_peak"] = best(lambda n: (max(-n["rise_left"], -n["rise_right"]) / bw(n))
+                               if (n["rise_left"] <= 0 and n["rise_right"] <= 0) else None)
+    return {"side": side, "frame": frame, "n": len(history), "k": need}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dump", default="",
@@ -279,11 +341,40 @@ def main() -> int:
     ap.add_argument("--dir", default="",
                     help="directory of such dumps: prints the whole table")
     ap.add_argument("--side", default="far")
+    ap.add_argument("--required-k", action="store_true",
+                    help="the multiplier each test would NEED (in ball widths)")
     ap.add_argument("--point", type=int, default=0)
     ap.add_argument("--frame", type=int, default=0)
     args = ap.parse_args()
 
     if args.dir:
+        if args.required_k:
+            print("side P    contact   tracked | required k (ball widths) per test; inf = NO valid vertex")
+            agg: Dict[str, List[float]] = {}
+            for path in sorted(Path(args.dir).glob("*.jsonl")):
+                row = required_k(path)
+                if not row.get("k"):
+                    print(f"{row['side']:>4} f{row['frame']:<6} {row['n']:>4} | (no usable vertex)")
+                    continue
+                cells = []
+                for test, value in row["k"].items():
+                    agg.setdefault(test, []).append(value)
+                    agg.setdefault(f"{test}@{row['side']}", []).append(value)
+                    cells.append(f"{test}={'inf' if value == float('inf') else format(value, '.1f')}")
+                print(f"{row['side']:>4} f{row['frame']:<6} {row['n']:>4} | " + " ".join(cells))
+            print("\nfinite-k rate and median, by side (k in ball widths; production equivalent k~1)")
+            for test in ("bounce", "redirect", "drive_decel", "drive_impulse",
+                         "serve_fed", "mirror_peak"):
+                line = [f"{test:<14}"]
+                for side in ("far", "near"):
+                    vals = [v for v in agg.get(f"{test}@{side}", []) if v < float("inf")]
+                    total = len(agg.get(f"{test}@{side}", []))
+                    if not total:
+                        continue
+                    med = sorted(vals)[len(vals) // 2] if vals else float("nan")
+                    line.append(f"{side}: finite {len(vals):>2}/{total:<2} median {med:5.1f}")
+                print("  " + "  ".join(line))
+            return 0
         print("side P    contact  trk   w   at f    the four contact tests at the closest usable vertex")
         for path in sorted(Path(args.dir).glob("*.jsonl")):
             print(summary_line(path))

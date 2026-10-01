@@ -44,6 +44,7 @@ from scripts.score_serve_events import (  # noqa: E402
     MATCH_CALIB,
     MATCH_GT,
     MATCH_VIDEO,
+    load_control_contacts,
     load_far_serves,
     load_serves,
     production_config,
@@ -155,6 +156,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--side", default="far", choices=["far", "near"],
                     help="far = the loss under study; near = the CONTROL side")
+    ap.add_argument("--control", action="store_true",
+                    help="score mid-rally NON-serve contacts instead (false-positive windows)")
+    ap.add_argument("--control-limit", type=int, default=24)
     ap.add_argument("--points", default="")
     ap.add_argument("--before", type=int, default=90)
     ap.add_argument("--after", type=int, default=60)
@@ -165,8 +169,13 @@ def main() -> int:
                     help="directory for the per-window diag JSONL (probe_far_serve_geometry reads it)")
     args = ap.parse_args()
 
-    serves = load_far_serves(ROOT / MATCH_GT) if args.side == "far" \
-        else load_serves(ROOT / MATCH_GT, args.side)
+    if args.control:
+        serves = load_control_contacts(ROOT / MATCH_GT, args.control_limit)
+        print(f"CONTROL mode: {len(serves)} mid-rally non-serve windows")
+    elif args.side == "far":
+        serves = load_far_serves(ROOT / MATCH_GT)
+    else:
+        serves = load_serves(ROOT / MATCH_GT, args.side)
     if args.points:
         want = {int(p) for p in args.points.split(",") if p}
         serves = [s for s in serves if s["point"] in want]
