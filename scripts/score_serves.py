@@ -813,9 +813,25 @@ def build_match_session() -> Dict[str, Any]:
     }
 
 
+def session_pipeline_path(n: int) -> str:
+    """The pipeline run to score for ``video_entreno_N``.
+
+    The `output/video_entreno_*` artifacts are from 2026-09-04/06, i.e. BEFORE
+    the v3 ball detector (09-26) and the pose gates (09-27) -- SR0 measured that
+    they read as 3/5 serves where the plan quoted 4/5.  A fresh production run
+    under `output/sr1/` therefore wins, and the staleness of a run is visible in
+    the report (each stream prints its `processed_at` + commit).
+    """
+    for candidate in (f"output/sr1/entreno_{n}/pipeline_output.json",
+                      f"output/video_entreno_{n}/pipeline_output.json"):
+        if (REPO / candidate).exists():
+            return candidate
+    return f"output/sr1/entreno_{n}/pipeline_output.json"
+
+
 def build_entreno_session(n: int) -> Dict[str, Any]:
     gt_path = f"ground_truth/video_entreno_{n}_annotations.json"
-    pipeline_path = f"output/video_entreno_{n}/pipeline_output.json"
+    pipeline_path = session_pipeline_path(n)
     gt = _read(gt_path)
     pipeline = _read(pipeline_path)
     streams = []

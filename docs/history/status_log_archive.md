@@ -2991,3 +2991,74 @@ far_roi_ball,structural_serve_sweep,seek_offsets}.json`; docs
 the evidence post-hoc for who-served / aces / serve faults; the label bucket
 (`overpass` 0/18) is still the largest held-out perception loss; the
 owner-GT-annotator seek wants a fix before the next annotation pass.
+
+### 2026-10-02 (fifty-fourth session) — S4 DONE: the serve evidence is a real artifact, and it needs two numbers
+
+**Asked:** "do recommendation" — build the approved operating point (the 14/17
+union of the gated conjunction and the structural arm, consumed post-hoc).
+
+**Shipped.** `ServeContactProposer` in `src/analysis/serve_events.py` (inside the
+`--serve-events` envelope, 5 `serve_structural_*` config keys, drift-guard clean,
+12 unit tests): a runway occupant + a ball-SIZED (8-60 px) far-side detection
+within 1.5 bbox heights, WITHOUT the `far_flight` requirement, one candidate per
+run, the contact at the run's last frame. `scripts/consume_serve_evidence.py`
+(pass 2) reads `pipeline_output.json` + the point map and writes
+`output/serve_evidence.json` — 87 records, 21 with both arms agreeing, 19/33
+points bound, plus a `validation` block and a `disclaimer`. It touches nothing
+else: no `events`, no CSV, no DB (AGENTS.md §6, the S0b lesson).
+
+**The production artifact is a real run**, not a probe: `src.main` over the
+match with `--serve-events`, 26 061 frames, 33 min on MPS, serve events
+runway 395 / far flight 578 / conjunction 443 / structural 60.
+
+**Inertness is measured, not asserted.** `scripts/probe_serve_events_inertness.py`
+decodes one span sequentially into two processors (emitters off, then on) on CPU:
+actions OFF 1 / ON 1, **byte-identical**, no `serve_events` key with them off,
+20 events with them on. The observers add a key and nothing else.
+
+**The honest result is two numbers, and the doc leads with the difference.**
+
+| measure | value |
+|---|---|
+| evidence coverage (anchored on the GT contact) | **14/17** GT far serves |
+| the consumer's own binding (no GT, as shipped) | **9/17** (dev **5/5**, held-out **4/12**) |
+| owner FALSE/OFFGAME false positives | **1** (f5121 "ball handling after the point ended") -> precision **0.90** |
+| points with a serve record | 19/33 (7 of them in points the map calls near-served, which this layer cannot observe — reported, never consumed) |
+
+This is the G1 shape again: the signal is there, the interpretation is the loss.
+Reporting only 14/17 would be the mistake the whole G1 exercise exists to
+prevent, so both numbers are in `docs/g4_serve_evidence.md` and in the artifact's
+`validation` block.
+
+**Two implementation findings worth keeping.** (1) Binding by **dead-time
+episode** rather than by the pass-2 point window removed a whole failure class:
+the first version scored 8/17 and four of its misses were serves that fall
+outside their own predicted window (the episode map's windows are PREDICTIONS,
+12/25 cover their own contact range). The emitted contacts are not predictions
+and already partition the video, so binding through them is both cheaper and
+more faithful. (2) The selector is ONE constant — the record closest to the
+reception that is at least `min_next_gap = 20` frames from it, which drops the
+post-contact echo (the ball still inside the server's bbox a few frames after
+the hit) and the walk to the serve line. The sweep ships in the artifact and is
+flat over 15-20 f (9/17 at both), so the constant is not balanced on a knife
+edge.
+
+**The five binding misses, diagnosed.** P14 / P22 / P23 have **no record at all**
+near the serve (closest 117 f, 187 f, nothing) — an evidence gap, not a binding
+gap. P28 and P31 have a second record 8-19 f from the contact (P31: 24535 and
+24648 for a 24543 serve) and nothing in the emitted stream says which side of the
+contact the ball is on. **The missing ingredient is already measured and unused:
+the net crossing** — a served ball crosses the calibrated net line toward the
+camera, and the 578 `far_flight` events carry the width growth that precedes it.
+That is a post-hoc computation over the existing artifact (no re-decode) and it
+is the next session's lever.
+
+Artifacts: `output/serve_evidence.json`,
+`output/20260920_match_ari_joan_lost/pipeline_output.json`; docs
+`docs/g4_serve_evidence.md`; tests `tests/test_serve_evidence_consumer.py` (25).
+Suite **1036**.
+
+**Next:** the net-crossing selector, then S4's ace / serve-fault derivation off
+the 19/33 points that already carry a record. The label bucket (`overpass` 0/18)
+is still the largest held-out perception loss, and the owner-GT-annotator seek
+that `tests/test_vfr_seek_guard.py` flagged still wants a sequential-cursor fix.

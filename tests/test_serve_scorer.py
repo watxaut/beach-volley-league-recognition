@@ -338,6 +338,17 @@ class TestSessionBuilders:
     def test_every_entreno_session_has_a_gt_path_that_exists(self, n):
         assert (ROOT / S.build_entreno_session(n)["gt"]).exists()
 
+    def test_a_fresh_practice_run_beats_the_stale_artifact(self, tmp_path, monkeypatch):
+        """SR0 measured that `output/video_entreno_*` predates the v3 detector
+        (09-26) and the pose gates (09-27), so a run under `output/sr1/` wins."""
+        monkeypatch.setattr(S, "REPO", tmp_path)
+        (tmp_path / "output" / "video_entreno_2").mkdir(parents=True)
+        (tmp_path / "output" / "video_entreno_2" / "pipeline_output.json").write_text("{}")
+        assert S.session_pipeline_path(2).startswith("output/video_entreno_2")
+        (tmp_path / "output" / "sr1" / "entreno_2").mkdir(parents=True)
+        (tmp_path / "output" / "sr1" / "entreno_2" / "pipeline_output.json").write_text("{}")
+        assert S.session_pipeline_path(2) == "output/sr1/entreno_2/pipeline_output.json"
+
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
