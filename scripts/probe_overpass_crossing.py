@@ -42,6 +42,11 @@ Pre-registered KILLS (frozen before the held-out look):
   toucher's team at overpasses < 1.5x the controls -> the structural
   next-possession signal is also unavailable in the stream.
 
+As a second step the probe REPLAYS the production ``ActionContextResolver``
+(imported, never reimplemented) over the diag dump's raw
+``candidate_passed_gates`` contacts with three candidate overpass rules; all
+are net-negative on P9-P33, which is why no ``src/`` change ships.
+
 Usage (defaults reproduce the doc)::
 
     venv/bin/python scripts/probe_overpass_crossing.py
@@ -60,6 +65,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import evaluate_timed as et  # noqa: E402
+from src.recognition.action_context import ActionContextResolver  # noqa: E402
+from src.recognition.volleyball_actions import VisualGesture, VolleyballAction  # noqa: E402
 from src.utils.diagnostics import load_diag  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
@@ -320,6 +327,139 @@ def build_pairs(gt_contacts: Sequence[Dict[str, Any]],
 
 
 # ----------------------------------------------------------------------
+# resolver rule replay (offline; no src/ change)
+# ----------------------------------------------------------------------
+
+_GESTURES = {
+    "bump_set": VisualGesture.BUMP_SET,
+    "attack": VisualGesture.ATTACK,
+    "block": VisualGesture.BLOCK,
+    "unknown": VisualGesture.UNKNOWN,
+}
+
+
+def load_raw_contacts(diag_path: str) -> List[Dict[str, Any]]:
+    """The resolver's INPUT contacts from the diag dump.
+
+    ``candidate_passed_gates`` records carry exactly what ``_decide`` reads
+    (gesture, near_net, behind_baseline, team, ball_side, kind) -- so the
+    resolver can be replayed offline instead of reimplemented.  Caveat: the
+    dump is the bw03 run, so contacts its departure gate removed are absent.
+    """
+    recs = load_diag(diag_path)["frames"]
+    out: List[Dict[str, Any]] = []
+    for rec in recs.values():
+        for c in rec.get("candidates") or []:
+            if c.get("stage") != "candidate_passed_gates":
+                continue
+            out.append({
+                "frame": int(c["frame"]),
+                "gesture": _GESTURES.get(c.get("gesture"), VisualGesture.UNKNOWN),
+                "near_net": bool(c.get("near_net")),
+                "behind_baseline": bool(c.get("behind_baseline")),
+                "team": c.get("team"),
+                "ball_side": c.get("ball_side"),
+                "contact_kind": c.get("kind"),
+            })
+    return sorted(out, key=lambda c: c["frame"])
+
+
+def _rule_next_team_crossing(c, nxt, resolved, resolver):
+    """Rule A: any bump-set whose NEXT contact is the opposite team crosses."""
+    if (c["gesture"] == VisualGesture.BUMP_SET and nxt is not None
+            and nxt["frame"] - c["frame"] <= resolver.rally_reset_gap
+            and nxt.get("team") != c.get("team")):
+        return VolleyballAction.OVERPASS
+    return None
+
+
+def _rule_no_follow_touch(c, nxt, resolved, resolver):
+    """Rule C/D: a net bump-set with NO follow is overpass (t1/t3 too)."""
+    no_follow = nxt is None or nxt["frame"] - c["frame"] > resolver.rally_reset_gap
+    if (c["gesture"] == VisualGesture.BUMP_SET and c["near_net"] and no_follow
+            and not (c["behind_baseline"] and resolved.get("new_possession"))):
+        return VolleyballAction.OVERPASS
+    return None
+
+
+def _rule_next_team_with_side(c, nxt, resolved, resolver):
+    """Rule E: Rule A additionally requiring ball-side evidence on the ball."""
+    if (c["gesture"] == VisualGesture.BUMP_SET and nxt is not None
+            and nxt["frame"] - c["frame"] <= resolver.rally_reset_gap
+            and nxt.get("team") != c.get("team")
+            and nxt.get("ball_side") == c.get("team")):
+        return VolleyballAction.OVERPASS
+    return None
+
+
+RULES = {
+    "ruleA_next_team": _rule_next_team_crossing,
+    "ruleCD_no_follow": _rule_no_follow_touch,
+    "ruleE_next_team_side": _rule_next_team_with_side,
+}
+
+
+def replay_resolver(contacts: Sequence[Dict[str, Any]],
+                    rule=None) -> List[Dict[str, Any]]:
+    """Replay ``ActionContextResolver`` over raw contacts, optionally applying
+    a candidate overpass rule when the baseline did NOT emit ``overpass``."""
+    resolver = ActionContextResolver()
+    out: List[Dict[str, Any]] = []
+    for i, c in enumerate(contacts):
+        nxt = contacts[i + 1] if i + 1 < len(contacts) else None
+        r = resolver.resolve(c, nxt)
+        action = r["action"]
+        if rule is not None and action != VolleyballAction.OVERPASS.value:
+            override = rule(c, nxt, r, resolver)
+            if override is not None:
+                action = override.value
+        out.append({"frame": c["frame"], "action": action, "team": c.get("team")})
+    return out
+
+
+def label_status(emitted: Sequence[Dict[str, Any]],
+                 gt_contacts: Sequence[Dict[str, Any]],
+                 tol: int = 15) -> Dict[str, Any]:
+    """Match each GT contact to the nearest emission within ``tol`` frames and
+    score the label: correct / wrong_label / missed."""
+    out = {"correct": 0, "wrong_label": 0, "missed": 0, "overpass_recovered": 0}
+    n_op = 0
+    for e in gt_contacts:
+        ga = e.get("final_action") or e.get("action")
+        f = int(e["frame"])
+        cands = [p for p in emitted if abs(p["frame"] - f) <= tol]
+        best = min(cands, key=lambda p: abs(p["frame"] - f)) if cands else None
+        if ga == "overpass":
+            n_op += 1
+        if best is None:
+            out["missed"] += 1
+            continue
+        if ga is None or best["action"] == ga:
+            out["correct"] += 1
+            if ga == "overpass":
+                out["overpass_recovered"] += 1
+        else:
+            out["wrong_label"] += 1
+    out["n_overpass"] = n_op
+    return out
+
+
+def replay_rule_candidates(diag_path: str,
+                           gt_contacts: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    """Replay the baseline + every candidate rule and score each on the GT."""
+    raw = load_raw_contacts(diag_path)
+    result: Dict[str, Any] = {
+        "n_raw_contacts": len(raw),
+        "baseline": label_status(replay_resolver(raw), gt_contacts),
+        "candidates": {},
+    }
+    for name, rule in RULES.items():
+        result["candidates"][name] = label_status(
+            replay_resolver(raw, rule), gt_contacts)
+    return result
+
+
+# ----------------------------------------------------------------------
 # main
 # ----------------------------------------------------------------------
 
@@ -363,6 +503,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     control_by_action = bucket_by_action(control_rows)
 
     verdict = kill_verdict(control_by_action)
+    rules = replay_rule_candidates(args.diag, scope)
 
     result = {
         "scope": {"from_point": args.from_point, "to_point": args.to_point,
@@ -378,6 +519,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             r["pred_action"] or "<missed>" for r in rows)),
         "overpass_by_action": by_action,
         "control_by_action": control_by_action,
+        "resolver_rules": rules,
         "verdict": verdict,
         "rows": rows,
     }
@@ -434,6 +576,21 @@ def render_report(result: Dict[str, Any]) -> str:
               "## Resolver read at the overpass contacts", "",
               "Emitted labels near the 18 GT overpasses (production stream): "
               f"{result['overpass_emitted']}.", "",
+              "## Candidate overpass RULES replayed offline", "",
+              "The diag dump's `candidate_passed_gates` records carry the "
+              "resolver's own inputs, so `ActionContextResolver` was replayed "
+              "(imported, not reimplemented) with each candidate rule overriding "
+              "a non-overpass baseline decision. Scored against the GT contacts "
+              "nearest within +-15 f:", "",
+              "| arm | correct | wrong_label | missed | overpass recovered |",
+              "|---|---:|---:|---:|---:|"]
+    rr = result.get("resolver_rules") or {}
+    for name, st in ([("baseline", rr.get("baseline"))] + list(rr.get("candidates", {}).items())):
+        if st:
+            lines.append(f"| {name} | {st['correct']} | {st['wrong_label']} "
+                         f"| {st['missed']} | {st['overpass_recovered']}/{st['n_overpass']} |")
+    lines += [
+              "",
               "## Reading the result", "",
               "A negative result, the same class as S1/T5/R1: the ball-width "
               "net-crossing signal is NOT available at the owner's overpass "

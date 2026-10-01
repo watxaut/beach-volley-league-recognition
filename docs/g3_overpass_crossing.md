@@ -30,6 +30,17 @@ Crossing signal = ball apparent WIDTH regime (near > 35 px / far < 26 px) across
 
 Emitted labels near the 18 GT overpasses (production stream): {'<missed>': 5, 'spike': 5, 'set': 2, 'dig': 6}.
 
+## Candidate overpass RULES replayed offline
+
+The diag dump's `candidate_passed_gates` records carry the resolver's own inputs, so `ActionContextResolver` was replayed (imported, not reimplemented) with each candidate rule overriding a non-overpass baseline decision. Scored against the GT contacts nearest within +-15 f:
+
+| arm | correct | wrong_label | missed | overpass recovered |
+|---|---:|---:|---:|---:|
+| baseline | 85 | 54 | 44 | 0/18 |
+| ruleA_next_team | 71 | 68 | 44 | 3/18 |
+| ruleCD_no_follow | 80 | 59 | 44 | 3/18 |
+| ruleE_next_team_side | 82 | 57 | 44 | 0/18 |
+
 ## Reading the result
 
 A negative result, the same class as S1/T5/R1: the ball-width net-crossing signal is NOT available at the owner's overpass contacts (3/18), while the ball is tracked on BOTH sides at 18/18 — so this is not a detection gap either. The crossing is measured at the net/tape, where the width regime abstains, and a high lob reads ambiguously on both sides of the contact.

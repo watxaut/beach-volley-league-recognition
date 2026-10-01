@@ -22,7 +22,10 @@ from probe_overpass_crossing import (  # noqa: E402
     crossing_evidence,
     is_tracked,
     kill_verdict,
+    label_status,
+    load_raw_contacts,
     next_emitted_after,
+    replay_resolver,
     side_of_width,
     track_coverage,
 )
@@ -193,3 +196,62 @@ def test_kill_verdict_next_team_separation():
 
 def test_min_track_side_constant_is_sane():
     assert MIN_TRACK_SIDE == 5
+
+
+# --------------------------------------------------------- resolver replay --
+
+def test_load_raw_contacts_only_keeps_passed_gates(tmp_path):
+    import json as _json
+    dump = tmp_path / "d.jsonl"
+    lines = [
+        {"meta": {"fps": 30.0}},
+        {"frame": 10, "candidates": [
+            {"stage": "candidate_passed_gates", "frame": 9, "gesture": "bump_set",
+             "near_net": True, "behind_baseline": False, "team": "A",
+             "ball_side": None, "kind": "bounce"},
+            {"stage": "rejected", "frame": 9, "reason": "reach"}]},
+    ]
+    dump.write_text("\n".join(_json.dumps(x) for x in lines))
+    raw = load_raw_contacts(str(dump))
+    assert len(raw) == 1
+    assert raw[0]["gesture"].value == "bump_set"
+    assert raw[0]["contact_kind"] == "bounce"
+
+
+def test_label_status_scores_nearest_within_tol():
+    emitted = [{"frame": 98, "action": "dig"}, {"frame": 140, "action": "spike"}]
+    gt = [{"frame": 100, "final_action": "dig"},
+          {"frame": 142, "final_action": "overpass"},
+          {"frame": 200, "final_action": "set"}]
+    st = label_status(emitted, gt, tol=15)
+    assert st["correct"] == 1          # f98 dig matches GT f100 dig
+    assert st["wrong_label"] == 1      # f140 spike vs GT f142 overpass
+    assert st["missed"] == 1           # f200 has no emission
+    assert st["n_overpass"] == 1
+    assert st["overpass_recovered"] == 0
+
+
+def test_label_status_counts_overpass_recovery():
+    emitted = [{"frame": 100, "action": "overpass"}]
+    gt = [{"frame": 100, "final_action": "overpass"}]
+    st = label_status(emitted, gt)
+    assert st["overpass_recovered"] == 1
+
+
+def test_replay_resolver_rule_override_applies_only_when_not_overpass():
+    from src.recognition.volleyball_actions import VisualGesture
+
+    contacts = [
+        {"frame": 100, "gesture": VisualGesture.BUMP_SET, "near_net": True,
+         "behind_baseline": False, "team": "A", "ball_side": None,
+         "contact_kind": "bounce"},
+    ]
+    base = replay_resolver(contacts)
+    assert base[0]["action"] == "dig"  # touch-1 bump-set baseline
+
+    def always_overpass(c, nxt, resolved, resolver):
+        from src.recognition.volleyball_actions import VolleyballAction
+        return VolleyballAction.OVERPASS
+
+    got = replay_resolver(contacts, always_overpass)
+    assert got[0]["action"] == "overpass"

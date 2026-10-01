@@ -33,10 +33,13 @@ K4 fires) because the stream's possession/team read is noisy (G1 side-level
 0.755). The overpass loss is therefore a LABEL/RULE problem, not a geometry
 one: the resolver emits `overpass` only at touch-2-no-follow while GT
 overpasses span touch 1/2/3, and the emitted reads were dig 6 / spike 5 / set
-2 / missed 5. Suite **916** (+19). **Next = the owner/architect decision on an
-overpass lever (gesture/touch-rule + a reliable possession signal), the G2
-far-serve decision, or S4 (`pass2_squad`); the label bucket is still the
-largest held-out loss (57/183).**)
+2 / missed 5. The three implementable rules were then REPLAYED offline through
+the imported resolver on the dump's raw contacts: **all net-negative** (baseline
+85 correct; next-team 71, no-follow 80 with 3/18 recovered, next-team+side 82
+with 0/18) — so no overpass `src/` change ships (T5/R1 precedent). Suite **920**
+(+23). **Next = the ENABLING work (a reliable possession/next-toucher signal —
+the 34 genuine side errors) or the G2 far-serve decision / S4; the label bucket
+is still the largest held-out loss (57/183).**)
 
 **Previous (forty-ninth session — **S3 DONE: the pass-2
 side-switch/squad layer.** `scripts/resolve_side_switches.py` (+25 tests) +
@@ -178,7 +181,10 @@ owner/architect call on an overpass lever the next worker one.**
   ambiguously. The perceived next-team is no substitute (overpass flip 8/18 =
   0.444 vs controls 0.582; K4 fires). Emitted reads: dig 6 / spike 5 / set 2 /
   missed 5; the resolver emits `overpass` only at touch-2-no-follow while GT
-  overpasses span touch 1/2/3. Artifacts `output/g3_overpass/`.
+  overpasses span touch 1/2/3. Artifacts `output/g3_overpass/`. The three
+  implementable rules replayed offline through the imported resolver are ALL
+  net-negative (baseline 85 → 71/80/82), so no `src/` change ships; the blocker
+  is a reliable possession/next-toucher signal (34 genuine side errors).
 - **Far serves 0/12 held-out** — 6/8 with a nearby "serve" are the pass-2
   re-labelled GT reception (+26…+34 f), 2 are production serves 26–28 f late
   with the opposite team, 4 have no serve within ±80 f. The S0b dev finding
@@ -721,7 +727,14 @@ point number in `docs/history/`.
     1/2/3, and the emitted reads were dig 6 / spike 5 / set 2 / missed 5.
     Next = an owner/architect decision on an overpass lever — a
     gesture/touch-rule change plus a RELIABLE possession signal (the
-    current team read is 0.755 side-level), never a ball-width threshold.]**
+    current team read is 0.755 side-level), never a ball-width threshold.
+    The three implementable rules were replayed offline through the imported
+    resolver on the dump's raw contacts — next-team (85→71 correct), no-follow
+    (85→80, 3/18 overpasses recovered), next-team+side (85→82, 0/18) — ALL
+    net-negative, so no `src/` change ships (T5/R1 precedent). The blocker is
+    upstream: a reliable next-toucher/possession signal (34 genuine side
+    errors, open points 2/5), without which the structural crossing rule
+    cannot be built.]**
 
 13. **Ace metric (parked) — needs point-outcome detection.** Paths: (a)
     derived heuristic in the metrics layer (serve whose rally has no
@@ -907,6 +920,13 @@ survive across sessions; provenance in the archives.
   overpasses span touch 1/2/3 (emitted dig 6 / spike 5 / set 2 / missed 5), so
   the loss is a rule/touch-geometry problem — `scripts/probe_overpass_crossing.py`,
   session 50, `docs/g3_overpass_crossing.md`.
+- No implementable overpass RULE works without a reliable possession signal:
+  replaying the imported `ActionContextResolver` over the diag dump's raw
+  `candidate_passed_gates` contacts, every candidate is net-negative on P9–P33
+  (baseline 85 correct; next-team crossing 71; no-follow net bump-set 80 with
+  only 3/18 overpasses recovered; next-team + ball-side 82 with 0/18). An
+  overpass override needs a trustworthy NEXT-TOUCHER team, i.e. the possession
+  layer is the real enabler. Session 50.
 - Device caveat: MPS jitter can flip a gesture label (e.g. e6 f309
   block vs spike); the script path (deterministic) is the reference.
 
@@ -1056,7 +1076,7 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
-- 2026-10-01 **#50** — G3 overpass crossed diagnosis REFUTED (diagnose only, no `src/` change, no decode): `scripts/probe_overpass_crossing.py` (+19 tests) + `docs/g3_overpass_crossing.md`, artifacts `output/g3_overpass/`; the ball-width net-crossing across the contact is present at only **3/18** held-out GT overpasses vs non-attack controls (set 4/46, dig 10/55) — K1+K2 fire; tracked both sides 18/18 (K3 clean, not detection — crossing is at the net/tape where width abstains); perceived next-team unusable (overpass flip 8/18 = 0.444 vs controls 0.582, K4 fires); emitted dig 6 / spike 5 / set 2 / missed 5; loss is a LABEL/RULE problem (resolver emits overpass only at touch-2-no-follow, GT spans touch 1/2/3); suite 916.
+- 2026-10-01 **#50** — G3 overpass crossed diagnosis REFUTED (diagnose only, no `src/` change, no decode): `scripts/probe_overpass_crossing.py` (+23 tests) + `docs/g3_overpass_crossing.md`, artifacts `output/g3_overpass/`; the ball-width net-crossing across the contact is present at only **3/18** held-out GT overpasses vs non-attack controls (set 4/46, dig 10/55) — K1+K2 fire; tracked both sides 18/18 (K3 clean, not detection — crossing is at the net/tape where width abstains); perceived next-team unusable (overpass flip 8/18 = 0.444 vs controls 0.582, K4 fires); emitted dig 6 / spike 5 / set 2 / missed 5; loss is a LABEL/RULE problem (resolver emits overpass only at touch-2-no-follow, GT spans touch 1/2/3); the three implementable rules replayed through the imported resolver are ALL net-negative (baseline 85 → 71/80/82), so no `src/` change ships; suite 920.
 - 2026-10-01 **#49** — S3 DONE: pass-2 side-switch/squad layer — `scripts/resolve_side_switches.py` (+25 tests) + `docs/g3_side_switch_layer.md`, no `src/` change, no decode; beach cadence from the point order alone → `[7,14,21,28]` EXACT vs the owner schedule; side→squad by parity → `actions_pass2.pass2_squad` (207/207); **G1 raw team 0.518 is a side-vs-squad confound — same 139 found contacts score 0.755 squad-mapped, 34 genuine side errors**; player-crossing cross-check evidence-only (3/4 switches supported but 16/28 non-switch boundaries too — ids hop); suite 897.
 - 2026-10-01 **#48** — G1 DONE: the first HELD-OUT contact score — `scripts/score_heldout_contacts.py` (+20 tests) + `docs/g3_heldout_p9_p33.md`, no `src/` change; P9–P33 (183 owner contacts, region f5240–f26147, effective ±15 f) production **P 0.785 / R 0.760 / F1 0.772**, class 0.590, team 0.518; pass-2 F1 0.774 / class 0.561 / team 0.561; miss taxonomy 46 correct / **57 wrong-label** / 36 wrong-team / 44 missed ⇒ the label bucket is the largest held-out loss (not proposal); `overpass` recall 0.000; far serves **0/12** (6/8 nearby "serves" = pass-2 re-labelled reception +26…+34 f); stage waterfall not reproduced (only match diag dump is R1 bw=0.3), flagged; suite 872.
 - 2026-10-01 **#47** — G0 DONE: the whole-match contact GT (P1–P33) is machine-readable — dialect-B `parse_contact_gt` + `scripts/build_match_contact_gt.py` → `ground_truth/20260920_match_contacts.json` (33 points, **211 owner contacts**: 28 P1–P8 + 183 P9–P33, match-frame axis, all `source=owner_gt`) + 33 contact sheets; P1–P8 rebuild field-identical (only physical `raw_line_no` +3); fixed side→squad mapping to switch PARITY (P29–P33 `near`=Team A again; old last-switch formula mislabelled P15–P21/P29–P33); P30 f23545 unlabelled touch kept `action=null` + `owner_action_unspecified`; no `src/` change; suite 852.
@@ -1180,13 +1200,23 @@ were dig 6 / spike 5 / set 2 / **missed 5**. The resolver's touch/gesture read
 label, and the stream's own possession/team signal (G1 side-level 0.755) is
 too noisy to supply the crossing structurally.
 
-**Suite:** **916** (897 + 19). No `src/` change (`git diff 185c6f0 -- src/`
+**Then the code change was scoped (all refuted).** The diag dump's
+`candidate_passed_gates` records carry the resolver's own inputs, so
+`ActionContextResolver` was replayed offline (imported, not reimplemented) with
+three candidate overpass rules on top of the baseline. **All net-negative on
+P9–P33**: baseline 85 correct / 0 overpasses; next-team crossing 71 (3/18
+recovered); no-follow net bump-set 80 (3/18); next-team + ball-side 82 (0/18).
+Since no rule passes, no `src/` change ships (T5/R1 precedent). The blocker is
+upstream — a reliable next-toucher/possession signal (the 34 genuine side
+errors).
+
+**Suite:** **920** (897 + 23). No `src/` change (`git diff 185c6f0 -- src/`
 empty).
 
-**Next:** an owner/architect decision on an overpass lever (a gesture/touch-rule
-change plus a reliable possession signal — NOT a ball-width threshold), the G2
-far-serve decision, or S4 (`pass2_squad`). The label bucket remains the largest
-held-out loss. Owner-side capture-spec rewrite (point 29) still open.
+**Next:** the enabling work (a reliable possession/next-toucher signal) before
+any overpass rule; or the G2 far-serve decision / S4 (`pass2_squad`). The label
+bucket remains the largest held-out loss. Owner-side capture-spec rewrite
+(point 29) still open.
 
 ### 2026-10-01 (forty-ninth session) — S3 DONE: pass-2 side-switch/squad layer; G1's raw team 0.518 corrected to 0.755 (`src/` untouched)
 
