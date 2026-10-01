@@ -110,6 +110,12 @@ class BallDetector(BaseDetector):
         # returned detections.
         self.diag_enabled = False
         self._diag_dets: List[Dict[str, Any]] = []
+        # Side channel (read-only): the detections BEFORE static suppression,
+        # kept every frame so an observer can work on the un-suppressed stream
+        # without a second decode.  The AGENTS.md §6 escalation path for
+        # windows the stream mis-serves (far-flight mining) needs exactly this;
+        # ``detect()``'s return value is unchanged either way.
+        self.raw_detections: List[Dict[str, Any]] = []
 
         self.load_model()
 
@@ -229,6 +235,7 @@ class BallDetector(BaseDetector):
             # can distrust those candidates (see __init__). The full
             # pre-suppression center list is what we remember, so a phantom
             # keeps being counted even on frames where it's suppressed.
+            self.raw_detections = list(detections)
             if self.suppress_static:
                 survivors = []
                 for d in detections:

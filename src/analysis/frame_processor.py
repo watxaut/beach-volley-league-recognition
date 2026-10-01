@@ -20,6 +20,7 @@ from ..recognition.pose_estimator import PoseEstimator
 from ..recognition.action_classifier import ActionClassifier
 from .game_state_manager import GameStateManager
 from .spike_analyzer import SpikeAnalyzer
+from .serve_events import ServeEventEmitter
 from ..utils.diagnostics import DiagRecorder
 
 
@@ -52,8 +53,36 @@ class FrameProcessor:
         # has already computed; see src/utils/diagnostics.py.
         self.diag: Optional[DiagRecorder] = None
 
+        # Serve-evidence event emitters (E1 far flight + E2 serve runway +
+        # the conjunction): OFF unless ``serve_events_enabled`` is set. Pure
+        # observers -- they read detections the pipeline already produced and
+        # never touch the tracker/action streams, so every default run stays
+        # byte-identical (see src/analysis/serve_events.py, open point G2).
+        self.fps: float = 30.0
+        self.serve_events: Optional[ServeEventEmitter] = None
+
         self._initialize_components()
         self._enable_diagnostics()
+        self._enable_serve_events()
+
+    def _enable_serve_events(self) -> None:
+        """Build the serve-event emitter when enabled AND the court is calibrated.
+
+        The runway geometry IS the 8 calibration clicks; without them there is
+        no region to test, so the emitter stays None instead of guessing.
+        """
+        if not self.config.get("serve_events_enabled"):
+            return
+        calibration = self.court_calibration
+        if (calibration is None or not calibration.is_calibrated
+                or calibration.court_corners is None):
+            self.logger.warning("serve_events_enabled but no court calibration: emitter OFF")
+            return
+        self.serve_events = ServeEventEmitter.from_config(
+            self.config, calibration.court_corners, fps=self.fps,
+            midcourt_points=getattr(calibration, "midcourt_points", None),
+        )
+        self.logger.info("Serve event emitters ON (far flight + serve runway)")
 
     def _enable_diagnostics(self) -> None:
         """Create the diag recorder and turn the component sinks on.
@@ -213,11 +242,24 @@ class FrameProcessor:
         self.player_tracker.set_court_calibration(calibration)
         self.action_classifier.set_court_calibration(calibration)
         self.spike_analyzer.court = calibration
+        if self.config.get("serve_events_enabled"):
+            # The runway geometry IS the calibration: rebuild on new corners.
+            self.serve_events = None
+            self._enable_serve_events()
         if calibration.is_calibrated and calibration.court_bounds:
             self.ball_tracker.set_court_bounds(calibration.court_bounds)
 
     def setup_video_fps(self, fps: float) -> None:
         """Setup components with video FPS information."""
+        self.fps = fps
+        if self.serve_events is not None:
+            # Windows are defined in SECONDS (variable fps is expected,
+            # AGENTS.md §7), so the emitter needs the real rate.
+            self.serve_events.flight.fps = fps
+            self.serve_events.flight.span_frames = max(
+                2, int(round(self.serve_events.flight.span_s * fps)))
+            self.serve_events.lookback_frames = int(
+                round(self.serve_events.lookback_s * fps))
         if hasattr(self.game_state_manager, "set_video_info"):
             self.game_state_manager.fps = fps
         if self.diag is not None:
@@ -306,6 +348,19 @@ class FrameProcessor:
 
             frame_result["tracked_players"] = tracked_players
             frame_result["tracked_ball"] = tracked_ball
+
+            # 3b. Serve-evidence events (pure observer, OFF by default). Reads
+            # the UNFILTERED person detections (the play-area filter would hide
+            # a server standing behind the far baseline) and the pre-static-
+            # suppression ball detections; writes nothing back into the streams.
+            if self.serve_events is not None:
+                events = self.serve_events.observe(
+                    frame_index,
+                    list(player_detections) + list(self.player_detector.off_area_detections),
+                    self.ball_detector.raw_detections,
+                )
+                if events:
+                    frame_result["serve_events"] = events
 
             # 4. Action recognition (event-driven -- only emits at ball contacts)
             actions = []
@@ -429,6 +484,8 @@ class FrameProcessor:
         self.game_state_manager.observe_flushed_actions(visible)
         self.game_state_manager.finish()
         self.spike_analyzer.flush()
+        if self.serve_events is not None:
+            self.serve_events.finish()
         if self.diag is not None:
             self.diag.add_section("candidates", self.action_classifier.pop_diag())
             self.diag.add_section("actions", [dict(a, frame=a.get("frame_number"))
@@ -446,6 +503,12 @@ class FrameProcessor:
 
         self.game_state_manager = GameStateManager(self.config)
         self.logger.debug("Trackers and game state reset")
+
+    def get_serve_events(self) -> List[Dict[str, Any]]:
+        """Every serve-evidence event emitted this run (empty when the emitter is OFF)."""
+        if self.serve_events is None:
+            return []
+        return self.serve_events.events
 
     def get_court_detector(self):
         """Get court calibration (backward compat name)."""

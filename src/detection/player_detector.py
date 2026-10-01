@@ -51,6 +51,13 @@ class PlayerDetector(BaseDetector):
         self.imgsz = imgsz
         self._person_class_ids = {0}  # COCO class ID for person
         self.court_detector = None  # Will be set later via set_court_detector
+        # Side channel (read-only, never fed back into the returned list): the
+        # person detections the PLAY-AREA filter dropped this frame.  The
+        # serve-runway emitter needs them -- a server standing well behind the
+        # far baseline falls outside court+margin and is invisible in
+        # ``detect()``'s output (see src/analysis/serve_events.py).  Cheap: the
+        # dicts already exist; only the play-area branch appends.
+        self.off_area_detections: List[Dict[str, Any]] = []
         self.load_model()
 
     def load_model(self) -> None:
@@ -80,6 +87,7 @@ class PlayerDetector(BaseDetector):
         Returns:
             List of player detection dictionaries with bbox, confidence, etc.
         """
+        self.off_area_detections = []
         if not self.validate_frame(frame):
             return []
 
@@ -186,6 +194,7 @@ class PlayerDetector(BaseDetector):
                     if self._is_player_in_court(detection, court_mask):
                         court_filtered.append(detection)
                     else:
+                        self.off_area_detections.append(detection)
                         self.logger.debug(f"Filtered player outside play area")
                 player_filtered = court_filtered
             else:

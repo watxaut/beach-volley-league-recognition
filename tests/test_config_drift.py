@@ -268,6 +268,7 @@ def test_argparse_defaults_match_config():
 # ---------------------------------------------------------------------------
 FALLBACK_FILES = [
     ROOT / "src" / "analysis" / "frame_processor.py",
+    ROOT / "src" / "analysis" / "serve_events.py",
     ROOT / "src" / "analysis" / "video_processor.py",
     ROOT / "src" / "main.py",
     ROOT / "scripts" / "dump_player_tracks.py",

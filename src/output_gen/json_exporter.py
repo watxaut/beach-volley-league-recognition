@@ -99,7 +99,7 @@ class JSONExporter:
         actions = self.collect_actions(analysis_results)
         spikes = self.collect_spikes(analysis_results)
 
-        return {
+        payload = {
             "schema_version": 1,
             "video": {
                 # The video stem is the unique video key everywhere (matches
@@ -122,6 +122,14 @@ class JSONExporter:
             "snapshots": self.collect_snapshots(analysis_results, actions),
             "game_state": self.collect_game_state(analysis_results),
         }
+        # Serve-evidence events. Additive + optional: the key only exists when
+        # the emitters ran (serve_events_enabled), so every default payload is
+        # byte-identical to before and the DB ingester (which reads specific
+        # keys) is unaffected.
+        serve_events = analysis_results.get("serve_events")
+        if serve_events:
+            payload["serve_events"] = serve_events
+        return payload
 
     def collect_actions(self, analysis_results: Dict[str, Any]) -> List[Dict[str, Any]]:
         """All emitted actions with their full field set, frame-ordered.

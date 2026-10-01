@@ -171,6 +171,36 @@ class Config:
         # scripts/waterfall.py (see src/utils/diagnostics.py).
         "diag_dump": None,
 
+        # Serve-evidence event emitters (open point G2: the far serve is 0/12
+        # held-out and every classifier tried so far was refuted; the owner's
+        # alternative is to EMIT the evidence and decide with it afterwards).
+        # Pure observers in FrameProcessor.process_frame, OFF by default, so
+        # batch/live/probe output stays byte-identical until they are switched
+        # on deliberately (--serve-events). They never touch the action stream.
+        "serve_events_enabled": False,
+        # Runway band around the FAR BASELINE as a FRACTION of the court's
+        # projected depth (px constants are venue-coupled: 206 px deep on the
+        # beach vs 464-479 px at the practice venue, AGENTS.md §7). Measured
+        # over the 17 GT far serves: strictly-behind-the-line sees a person at
+        # 7/17, this straddling band at 17/17 (a far server often stands ON the
+        # line). The lateral bound is the two sidelines continued to infinity.
+        "serve_runway_front_frac": 0.15,    # how far IN FRONT of the far line the band reaches
+        "serve_runway_back_frac": 0.30,     # how far BEHIND it reaches (the wedge apex closes it)
+        "serve_runway_side_margin_frac": 0.0,  # extra lateral slack (0 = strictly inside the lines)
+        "serve_runway_min_conf": 0.15,      # a far server sits at conf 0.2-0.45, far below player_confidence
+        "serve_runway_min_frames": 3,       # presence run length before a runway_occupant event
+        "serve_ball_min_conf": 0.15,        # floor on raw (pre-static-suppression) ball dets
+        # E1 far flight: apparent bbox width GROWING = approaching the long-axis
+        # camera. S1 refuted this as a SEPARATOR (L overlaps non-serve far lofts);
+        # as an event combined with the runway it is still informative evidence.
+        "far_flight_span_s": 0.5,           # window length in seconds
+        "far_flight_min_points": 3,         # real sightings needed for a slope
+        "far_flight_min_growth": 0.0,       # L = slope of ln(width) vs seconds must exceed this
+        "far_flight_max_gap": 3,            # frames a run may skip: a far ball is detected ~1 frame in 4
+        # Conjunction ("a player in the runway, with the ball, and a contact").
+        "serve_candidate_reach_factor": 1.0,  # ball-to-box gap, in occupant bbox heights
+        "serve_candidate_lookback_s": 5.0,    # how far back from the flight onset to look for that ball
+
         # Model paths (optional - uses defaults if not specified)
         "ball_model_path": None,
         "player_model_path": None,

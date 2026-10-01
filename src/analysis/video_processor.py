@@ -183,6 +183,13 @@ class VideoProcessor:
             ]
         }
 
+        # Serve-evidence events (far flight / serve runway / serve candidate).
+        # Only present when the emitters ran (serve_events_enabled); the key is
+        # absent otherwise, so default runs keep their exact result shape.
+        serve_events = self.frame_processor.get_serve_events()
+        if serve_events:
+            results["serve_events"] = serve_events
+
         # Generate statistics
         results["statistics"] = self.statistics_analyzer.analyze_video_results(results)
 

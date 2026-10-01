@@ -123,6 +123,15 @@ def parse_arguments() -> argparse.Namespace:
              "consumed by scripts/waterfall.py."
     )
 
+    parser.add_argument(
+        "--serve-events",
+        action="store_true",
+        help="Emit serve-evidence events (far flight + serve runway + serve candidate). "
+             "Pure observers over detections the pipeline already produces; off by "
+             "default and inert when off (byte-identical output either way). Needs a "
+             "court calibration -- the runway region IS the 8 calibration clicks."
+    )
+
     return parser.parse_args()
 
 
@@ -184,6 +193,8 @@ def main() -> int:
         config = Config.load(args.config) if args.config else Config.default()
         if args.diag_dump:
             config["diag_dump"] = args.diag_dump
+        if args.serve_events:
+            config["serve_events_enabled"] = True
 
         # Sub-1080p sources are upscaled ONCE (cached next to the original)
         # before anything reads them: the pixel-space constants downstream
