@@ -2535,3 +2535,66 @@ tests), `docs/g3_far_serve_looming.md`, `output/s1/far_serve_looming.json`
 contact P 0.586 / R 0.607 / F1 0.597 and `dev_waterfall.json` stage
 `3_candidate` = 6 (the committed T4 baseline; no src change to re-measure).
 Suite **811** (782 + 29).
+
+
+---
+
+### 2026-10-01 (forty-seventh session) — G0 DONE: the whole-match contact GT (P1–P33, 211 contacts) is machine-readable (`src/` untouched)
+
+**Asked:** execute G0 from *Active next*: extend `parse_contact_gt`
+(`scripts/build_dev_clip_gt.py`) with the owner's dialect B (P9–P33) and emit
+a match-level GT JSON for P1–P33 on the match frame axis plus a per-point
+contact sheet, with the P1–P8 rebuild as the regression anchor.
+
+**Delivered.**
+- `scripts/build_dev_clip_gt.py`: dialect-B grammar (NT/FT, frame-first form,
+  player id after the frame, `-> overpass` / `overpasses` relabels, bare
+  frames, wrapped parentheticals, the duplicated empty `Point 21`,
+  prose-vs-contact discrimination), `_join_continuations`, parenthetical-
+  protected note extraction, the owner's blanket overpass rule
+  (`OVERPASS_CONVENTION`), `poke` / `rainbow` -> soft spike, `hard` -> hard
+  spike, spike-out wording, and `_side_to_team` now uses switch PARITY.
+- `scripts/build_match_contact_gt.py` (new): `build_match_gt` (pure; identity
+  clip<->match map + the shared `contact_events` translation), a sequential
+  contact-sheet renderer + markdown index, `--no-sheets` mode.
+- `ground_truth/20260920_match_contacts.json`: 33 points, **211 owner
+  contacts** (28 P1–P8 + 183 P9–P33), every event `source=owner_gt` with
+  `frame == match_frame` and coarse `frame_tolerance=15`.
+  `output/match_contact_sheet/` has 33 PNG grids + README.
+- `ground_truth/README.md`: dialect B documented as parsed (shapes +
+  mechanical transcription rules + the match GT section).
+
+**Gates (all met).**
+- P1–P8 rebuild: parsed contacts equal the committed dev GT
+  `owner_contacts` FIELD-for-FIELD; the only difference is physical
+  `raw_line_no` (+3 — the owner appended header lines after that GT was
+  built). Pinned by `test_dialect_b_regression_p1_p8_unchanged`.
+- Every contact line lands in `events` (211 = 211 contacts);
+  `test_owner_file_lines_are_all_accounted_for` balances every logical line of
+  the txt against headers + switches + contacts + notes + unparsed (3 preamble
+  lines only).
+- 4 `Side switch` flags stay after P7/14/21/28; owner parentheticals survive
+  verbatim as `owner_note`.
+- No `src/` change; suite **852** (+12 tests: 7 in
+  `tests/test_build_dev_clip_gt.py`, 5 in `tests/test_match_contact_gt.py`).
+
+**Findings worth remembering (now Learnings / README).**
+- The team mapping needed switch PARITY: the old `switch_after` "last marker"
+  formula labels `near` as Team B for P15–P21 and P29–P33; with 4
+  switches `near` is Team A again from P29. Dialect A's P1–P8 output is
+  unchanged.
+- `poke` = soft attack -> `spike` + `spike_type="touch"`; `bump set` = set;
+  `bump pass(es) (the) ball` = overpass; `returns` (serve reception) = dig.
+- `"... missatributed to P2, but its P4"` gives the TRUE player P4 (not the
+  wrong id named before it); the correction stays verbatim in the note.
+- P15 f10180 (`FT is close to a dig ...`) is PROSE, never a contact (open
+  point 25); P20 f14518's note wraps across two physical lines; P30 f23545 is
+  a touch with no owner action label -> `action=null` +
+  `owner_action_unspecified=true` (contact scoring is class-agnostic, so it
+  still counts; class accuracy must skip it).
+
+**Next:** G1 — the first held-out contact score on P9–P33 (perception +
+`actions_pass2` arms) with `score_pass2_contacts.py`'s scope discipline, point
+windows from the episode map (the match GT's `match_start_frame/end_frame` are
+episode-map PREDICTIONS, flagged), then the G2 far-serve lever decision on real
+labels. Owner-side: capture-spec doc rewrite (point 29).
