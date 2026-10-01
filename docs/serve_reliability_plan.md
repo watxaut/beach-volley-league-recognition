@@ -226,9 +226,9 @@ SR0 ──> SR1 ─┐
 SR3 (owner, async, start now) ─┘            SR7 when its trigger fires
 ```
 
-- **D1 (owner, after SR2):** adopt audio as a pipeline input?
-- **D2 (owner, now):** dictate serve-only GT for the two new sessions, and
-  calibrate the 05-05-2025 video.
+- **D1: APPROVED.** Run SR2. Production adoption still depends on its kills.
+- **D2: APPROVED, scoped down.** Label vall_dhebron only. The 05-05-2025 video
+  is dropped because its conditions are too poor.
 - **D3 (owner, now):** ratify the per-point serve record (post-hoc) as THE serve
   product. Pursuing a far serve in the causal `ActionClassifier` stops. The
   production `serve` label becomes a secondary signal.

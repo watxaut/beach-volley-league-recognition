@@ -190,8 +190,8 @@ point number in `docs/history/`.
         proposer precision <0.8 on dev; K3 far onset rate more than 15 pts below
         near.
       - [ ] **SR3 (OWNER)** serve-only GT (`mm:ss.s near|far server outcome`) on
-        vall_dhebron + 05-05-2025 (calibrate first). Target ≥60 serves, both
-        sides. Worker: run both videos with `--serve-events`.
+        vall_dhebron only (05-05-2025 dropped by the owner). Every serve,
+        both sides. Worker: run both videos with `--serve-events`.
       - [ ] **SR4** per-point serve record (`output/serve_records.json`): opener
         gate, then a side vote (runway / behind-baseline / width trend / first
         receiver side / structural arm), then the time (audio if SR2 survives).
@@ -207,9 +207,12 @@ point number in `docs/history/`.
       - [ ] **SR7 (DEFERRED)** learned serve detector (pose + raw ball + audio),
         leave-one-session-out. Trigger: ≥3 sessions and ≥100 serves of GT.
     - **Owner decisions:**
-      - **D1:** audio as a pipeline input (after SR2; it is a new perception input
-        outside §6's rule).
-      - **D2:** serve-only GT + calibration.
+      - **D1: APPROVED (#55 follow-up).** The audio probe SR2 goes ahead. Adopting
+        audio in production is still gated on SR2's kills.
+      - **D2: APPROVED, scoped down.** The owner labels serves on
+        `20290928_entreno_vall_dhebron.mp4` only. The 05-05-2025 video is DROPPED
+        (bad conditions) and is being removed from the repo. The SR3 target becomes
+        "every serve in vall_dhebron, both sides".
       - **D3:** the post-hoc serve record becomes THE serve product, and the
         causal far-serve contact chase stops.
 
