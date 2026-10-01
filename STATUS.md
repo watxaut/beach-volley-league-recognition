@@ -17,7 +17,21 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-02 (fifty-fifth session, **planning only: the
+**Last updated:** 2026-10-02 (fifty-sixth session, **SR0 DONE: one serve scorer**,
+`scripts/score_serves.py` + `docs/sr0_serve_scorer.md`, open point **30**). The
+scorer reproduces the plan's pre-registered baseline exactly (production near
+**8/16**, far **0/17**, 12 FP, ±15 f) and adds the numbers the backlog was
+missing. It corrects the record twice: the shipped far-serve evidence covers
+**13/17** far serves, not 14 (the 14th record sits on a NEAR serve), and its
+precision as a claim is **0.47**, not 1.00. Three findings steer SR4: (1) the
+**rally onset already times 11/17 far serves at median |offset| 3 f** (vs 3/16
+near at 14 f) -- far-side timing is nearly free, near-side timing is not, so the
+proposal step must be per side; (2) the near serves production *does* emit are
+all within ±2 f, so the 8 near misses are missing emissions, not late ones
+(SR1's job, now cheap); (3) 8 of the 12 false emissions are dead-time handlings
+and only 3 are mislabeled rally contacts (named). Nothing in `src/` changed.
+
+**Previous:** 2026-10-02 (fifty-fifth session, **planning only: the
 serve-reliability plan and a course correction**, `docs/serve_reliability_plan.md`,
 open point **30**). Measured honestly, serves are unreliable on BOTH sides. At
 contact level (±15 f, match P1-P33) the production stream gets near **8/16**, far
@@ -29,9 +43,7 @@ match. The plan replaces it with a per-point **serve record** covering both side
 (time, side/squad, server, outcome), built post-hoc from the existing evidence plus
 two signals never used before: the **audio track** (real AAC in every video, never
 read) and the **beach serving rules** (decoded jointly across the match). It also
-asks the owner for cheap serve-only GT on two new sessions. Nothing in `src/`,
-`scripts/` or GT changed. STATUS was lean-trimmed: the #48-#54 header chain, the #54
-"Where we are" block and Log #50-#52 were moved VERBATIM to `docs/history/`.
+asks the owner for cheap serve-only GT on one new session.
 
 Earlier sessions: see the *Session index* below.
 
@@ -86,27 +98,34 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
-**Serves are the active track and they are NOT reliable (#55,
-`docs/serve_reliability_plan.md`, open point 30).**
+**Serves are the active track and they are NOT reliable (#56: SR0 measured them
+properly; `docs/serve_reliability_plan.md` + `docs/sr0_serve_scorer.md`, open
+point 30).**
 
-Honest per-side serve baseline (contact level, ±15 f, the real match):
+Honest per-side serve baseline, all from `scripts/score_serves.py` (contact
+level, ±15 f, greedy one-to-one, side-correct; match P1-P33, 33 owner serves):
 
 | stream | near | far | other |
 |---|---|---|---|
-| production | **8/16** | **0/17** | 12 FP emissions; held-out P9-P33 near 7/13, far 0/12 |
-| entreno e2-e7 (all near) | 4/5 | — | e2 missed |
-| far-only evidence layer | not observed | 14/17 anchored (**in-sample**), bound **9/17** (held-out **4/12**) | 1 owner FP |
+| production | **8/16** (dev 1/3, held-out 7/13) | **0/17** (0/5, 0/12) | 12 FP (precision 0.40, 0.36/point); timing of every hit within ±2 f |
+| pass-2 re-label (GT-derived squad) | 12/16 | 0/17 | 14 near FP; squad acc 0.58 even though GT-derived |
+| rally onset (`game_on`, time only) | 3/16 | **11/17** (median &#124;offset&#124; 3 f) | no side read; 17 of 31 onsets unmatched |
+| far-only evidence layer | not observed | **13/17** coverage (**in-sample**), **9/17** bound (held-out **4/12**) | precision 0.47 as a claim; 1 owner FP |
+| entreno e2-e7 | 3/5 from STALE artifacts | — | e2/e6 emit no serve; artifacts predate the v3 model and pose gating |
 
 `docs/g3_heldout_p9_p33.md`'s near 11/13 counts production OR pass-2 serves. The
 production stream alone is 7/13.
 
 **Plan: SR0-SR7.**
-- **SR0:** one serve scorer, per side, dev vs held-out.
-- **SR1:** near-serve miss taxonomy.
-- **SR2:** audio onset probe (diagnose-only).
-- **SR3:** OWNER serve-only GT on `20290928_entreno_vall_dhebron.mp4` + the 55-min
-  `Entreno Vall Hebron i Partits - 05 05 2025.mp4` (that one needs calibration).
-- **SR4:** per-point serve record, both sides, post-hoc.
+- **SR0:** DONE (#56) — `scripts/score_serves.py`, gate PASS.
+- **SR1:** near-serve miss taxonomy (unblocked and cheap: the near serves
+  production emits are all within ±2 f, so the 8 misses are missing emissions).
+- **SR2:** audio onset probe (diagnose-only) -- the only symmetric timing signal.
+- **SR3:** OWNER serve-only GT on `20290928_entreno_vall_dhebron.mp4` (the
+  05-05-2025 video was dropped, D2). Worker half: run both with `--serve-events`,
+  and re-run the seven entreno clips whose artifacts predate the v3 model.
+- **SR4:** per-point serve record, both sides, post-hoc. Its proposal step must
+  be per side (far timing is free, near timing is not).
 - **SR5:** beach-rules serve-sequence decoding.
 - **SR6:** ace / service fault.
 - **SR7:** learned detector, deferred until ≥3 sessions of serve GT.
@@ -129,11 +148,11 @@ the reception as the serve.
     consume it as a label.
   - `resolve_side_switches.py`: `[7,14,21,28]`, exact.
   - `resolve_point_winners.py`: 18/33.
-  - `consume_serve_evidence.py`: far-only, 9/17 bound.
+  - `consume_serve_evidence.py`: far-only, 13/17 covered, 9/17 bound.
 - **`--serve-events` observers:** default OFF. Inertness is measured
   (byte-identical).
 - **Entreno gate record** (`evaluate --ignore-player` F1): e1 0.706, e2 0.571,
-  e3 1.0, e4 0.933, e5 0.923, e6 0.933, e7 0.75. Suite **1036**.
+  e3 1.0, e4 0.933, e5 0.923, e6 0.933, e7 0.75. Suite **1069**.
 
 **Refuted and parked** (do not reopen without new data): T5 tracker admission, R1
 departure gate, S1 looming, scale-aware geometry, M1 far-end crop, possession
@@ -144,10 +163,11 @@ VFR. Both are allow-listed in `tests/test_vfr_seek_guard.py`. Fix the annotator
 before any frame-shown annotation pass.
 
 **Active next (ranked):**
-1. SR0.
-2. SR1 and SR2, one per session.
-3. Now and in parallel (owner): SR3, plus decisions D2/D3.
-4. SR4, then SR5, then SR6.
+1. SR1 (near-serve miss taxonomy, diagnose-only) or SR2 (audio onsets), one per
+   session.
+2. Now and in parallel: SR3 (owner), plus the worker half — re-run the seven
+   entreno clips and vall_dhebron with `--serve-events`.
+3. SR4, then SR5, then SR6.
 
 The non-serve backlog is unchanged: the label bucket (open point 9), the reach-gate
 bucket, e4/e5/e6 re-adjudication, and the first run of the vall_dhebron video
@@ -171,20 +191,30 @@ point number in `docs/history/`.
 
 30. **Serve reliability, BOTH sides (new, #55; supersedes point 22's
     far-only framing).**
-    - **Status:** PLANNED (`docs/serve_reliability_plan.md`).
+    - **Status:** PLANNED (`docs/serve_reliability_plan.md`); **SR0 DONE #56**
+      (`scripts/score_serves.py` + `docs/sr0_serve_scorer.md`, +33 tests, gate
+      PASS, no `src/` change, no decode).
     - **Problem:** production serve recall is 8/33 (near 8/16, far 0/17) and
-      precision 0.40. The far evidence layer is 14/17 in-sample, 4/12 held-out
-      binding. The near side has no plan. Audio and the beach serving rules are
-      unused.
+      precision 0.40. The far evidence layer is 13/17 covered (**in-sample**),
+      4/12 held-out binding. The near side has no plan. Audio and the beach
+      serving rules are unused.
     - **Acceptance** (on a session NOT used for design, ±15 f): recall ≥0.90 on
       each side, side/squad ≥0.95, ≤0.1 false records per point, server identity
       ≥0.90 after SR5. If SR4 is below 0.75 on either side held-out, stop hand
       rules and go to SR7 when its trigger fires.
     - **Tasks:**
-      - [ ] **SR0** `scripts/score_serves.py`: every stream (production, pass-2,
-        serve_evidence, GAME_ON starts) scored per side, dev / held-out / new
-        session. Gate: reproduces near 8/16, far 0/17, 12 FP.
-      - [ ] **SR1** near-serve miss taxonomy (8 match + e2), diagnose-only.
+      - [x] **SR0** `scripts/score_serves.py`: every stream (production, pass-2,
+        serve_evidence coverage/binding, rally onset, SR4 records) scored per
+        side, dev / held-out / new session. Gate PASSES (near 8/16, far 0/17,
+        12 FP). Findings: rally onset times **11/17 far** serves at |offset| 3 f
+        vs 3/16 near at 14 f (far timing is nearly free, near is not); production
+        near hits are all within ±2 f, so the 8 near misses are missing
+        emissions; 8 of 12 FPs are dead-time handlings, 3 named rally contacts;
+        the evidence layer is **13/17** covered (the "14" is a near serve) and
+        **0.47** precision as a claim. **Action:** re-run the 7 entreno clips
+        (their artifacts are from 2026-09-04/06, before the v3 model).
+      - [ ] **SR1** near-serve miss taxonomy (8 match + e2/e6), diagnose-only.
+        Unblocked by SR0: the misses are missing emissions, not timing.
       - [ ] **SR2** `scripts/probe_audio_onsets.py`, diagnose-only, PTS-mapped.
         Kills: K1 onset at <70% of serves on either side; K2 dead-time-onset
         proposer precision <0.8 on dev; K3 far onset rate more than 15 pts below
@@ -194,10 +224,11 @@ point number in `docs/history/`.
         both sides. Worker: run both videos with `--serve-events`.
       - [ ] **SR4** per-point serve record (`output/serve_records.json`): opener
         gate, then a side vote (runway / behind-baseline / width trend / first
-        receiver side / structural arm), then the time (audio if SR2 survives).
-        Optional toss/pose check for the pre-serve-handling FPs. Promotion =
-        INSERT a serve into `actions_pass2`/DB after acceptance on ≥2 sessions,
-        never relabel.
+        receiver side / structural arm), then the time (audio if SR2 survives;
+        **on the far side the rally onset already gives the time at |offset| 3 f**
+        -- SR0). Optional toss/pose check for the pre-serve-handling FPs (8 of
+        the 12 measured). Promotion = INSERT a serve into
+        `actions_pass2`/DB after acceptance on ≥2 sessions, never relabel.
       - [ ] **SR5** DP/HMM over points (winner serves next, the server alternates
         on regaining the serve, side switch every 7). GT winners stay
         validate-only. Measure serve-squad accuracy and winner accuracy (18/33
@@ -992,8 +1023,15 @@ survive across sessions; provenance in the archives.
 - Every video, including the 20260920 match, carries a real AAC 48 kHz stereo audio track (match mean −35 dB / max −4.6 dB). The pipeline never reads it; `src/utils/video_upscale.py` only stream-copies it. Contact sounds are a geometry-independent signal that has never been tried (session 55, `docs/serve_reliability_plan.md`).
 - The production serve baseline at contact level (±15 f, match P1-P33) is near **8/16**, far **0/17**, with 12 FP emissions. `scripts/score_heldout_contacts.py` counts `action OR pass2_action == serve`, so its near 11/13 is not the production number (production is 7/13). Session 55.
 - The #53 structural serve operating point (14/17, 0 FP) was chosen by a sweep over ALL 17 match far serves, so it is in-sample. The out-of-sample signal is the consumer's held-out binding of 4/12. Never tune serve rules again on those same 17 serves (session 55).
+- **One scorer for every serve number** (`scripts/score_serves.py`, session 56): greedy one-to-one, nearest first, inside each owner contact's own `frame_tolerance`, side-correct by default with the positional match reported beside it. Side-correct matching makes side accuracy TAUTOLOGICAL (always 1.00), so side accuracy must be scored on the positional match; a squad call is only comparable through the switch parity, and the court words `near`/`far` must be mapped to the stack's side letters `A`/`B` before `resolve_side_switches.side_to_squad` will accept them.
+- **A stream that proposes is not a stream that claims.** Scoring the raw far-side evidence records as "74 false serves" and the rally onset as "precision 1.000" were both one line away from being reported; `proposes_serve: false` makes the scorer print no precision at all. Same for the point dimension: a record that lands on the serve but was bound to the WRONG point is a binding miss, which is the whole 13-vs-9 gap between coverage and binding (session 56).
+- **The far-serve TIME is nearly free and the near-side TIME is not.** The `game_on` backdated burst start lands within ±15 f of **11/17** far serves at median |offset| **3 f**, vs **3/16** near at 14 f (all late); at ±120 f it covers 27/33. A far serve IS the rally onset, so SR4 needs a side decision on a known time far side and a real proposer near side (session 56).
+- **The near serves production emits are all within ±2 f of the owner frame** (8/8, median 1 f), so the 8 missing near match serves are missing EMISSIONS (proposal / label / gate), not late ones — SR1 should look at the emit path, not at timing (session 56).
+- **The shipped far-serve evidence covers 13/17 far serves, not 14.** 14 records land within ±15 f of a serve of any side, but the 14th is on a NEAR serve (P12 f7777, record f7762); 14/17 was a sweep figure on the recording, and the consumer's precision as a claim is 0.47 (19 bound records, 9 on their own serve) — the zero-FP claim was measured against mid-rally controls and owner FALSE/OFFGAME moments, which is a different and still true number (session 56).
+- **A pipeline artifact in `output/` can be silently stale.** The seven `output/video_entreno_*/pipeline_output.json` files date from 2026-09-04/06 (commits `239490c`/`8150694`), i.e. before the v3 ball detector (09-26) and the pose gates (09-27); they read as 3/5 serves where the plan quotes 4/5 from a run whose artifacts are gone. `score_serves.py` prints each stream's `processed_at` + commit for exactly this reason (session 56).
 
 ## Session index (one line each)
+- #56 SR0 DONE: one serve scorer for every stream and side (`scripts/score_serves.py` + `docs/sr0_serve_scorer.md`, +33 tests, gate PASS): baseline reproduced (near 8/16, far 0/17, 12 FP), the record corrected (13/17 far covered not 14; evidence precision 0.47 not 1.00), and three SR4-steering findings (rally onset times 11/17 far at |offset| 3 f; near hits all within ±2 f so the misses are missing emissions; 8 of 12 FPs are dead-time handlings). Entreno artifacts found stale.
 - #55 planning only: serve-reliability plan SR0-SR7 (`docs/serve_reliability_plan.md`, open point 30). Honest baseline near 8/16 / far 0/17 / 12 FP. The far-serve track is declared a proxy fit on one match. Audio and beach-rule decoding are proposed. STATUS lean-trimmed (header chain, Where we are, Log #50-#52 archived verbatim).
 - #54 S4 DONE: the serve evidence is a real artifact (`output/serve_evidence.json`, 87 records, precision 0.90, inertness measured) — anchored coverage 14/17 vs consumer binding 9/17, both reported — `docs/g4_serve_evidence.md`.
 - #53 the far serve SOLVED as evidence: 14/17 GT far serves at ZERO false positives (production 0/17) via the opener gate + a structural proposer over raw detections; M1 (magnified far-end crop) REFUTED and it corrects the detector-vs-tracker record; the VFR seek defect found and guarded — `docs/g4_structural_serve.md`.
@@ -1090,6 +1128,75 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+
+### 2026-10-02 (fifty-sixth session) — SR0 DONE: one serve scorer, and the record corrected
+
+**Asked:** "read agents, start with the next task" — the next task being SR0, the
+first task of the serve-reliability plan: one scorer, per side, dev vs held-out.
+Scorer only: no decode, no `src/` change, no label emitted (AGENTS.md §6).
+
+**Shipped.** `scripts/score_serves.py` (+33 tests, `tests/test_serve_scorer.py`),
+`docs/sr0_serve_scorer.md`, artifact `output/serves/sr0.json`. Sessions are
+declared, not discovered, so a stream can never be silently swapped; each stream
+declares what it SPEAKS (court side / squad / time only), whether it CLAIMS a
+serve per candidate, and whether it is point-bound. Five measurement rules, each
+of which prevented a wrong number from being printed:
+
+- one matching rule for everything (greedy one-to-one, nearest first, inside each
+  owner contact's own `frame_tolerance`), side-correct by default;
+- **side accuracy is scored on the POSITIONAL match** — under side-aware matching
+  it is tautologically 1.00;
+- **a proposal is not a claim**: the raw evidence records and the rally onset
+  report no precision at all ("74 false serves" and "precision 1.000" were both
+  one line away);
+- **coverage ≠ binding**: `point_bound` reproduces what a consumer claims, and it
+  is the whole 13-vs-9 gap;
+- **side ≠ squad**: pass-2's side read is the emitted letter, never its
+  winner-serves-derived squad (which is flagged GT-derived), and a squad is
+  compared through the switch parity imported from `resolve_side_switches`.
+
+**Gate PASSES** exactly as pre-registered: production near **8/16**, far **0/17**,
+12 false emissions. The script exits non-zero if those move.
+
+**The record, corrected twice.** The shipped far-serve evidence covers **13/17**
+far serves, not 14 — 14 records land within ±15 f of a serve of any side and the
+fourteenth is on a **near** serve (P12 f7777, record f7762); 14/17 was a sweep
+figure on the recording, not a property of the shipped artifact. And scored as the
+claim it is, the consumer's precision is **0.47** (19 bound records, 9 on their
+own serve), while its zero-FP property (1 FP on 24 mid-rally controls + 9 owner
+FALSE/OFFGAME moments) remains exactly as true as before. Both are printed.
+
+**Three findings that steer SR4.**
+1. **Far-side serve TIME is nearly free.** The `game_on` backdated burst start —
+   already computed, zero extra work — lands within ±15 f of **11/17** far
+   serves at median |offset| **3 f** (range −6…+6), against **3/16** near at 14 f
+   (all late). At ±120 f it covers 27/33. A far serve IS the rally onset; a near
+   serve is not, because the onset there belongs to the reception. So SR4's
+   proposal step must be **per side**: a side vote on a known time far side, a
+   real proposer near side.
+2. **The near misses are not timing.** Every near serve production emits is
+   within **±2 f** of the owner frame (8/8, median 1 f), so the 8 missing near
+   match serves are missing *emissions*. SR1 is unblocked and cheap.
+3. **The 12 false emissions are mostly dead time**: 8 handlings with no owner
+   contact within 80 f, 3 rally contacts with the wrong label (f3856 a `set`,
+   f8534 and f10070 `dig`s) and 1 serve 25 f late. The toss sub-probe in SR4 is
+   worth spending on the 8, not the 3.
+
+**A stale-artifact defect found while scoring the other sessions.** The seven
+`output/video_entreno_*/pipeline_output.json` files date from 2026-09-04/06
+(commits `239490c` / `8150694`) — before the v3 ball detector (09-26) and the pose
+gates (09-27) — so their 3/5 is not the current production number and the plan's
+4/5 came from a run whose artifacts are gone. The scorer prints each stream's
+`processed_at` + commit so this cannot be read as current; re-running the seven
+short clips is queued with the SR3 worker half.
+
+**Housekeeping:** STATUS's *Where we are* rewritten on the SR0 numbers; open point
+30's SR0 marked done with its findings folded into SR1/SR4; seven Learnings added
+(one per durable fact); session index extended; Log entry #53 moved VERBATIM to
+`docs/history/status_log_archive.md`. Suite **1069** (1036 + 33).
+
+**Next:** SR1 (near-serve miss taxonomy) or SR2 (audio onsets), one mechanism per
+session. Owner: SR3 on vall_dhebron.
 
 ### 2026-10-02 (fifty-fifth session): serve-reliability plan; the far-serve track is a proxy (planning only)
 
@@ -1205,95 +1312,3 @@ Suite **1036**.
 the 19/33 points that already carry a record. The label bucket (`overpass` 0/18)
 is still the largest held-out perception loss, and the owner-GT-annotator seek
 that `tests/test_vfr_seek_guard.py` flagged still wants a sequential-cursor fix.
-
-### 2026-10-02 (fifty-third session) — the far serve SOLVED as evidence: 14/17 at ZERO false positives; the VFR seek defect found
-
-**Asked:** "so far what we tried to get the far serves did not work. What can we
-do to reliably get serves" — then, to the three proposed checks (M2 opener gate
-~15 min, M1 magnified far-ROI probe, M3 structural proposer): "check all in the
-order you stated". No `src/` change; the action stream is untouched.
-
-**Three verdicts.**
-
-**M2 — the opener gate: a strict win.** A serve opens a rally, so a
-`serve_candidate` should only count when no contact was emitted in the preceding
-N frames. Measured seek-free on the 17 GT far serves vs 24 mid-rally controls:
-no gate = 11/17 hits and 8/24 FPs (precision 0.579, recall 0.647); gate 30 = 4
-FPs; **gate 60 → 240 = 0 FPs at unchanged 11/17 (precision 1.000)**. Every
-control FP sits at a 2-58 f gap and every hit at 231-816 f, so the plateau is
-60-240 f wide — consistent with the session-28 measurement that openers follow
->=153 f of dead time while the largest mid-rally gap is 134 f, and therefore
-neither a fitted threshold nor an MPS/CPU-jitter artefact. `GAME_OFF` gives
-identical numbers.
-
-**M1 — the magnified far-end pass: refuted, and it corrects the record.** The
-match is natively 720p, upscaled, and the ball detector runs at imgsz 1280, so
-a 14-28 px far ball is 9-19 px inside YOLO; running the same production weights
-on a 4x-magnified square crop of the far band (3 x 320 px, tile geometry from
-the 8 calibration clicks) should have recovered the "missing" detections.
-`scripts/probe_far_roi_ball.py`, one sequential pass over all 41 windows:
-**0 of 17 windows were empty for the full-frame arm** — the detector sees a
-15-21 px ball in 14-31 of 31 frames at every serve, P31 f24543 excepted (2/31,
-which the tiles lift to 26/31 at +105 ms/frame for 3 tiles). The tiled arm's
-median detection is 3.2 px of unscaled sand/line noise, because a magnified far
-band is mostly ground. **So the "the far ball is seen on 0-1 frames in 8/17
-windows" line repeated across STATUS and the G4 docs is a TRACKER count, not a
-detector count** — the detector was never the far-serve problem, which moves the
-blocker to the lock + the label, exactly where #51's geometry diagnosis said it
-was. Parked as a possible P31-class fallback; not built.
-
-**M3' — the structural proposer: the frontier, and the answer.** Rule over the
-RAW detections (no tracker, no shape test): *no emitted contact for 60-240 f* +
-*a person in the far band* + *a far-side ball-sized 8-60 px detection within
-30 f* + *the ball within R bbox heights of that person*. Swept 648 ways offline
-from one recording (`scripts/sweep_structural_serve.py`): runway-only at reach
-1.5-4.0 = **11/17 with 0 FP**; runway+court at reach 1.0 = **15/17 with 1 owner
-FP**; at reach 2.5 = **17/17 with 2**. Median |offset| **1 f** (the G4
-conjunction's is -9 f). The two zero-FP rules miss *different* windows, so their
-**union is 14/17 with no false positive at all** against 24 mid-rally contacts
-and the 9 owner FALSE/OFFGAME moments. The two residual FPs (f5130 "ball
-handling after the point ended", f2414 "walking to the serve line with the ball
-in hands") are pre-serve handlings: no dead-time test separates them from a
-serve, only the toss does, and the toss is the one signature the far-end
-geometry refuses — which is also why this is EVIDENCE (post-hoc, AGENTS.md §6)
-and never a label source (S0b broke 3 correct dig labels).
-
-**The measurement defect.** To score any of this I had to decode the match
-without seeks, and that exposed a defect in the existing numbers: on this VFR
-file (25.67 fps in a 30.12 container) `CAP_PROP_POS_FRAMES` lands **-28..+30
-frames** from the requested index (13 probe points, mean +8.5, measured against
-a full sequential decode). Every windowed G4 probe seeks, so the recorded
-"6/17 far serves, 4/24 FPs, precision 0.60" was computed on shifted windows:
-seek-free it is **11/17 with 8/24 FPs**, and the candidate offsets are
-systematically **-9 f** (the same sign as the mean seek error). Two seek-free
-probes replace them, `tests/test_vfr_seek_guard.py` (3 tests, AST-based so a
-docstring mention is not an offence, exceptions allow-listed with reasons and
-failing when stale) greps `scripts/`, `src/` and `tests/` — and its audit turned
-up two real defects outside the serve work: `scripts/annotate_player_gt.py` can
-show the OWNER a frame up to ~30 f from the requested one (a GT contact could be
-judged off its own moment; it wants a sequential-cursor fix before the next
-annotation pass) and `src/db/ingest.py` crops review-UI player thumbnails with
-the same seek (cosmetic). Both recorded as allow-list KNOWN ISSUES, not fixed
-here.
-
-**Also corrected:** the G4 doc's "a far ball is detected on ~1 frame in 4" was
-already known to be a COCO-detector artefact; the honest figure is a median gap
-of 1 frame, i.e. nearly every frame.
-
-**Not done, deliberately:** no `src/` change, no label emitted, no player
-identity (the server is a raw detection, not one of the 4 tracks), near side
-untouched by construction. The recommendation to the owner is the 14/17 union
-consumed post-hoc; the 17/17 point is available at 0.90 but its errors are
-systematic (pre-serve handlings), not random.
-
-Artifacts: `output/g4/serve_events_seq_recording.json` (the recording the sweep
-replays, so future rules cost no decode), `output/g4/{serve_events_seq,
-far_roi_ball,structural_serve_sweep,seek_offsets}.json`; docs
-`docs/g4_structural_serve.md`, `docs/g4_far_ball_presence.md`,
-`docs/g4_far_serve_alignment.md`; tests `tests/test_structural_serve_rule.py`
-(13), `tests/test_vfr_seek_guard.py` (3). Suite **1008**.
-
-**Next:** the owner picks the operating point (recommend 14/17) and S4 consumes
-the evidence post-hoc for who-served / aces / serve faults; the label bucket
-(`overpass` 0/18) is still the largest held-out perception loss; the
-owner-GT-annotator seek wants a fix before the next annotation pass.
