@@ -56,10 +56,12 @@ a fraction of the court's projected depth. `scripts/score_serve_events.py`
 (+`--control`) + 45 tests + `docs/g4_serve_events.md`; suite **965**.
 Measured on the 17 GT far serves (windowed replay through the real
 `process_frame`): runway **15/17** (only 7/17 genuinely off-court), far flight
-**11/17** in window / **4/17** at +-15 f, conjunction **6/17** in window /
-**3/17** at +-15 f (**3/12 held-out**, offsets 6/6/13 f) against production's
-**0/12**; 24 mid-rally NON-serve control windows give **1** false positive at
-+-15 f (4 in window). Verdict: the runway leg is strong, the conjunction is a
+in window / conjunction at +-15 f — **CORRECTED in the addendum below** (this
+block's ball-side numbers came from a config that silently ran the COCO
+`yolov8n` ball detector; with the production model they are far flight 16/17
+in window and 8/17 at +-15 f, conjunction 14/17 in window and **6/17** at +-15 f
+— 3/5 dev, 3/12 held-out — with 4/24 control false positives, precision 0.60,
+recall 0.35, against production's **0/17**). Verdict: the runway leg is strong, the conjunction is a
 real but thin signal — an evidence stream for the G2 decision, NOT a fix.
 **Next = the owner reads `docs/g4_serve_events.md` and decides whether to consume
 the events in the post-hoc layer (S4) or keep pushing the ball side (a far ball
