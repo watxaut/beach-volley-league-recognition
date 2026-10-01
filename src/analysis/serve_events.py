@@ -391,6 +391,150 @@ class FarFlightDetector:
 
 
 # ---------------------------------------------------------------------------
+# Structural contact proposer (session 53)
+# ---------------------------------------------------------------------------
+
+
+class ServeContactProposer:
+    """``serve_contact`` -- a far-side contact proposed from the RAW detections.
+
+    The conjunction above needs a ``far_flight`` run (>=3 sightings with a
+    positive width growth) before it will place a contact, and its reach is 1.0
+    bbox heights. Session 53 measured why that is a bad trade: on the 17 GT far
+    serves of the beach match the conjunction scores 11/17 once the opener gate
+    is applied, but six real serves have a far-side ball in reach and no growing
+    run, and the same reach value that rejects all nine owner FALSE/OFFGAME
+    moments is what rejects them.
+
+    So this arm drops the flight requirement and widens the reach, and keeps
+    only what the false positives cannot fake:
+
+    * the ball must be **ball-sized** (8-60 px). The venue fires the detector at
+      ~2 candidates/frame on sand and lines, and the far-band junk measures 3 px
+      unscaled -- the size gate is what stops a magnified patch of ground from
+      reading as a ball;
+    * the person must be in the **runway** region proper (``classify`` returns
+      ``"runway"``, i.e. behind or on the far line), not merely in the court
+      band -- the band exists to keep the *occupancy* measurement at 17/17, and
+      admitting ``"court"`` here is what costs the two owner false positives;
+    * the ball must be on the **far side of the net line** (``is_far_side``),
+      because the contact happens at hand height and the ball is airborne after
+      it (a ground-plane wedge throws the whole flight away);
+    * the contact is placed at the **last qualifying sighting of a run**, which
+      is the frame the ball is still with the server. No lookahead: a run closes
+      on its own, so the proposer is causal and belongs in ``process_frame``.
+
+    Emitting one candidate per run (not per frame) is what keeps the stream
+    small. Everything it emits is EVIDENCE: the opener gate (a serve opens a
+    rally) is structural bookkeeping the post-hoc layer applies, because only it
+    has the whole action stream. Measured frontier:
+    ``docs/g4_structural_serve.md``.
+    """
+
+    def __init__(self, runway: ServeRunway, min_conf: float = 0.15,
+                 ball_min_conf: float = 0.15, reach_factor: float = 1.5,
+                 ball_w_min: int = 8, ball_w_max: int = 60,
+                 max_gap: int = 3) -> None:
+        self.runway = runway
+        self.min_conf = float(min_conf)
+        self.ball_min_conf = float(ball_min_conf)
+        self.reach_factor = float(reach_factor)
+        self.ball_w_min = int(ball_w_min)
+        self.ball_w_max = int(ball_w_max)
+        self.max_gap = int(max_gap)
+        self._run: Optional[Dict[str, Any]] = None
+        self.events: List[Dict[str, Any]] = []
+
+    def observe(self, frame_index: int, person_detections: Sequence[Dict[str, Any]],
+                ball_detections: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """One frame; returns a ``serve_contact`` event when a run closes."""
+        best = self._best_pair(frame_index, person_detections, ball_detections)
+        if best is None:
+            if self._run is not None and frame_index - self._run["last_frame"] > self.max_gap:
+                return self._close()
+            return []
+        if self._run is None:
+            self._run = {"start_frame": frame_index, "sightings": 1,
+                         "last_frame": frame_index, "best": best}
+            return []
+        self._run["sightings"] += 1
+        self._run["last_frame"] = frame_index
+        if best["gap_norm"] < self._run["best"]["gap_norm"]:
+            self._run["best"] = best
+        return []
+
+    def _best_pair(self, frame_index: int, person_detections: Sequence[Dict[str, Any]],
+                   ball_detections: Sequence[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """The closest ball-in-reach pair this frame, or None."""
+        best: Optional[Dict[str, Any]] = None
+        for det in person_detections:
+            bbox = det.get("bbox")
+            conf = float(det.get("confidence", 0.0))
+            if not bbox or len(bbox) != 4 or conf < self.min_conf:
+                continue
+            if self.runway.classify(foot_point(bbox)) != "runway":
+                continue
+            height = float(bbox[3] - bbox[1])
+            if height <= 0:
+                continue
+            for ball in ball_detections:
+                if float(ball.get("confidence", 0.0)) < self.ball_min_conf:
+                    continue
+                box = ball.get("bbox")
+                if not box or len(box) != 4:
+                    continue
+                width = float(box[2] - box[0])
+                if not (self.ball_w_min <= width <= self.ball_w_max):
+                    continue
+                center = ball.get("center")
+                if not center:
+                    continue
+                point = (float(center[0]), float(center[1]))
+                if not self.runway.is_far_side(point):
+                    continue
+                gap = bbox_gap(bbox, point) / height
+                if gap > self.reach_factor:
+                    continue
+                if best is None or gap < best["gap_norm"]:
+                    best = {"frame": frame_index, "gap_norm": round(gap, 3),
+                            "occupant_bbox": [round(float(v), 1) for v in bbox],
+                            "occupant_conf": round(conf, 3),
+                            "ball_width": round(width, 1),
+                            "ball_conf": round(float(ball.get("confidence", 0.0)), 3),
+                            "ball_center": [round(point[0], 1), round(point[1], 1)]}
+        return best
+
+    def _close(self) -> List[Dict[str, Any]]:
+        run, self._run = self._run, None
+        if run is None or run["sightings"] < 2:
+            return []          # a single frame is a phantom, not a contact
+        best = run["best"]
+        event = {
+            "type": "serve_contact",
+            # The contact is where the ball is still WITH the server: the last
+            # frame of the run, not the frame of the closest approach (which can
+            # be earlier, while the ball is being held).
+            "frame": run["last_frame"],
+            "contact_frame": run["last_frame"],
+            "evidence_frame": best["frame"],
+            "start_frame": run["start_frame"],
+            "sightings": run["sightings"],
+            "occupant_bbox": best["occupant_bbox"],
+            "occupant_region": "runway",
+            "occupant_conf": best["occupant_conf"],
+            "ball_gap_norm": best["gap_norm"],
+            "ball_width": best["ball_width"],
+            "ball_conf": best["ball_conf"],
+            "ball_center": best["ball_center"],
+        }
+        self.events.append(event)
+        return [event]
+
+    def flush(self) -> List[Dict[str, Any]]:
+        return self._close()
+
+
+# ---------------------------------------------------------------------------
 # Combiner -- the owner's rule
 # ---------------------------------------------------------------------------
 
@@ -423,6 +567,11 @@ class ServeEventEmitter:
         far_flight_max_gap: int = 3,
         reach_factor: float = 1.0,
         lookback_s: float = 5.0,
+        structural_enabled: bool = True,
+        structural_reach_factor: float = 1.5,
+        structural_ball_w_min: int = 8,
+        structural_ball_w_max: int = 60,
+        structural_max_gap: int = 3,
     ) -> None:
         self.runway = ServeRunway(court_corners, midcourt_points,
                                   front_frac, back_frac, side_margin_frac)
@@ -436,6 +585,21 @@ class ServeEventEmitter:
         self.ball_min_conf = float(ball_min_conf)
         self._reach: List[Dict[str, Any]] = []
         self.events: List[Dict[str, Any]] = []
+        # The structural arm (session 53): the same runway occupant and a
+        # ball-SIZED far-side detection in reach, WITHOUT requiring a
+        # ``far_flight`` run.  It is a separate event type so the post-hoc
+        # consumer can union the two; see docs/g4_structural_serve.md for the
+        # measured frontier (11/17 at precision 1.00 on its own, 14/17 unioned
+        # with the gated conjunction, vs 0/17 in the action stream).
+        self.contacts = ServeContactProposer(
+            runway=self.runway,
+            min_conf=self.watcher.min_conf,
+            ball_min_conf=self.ball_min_conf,
+            reach_factor=float(structural_reach_factor),
+            ball_w_min=int(structural_ball_w_min),
+            ball_w_max=int(structural_ball_w_max),
+            max_gap=int(structural_max_gap),
+        ) if structural_enabled else None
 
     def observe(
         self,
@@ -448,6 +612,9 @@ class ServeEventEmitter:
         emitted = self.flight.observe(frame_index, ball_detections)
         if occupied:
             self._record_reach(frame_index, person_detections, ball_detections)
+        if self.contacts is not None:
+            emitted.extend(self.contacts.observe(frame_index, person_detections,
+                                                 ball_detections))
         for flight in list(emitted):  # snapshot: candidates are appended below
             if flight.get("type") != "far_flight":
                 continue
@@ -521,8 +688,12 @@ class ServeEventEmitter:
         """Close open runs/trailing windows and return everything emitted."""
         self.flight.flush()
         self.watcher.flush()
+        if self.contacts is not None:
+            self.contacts.flush()
         self.events = self.watcher.events + self.flight.events + [
             e for e in self.events if e["type"] == "serve_candidate"]
+        if self.contacts is not None:
+            self.events.extend(self.contacts.events)
         self.events.sort(key=lambda e: e["frame"])
         return self.events
 
@@ -552,4 +723,9 @@ class ServeEventEmitter:
             far_flight_max_gap=config.get("far_flight_max_gap", 3),
             reach_factor=config.get("serve_candidate_reach_factor", 1.0),
             lookback_s=config.get("serve_candidate_lookback_s", 5.0),
+            structural_enabled=config.get("serve_structural_enabled", True),
+            structural_reach_factor=config.get("serve_structural_reach_factor", 1.5),
+            structural_ball_w_min=config.get("serve_structural_ball_w_min", 8),
+            structural_ball_w_max=config.get("serve_structural_ball_w_max", 60),
+            structural_max_gap=config.get("serve_structural_max_gap", 3),
         )

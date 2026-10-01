@@ -201,6 +201,18 @@ class Config:
         "serve_candidate_reach_factor": 1.0,  # ball-to-box gap, in occupant bbox heights
         "serve_candidate_lookback_s": 5.0,    # how far back from the flight onset to look for that ball
 
+        # Structural contact arm (session 53): the same runway occupant and a
+        # ball-SIZED far-side detection in reach, WITHOUT the far_flight
+        # requirement. Measured on the 17 GT far serves: 11/17 at precision 1.00
+        # on its own and 14/17 unioned with the gated conjunction, against 0/17
+        # in the action stream (docs/g4_structural_serve.md). The opener gate
+        # that makes it safe is applied post-hoc, not here.
+        "serve_structural_enabled": True,       # inside the --serve-events envelope
+        "serve_structural_reach_factor": 1.5,   # ball-to-box gap, in occupant bbox heights
+        "serve_structural_ball_w_min": 8,        # venue far/near ball range; below this it is sand
+        "serve_structural_ball_w_max": 60,
+        "serve_structural_max_gap": 3,          # frames a run may skip (far ball ~1 frame in 4)
+
         # Model paths (optional - uses defaults if not specified)
         "ball_model_path": None,
         "player_model_path": None,
