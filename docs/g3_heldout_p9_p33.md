@@ -62,6 +62,17 @@ Pass-2 remains a wash on contact F1 and again **costs class accuracy**
 (0.590 → 0.561): it breaks correct labels faster than it fixes anything. It
 does move team accuracy up (+0.043) by overriding far-band attribution.
 
+> **Correction (S3, 2026-10-01).** The `team` column above compares the
+> perception stream's COURT-SIDE letter to the GT SQUAD letter, so it is a
+> side-vs-squad confound, not a side-attribution failure. `scripts/
+> resolve_side_switches.py` derives the beach switch cadence
+> (`[7,14,21,28]`, exact vs owner GT) and maps side→squad: the same 139 found
+> contacts score **105/139 = 0.755** squad-mapped (also 0.755 as pred side vs
+> owner side), leaving **34 genuine side errors**. The `wrong_team` bucket in
+> the taxonomy is inflated by the same confound. See
+> `docs/g3_side_switch_layer.md`. The recorded 0.518 is kept as the raw
+> side-vs-squad number.
+
 ### Held-out vs dev (the re-ranking)
 
 | | dev P1–P8 | held-out P9–P33 |

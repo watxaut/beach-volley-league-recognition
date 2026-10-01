@@ -2481,3 +2481,57 @@ Config-drift guard extended.)
 signature that does not require a fed ascent and (b) detection evidence on the
 far toss. Both are recognition/detection mechanisms, outside the approved T5
 scope — decision needed before code.
+
+
+---
+
+### 2026-09-30 (forty-fourth session) — G3 plan S1 far-side serve looming probe: diagnose only; REFUTED at kill 2 (`src/` untouched)
+
+**Asked:** execute the owner-approved G3 plan S1 (STATUS #42, Active next):
+a diagnose-only far-side serve LOOMING probe, with pre-registered kill
+criteria, no `src/` change. Chosen over S0b because S0 is owner-only and S0b's
+expected result (far serves 0/5 at contact level) was already hand-measured;
+S1 is the first concrete far-serve perception mechanism and unblocks the
+S3/S4 pass-2 layers that wait on real serve contacts.
+
+**Mechanism measured (spec frozen by #42, not tuned).** After the contact the
+far serve flies toward the fixed long-axis camera, so its apparent bbox width
+grows; the pre-contact toss is absent at ~3/5 dev far serves (T5). In the
+new-rally state (no emitted contact within `RALLY_RESET_GAP=90`), a ball
+SEGMENT is a run of production-tracked sightings merged across gaps ≤
+`ball_max_missing` (10 f, the identity horizon); its ONSET is the first
+tracked frame and must be far-band (width ≤26 px, below the 26–35 abstain
+band); `L` = OLS slope of `ln(width)` vs time in SECONDS over
+`[onset, onset+0.5 s]`. Dev/e1–e7 use the dumped production `ball_track`;
+the match dump is replayed through the production `BallTracker` (imported from
+`scripts/probe_serve_mechanisms.py`, never re-implemented) with a hard parity
+stop. Secondary feature `nearest far-team player is_behind_baseline at onset`
+declared before any held-out look, reported only, never fit.
+
+**Result.** Kill 1 (far flight detected?): **passes at the boundary** — 4/5
+far serves have ≥5 far-band tracked sightings in `[c, c+0.5 s]` (f210 7,
+f2154 10, f3038 9, f4770 9; f880 only 3). Kill 2 (does `L` separate?):
+**FIRES** — lowest far-serve `L` **0.338** (P4 f2159) vs highest new-rally
+non-serve `L` **0.945** (dead-time throw-back f1673, width 26; also f4581
+0.495, f3390 0.364), so `L*` is undefined and no threshold admits all five
+without false fires. Robust to the segment-merge choice: maxgap 0/2/5/10 all
+overlap (non-serve max 1.29/1.18/1.18/0.945). Kill 3 (entreno neutrality)
+vacuous (`L*` undefined); census only (e1/e2/e4/e6/e7 have 1 far-band
+new-rally segment each). Kill 4 (match P9–P33) **pending owner S0** — the
+match replay is exact (0 locked / 0 centre mismatches over 26068 frames; 55
+far-band new-rally segments). **Verdict: the far-serve looming lever is
+REFUTED at diagnosis** — same class as T5 and R1; no threshold was tuned on
+the 5 dev points.
+
+**Deliberately NOT done.** No kill-1 detector-mining branch (kill 1 passed);
+no `src/` mechanism band (S2 is owner-gated and not triggered); the
+`behind_baseline` secondary was not used to move `L*`. The far-serve CONTACT
+(open point 22) stays open; the next lever (targeted far-flight detector
+mining vs another contact-proposal mechanism) is an owner call.
+
+**Artifacts.** `scripts/probe_far_serve_looming.py` (+29 pure-mechanism
+tests), `docs/g3_far_serve_looming.md`, `output/s1/far_serve_looming.json`
+(git-ignored). T4 base anchors re-confirmed: `output/t4/dev_timed.json`
+contact P 0.586 / R 0.607 / F1 0.597 and `dev_waterfall.json` stage
+`3_candidate` = 6 (the committed T4 baseline; no src change to re-measure).
+Suite **811** (782 + 29).

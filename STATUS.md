@@ -17,7 +17,22 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-01 (forty-eighth session — **G1 DONE: the first
+**Last updated:** 2026-10-01 (forty-ninth session — **S3 DONE: the pass-2
+side-switch/squad layer.** `scripts/resolve_side_switches.py` (+25 tests) +
+`docs/g3_side_switch_layer.md`; no `src/` change, no decode. Derives the beach
+switch cadence from the POINT ORDER alone (`[7,14,21,28]`, EXACT vs the owner
+`side_switch_after_point`), maps court-side→squad by parity, and augments
+`actions_pass2` with `pass2_squad`. The needle is a measurement confound found
+en route: the perception stack emits COURT-SIDE letters while the GT is SQUAD,
+so G1's raw `team 0.518` is side-vs-squad; the same 139 found contacts score
+**105/139 = 0.755** squad-mapped (leaving 34 genuine side errors). The
+player-crossing cross-check is honest but useless (3/4 switches supported, but
+16/28 non-switch boundaries also supported — ids hop, open point 2) and is
+evidence only. Suite **897** (+25). **Next = S4 (consume `pass2_squad`) or the
+G2 owner far-serve decision; the label bucket (`overpass` 0/18) is still the
+largest held-out perception loss.**)
+
+**Previous (forty-eighth session — **G1 DONE: the first
 HELD-OUT contact score on P9–P33.** `scripts/score_heldout_contacts.py`
 (+20 tests, `tests/test_heldout_contacts.py`) + `docs/g3_heldout_p9_p33.md`;
 no `src/` change, no video decode. On the 183 owner contacts of the 25 held-out
@@ -383,8 +398,10 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
-**G1 DONE (#48): the first held-out contact score exists; G2 (the far-serve
-lever decision) is the next action.**
+**G1 DONE (#48) and S3 DONE (#49): the first held-out contact score exists
+and the team metric's side-vs-squad confound is fixed; G2 (the far-serve lever
+decision) is the next owner action, S4 (consume `pass2_squad`) the next worker
+one.**
 
 - **Held-out score** — `scripts/score_heldout_contacts.py` scores P9–P33
   against `ground_truth/20260920_match_contacts.json` with the S0b scope
@@ -393,11 +410,20 @@ lever decision) is the next action.**
   `--ignore-player`, effective ±15 f). Production **P 0.785 / R 0.760 / F1
   0.772**, class 0.590, team 0.518; pass-2 F1 0.774 / class 0.561 / team 0.561.
   Doc `docs/g3_heldout_p9_p33.md`; artifacts `output/heldout_contacts/`.
+- **S3 side-switch/squad layer** (`scripts/resolve_side_switches.py`, +25
+  tests, `docs/g3_side_switch_layer.md`) — beach cadence from the point order
+  alone → `[7,14,21,28]` EXACT vs the owner schedule; side→squad by parity;
+  `actions_pass2.pass2_squad` on 207/207 actions. The recorded G1 **team 0.518
+  is a side-vs-squad confound** (the stack emits side letters): the same 139
+  found contacts score **0.755** squad-mapped, leaving **34 genuine side
+  errors**. The player-crossing cross-check is evidence-only (ids hop, open
+  point 2).
 - **Miss taxonomy (perception, 183 contacts)** — 46 correct / **57
   wrong_label** / 36 wrong_team / 44 missed. The largest bucket is the label,
-  not proposal. `overpass` 0/18 correct (13 found, all mislabelled); serve
-  recall 0.280 (far serves all missed). Only 3/44 missed have no action within
-  ±80 f.
+  not proposal. The 36 wrong_team is inflated by the side-vs-squad confound
+  (S3); the true side error is ~34 of 139 found contacts. `overpass` 0/18
+  correct (13 found, all mislabelled); serve recall 0.280 (far serves all
+  missed). Only 3/44 missed have no action within ±80 f.
 - **Far serves 0/12 held-out** — 6/8 with a nearby "serve" are the pass-2
   re-labelled GT reception (+26…+34 f), 2 are production serves 26–28 f late
   with the opposite team, 4 have no serve within ±80 f. The S0b dev finding
@@ -597,11 +623,13 @@ the P9–P33 set as its held-out check.
   serves within tolerance vs the S0 GT. Refuted ⇒ `git checkout 185c6f0 --
   src/ tests/test_config_drift.py` and the band moves to a default-off
   `scripts/*_harness.py` subclass (T5/R1 precedent).
-- **S3 (queued behind G0/G1, was #45's next worker item) — pass-2 squad/side-switch layer (open point 21.4):** squad = side ×
+- **S3 (worker) — [#49 DONE 2026-10-01] pass-2 squad/side-switch layer (open point 21.4):** squad = side ×
   switch parity (beach rule: switch every 7 points), cross-checked by all four
   players crossing the net in dead time; target exactly the 4 GT switches
-  (after P7/14/21/28). Should fix 4 of the 5 dev stage-5 team errors (all P8).
-  Deterministic pass-2, independent of S1.
+  (after P7/14/21/28). SHIPPED: derived `[7,14,21,28]` exact; `pass2_squad`
+  on 207/207 actions; **G1 team 0.518 → 0.755 squad-mapped** (the raw number
+  was a side-vs-squad confound), 34 genuine side errors; player-crossing
+  evidence-only. Deterministic pass-2, independent of S1. Consume in S4.
 - **S4 — 21.3 winner/outcome layer → 13 (ace / serve fault / assist) → fantasy
   module + points table (14e)**, consuming `actions_pass2` after S1–S3 so aces,
   faults and receptions hang on real serve contacts. **21.3 DONE (#43)** as a
@@ -740,11 +768,17 @@ point number in `docs/history/`.
     (fault prior over the terminal touch; 33/33 decided, 18/33 vs the dictated
     winners — 54.5%; `docs/point_winner_layer.md`). Ball-death side/in-out is
     absent from every artifact, so kill/ace endings (3 misses) stay honest
-    fault-prior misses; 8 misses are terminal-touch attribution (→ 22).** (4) *Side-switch layer:* persistent
+    fault-prior misses; 8 misses are terminal-touch attribution (→ 22).** (4) *Side-switch layer:* **[#49 DONE 2026-10-01]** persistent
     all-player side flip between points (majority + serve-side evidence),
     cross-checked vs score expectation; ALL team fields become squad
     identity; overlay labels must swap; target = exactly the 4 GT switches
-    after points 7/14/21/28. (5) *Persistent player numbers:* GT pass
+    after points 7/14/21/28. SHIPPED as `scripts/resolve_side_switches.py`
+    (+25 tests, `docs/g3_side_switch_layer.md`): beach cadence from the point
+    order alone reproduces `[7,14,21,28]` exactly; side→squad by parity;
+    `actions_pass2.pass2_squad` for downstream. The player-crossing
+    cross-check is EVIDENCE ONLY — noisy because ids hop (open point 2), so
+    the cadence places the switches. Corrected G1's raw team 0.518 (side vs
+    squad) to **0.755** squad-mapped, 34 genuine side errors. (5) *Persistent player numbers:* GT pass
     around the switches first (`annotate_player_gt.py`), then GAME_OFF
     dead-time gallery mode (18a lever) + size/appearance gates on
     continuous feeds; Phase 2 stitch (6) only if fragmentation persists.
@@ -967,6 +1001,12 @@ survive across sessions; provenance in the archives.
   canonical ids.
 - The scorer merges GT `overrides` before matching — ratified corrections
   must be visible to eval.
+- The perception stack emits COURT-SIDE letters (A=near, B=far,
+  `get_team`); GT/owner teams are SQUAD letters. Comparing them directly is a
+  side-vs-squad confound: G1's raw team 0.518 corrects to **0.755** once
+  side→squad is mapped via the beach switch cadence
+  (`scripts/resolve_side_switches.py`, S3). Score team at side level, or map
+  side→squad before consuming it as squad.
 - pred `player_id` = L-R index over the team-filtered snapshot set; it
   shifts when the filter set changes (harmless for spatial scoring).
 - A/B baselines: generate from HEAD (git stash) BEFORE editing, never
@@ -1229,6 +1269,7 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- 2026-10-01 **#49** — S3 DONE: pass-2 side-switch/squad layer — `scripts/resolve_side_switches.py` (+25 tests) + `docs/g3_side_switch_layer.md`, no `src/` change, no decode; beach cadence from the point order alone → `[7,14,21,28]` EXACT vs the owner schedule; side→squad by parity → `actions_pass2.pass2_squad` (207/207); **G1 raw team 0.518 is a side-vs-squad confound — same 139 found contacts score 0.755 squad-mapped, 34 genuine side errors**; player-crossing cross-check evidence-only (3/4 switches supported but 16/28 non-switch boundaries too — ids hop); suite 897.
 - 2026-10-01 **#48** — G1 DONE: the first HELD-OUT contact score — `scripts/score_heldout_contacts.py` (+20 tests) + `docs/g3_heldout_p9_p33.md`, no `src/` change; P9–P33 (183 owner contacts, region f5240–f26147, effective ±15 f) production **P 0.785 / R 0.760 / F1 0.772**, class 0.590, team 0.518; pass-2 F1 0.774 / class 0.561 / team 0.561; miss taxonomy 46 correct / **57 wrong-label** / 36 wrong-team / 44 missed ⇒ the label bucket is the largest held-out loss (not proposal); `overpass` recall 0.000; far serves **0/12** (6/8 nearby "serves" = pass-2 re-labelled reception +26…+34 f); stage waterfall not reproduced (only match diag dump is R1 bw=0.3), flagged; suite 872.
 - 2026-10-01 **#47** — G0 DONE: the whole-match contact GT (P1–P33) is machine-readable — dialect-B `parse_contact_gt` + `scripts/build_match_contact_gt.py` → `ground_truth/20260920_match_contacts.json` (33 points, **211 owner contacts**: 28 P1–P8 + 183 P9–P33, match-frame axis, all `source=owner_gt`) + 33 contact sheets; P1–P8 rebuild field-identical (only physical `raw_line_no` +3); fixed side→squad mapping to switch PARITY (P29–P33 `near`=Team A again; old last-switch formula mislabelled P15–P21/P29–P33); P30 f23545 unlabelled touch kept `action=null` + `owner_action_unspecified`; no `src/` change; suite 852.
 - 2026-09-30 **#46** — RECORD-ONLY session: owner dictated the **whole 20260920 match contact GT (P1–P33)** in a second dialect (0 of ~196 new lines parse yet; G0 queued) and delivered a new calibrated practice video `20290928_entreno_vall_dhebron.mp4` (1080p, 695 s, ~30.1 fps); camera domain pinned in AGENTS.md §7 (long axis always, fps drops by itself in heat/low light, height varies per video); 3 new open points (25 dig-vs-ball-death, 26 duplicate actor attribution, 29 stale recording docs) + point 5 extended with the owner's "past + ball field" attribution spec; suite 840.
@@ -1314,6 +1355,51 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+### 2026-10-01 (forty-ninth session) — S3 DONE: pass-2 side-switch/squad layer; G1's raw team 0.518 corrected to 0.755 (`src/` untouched)
+
+**Asked:** continue with the next point that moves the needle for G3. G2
+(far-serve lever) is an owner decision, S2 is owner-gated and S1 refuted, so
+the next unblocked worker item was **S3 — the pass-2 side-switch/squad layer
+(open point 21.4)**.
+
+**Delivered.** `scripts/resolve_side_switches.py` + 25 tests
+(`tests/test_side_switches.py`) + `docs/g3_side_switch_layer.md`; no `src/`
+change, no video decode. The layer derives the beach switch cadence (change
+ends after every 7 points) from the POINT ORDER alone, maps each court-side
+letter to a squad letter by switch parity, and augments every `actions_pass2`
+entry with `pass2_squad` (+ `pass2_point`) for downstream fantasy/stat
+consumption. Output `output/side_switches.json`; report
+`logs/side_switch_report.md`.
+
+**The needle (a measurement confound found en route).** The perception stack
+speaks COURT-SIDE letters (A=near, B=far, `CourtCalibration.get_team`) while
+the owner/GT convention is SQUAD letters — so G1's recorded raw `team 0.518`
+is side-vs-squad, NOT a side-attribution failure. On the same 139 found
+contacts, mapping side→squad lifts team to **105/139 = 0.755** (identical to
+`pred side vs owner side`, what the stack actually emits), leaving **34
+genuine side errors** (clustered P10/P15/P18/P19/P22/P24–P26/P29–P30 — the
+near/far width-band attribution class). The T4 dev "5 stage-5 team errors, all
+P8" are the same confound at the first switch point.
+
+**Gates.** Derived switches `[7,14,21,28]` are an EXACT match to the owner
+`side_switch_after_point` (validate-only read); P9 f5496 (owner near/squad B)
+is the parity anchor test; 207/207 actions annotated.
+
+**Cross-check honest result.** The player-crossing cross-check (from the R1
+match diag dump, whose player tracking is independent of the ball departure
+gate) gives only **3/4 cadence switches with support AND 16/28 non-switch
+boundaries also supported** — it cannot place switches because tracker ids hop
+(open point 2). It is therefore EVIDENCE ONLY and explicitly NOT used; a
+position-based detector waits on stable identity GT.
+
+**Suite:** **897** (872 + 25). No `src/` change (`git diff 185c6f0 -- src/`
+empty).
+
+**Next:** S4 (consume `pass2_squad`; the winner layer's side→squad mapping can
+now use this schedule instead of GT) and/or the G2 owner decision on the
+far-serve lever (baseline F1 0.772 / far-serve 0/12); the label bucket
+(`overpass` 0/18) remains the largest held-out perception loss.
+
 ### 2026-10-01 (forty-eighth session) — G1 DONE: first HELD-OUT contact score on P9–P33; far serves 0/12; labels (not proposal) dominate the loss (`src/` untouched)
 
 **Asked:** execute G1 from *Active next*: score the perception stream (and
@@ -1430,54 +1516,3 @@ contact sheet, with the P1–P8 rebuild as the regression anchor.
 windows from the episode map (the match GT's `match_start_frame/end_frame` are
 episode-map PREDICTIONS, flagged), then the G2 far-serve lever decision on real
 labels. Owner-side: capture-spec doc rewrite (point 29).
-
-### 2026-09-30 (forty-fourth session) — G3 plan S1 far-side serve looming probe: diagnose only; REFUTED at kill 2 (`src/` untouched)
-
-**Asked:** execute the owner-approved G3 plan S1 (STATUS #42, Active next):
-a diagnose-only far-side serve LOOMING probe, with pre-registered kill
-criteria, no `src/` change. Chosen over S0b because S0 is owner-only and S0b's
-expected result (far serves 0/5 at contact level) was already hand-measured;
-S1 is the first concrete far-serve perception mechanism and unblocks the
-S3/S4 pass-2 layers that wait on real serve contacts.
-
-**Mechanism measured (spec frozen by #42, not tuned).** After the contact the
-far serve flies toward the fixed long-axis camera, so its apparent bbox width
-grows; the pre-contact toss is absent at ~3/5 dev far serves (T5). In the
-new-rally state (no emitted contact within `RALLY_RESET_GAP=90`), a ball
-SEGMENT is a run of production-tracked sightings merged across gaps ≤
-`ball_max_missing` (10 f, the identity horizon); its ONSET is the first
-tracked frame and must be far-band (width ≤26 px, below the 26–35 abstain
-band); `L` = OLS slope of `ln(width)` vs time in SECONDS over
-`[onset, onset+0.5 s]`. Dev/e1–e7 use the dumped production `ball_track`;
-the match dump is replayed through the production `BallTracker` (imported from
-`scripts/probe_serve_mechanisms.py`, never re-implemented) with a hard parity
-stop. Secondary feature `nearest far-team player is_behind_baseline at onset`
-declared before any held-out look, reported only, never fit.
-
-**Result.** Kill 1 (far flight detected?): **passes at the boundary** — 4/5
-far serves have ≥5 far-band tracked sightings in `[c, c+0.5 s]` (f210 7,
-f2154 10, f3038 9, f4770 9; f880 only 3). Kill 2 (does `L` separate?):
-**FIRES** — lowest far-serve `L` **0.338** (P4 f2159) vs highest new-rally
-non-serve `L` **0.945** (dead-time throw-back f1673, width 26; also f4581
-0.495, f3390 0.364), so `L*` is undefined and no threshold admits all five
-without false fires. Robust to the segment-merge choice: maxgap 0/2/5/10 all
-overlap (non-serve max 1.29/1.18/1.18/0.945). Kill 3 (entreno neutrality)
-vacuous (`L*` undefined); census only (e1/e2/e4/e6/e7 have 1 far-band
-new-rally segment each). Kill 4 (match P9–P33) **pending owner S0** — the
-match replay is exact (0 locked / 0 centre mismatches over 26068 frames; 55
-far-band new-rally segments). **Verdict: the far-serve looming lever is
-REFUTED at diagnosis** — same class as T5 and R1; no threshold was tuned on
-the 5 dev points.
-
-**Deliberately NOT done.** No kill-1 detector-mining branch (kill 1 passed);
-no `src/` mechanism band (S2 is owner-gated and not triggered); the
-`behind_baseline` secondary was not used to move `L*`. The far-serve CONTACT
-(open point 22) stays open; the next lever (targeted far-flight detector
-mining vs another contact-proposal mechanism) is an owner call.
-
-**Artifacts.** `scripts/probe_far_serve_looming.py` (+29 pure-mechanism
-tests), `docs/g3_far_serve_looming.md`, `output/s1/far_serve_looming.json`
-(git-ignored). T4 base anchors re-confirmed: `output/t4/dev_timed.json`
-contact P 0.586 / R 0.607 / F1 0.597 and `dev_waterfall.json` stage
-`3_candidate` = 6 (the committed T4 baseline; no src change to re-measure).
-Suite **811** (782 + 29).
