@@ -238,10 +238,31 @@ S4/`pass2_squad` and the overpass rule/possession call remain open.**
   sidelines continued to infinity, longitudinally a band straddling the far line
   (`-0.15..+0.30` x court depth). Scored on the 17 GT far serves vs 24 mid-rally
   non-serve control windows: runway **15/17** (only 7/17 genuinely off-court),
-  conjunction **3/17** at +-15 f (**3/12 held-out**) vs production **0/12**, FP
-  **1/24**. Doc `docs/g4_serve_events.md`, scorer `scripts/score_serve_events.py`.
-  These are EVIDENCE — no consumer is wired, and the label bucket (`overpass`
-  0/18) is still the largest held-out loss.
+  conjunction **6/17** at +-15 f (**3/12 held-out**) vs production **0/17**, FP
+  **4/24** -> precision 0.60, recall 0.35. Docs `docs/g4_serve_events.md`,
+  `docs/g4_far_serve_failure_mode.md`; scorers `scripts/score_serve_events.py`,
+  `scripts/probe_far_serve_{tracking,geometry}.py`. These are EVIDENCE — no
+  consumer is wired, and the label bucket (`overpass` 0/18) is still the largest
+  held-out loss.
+- **WHY the far serve dies (#51, the "which signal does not switch" answer)** —
+  `docs/g4_far_serve_failure_mode.md`. The stage waterfall is nearly IDENTICAL
+  far vs near (first failing stage: candidate 6/17 vs 7/16; probe reasons
+  `no_ball_sighting` 334 vs 256, `no_contact_geometry` 150 vs 195), so it is not
+  a skipped stage: **the contact GEOMETRY cannot reach its thresholds at the far
+  end**. Replaying every recorded far-serve ball track through the production
+  `ActionClassifier`: no vertex is ever the lowest point (bounce needs a 26 px
+  rise), horizontal flip **0 px** (redirect needs 20 px), `dvy` +4/-1 (drive
+  needs <= -8), `dvx` 2 px (needs 12), and the **serve branch's fed-ascent
+  margin is +0..+4 px against its required +10** — the far toss DECAYS like free
+  flight, which is that branch's designed reject. Near-side control reaches
+  rise 60-100 px, flips 38-65 px, `dvy` -42, fed ascent +13..+20 and fires 5/10.
+  Root cause: all four thresholds are near-half-scale px constants (AGENTS.md
+  §5) and at the far end the ball's image motion is DEPTH-dominated (growing +
+  descending toward the lens), so a far serve looks like uninterrupted free
+  flight. Secondary, independent: 2/17 far serves have zero raw detections at
+  conf 0.15 and 5/17 never lock a track; and where a candidate IS accepted
+  (P28 f21344-46, P25/P26/P4) the label is dig/overpass because attribution
+  picks the nearest TRACKED player — the server is not one.
 - **Far serves 0/12 held-out** — 6/8 with a nearby "serve" are the pass-2
   re-labelled GT reception (+26…+34 f), 2 are production serves 26–28 f late
   with the opposite team, 4 have no serve within ±80 f. The S0b dev finding
@@ -413,6 +434,14 @@ is 'consume the events post-hoc (S4)' vs 'keep pushing the ball side'.]**
   problem, not a gesture one. Any consumer ships with F1 0.772 / far-serve 0/12
   as its baseline and P9–P33 as the held-out check; re-score with
   `scripts/score_serve_events.py` (`--control` for the false-positive side).
+  **[#51 the WHY is measured too — `docs/g4_far_serve_failure_mode.md`: the
+  contact GEOMETRY is the signal that does not switch. Far-side contact tests
+  reach 0 of 4 (no lowest vertex, 0 px horizontal flip, dvy +4 vs <= -8, dvx 2
+  vs >= 12, fed ascent +0..+4 vs >= 10) while near-side control reaches them and
+  fires 5/10. Two options, both owner-gated: (a) SCALE-AWARE geometry --
+  thresholds in ball widths / local court scale instead of absolute px, which
+  must ship with a near-side non-regression A/B and the non-serve controls; or
+  (b) consume `serve_candidate` post-hoc as evidence (never as a label).]**
 - **G3-footage (worker, parallel, cheap) — first run of the new practice video**
   `20290928_entreno_vall_dhebron.mp4` (`make run VIDEO=…`, ~21k frames, the
   fastest full video here): sanity-check the pipeline on a second recording
@@ -882,6 +911,20 @@ survive across sessions; provenance in the archives.
 - A far ball is detected on roughly **1 frame in 4** (beach match); any
   consecutive-frame run logic throws the flight away unless it tolerates ~3-frame
   gaps (#51).
+- The far serve is **geometrically invisible to `ActionClassifier`**, not
+  merely untracked: with the ball tracked on 31/31 frames its four contact tests
+  reach none of their thresholds (no lowest vertex; 0 px horizontal flip vs the
+  20 px redirect gate; dvy +4 vs <= -8; dvx 2 vs >= 12; the serve branch's fed
+  ascent +0..+4 px vs the +10 px margin — the far toss decays like gravity).
+  All four thresholds are near-half-scale px constants and the far ball's image
+  motion is DEPTH-dominated (growing + descending toward the lens). Any far-serve
+  fix must therefore add a depth cue (apparent-size growth = the G4
+  `far_flight` event) or make the geometry scale-relative (#51).
+- **A probe that builds its config from `Config.default()` alone runs the COCO
+  `yolov8n.pt` ball detector, not the fine-tuned model** `src/main.py`
+  auto-loads — it under-reports the ball legs badly (far-flight at +-15 f 4/17 ->
+  8/17, conjunction 3/17 -> 6/17 once fixed). Probes now go through
+  `score_serve_events.production_config()` (#51).
 - Detectors can expose INERT read-only side channels for observers (person boxes
   the play-area filter dropped; pre-static-suppression ball candidates) without
   touching the returned list — the serve emitters need exactly these

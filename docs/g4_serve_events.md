@@ -105,23 +105,33 @@ occupant bbox heights.
 
 ## Measured (2026-10-01, `scripts/score_serve_events.py`)
 
-Windows `[c-90, c+60]` replayed through the real `process_frame` on the
-20260920 match, emitters ON. Far serves: the 17 GT far serves (5 dev P1–P8,
-12 held-out P9–P33). Control: 24 mid-rally **non-serve** GT contacts, where any
-candidate is a false positive by construction.
+**Re-measured with the PRODUCTION ball model.** The first run used
+`Config.default()` alone, which leaves `ball_model_path = None` -> the COCO
+`yolov8n.pt` instead of the fine-tuned `models/volleyball_ball_best.pt` that
+`src/main.py` auto-loads ("the COCO fallback rarely finds a volleyball on real
+footage"). Both probes now go through `production_config()`, which performs the
+same wiring as `src/main.py`. The runway leg was unaffected (the player detector
+is `yolov8n` in both paths); the ball legs were a lower bound.
 
-| event | far serves (17) | held-out (12) | control windows (24) |
-|---|---|---|---|
-| `runway_occupant` near the serve | **15** | 10 | 18 (fires often: weak alone) |
-| ... of which genuinely off-court | 7 | 5 | 5 |
-| `far_flight` in window | 11 | 9 | 14 |
-| `far_flight` within +-15 f | 4 | 3 | **8** |
-| `serve_candidate` in window | 6 | 5 | 4 |
-| **`serve_candidate` within +-15 f** | **3** | **3** | **1** |
+Windows `[c-90, c+60]` replayed through the real `process_frame`, emitters ON.
+Far serves: the 17 GT far serves (5 dev P1–P8, 12 held-out P9–P33). Control: 24
+mid-rally **non-serve** GT contacts, where any candidate is a false positive.
 
-Contact-level: **3 hits / 1 false positive** (P25 d=13, P26 d=6, P32 d=6 vs one
-control at d=6), against production's **0/12** held-out far serves. Offsets when
-the conjunction fires are 6/6/13 f -- inside the owner's own coarse +-10-15 f.
+| event | far serves (17) | dev (5) | held-out (12) | control (24) |
+|---|---|---|---|---|
+| `runway_occupant` near the serve | 15 | 5 | 10 | 18 (fires often: weak alone) |
+| ... of which genuinely off-court | 7 | 4 | 3 | 5 |
+| `far_flight` in window | 16 | 5 | 11 | 21 |
+| `far_flight` within +-15 f | 8 | 3 | 5 | 15 |
+| `serve_candidate` in window | 14 | 5 | 9 | 15 |
+| **`serve_candidate` within +-15 f** | **6** | **3** | **3** | **4** |
+
+Contact level: **6 hits (offsets 2, 2, 2, 7, 9, 15 f) vs 4 false positives** in
+24 non-serve control windows -> precision **0.60**, recall **0.35**, against
+production's **0/17** far serves (**0/12** held-out). The accidental COCO run
+measured 3 hits with 1 false positive: the correct detector buys recall
+(3 -> 6) and costs precision (1 -> 4 FPs), which is why the control windows
+exist.
 
 Read it honestly:
 
@@ -130,21 +140,25 @@ Read it honestly:
   the direct confirmation of the owner's premise -- the server is usually
   detected but not *trackable*, because he is off the court or standing on the
   line. It is also why the band had to straddle the far line.
-* **E1 (far flight) is a weak discriminator on its own** (4/17 vs 8/24
-  control), exactly S1's kill 2 reproduced on held-out data. Its value is
-  conditional: after the runway leg, it is what turns an occupancy into a
-  candidate.
-* **The conjunction is the usable signal but it is thin**: 3 contacts where we
-  had none. It is an evidence stream, not a fix. Two of the three are held-out
-  points, so the number is not a dev artefact, but 3/12 is not a mechanism.
-* What is missing is not the geometry but the **ball**: a far ball is detected
-  on roughly 1 frame in 4, so runs must tolerate gaps, and half the far-serve
-  windows have no growing-width run at all.
+* **E1 (far flight) is weak alone** (8/17 vs 15/24 control), reproducing S1's
+  kill 2 on held-out data; its value is conditional, after the runway leg.
+* **The conjunction is the usable signal and it is still thin**: 6 contacts
+  where we had none, precision 0.60.
+* **Why the action stream cannot get there on its own** is measured in
+  `docs/g4_far_serve_failure_mode.md`: the contact detector's four px-space
+  tests cannot reach their thresholds at the far end (no lowest vertex, no
+  horizontal flip, gravity-decaying toss), so the far serve is geometrically
+  invisible to `ActionClassifier` even when the ball is tracked on 31/31 frames.
 
 ## Reproduce
 
 ```bash
 venv/bin/python scripts/score_serve_events.py                    # all 17 far serves
 venv/bin/python scripts/score_serve_events.py --dev-only         # the 5 dev ones
+venv/bin/python scripts/score_serve_events.py --control          # the false-positive side
+# why the action stream cannot reach them:
+venv/bin/python scripts/probe_far_serve_tracking.py --side far
+venv/bin/python scripts/probe_far_serve_tracking.py --side near
+venv/bin/python scripts/probe_far_serve_geometry.py --dir output/g4/far_serve_dumps
 make run VIDEO=resources/full_videos/20260920_match_ari_joan_lost.mp4 EXTRA="--serve-events"
 ```

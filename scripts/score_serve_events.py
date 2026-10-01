@@ -38,8 +38,48 @@ from src.utils.config import Config  # noqa: E402
 MATCH_VIDEO = "resources/full_videos/20260920_match_ari_joan_lost_up1080.mp4"
 MATCH_CALIB = "calibrations/20260920_match_ari_joan_lost.json"
 MATCH_GT = "ground_truth/20260920_match_contacts.json"
+#: The fine-tuned ball model.  src/main.py auto-detects it and the COCO
+#: fallback "rarely finds a volleyball on real footage" (its own comment) --
+#: probes that skip this silently measure a different pipeline (the G4 scoring
+#: bug: the first far-flight numbers came from yolov8n.pt).
+BALL_MODEL = ROOT / "models" / "volleyball_ball_best.pt"
+
+
+def production_config(device: str = "cpu", **overrides: Any) -> Dict[str, Any]:
+    """Config.default() + the ball-model wiring src/main.py does.
+
+    Reused by every probe that decodes through FrameProcessor, so a probe can
+    never again measure the COCO detector instead of the shipped one.
+    """
+    config = dict(Config.default().config)
+    if BALL_MODEL.exists():
+        config["ball_model_path"] = str(BALL_MODEL)
+    config["device"] = device
+    config.update(overrides)
+    return config
+
+
 #: Owner frame estimates are coarse (+-10-15 f, stated in the GT file itself).
 DEFAULT_TOLERANCE = 15
+
+
+def load_serves(gt_path: Path, side: str = "far") -> List[Dict[str, Any]]:
+    """GT serves on one side (the far set is the loss; the near set is the control)."""
+    data = json.loads(gt_path.read_text())
+    out = []
+    for point in data["points"]:
+        for event in point.get("events", []):
+            if event.get("action") != "serve" or event.get("owner_side") != side:
+                continue
+            out.append({
+                "point": point["point"],
+                "frame": int(event["match_frame"]),
+                "tolerance": int(event.get("frame_tolerance") or DEFAULT_TOLERANCE),
+                "squad": event.get("player_team"),
+                "held_out": point["point"] > 8,
+            })
+    out.sort(key=lambda s: s["frame"])
+    return out
 
 
 def load_control_contacts(gt_path: Path, limit: int = 12) -> List[Dict[str, Any]]:
@@ -94,10 +134,9 @@ class WindowRunner:
     """One FrameProcessor reused across windows (models load once)."""
 
     def __init__(self, calibration: str, fps: float, device: str = "cpu") -> None:
-        self.config = dict(Config.default().config)  # DEFAULT_CONFIG copy, plain dict
+        self.config = production_config(device)
         self.config["court_calibration_path"] = calibration
         self.config["serve_events_enabled"] = True
-        self.config["device"] = device
         self.fps = fps
         self._cap: Optional[cv2.VideoCapture] = None
         self._frame_index = 0
