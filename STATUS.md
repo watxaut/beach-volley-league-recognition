@@ -17,7 +17,30 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-01 (fifty-first session — **G4: the two serve-EVIDENCE
+**Last updated:** 2026-10-01 (fifty-second session — **the possession signal
+(open point 9 enabler) was built, tested, and REFUTED as a needle-mover, then
+parked default-OFF in a harness.** Two mechanisms: a ball-field width TREND
+fallback in attribution (`_width_side_trend`: when the strict 26-35 px regime
+abstains, the direction the apparent width moves names the arriving side) and a
+motion-history tie-break (`_motion_convergence`, owner spec open point 5:
+candidates within 60 px of the closest re-ranked by trajectory convergence).
+Both were wired with config keys + drift guard + 18 unit tests, then measured:
+entreno/dev effectively neutral (the e1 "team flip" was run-to-run
+nondeterminism; dev shifted only one L-R `player_id`), and the decisive offline
+replay of the REAL attribution methods on the match dump gives base **121/157
+(0.771)** → both **122/157 (0.777)**. The trend fires 11× and is **11/11 on the
+correct side** but mostly redundant; motion changes **0** team attributions.
+The carry errors it targeted mostly have NO ball signal at all (ball lost),
+which no ball-field rule can recover. Verdict: parked in
+`scripts/possession_signal_harness.py` (default OFF, T5/R1 precedent), evidence
+`scripts/probe_possession_signal.py` + `docs/g3_possession_signal.md`; `src/`
+untouched. Suite **985** (+20). **ALSO: a second pi session (G4/#51) worked this
+repo concurrently and its commit collided with my stash mid-validation — never
+run two sessions on this repo at once.** **Next = the owner decides on the S4
+consume-the-serve-events step, or another possession attempt with a NON-ball
+signal (motion history alone was inert for team attribution).**)
+
+**Previous (fifty-first session — **G4: the two serve-EVIDENCE
 event emitters the owner asked for are built, scored and committed.** New
 `src/analysis/serve_events.py`: **E1 `far_flight`** (a ball whose apparent bbox
 width GROWS is flying at the fixed long-axis camera = far-side flight) and **E2
@@ -154,12 +177,14 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 ## Where we are
 
 **G1 DONE (#48), S3 DONE (#49), overpass-crossing REFUTED (#50), serve-EVIDENCE
-events shipped + scored (#51): the first held-out contact score exists, the team
-side-vs-squad confound is fixed, the overpass loss is measured as a rule (not
-geometry) problem, and the far serve now has two event emitters that surface
-3/17 GT far serves at contact level (3/12 held-out) where the action stream has
-0/12. Next owner action: consume those events post-hoc (S4) or push the ball
-side; S4/`pass2_squad` and the overpass rule/possession call remain open.**
+events shipped + scored (#51), possession-signal REFUTED + parked (#52): the
+first held-out contact score exists, the team side-vs-squad confound is fixed,
+the overpass loss is measured as a rule (not geometry) problem, the far serve
+has two event emitters that surface 3/17 GT far serves at contact level (3/12
+held-out) where the action stream has 0/12, and the ball-field possession
+signal was built and measured to be redundant (base 121/157 → 122/157). Next
+owner action: consume the serve events post-hoc (S4) or push the ball side;
+S4/`pass2_squad` and the overpass rule/possession call remain open.**
 
 - **Held-out score** — `scripts/score_heldout_contacts.py` scores P9–P33
   against `ground_truth/20260920_match_contacts.json` with the S0b scope
@@ -176,6 +201,15 @@ side; S4/`pass2_squad` and the overpass rule/possession call remain open.**
   found contacts score **0.755** squad-mapped, leaving **34 genuine side
   errors**. The player-crossing cross-check is evidence-only (ids hop, open
   point 2).
+- **Possession signal REFUTED + parked (#52, open point 9 enabler)** —
+  `scripts/possession_signal_harness.py` (default OFF) +
+  `scripts/probe_possession_signal.py` + `docs/g3_possession_signal.md`; no
+  `src/` change, no decode. Offline replay of the REAL attribution methods on
+  the match dump: base **121/157 (0.771)** → both **122/157 (0.777)**; the
+  ball-field width trend fires 11×, **11/11 correct side** but redundant;
+  the motion tie-break changes **0** team attributions. The carry errors it
+  targeted mostly have no ball signal at all (ball lost mid-flight). Parked
+  per the T5/R1 rule.
 - **Miss taxonomy (perception, 183 contacts)** — 46 correct / **57
   wrong_label** / 36 wrong_team / 44 missed. The largest bucket is the label,
   not proposal. The 36 wrong_team is inflated by the side-vs-squad confound
@@ -778,6 +812,12 @@ point number in `docs/history/`.
     upstream: a reliable next-toucher/possession signal (34 genuine side
     errors, open points 2/5), without which the structural crossing rule
     cannot be built.]**
+    **[#52: the possession signal was then BUILT and measured — ball-field
+    width trend + motion-convergence tie-break — and REFUTED (base 121/157 →
+    122/157; trend 11/11 precise but redundant; motion 0 team changes). The
+    carry errors have no ball signal at all (ball lost). Parked default-OFF
+    in `scripts/possession_signal_harness.py`; a NON-ball possession signal
+    is the open need.]**
 
 13. **Ace metric (parked) — needs point-outcome detection.** Paths: (a)
     derived heuristic in the metrics layer (serve whose rally has no
@@ -989,6 +1029,14 @@ survive across sessions; provenance in the archives.
   only 3/18 overpasses recovered; next-team + ball-side 82 with 0/18). An
   overpass override needs a trustworthy NEXT-TOUCHER team, i.e. the possession
   layer is the real enabler. Session 50.
+- A BALL-FIELD possession signal cannot fix the `carry` attribution errors:
+  the width-trend fallback is 11/11 precise on the strict-abstain contacts
+  where it fires, but they were mostly already correct, and the remaining
+  carry errors have NO ball signal at all (ball lost mid-flight) — base
+  attribution 121/157 → 122/157. A motion-convergence tie-break changes only
+  same-team actor picks (0 team changes). Possession needs a NON-ball signal.
+  Parked default-OFF in `scripts/possession_signal_harness.py`, session 52,
+  `docs/g3_possession_signal.md`.
 - Device caveat: MPS jitter can flip a gesture label (e.g. e6 f309
   block vs spike); the script path (deterministic) is the reference.
 
@@ -1138,6 +1186,7 @@ Details: `docs/history/status_where_we_are_archive.md` (per-session state
 summaries) + `docs/history/status_log_archive.md` (detailed entries,
 2026-08-14 → 2026-09-26). The last ~3 sessions keep full Log entries below.
 
+- 2026-10-01 **#52** — possession signal built + REFUTED + parked (no `src/` change, no decode): `scripts/possession_signal_harness.py` (default OFF) + `scripts/probe_possession_signal.py` + `docs/g3_possession_signal.md`; ball-field width trend + motion-convergence tie-break both implemented and unit-tested (20 tests), then replayed through the REAL attribution methods on the match dump: base **121/157 (0.771)** → both **122/157 (0.777)**, trend fires 11× / **11/11 correct side** but redundant, motion **0** team changes; the carry errors have no ball signal (ball lost). Parked per T5/R1. ALSO: a concurrent pi session (G4/#51) collided with the validation stash — never run two sessions on this repo at once. Suite 985.
 - 2026-10-01 **#50** — G3 overpass crossed diagnosis REFUTED (diagnose only, no `src/` change, no decode): `scripts/probe_overpass_crossing.py` (+23 tests) + `docs/g3_overpass_crossing.md`, artifacts `output/g3_overpass/`; the ball-width net-crossing across the contact is present at only **3/18** held-out GT overpasses vs non-attack controls (set 4/46, dig 10/55) — K1+K2 fire; tracked both sides 18/18 (K3 clean, not detection — crossing is at the net/tape where width abstains); perceived next-team unusable (overpass flip 8/18 = 0.444 vs controls 0.582, K4 fires); emitted dig 6 / spike 5 / set 2 / missed 5; loss is a LABEL/RULE problem (resolver emits overpass only at touch-2-no-follow, GT spans touch 1/2/3); the three implementable rules replayed through the imported resolver are ALL net-negative (baseline 85 → 71/80/82), so no `src/` change ships; suite 920.
 - 2026-10-01 **#49** — S3 DONE: pass-2 side-switch/squad layer — `scripts/resolve_side_switches.py` (+25 tests) + `docs/g3_side_switch_layer.md`, no `src/` change, no decode; beach cadence from the point order alone → `[7,14,21,28]` EXACT vs the owner schedule; side→squad by parity → `actions_pass2.pass2_squad` (207/207); **G1 raw team 0.518 is a side-vs-squad confound — same 139 found contacts score 0.755 squad-mapped, 34 genuine side errors**; player-crossing cross-check evidence-only (3/4 switches supported but 16/28 non-switch boundaries too — ids hop); suite 897.
 - 2026-10-01 **#48** — G1 DONE: the first HELD-OUT contact score — `scripts/score_heldout_contacts.py` (+20 tests) + `docs/g3_heldout_p9_p33.md`, no `src/` change; P9–P33 (183 owner contacts, region f5240–f26147, effective ±15 f) production **P 0.785 / R 0.760 / F1 0.772**, class 0.590, team 0.518; pass-2 F1 0.774 / class 0.561 / team 0.561; miss taxonomy 46 correct / **57 wrong-label** / 36 wrong-team / 44 missed ⇒ the label bucket is the largest held-out loss (not proposal); `overpass` recall 0.000; far serves **0/12** (6/8 nearby "serves" = pass-2 re-labelled reception +26…+34 f); stage waterfall not reproduced (only match diag dump is R1 bw=0.3), flagged; suite 872.
@@ -1225,6 +1274,49 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+### 2026-10-01 (fifty-second session) — possession signal built, REFUTED, parked default-OFF (`src/` untouched)
+
+**Asked:** create a possession signal (open point 9's enabler for overpass and
+for the 34 genuine side errors). Diagnose the team errors first, then build.
+
+**Diagnosis.** Joining the G1 rows to the diag's attribution provenance:
+`width` target 76 correct / 13 wrong (0.85 precision), `carry`/`flip` 14 / 21
+(0.40), `none` 15 / 0. The weak link is the same-team carry fallback used
+whenever the strict width regime abstains; a gated width TREND decoded the
+arriving side at precision 1.00 on the strict-abstain contacts it covers.
+
+**Built (both requested mechanisms).** (1) A ball-field width-trend fallback
+(`_width_side_trend`: median split of `ln(width)` over 15 frames, commit at
+`|dln| >= 0.20`) after the strict width step in `_attribution_target`. (2) A
+motion-history convergence tie-break (`_motion_convergence`: candidates within
+60 px of the closest re-ranked by the cosine between their recent trajectory
+and the direction to the contact) in `_closest_player_at`. Config keys +
+drift-guard rows + 18 unit tests.
+
+**Measured, then refuted.** Entreno/dev: effectively neutral (the e1 "team
+flip" was run-to-run NONDETERMINISM — two reruns without the mechanism gave
+different results; dev shifted only one L-R `player_id`). The decisive offline
+replay of the REAL attribution methods on the match dump (157 GT-side
+contacts): base **121/157 (0.771)** → both **122/157 (0.777)**; the trend fires
+11x and is **11/11 on the correct side** but mostly redundant (base already
+resolved those contacts); motion changes **0** team attributions. The carry
+errors it targeted mostly have NO ball signal at all (ball lost mid-flight),
+which no ball-field rule can recover.
+
+**Parked per T5/R1.** `src/`/config/frame_processor/tests reverted to HEAD;
+the mechanisms live default-OFF in `scripts/possession_signal_harness.py`,
+with the evidence in `scripts/probe_possession_signal.py` +
+`docs/g3_possession_signal.md` (+20 tests). `git diff HEAD -- src/ tests/` is
+empty.
+
+**Environment incident.** A concurrent pi session (G4/#51) was committing in
+this repo during validation: my `git stash` swept its uncommitted files and the
+first match A/B "new" arm never had my changes. Recovered cleanly (its files
+intact, 985 tests green). Rule: never run two sessions on this repo at once.
+
+**Suite:** **985** (+20). **Next:** S4 (consume the serve events) or a
+NON-ball possession signal.
+
 ### 2026-10-01 (fifty-first session) — G4: serve-EVIDENCE event emitters (far flight + serve runway), scored against the 17 GT far serves
 
 **Asked:** (1) "add the far-flight detector as a new event that we can use to
@@ -1386,60 +1478,3 @@ empty).
 now use this schedule instead of GT) and/or the G2 owner decision on the
 far-serve lever (baseline F1 0.772 / far-serve 0/12); the label bucket
 (`overpass` 0/18) remains the largest held-out perception loss.
-
-### 2026-10-01 (forty-eighth session) — G1 DONE: first HELD-OUT contact score on P9–P33; far serves 0/12; labels (not proposal) dominate the loss (`src/` untouched)
-
-**Asked:** execute G1 from *Active next*: score the perception stream (and
-`actions_pass2`) at contact level on the held-out match points P9–P33 with
-`score_pass2_contacts.py`'s scope discipline, and re-rank the dev loss budget
-against held-out reality.
-
-**Delivered.** `scripts/score_heldout_contacts.py` (+20 tests,
-`tests/test_heldout_contacts.py`) + `docs/g3_heldout_p9_p33.md`; artifacts
-`output/heldout_contacts/{gt_p9_p33.json,pred_perception.json,pred_pass2.json,g1.json}`.
-No `src/` change, no video decode. The script reuses the tested S0b helpers
-(arm construction, `evaluate_timed` matcher, serve-nearest table) and adds a
-SCOPED-GT writer so P1–P8 events can never be charged as false negatives, a
-contact-level miss taxonomy, and a per-side/per-class recall split.
-
-**Headline.** Region f5240–f26147 (padded span of the P9–P33 emission
-windows; covers all 183 owner contacts, no P1–P8 contact), effective tolerance
-±15 f at 25.67 fps. Production **P 0.785 / R 0.760 / F1 0.772**, class
-**0.590**, team **0.518** (38 FP / 44 FN / 2 dup). Pass-2 F1 0.774, class
-0.561, team 0.561 — again flat on contact and negative on class.
-
-**The re-rank (the point of G1).** Held-out contact DETECTION is BETTER than
-the dev clip (F1 0.772 vs 0.597), while class/team are similar or worse. The
-miss taxonomy over 183 contacts: **46 correct / 57 wrong-label / 36 wrong-team
-/ 44 missed**. Normalized vs the T4 dev waterfall (39% proposal / 18% team /
-14% label), the held-out loss is 24% missed / 20% team / **31% label** — the
-dev budget over-weighted proposal and under-weighted the gesture label. The
-single largest held-out error class is the LABEL, and `overpass` is never
-emitted correctly (recall 0.000 over 18 contacts; 13 found, all dig/spike/set).
-Only 3/44 missed contacts have no action within ±80 f; 41 have one 7–69 f away.
-
-**Far serves 0/12, reproduced on independent contacts.** 8/12 have a nearby
-emitted "serve": 6 are the GT reception the pass-2 layer re-labelled
-(+26…+34 f), 2 are production serves 26–28 f late with the opposite team; 4
-have nothing within ±80 f. Near serves 11/13; all serves 11/25 (serve recall
-0.280 — the far serve is the whole serve-recall hole). This is S0b's dev
-finding confirmed on 12 held-out contacts, and it closes the last excuse for
-leaving the far-serve contact open.
-
-**Honesty notes.** The episode-map emission windows are predictions and only
-12/25 cover their own owner contact range, so the contact P/R/F1 is
-window-independent but the dead-time/points metrics inherit the drift (flagged
-in the doc). The stage waterfall is NOT reproduced: the only full-match diag
-dump is the R1 `bw=0.3` run, whose gate decisions differ from production, so
-the script records `waterfall.available = false` rather than faking stage
-counts; a production diag dump is a follow-up decode. `--autonomous` is not
-used (the pass-2 stream carries owner anchors); the GT-derived-input audit is
-recorded.
-
-**Suite:** **872** (852 + 20). No `src/` change (`git diff 185c6f0 -- src/`
-empty).
-
-**Next:** G2 — the owner decision on the far-serve lever, now decidable on
-data with baseline F1 0.772 / far-serve 0/12; the G1 data also makes the
-gesture-label bucket (`overpass` 0/18) a first-class candidate for the next
-mechanism. The deferred production diag dump would give the stage waterfall.

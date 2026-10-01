@@ -249,3 +249,13 @@ side channels — `PlayerDetector.off_area_detections`,
 key to `pipeline_output.json` unless enabled, and their events are scored
 against GT **including a NON-serve control window** for the false-positive side
 before anything is allowed to act on them.
+
+### 8. One session per working tree (owner-stated 2026-10-01)
+
+Never run two agent sessions against this repo concurrently. Uncommitted work
+is shared: a `git stash` for an A/B baseline sweeps up the other session's
+uncommitted files, and long background pipeline runs import whatever tree
+state exists at start — once a "new" A/B arm silently ran without the tested
+changes. Serialize sessions, or give each session its own `git worktree`
+(with `models/` and `resources/` symlinked in), and re-check `git status`
+before any stash/checkout.

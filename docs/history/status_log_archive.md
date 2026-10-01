@@ -2632,3 +2632,63 @@ switches P29–P33 `near` is Team A again (the old last-switch formula
 mislabelled P15–P21 and P29–P33). No `src/` change; suite **852** (+12 tests).
 **Next = G1: the first held-out contact score on P9–P33** → G2 far-serve
 lever on real labels.)
+
+
+---
+
+### 2026-10-01 (forty-eighth session) — G1 DONE: first HELD-OUT contact score on P9–P33; far serves 0/12; labels (not proposal) dominate the loss (`src/` untouched)
+
+**Asked:** execute G1 from *Active next*: score the perception stream (and
+`actions_pass2`) at contact level on the held-out match points P9–P33 with
+`score_pass2_contacts.py`'s scope discipline, and re-rank the dev loss budget
+against held-out reality.
+
+**Delivered.** `scripts/score_heldout_contacts.py` (+20 tests,
+`tests/test_heldout_contacts.py`) + `docs/g3_heldout_p9_p33.md`; artifacts
+`output/heldout_contacts/{gt_p9_p33.json,pred_perception.json,pred_pass2.json,g1.json}`.
+No `src/` change, no video decode. The script reuses the tested S0b helpers
+(arm construction, `evaluate_timed` matcher, serve-nearest table) and adds a
+SCOPED-GT writer so P1–P8 events can never be charged as false negatives, a
+contact-level miss taxonomy, and a per-side/per-class recall split.
+
+**Headline.** Region f5240–f26147 (padded span of the P9–P33 emission
+windows; covers all 183 owner contacts, no P1–P8 contact), effective tolerance
+±15 f at 25.67 fps. Production **P 0.785 / R 0.760 / F1 0.772**, class
+**0.590**, team **0.518** (38 FP / 44 FN / 2 dup). Pass-2 F1 0.774, class
+0.561, team 0.561 — again flat on contact and negative on class.
+
+**The re-rank (the point of G1).** Held-out contact DETECTION is BETTER than
+the dev clip (F1 0.772 vs 0.597), while class/team are similar or worse. The
+miss taxonomy over 183 contacts: **46 correct / 57 wrong-label / 36 wrong-team
+/ 44 missed**. Normalized vs the T4 dev waterfall (39% proposal / 18% team /
+14% label), the held-out loss is 24% missed / 20% team / **31% label** — the
+dev budget over-weighted proposal and under-weighted the gesture label. The
+single largest held-out error class is the LABEL, and `overpass` is never
+emitted correctly (recall 0.000 over 18 contacts; 13 found, all dig/spike/set).
+Only 3/44 missed contacts have no action within ±80 f; 41 have one 7–69 f away.
+
+**Far serves 0/12, reproduced on independent contacts.** 8/12 have a nearby
+emitted "serve": 6 are the GT reception the pass-2 layer re-labelled
+(+26…+34 f), 2 are production serves 26–28 f late with the opposite team; 4
+have nothing within ±80 f. Near serves 11/13; all serves 11/25 (serve recall
+0.280 — the far serve is the whole serve-recall hole). This is S0b's dev
+finding confirmed on 12 held-out contacts, and it closes the last excuse for
+leaving the far-serve contact open.
+
+**Honesty notes.** The episode-map emission windows are predictions and only
+12/25 cover their own owner contact range, so the contact P/R/F1 is
+window-independent but the dead-time/points metrics inherit the drift (flagged
+in the doc). The stage waterfall is NOT reproduced: the only full-match diag
+dump is the R1 `bw=0.3` run, whose gate decisions differ from production, so
+the script records `waterfall.available = false` rather than faking stage
+counts; a production diag dump is a follow-up decode. `--autonomous` is not
+used (the pass-2 stream carries owner anchors); the GT-derived-input audit is
+recorded.
+
+**Suite:** **872** (852 + 20). No `src/` change (`git diff 185c6f0 -- src/`
+empty).
+
+**Next:** G2 — the owner decision on the far-serve lever, now decidable on
+data with baseline F1 0.772 / far-serve 0/12; the G1 data also makes the
+gesture-label bucket (`overpass` 0/18) a first-class candidate for the next
+mechanism. The deferred production diag dump would give the stage waterfall.
