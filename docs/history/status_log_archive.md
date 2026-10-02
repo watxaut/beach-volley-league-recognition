@@ -3175,3 +3175,75 @@ short clips is queued with the SR3 worker half.
 
 **Next:** SR1 (near-serve miss taxonomy) or SR2 (audio onsets), one mechanism per
 session. Owner: SR3 on vall_dhebron.
+
+### 2026-10-02 (fifty-seventh session) — SR1 DONE: the near serve is lost at the LABEL, and 5 of 6 misses are one condition
+
+**Asked:** "Start with SR1" — the near-serve miss taxonomy. Diagnose-only by the
+plan's own wording, and that held: **no mechanism designed, no `src/` file
+touched**. `scripts/probe_near_serve_misses.py` (+21 tests),
+`docs/sr1_near_serve_misses.md`, artifacts `output/serves/sr1.json`.
+
+**Two decodes, both necessary and both cheap.** (1) All seven
+`video_entreno_*` clips re-run under **production config with `--diag-dump`**,
+which closed SR0's outstanding action: those `output/video_entreno_*` artifacts
+are from 2026-09-04/06, before the v3 detector and the pose gates. (2) One
+**sequential** pass over the match prefix [0, 4000] (MPS, 14.0 fps, 285 s) for the
+two `no_contact` cases, which are early in the file. It **passed the
+prefix-parity gate — 23/23 `(frame, action, team)` triples identical to the
+shipped artifact** — so its dump is a production pass, not a probe. No seek
+anywhere (AGENTS.md §9).
+
+**The taxonomy (10 missed near serves: match 8, practice 2).**
+
+| bucket | n | what it is |
+|---|---|---|
+| `label` | **6** | a same-side contact AT the serve frame, emitted as `dig`/`spike` |
+| `no_contact` | **3** | no same-side contact; the contact died earlier in the chain |
+| `other_side_contact` | 1 | the only nearby contact is on the OTHER half (P24) |
+
+**The label bucket is one mechanism.** `ActionContextResolver._decide` emits
+SERVE only when `behind_baseline AND rally_start`; anything else is DIG (bump
+gesture) or SPIKE (attack gesture). So the probe splits the two conditions:
+**5 of 6 fail on `behind_baseline`** with `rally_start` certainly true (gaps of
+204–478 f to the previous contact) — the contact is detected, attributed to a
+player and opens the rally; it is simply not judged behind the baseline, and e2
+f32's dump measures that field directly (`"behind_baseline": false`,
+`"near_net": true` at a serve contact). The 6th is a **cascade of our own
+emission**: at P33 the pipeline emits a serve **25 f early** (f25782), which
+counts as a contact and suppresses `rally_start` 16 f later, so the real serve
+at f25798 reads as a `dig`. One bad emission costs a correct label.
+
+**The `no_contact` bucket splits into two different stages.** P5 f2575 and
+P7 f3747 both die at **stage 4, the reach gate**: the ball is tracked, the
+geometry fires (a `bounce` at f2572, `drive`s at f3749-51) and the candidate is
+refused at 448.3 px and 204.0 px against a 140 px reach, with all four tracked
+boxes elsewhere on court. That is the reach-gate family the non-serve backlog
+already carries (open point 7), now measured for the serve. e5 f20 dies one
+stage earlier: `no_ball_sighting` × 15 of 31 window frames.
+
+**What this corrects.**
+- SR0's inference needed one step: the 8 match near misses are missing **serve**
+  emissions, but **6 of the 10 have the contact right there in the stream**. The
+  near side is a LABEL problem, not a perception one — the ball was tracked in
+  all 10 and a contact candidate existed in 9.
+- **Practice serves are 3/5, not the plan's 4/5.** Fresh runs hit e3 f29 (+0),
+  e6 f35 (+1), e7 f25 (+0) and miss e2 f32, e5 f20. The stale artifacts also
+  gave 3/5 but a *different* set (e6 missed, e5 hit) — the coincidence is not
+  evidence the recorded number was right.
+- **"No diagnostic records in the window" is not "no detection in the window."**
+  The first version of the probe reported six phantom `1_raw_detection` stages
+  for match rows past the prefix dump; `diag_stage` now checks the dump's
+  coverage and returns nothing outside it.
+
+**Near-side serve recall is 11/21 = 0.52** on current production artifacts.
+
+**Housekeeping:** `score_serves.py` now prefers a fresh practice run over the
+stale one; STATUS's *Where we are*, open point 30 (SR1 done, its findings folded
+into SR4's task) and the Learnings updated with five new facts; session index
+extended; Log #54 moved VERBATIM to `docs/history/status_log_archive.md`. Suite
+**1090**.
+
+**Next:** SR2 (audio onsets), or the SR4 design decision SR1 makes answerable —
+a side + rally-opening test for the serve record that does not read the emitted
+label. One open sub-question, cheap to close: was the server detected but
+untracked at P5/P7 (one more prefix pass with `--serve-events`)?
