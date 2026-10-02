@@ -3288,3 +3288,83 @@ serves). Harness: `.pi/prompts/next-task.md` (executor contract) and
 **Nothing in `src/` changed.** Suite unchanged (1091).
 
 **Next:** card SR1c, then SR1d (one decode at a time), then owner gate D4.
+
+### 2026-10-02 (fifty-ninth session) — live debug: readable frame counter + a signal/event side panel
+
+**Asked** (two changes, both HUD-only): the frame counter is hard to read, and
+live debug needs a side panel showing which events fire on which frame and what
+the signals were (ball px width first), so "something is very wrong" is visible
+at plain sight.
+
+**1. Frame counter.** `overlay.draw_frame_counter` now paints a SOLID black
+plate (8 px padding, drawn first) instead of relying on a thin black text
+underlay, and the scale is 0.55 → **0.60** (+1 px cap height). Pinned by
+`tests/test_overlay_frame_counter.py` (plate black in all four corners/padding,
+frame outside untouched, and the scale delta so it cannot silently revert).
+Same helper the standalone action script draws with, so both entry points stay
+aligned.
+
+**2. Side panel** (`src/analysis/debug_panel.py`, display-only, `p` toggles it):
+a 600 px strip composited to the RIGHT of the annotated frame by the live
+consumer, built from a per-frame snapshot the PRODUCER takes right after
+`process_frame` (`LiveDebugProcessor._signals`), so the render thread never
+touches tracker/classifier state. Body text scale **0.55** (owner follow-up:
++3 px over 0.40), row height 20 px, rows clipped to the strip by MEASURED width
+so a dense signal row degrades to `~` instead of running off the edge. It
+prints, per frame:
+- **BALL** — pos, bbox size in px, the classifier's OWN width-side read
+  (`_width_side`: `A (near)` / `B (far)` / `-` abstain, with vote count), speed
+  px/f, detection confidence, real vs `PREDICTED`, frames since the last real
+  sighting. **A dropped track HOLDS the last sighting** (owner follow-up: the
+  block used to vanish and the row became unreadable mid-rally): pos / size /
+  width-side / speed / conf stay on screen, with the flag riding ON the section
+  header (`-- BALL -- NOT TRACKED (last f147, 8f ago)`, no extra row — the held
+  block has exactly as many rows as the tracked one) and `track HELD stale Nf`
+  on the track row, so the last known signal is visible while the tracker is
+  blind. Predicted coasting points still update it (flagged `PREDICTED`), player
+  distances keep measuring against the held point (dimmed + `[ball not tracked]`
+  on the section header), and the hold is cleared on restart;
+- **PLAYERS** — `P<id> team net/ghost` + point-to-BBOX distance to the ball,
+  coloured by whether it is inside `CONTACT_REACH` (the exact value the reach
+  gate used);
+- **GAME** — the on/off badge value + point count;
+- **CONTACT PROBE / LOOK-AHEAD** — what `_detect_contact` did at `t-7` this
+  frame (`found drive d=41px/140px`) or WHICH GATE refused it (`refused: reach`),
+  plus the contact the classifier is currently holding back for the one-contact
+  look-ahead;
+- **EVENTS** — every emitted action and every resolved spike outcome, keyed on
+  the action's **TRUE contact frame** (`EventPlan`, thread-safe, producer writes
+  / consumer reads) and marked `>>` on that frame. The second row carries the
+  signals that produced the label: `gesture/kind net= behind= bbl= src= w=<ball
+  px width at the contact>`.
+
+**Invariants kept.** No processing-path change: the producer runs the same
+call sequence (a test pins it), the panel only reads values the frame already
+produced (no duplicated thresholds — `CONTACT_REACH`/`NEAR_NET_PX` are read off
+the classifier class, the width verdict is its own method), and every read is
+guarded so a stubbed processor renders "-" instead of raising. The probe mirror
+reuses `ActionClassifier._diag` (the `diag_dump` writer's own inert record) and
+is **skipped when a `DiagRecorder` owns those records**, so live debug can never
+steal entries from a dump. Display only: `writer.write()` still gets the
+unpanelled frame, `--save-video` and the two-pass path are untouched, and the
+window asks for `WINDOW_NORMAL` (an autosized window wider than the screen
+clips its RIGHT edge, which is exactly where the panel lives).
+
+**Verified:** two real live runs of `video_entreno_3.mp4` with the actual
+pipeline (GUI patched, CPU). Run 1 (420 frames): 420/420 shown at 2350 px
+composed, events landing on their contact frames (f29 serve, f74 dig, f130 set,
+f177 spike with its `out → dug` resolution steps, f212 dig). Run 2 (240 frames,
+after the follow-up): **30 held frames / 14 never-seen** — e.g. at f155 the
+ball was last seen at f147 (pos 1164,11, 27x23 px, conf 0.21, i.e. gone off the
+top of the frame) and the panel kept all of it, flagged. Suite **1155** (+40
+total: `tests/test_debug_panel.py` 34, `tests/test_overlay_frame_counter.py` 5,
+3 panel/wiring cases in `tests/test_live_debug_decoupling.py`).
+
+**Note for the next session:** an event whose emission lag exceeds the 3 s
+display delay cannot appear on its contact frame (same limitation the player
+labels have); the measured lags stay inside it, but that is what to check if an
+event ever seems to be missing from the panel. The panel is drawn at 1:1 in the
+composed frame and OpenCV then scales that into the window (requested
+`min(composed, 1900)`), so the on-screen glyphs are ~0.75 of the composed size
+— the window is `WINDOW_NORMAL`, so dragging it bigger is a free legibility
+knob.

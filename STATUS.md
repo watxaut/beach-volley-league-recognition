@@ -17,13 +17,15 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-02 (fifty-ninth session, **live-debug HUD: readable
-frame counter + a signal/event side panel**, `src/analysis/debug_panel.py`,
-display-only, `p` toggles it). No pipeline behaviour changed. The panel mirrors
-what the frame already produced — ball pos/size/velocity, the classifier's own
-width-side verdict and staleness, per-player team/near-net/ball distance, the
-contact probe and the held-back contact — and an event log keyed on each
-action's TRUE contact frame, so a live frame shows what fired on it.
+**Last updated:** 2026-10-02 (sixty-second session, **D4 DECIDED: the serve-zone
+exemption from the off-court hold is PARKED; card SR4a (the near-opening table) is
+READY and unrun because the worker models are quota-blocked until 2026-10-03 18:49**,
+`docs/d4_gate_brief.md`, open point **30**). No `src/` change, no decode. M-b's
+ceiling is +1 near serve of 16 (+2 with P5) against a 0.90 bar that needs 15, and
+the only measured version was net 0; its cost is match-wide identity churn (#62
+re-read of P18: an attribution swap, not a rally_start failure), so it is priced
+only by a full-match run. Next: run card **SR4a** (`/next-task`), then SR4, then
+the held-out session once, then SR5 -> SR6.
 
 **#58 (previous session):** 2026-10-02 (fifty-eighth session, **SR1b: review of SR0/SR1 —
 the near serve has three measured causes, not one**, `docs/sr1b_near_serve_causes.md`,
@@ -320,7 +322,7 @@ The full #54 block (production facts, G0-G4/S0-S4 histories) is archived verbati
 - **est. cost:** ~35 min decode + ~1 h code.
 
 ### CARD SR1d — measure the cost of lifting the 90 f off-court hold (M-b), no `src/` change
-- **status:** DONE (#61): `global lift REFUTED` — entreno F1 unchanged on all 7 clips (action streams byte-identical, ΔF1 0.000) but the e2 sideline bystander is fed 423 f vs 400 f, and on the match near serves stay **8/16** (composition changes: **+P7** at f3747 delta +0, **−P18** — f11996 relabels `serve`→`dig`), far 0/17, FP 12→**14**, actions 207→**212**
+- **status:** DONE (#61): `global lift REFUTED` — entreno F1 unchanged on all 7 clips (action streams byte-identical, ΔF1 0.000) but the e2 sideline bystander is fed 423 f vs 400 f, and on the match near serves stay **8/16** (composition changes: **+P7** at f3747 delta +0, **−P18** — f11996 relabels `serve`→`dig`; #62 re-read: that is an ATTRIBUTION SWAP (toucher track 3→2, the server's partner), not a rally_start failure), far 0/17, FP 12→**14**, actions 207→**212**
 - **type:** measurement (diagnose-only)
 - **goal:** know what lifting `player_off_court_hold_frames` costs on the entreno
   gate and on the full match before anyone designs the serve-zone exemption.
@@ -1533,6 +1535,44 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+### 2026-10-02 (sixty-second session) — D4 DECIDED: the serve-zone exemption is PARKED; next is the near-opening table, and the worker tier is quota-blocked
+
+**Asked:** take the architect's answer to `docs/d4_gate_brief.md`, fold the decision
+into STATUS, and start the next task (the SR4a near-opening table, carded with the
+`task-card` skill).
+
+**The decision (architect, relayed by the owner 2026-10-02).** M-a stays CLOSED.
+**M-b (the serve-zone exemption from the 90 f off-court hold) is PARKED, not built**:
+its ceiling is **+1 near serve of 16** (+2 only with P5, which needs a second
+mechanism) against a 0.90 bar that needs 15 of 16, and the blunt version measured
+**net 0** (+P7, -P18, false serves 12 -> 14, actions 207 -> 212). Why the cost cannot
+be bounded from #61: **P18 is an attribution swap, not a rally_start failure** — the
+same ball point (867.5, 313) in both arms, touch 1 in both, a NEW rally in both, and
+the toucher track goes 3 -> 2, i.e. the hit is credited to the server's PARTNER, so
+the contact reads `dig`; the lift also renumbers tracks match-wide (f2494: track 1 ->
+4). Any exemption changes identity wherever it fires, so its price is only
+measurable on a full-match run, which is the most expensive kind of refutation. The
+geometric alternative was rejected as designed-blind (the two new false serves sit at
+the right edge of the image, x ~1552-1576, and no foot-behind-the-line test has been
+measured against them), and the comment it would be built around is stale: that
+bystander is fed on 400 of 423 frames at today's horizon.
+
+**What was done in `src/`: nothing.** No `src/` change, no decode, no new run. STATUS
+only: open point 30's status + SR1d lines, the D4 owner decision and card, the SR4a
+card, a Learning (a hold exemption's price shows up as identity churn elsewhere), the
+Active-next ranking, and the AGENTS.md warning that `evaluate.py --predictions <dir>`
+grades ZERO predictions on `src.main` output (it wants a `frame` key, `src.main`
+writes `frame_number` — measured #61, it cost a vacuous 0.000-vs-0.000 "PASS" then).
+The stale `player_off_court_hold_frames` comment at `src/utils/config.py:101` is now
+on the deferred list: comment-only, inside the next session that touches `src/` anyway.
+
+**Delegation BLOCKED — card SR4a is READY and UNRUN.** The `subagent` tool was not
+exposed in this session, so the `scripts/run_task.sh` fallback was used: `zai/glm-5.3`
+and `zai/glm-5.3-flash` both return `429 code 1310 Weekly/Monthly Limit Exhausted`
+(reset 2026-10-03 18:49), `openrouter` has no API key and `amazon-bedrock` no region.
+Three delegate attempts, zero files written, working tree untouched. **The card is the
+first READY card, so `/next-task` runs it as soon as a worker model is reachable.**
+
 
 ### 2026-10-02 (sixty-first session) — SR1d: lifting the 90 f off-court hold is REFUTED; it recovers P7 exactly and still buys nothing
 
@@ -1642,84 +1682,4 @@ moment. Serialize sessions, or give each one its own worktree.
 **Next:** card SR1d (the cost of lifting the 90-frame off-court hold) is the
 other open measurement; any change to the serve logic still needs both of them
 plus an owner decision.
-
-### 2026-10-02 (fifty-ninth session) — live debug: readable frame counter + a signal/event side panel
-
-**Asked** (two changes, both HUD-only): the frame counter is hard to read, and
-live debug needs a side panel showing which events fire on which frame and what
-the signals were (ball px width first), so "something is very wrong" is visible
-at plain sight.
-
-**1. Frame counter.** `overlay.draw_frame_counter` now paints a SOLID black
-plate (8 px padding, drawn first) instead of relying on a thin black text
-underlay, and the scale is 0.55 → **0.60** (+1 px cap height). Pinned by
-`tests/test_overlay_frame_counter.py` (plate black in all four corners/padding,
-frame outside untouched, and the scale delta so it cannot silently revert).
-Same helper the standalone action script draws with, so both entry points stay
-aligned.
-
-**2. Side panel** (`src/analysis/debug_panel.py`, display-only, `p` toggles it):
-a 600 px strip composited to the RIGHT of the annotated frame by the live
-consumer, built from a per-frame snapshot the PRODUCER takes right after
-`process_frame` (`LiveDebugProcessor._signals`), so the render thread never
-touches tracker/classifier state. Body text scale **0.55** (owner follow-up:
-+3 px over 0.40), row height 20 px, rows clipped to the strip by MEASURED width
-so a dense signal row degrades to `~` instead of running off the edge. It
-prints, per frame:
-- **BALL** — pos, bbox size in px, the classifier's OWN width-side read
-  (`_width_side`: `A (near)` / `B (far)` / `-` abstain, with vote count), speed
-  px/f, detection confidence, real vs `PREDICTED`, frames since the last real
-  sighting. **A dropped track HOLDS the last sighting** (owner follow-up: the
-  block used to vanish and the row became unreadable mid-rally): pos / size /
-  width-side / speed / conf stay on screen, with the flag riding ON the section
-  header (`-- BALL -- NOT TRACKED (last f147, 8f ago)`, no extra row — the held
-  block has exactly as many rows as the tracked one) and `track HELD stale Nf`
-  on the track row, so the last known signal is visible while the tracker is
-  blind. Predicted coasting points still update it (flagged `PREDICTED`), player
-  distances keep measuring against the held point (dimmed + `[ball not tracked]`
-  on the section header), and the hold is cleared on restart;
-- **PLAYERS** — `P<id> team net/ghost` + point-to-BBOX distance to the ball,
-  coloured by whether it is inside `CONTACT_REACH` (the exact value the reach
-  gate used);
-- **GAME** — the on/off badge value + point count;
-- **CONTACT PROBE / LOOK-AHEAD** — what `_detect_contact` did at `t-7` this
-  frame (`found drive d=41px/140px`) or WHICH GATE refused it (`refused: reach`),
-  plus the contact the classifier is currently holding back for the one-contact
-  look-ahead;
-- **EVENTS** — every emitted action and every resolved spike outcome, keyed on
-  the action's **TRUE contact frame** (`EventPlan`, thread-safe, producer writes
-  / consumer reads) and marked `>>` on that frame. The second row carries the
-  signals that produced the label: `gesture/kind net= behind= bbl= src= w=<ball
-  px width at the contact>`.
-
-**Invariants kept.** No processing-path change: the producer runs the same
-call sequence (a test pins it), the panel only reads values the frame already
-produced (no duplicated thresholds — `CONTACT_REACH`/`NEAR_NET_PX` are read off
-the classifier class, the width verdict is its own method), and every read is
-guarded so a stubbed processor renders "-" instead of raising. The probe mirror
-reuses `ActionClassifier._diag` (the `diag_dump` writer's own inert record) and
-is **skipped when a `DiagRecorder` owns those records**, so live debug can never
-steal entries from a dump. Display only: `writer.write()` still gets the
-unpanelled frame, `--save-video` and the two-pass path are untouched, and the
-window asks for `WINDOW_NORMAL` (an autosized window wider than the screen
-clips its RIGHT edge, which is exactly where the panel lives).
-
-**Verified:** two real live runs of `video_entreno_3.mp4` with the actual
-pipeline (GUI patched, CPU). Run 1 (420 frames): 420/420 shown at 2350 px
-composed, events landing on their contact frames (f29 serve, f74 dig, f130 set,
-f177 spike with its `out → dug` resolution steps, f212 dig). Run 2 (240 frames,
-after the follow-up): **30 held frames / 14 never-seen** — e.g. at f155 the
-ball was last seen at f147 (pos 1164,11, 27x23 px, conf 0.21, i.e. gone off the
-top of the frame) and the panel kept all of it, flagged. Suite **1155** (+40
-total: `tests/test_debug_panel.py` 34, `tests/test_overlay_frame_counter.py` 5,
-3 panel/wiring cases in `tests/test_live_debug_decoupling.py`).
-
-**Note for the next session:** an event whose emission lag exceeds the 3 s
-display delay cannot appear on its contact frame (same limitation the player
-labels have); the measured lags stay inside it, but that is what to check if an
-event ever seems to be missing from the panel. The panel is drawn at 1:1 in the
-composed frame and OpenCV then scales that into the window (requested
-`min(composed, 1900)`), so the on-screen glyphs are ~0.75 of the composed size
-— the window is `WINDOW_NORMAL`, so dragging it bigger is a free legibility
-knob.
 
