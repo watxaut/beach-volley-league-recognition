@@ -9,8 +9,8 @@ tiers exist — do not do the other tiers' jobs:
 | Tier | Who | When |
 |---|---|---|
 | 1 Coordinator (this prompt) | you | routine session: rank, brief, verify, close |
-| 1 Worker | **`subagent` tool, `agent: "worker"`** (GLM 5.3 / 5.3 flash); `scripts/run_task.sh` only as fallback | authors scripts, tests, probes, docs, diffs |
-| 2 Architect (`/architect`) | frontier model, stateless, advisory | rare: mechanism design, ambiguous refutations, protocol changes |
+| 1 Worker | **`subagent` tool, `agent: "worker"`** (GLM 5.3 / 5.3 flash); otherwise `scripts/run_task_openrouter.sh` with `stealth/space-bunny-alpha` (see *Delegation routes*) | authors scripts, tests, probes, docs, diffs |
+| 2 Architect (`/architect`) | frontier model, stateless, advisory; via `scripts/run_task_openrouter.sh` with `anthropic/claude-opus-5.5` | rare: mechanism design, ambiguous refutations, protocol changes |
 
 Owner focus/override: ${@:-none — proceed with the highest-ranked needle-moving task}.
 
@@ -95,7 +95,24 @@ If any top candidate needs an **owner decision** (approval of a production
 mechanism, GT adjudication, ratification), say so and wait — do not delegate
 past an owner gate.
 
-## Step 3 — Delegate: pi subagents first, `run_task.sh` only as fallback
+## Step 3 — Delegate: pi subagents first, `run_task_openrouter.sh` as the fallback
+
+**Delegation routes (owner-ratified 2026-10-02).** Use them in this order; the first
+one that starts, wins.
+
+| # | Route | Command | When |
+|---|---|---|---|
+| 1 | `subagent` tool | see 3.1 | always try first |
+| 2 | `scripts/run_task_openrouter.sh`, `stealth/space-bunny-alpha`, `THINK=max` | `MODEL=stealth/space-bunny-alpha THINK=max scripts/run_task_openrouter.sh /tmp/task_brief.md logs/<task>_run.log` | the normal fallback: free until 2026-10-05 and a good worker |
+| 3 | `scripts/run_task_openrouter.sh`, `deepseek/deepseek-v4.1-flash`, `THINK=high` | same command with `MODEL=deepseek/deepseek-v4.1-flash THINK=high` | only if #2 fails for any reason |
+| 4 | `scripts/run_task_openrouter.sh`, `anthropic/claude-opus-5.5`, `THINK=high`, with the architect prompt | see 3.5 | tier-2 escalation only, rarely |
+
+**`scripts/run_task.sh` (the GLM route) is OFF — do not use it.** The owner has a
+subscription there, but the weekly/monthly limit is exhausted and only resets on
+2026-10-03 (13:00-ish). It now pins `zai/glm-5.3-flash` on purpose: that model reads
+images and costs a fraction of GLM 5.3, so it is the right worker when the quota is
+back. Until then, use route #2 (or #3), and never burn a session discovering the GLM
+quota is still closed.
 
 **Delegation is authorized in this session** — routine tier-1 work always goes
 to a child (see the tier table); "the task is complex" is not the test. In a
@@ -162,26 +179,29 @@ line per checklist item below** (`1 scope: PASS — <file:line>`,
 `2 evidence: FAIL — <what is missing>`), so its self-assessment lands where
 Step 4 can check it.
 
-### 3.2 Fallback only: `scripts/run_task.sh`
+### 3.2 Fallback only: `scripts/run_task_openrouter.sh`
 
 Reach for it when the subagent path is unavailable (extension not loaded,
 `/subagents-doctor` failing, wrong agent-dir) or when the deliverable is a
 single long command you would otherwise have run yourself. It is `pi -p`
-non-interactively — a last resort, not the default.
+non-interactively, against the OpenRouter agent dir (`~/.pi-openroute`).
 
 ```bash
 # brief = 3-8 short lines, same STATE/CONTEXT/CONSTRAINTS/ACCEPTANCE/REPORT
-MODEL=zai/glm-5.3-flash THINK=high scripts/run_task.sh /tmp/task_brief.md logs/<task>_run.log
+MODEL=stealth/space-bunny-alpha THINK=max \
+  scripts/run_task_openrouter.sh /tmp/task_brief.md logs/<task>_run.log
+# if that fails for any reason:
+MODEL=deepseek/deepseek-v4.1-flash THINK=high \
+  scripts/run_task_openrouter.sh /tmp/task_brief.md logs/<task>_run.log
 ```
 
-Model env: `MODEL=zai/glm-5.3-flash THINK=high` for image work,
-`MODEL=zai/glm-5.3 THINK=max` otherwise — the env prefix goes on the same
-command line, and the delegate inherits your cwd. Use a generous tool timeout
-(`timeout: 1800`+; a dev-clip pipeline run is minutes, not seconds). The log's
-`EXIT 0` line is the only success signal — an `EXIT 1` or a log that stops
-mid-sentence means the delegate died: fix the brief, re-delegate, do not patch
-its work yourself. A bare `pi -p '<prompt>'` is acceptable for a one-line
-factual question and nothing else.
+The env prefix goes on the same command line, and the delegate inherits your
+cwd. Use a generous tool timeout (`timeout: 1800`+; a dev-clip pipeline run is
+minutes, not seconds). The log's `EXIT 0` line is the only success signal — an
+`EXIT 1` or a log that stops mid-sentence means the delegate died: fix the
+brief, re-delegate on the next route, do not patch its work yourself. A bare
+`pi -p '<prompt>'` is acceptable for a one-line factual question and nothing
+else. Never use `scripts/run_task.sh` (GLM) this session — see the route table.
 
 ## Step 3.5 — Escalate to the architect (`/architect`) when the call is tier-2
 
@@ -204,10 +224,20 @@ attached:
 Escalation is cheap if it is brief: write `/tmp/architect_brief.md` =
 question + the exact numbers/diffs the decision hinges on + constraints +
 the decision you need back, then run it in a frontier session with
-`/architect` (per-token via `~/.pi-openroute`, or a flat-fee Claude Code /
-Codex subscription), paste the memo back here, and **ratify with the owner**
-before any production change. Do not try to fake this tier with a cheap
-subagent (`oracle` on GLM is a second opinion, not an architect).
+`/architect` — through the same fallback wrapper, on the owner-ratified route:
+
+```bash
+# the wrapper cats ONE file, so the brief goes ON TOP of the architect prompt
+cat .pi/prompts/architect.md /tmp/architect_brief.md > /tmp/architect_full.md
+MODEL=anthropic/claude-opus-5.5 THINK=high \
+  scripts/run_task_openrouter.sh /tmp/architect_full.md logs/architect_run.log
+```
+
+Use it **rarely**: only when you are blocked or when the tier-2 input is what
+lets you proceed (the route table above). Paste the memo back here and
+**ratify with the owner** before any production change. Do not try to fake this
+tier with a cheap subagent (`oracle` on GLM is a second opinion, not an
+architect).
 
 Do **not** escalate: mechanical fixes, running harnesses, evidence gathering,
 cleanups after a refutation, or anything Step 4 can decide from a diff.
