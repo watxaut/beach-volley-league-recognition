@@ -161,7 +161,8 @@ report counts + CI, never a bare rate.
 - **SR4:** per-point serve record, both sides, post-hoc. Near side consumes the
   production near label once M-a/M-b land; far side = rally onset time + side vote.
 - **SR5:** beach-rules serve-sequence decoding (server identity needs the server's
-  track at the serve — M-b). Confirm with the owner that vall_dhebron is game play.
+  track at the serve — M-b). resources/full_videos/20290928_entreno_vall_dhebron.mp4 
+  is not real gameplay, there are no side switches, but you can use it for serve testing.
 - **SR6:** ace / service fault. **SR7:** learned detector, deferred.
 
 **STOP list:** no more px-space or contact-geometry far-serve thresholds, selector
