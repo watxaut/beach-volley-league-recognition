@@ -258,12 +258,14 @@ VFR. Both are allow-listed in `tests/test_vfr_seek_guard.py`. Fix the annotator
 before any frame-shown annotation pass.
 
 **Active next (ranked) — execute via the task cards below (`/next-task`):**
-0. **PG1 is an OWNER GATE and is READY (#64b)** — ratify **33 per-point start frames**
-   for the match (`ground_truth/20260920_match_point_starts.json`). The point map may be
-   changed in principle, but it was never validated: the match-points evaluator prints
-   `segmentation_starts: requires owner-ratified frame anchors per GT point`. Until those
-   exist, any point-map change is unfalsifiable, and SR4-FAR stays blocked. An executor
-   reaching PG1 STOPs — only the owner supplies the anchors.
+0. **PG1 (#64b, card rewritten after the owner pointed out the GT already exists)** — the
+   point map MAY be changed in principle, and the per-point start frames are the
+   **owner-dictated serve frames** (all 33 GT points: exactly one serve each, and in every
+   point the serve is the earliest contact — verified). What is missing is not GT but a
+   **scorer**: `evaluate_match_points.py` reports `segmentation_starts: requires
+   owner-ratified frame anchors per GT point`, so the alignment #64 measured (+6 … +3153 f
+   late on 31 of 31 pairs) has never been scored. PG1 is now a *measurement* card, not an
+   owner gate. Until it lands, SR4-FAR stays blocked.
 1. **PM1 DONE (#64): `FAIL=blocked`** — `docs/pm1_point_map.md`,
    `logs/pm1_report.md`. The probe ran both gates green (G1 baseline reproduced
    near 8/16 / far 0/17 / 12 FP; G2 plateau re-derived far 16-27 px vs near
@@ -320,33 +322,32 @@ The full #54 block (production facts, G0-G4/S0-S4 histories) is archived verbati
 > is ambiguous, wrong, or reality disagrees with it, the executor STOPS and
 > reports. It does not fill gaps.
 
-### CARD PG1 — OWNER GATE: ratify per-point start frames for the match (point map validation), not executable by a worker
+### CARD PG1 — POINT-MAP SCORING: the segment-start metric on the ground truth you already gave, no `src/` change
 - **status:** READY
-- **type:** owner-gate
-- **goal:** unblock the point map (open point 22) by turning #64's measured misalignment into a gated quantity. Moves open point 22 and open point 21.3.
-- **why:** #64 measured that `game_state.points` opens each point **+6 … +3153 f AFTER its own serve on all 31 pairs** (one-signed, uniform), 31 points vs 33 GT, and that this — not the serve signal — blocks the far-side serve record (16/17 detected, 294 false serves unbound; best binding 11/17 with 35 FP). `docs/pm1_point_map.md`. The owner has approved changing the map in principle (#64b) but the map was **never validated against GT**: `scripts/evaluate_match_points.py --gt ground_truth/20260920_match_points.json --pipeline output/20260920_match_ari_joan_lost/pipeline_output.json` prints `Not scored (missing pipeline layers / GT frame anchors): ... segmentation_starts: requires owner-ratified frame anchors per GT point`. The winners are already dictated (33) and the side switches after [7,14,21,28]; only per-point **start frames** are missing. Without them any point-map change is unfalsifiable.
-- **read first (nothing else):** AGENTS.md; this card; `ground_truth/README.md` (GT conventions — a GT addition needs owner-ratified contact sheets per AGENTS.md); `scripts/evaluate_match_points.py` (lines 48-75 `load_match_gt` / `load_pipeline_points`, and the `Not scored` branch) — read, never re-implement.
-- **may create:** `ground_truth/20260920_match_point_starts.json` (owner-ratified anchors only; format `match-points-v1` `points[i].start_frame`), and — only AFTER the file exists — `scripts/score_point_map.py` + `tests/test_point_map_score.py`
+- **type:** measurement (diagnose-only)
+- **goal:** put the point map behind a pass/fail gate using the owner's existing ground truth. Moves open point 22 and 21.3; it is the gate SR4-FAR waits on.
+- **why:** #64 measured that `game_state.points` opens each point **+6 … +3153 f AFTER its own serve on all 31 pairs** (one-signed, uniform), 31 points vs 33 GT, and that this — not the serve signal — blocks the far-side serve record (16/17 detected, 294 false serves unbound; best binding 11/17 with 35 FP). `docs/pm1_point_map.md`. The owner approved changing the map in principle (#64b) but it has never been validated. **The GT start frames EXIST** — see the correction in step 1.
+- **read first (nothing else):** AGENTS.md; this card; `docs/pm1_point_map.md` §3 and §7; `scripts/probe_point_map.py` (import its loaders and `alignment` logic, never re-implement); `scripts/evaluate_match_points.py` (`load_match_gt` / `load_pipeline_points`); `ground_truth/20260920_match_contacts.json` — `points[].contacts[*].match_frame` is owner-dictated.
+- **may create:** `scripts/score_point_map.py`, `tests/test_point_map_score.py`, `docs/point_map_alignment.md`, `logs/point_map_report.md`
 - **may modify:** `STATUS.md` (only the edits listed below)
-- **must not touch:** `src/`, `output/`, `models/`, `calibrations/`, and the held-out session `20290928_entreno_vall_dhebron` (held-out lock). No decode, no seek (§9), no new pipeline run. **Do NOT invent or infer any start frame** — an executor or coordinator that reaches this card STOPS and reports; only the owner supplies the anchors.
+- **must not touch:** `src/`, `ground_truth/`, `calibrations/`, `models/`, `output/`, and the held-out session `20290928_entreno_vall_dhebron` (held-out lock). No decode, no seek (§9), no new pipeline run, no GT edit. Do NOT add a task card.
 - **steps:**
-  1. **Owner action (not delegable):** the owner ratifies one `start_frame` per GT point for the match, 33 values, in `ground_truth/20260920_match_point_starts.json`. Review aids available to the owner: the dictated winners + descriptions (`ground_truth/20260920_match_points.json`) and contact sheets. **DO NOT offer `ground_truth/gt_point_start_end.txt` as a source** — it is the GAME-STATE VIDEO's GT (`video_entreno_game_state.mp4`, 13 mm:ss pairs), not this match. **Also do NOT offer the existing `points[].match_start_frame` in `ground_truth/20260920_match_contacts.json`** — all 33 carry `window_source: "episode_map_emission_window"` and `window_is_prediction: true`, i.e. they are the PIPELINE'S predictions, not owner anchors (measured spread vs the first owner contact: -1723 … +746 f). The coordinator/executor supplies candidate frames ONLY as a review aid, clearly marked unratified. If the owner declines to ratify all 33 now, they may ratify a subset — record the count.
-  2. **Gate G1 (executor, only after step 1):** `venv/bin/python -m json.tool ground_truth/20260920_match_point_starts.json` parses; `format == "match-points-v1"`; `len(points) == 33` (or the owner-ratified subset, recorded); every `start_frame` strictly increasing; every `start_frame` within `[0, 26061]` (the artifact's `video.total_frames`); and `scripts/evaluate_match_points.py` on the same inputs no longer lists `segmentation_starts` under `Not scored`. If any fails: **STOP**, report, do not "fix" a value.
-  3. **Gate G2 (executor, scoring only, decides nothing):** `scripts/score_point_map.py` prints, for each GT point: GT `start_frame`, the nearest pipeline point's `start_frame`, and the signed offset; then the aggregate **offset min / max / median** and **how many of 33 GT starts fall inside the pipeline point with the same ordinal index** (`point_map_alignment`, counting 0-33). Every number is labeled `[measured]`. It must NOT attempt any fix.
-  4. Write `docs/point_map_alignment.md` (the G2 table + one paragraph: whether the map is one point behind, uniformly late, or noise — the same three readings #64 listed) and `logs/point_map_report.md`.
-  5. `venv/bin/python -m pytest tests/ -o addopts="" -q` green; report the actual count (baseline **1214**).
-- **pre-registered decision (this card is a GATE, not an experiment; nothing is pre-registered to pass or fail, because the owner supplies the numbers):**
-  - If the owner ratifies the anchors: the session's only deliverable is the anchors + the G2 alignment measurement, and the coordinator decides the next card (architect design of the new opener) from those numbers.
-  - If the owner declines or defers: report `point_map_validation = DECLINED`, leave SR4-FAR blocked on open point 22, and do NOT start the architect design — there is no falsifiable target without the anchors.
-  - No numeric PASS/FAIL: inventing one here would be exactly the unfalsifiable move the card exists to prevent.
+  1. **CORRECTION — this card's earlier version wrongly said the GT start frames were missing; they are not, and the owner pointed it out (2026-10-02).** In `ground_truth/20260920_match_contacts.json`, **all 33 points carry exactly one `serve` contact, and in every point the serve IS the earliest contact** (verified by the coordinator: 0 of 33 exceptions; `n_contacts` min 1). So the owner's GT already carries a per-point start frame — the serve frame, +-15 f by construction. **Use that as the anchor.** **Explicitly NOT the anchor:** `points[].match_start_frame`, which all 33 carry as `window_source: "episode_map_emission_window"` + `window_is_prediction: true` (a pipeline prediction; measured spread vs the first owner contact -1723 … +746 f), and **not** `ground_truth/gt_point_start_end.txt` (the GAME-STATE VIDEO's GT — `video_entreno_game_state.mp4`, 13 mm:ss pairs, a different video). If step 1 does not reproduce (any point without exactly one serve, or a serve that is not the earliest contact), **STOP** and report.
+  2. **Gate G1 (metric definition, then the run):** `venv/bin/python scripts/score_point_map.py` prints, for each GT point *P* (1..33): the serve frame, the pipeline point paired with it (same ordinal), its `start_frame`, and the signed offset `pipeline start_frame - serve_frame`; then the aggregate **offset min / max / median**, the count of points whose offset is **>= 0** (must be 31 of 31 per #64 — if not, #64 is wrong, and that IS the finding), and the **within-tolerance start-hit count** = points whose pipeline `start_frame` is within **+-15 f** of the serve frame. This is the headline number; the pipeline emits starts ~+6 … +3153 f late, so a low count is the EXPECTED reading and is **not** a reason to stop.
+  3. **Gate G2 (parity, decide nothing):** the paired count is **31**, `gt_points_without_pipeline_point == [32, 33]`, and the per-point offsets match `output/pm1/probe.json`'s `alignment` list exactly (that file is #64's committed output; a mismatch means the two tools disagree — report it, do not re-tune).
+  4. **Gap-side measure (the #64 claim, scored):** for each of the 33 GT points report whether its serve frame falls inside ANY pipeline window and inside the inter-point gap preceding the point that holds its own contacts, so #64's "far 2/17 in-window vs near 14/16" split becomes a pinned number rather than prose. Every number labeled `[measured]`.
+  5. Write `docs/point_map_alignment.md` (the tables + one paragraph: is the map **one point behind**, **uniformly late**, or **noise**? — the same three readings #64 listed, decided by the offset distribution's sign) and `logs/point_map_report.md`.
+  6. `venv/bin/python -m pytest tests/ -o addopts="" -q` green; report the actual count (baseline **1214**).
+- **pre-registered decision (the gate, fixed):**
+  - **PASS** = `start_hits_within_15f >= 20` of 33 AND `offsets_nonnegative == 31` of 31 paired. Then the map's alignment is measured and an architect card for a corrected opener is justified; the coordinator cards it next.
+  - **FAIL** = anything else, reported as `point_map_gate = REFUTED/<number>`; the map's STRUCTURE (not its offset) is then the suspect, and SR4-FAR stays blocked with the blocker restated. **Do not try a second pairing (ordinal, nearest, ordinal+1), a re-derived offset, or a tolerance change.**
 - **deliverables:**
-  - `ground_truth/20260920_match_point_starts.json` — owner-ratified anchors, one per GT point, `match-points-v1`.
-  - `scripts/score_point_map.py` — imports `scripts/evaluate_match_points.py`'s `load_match_gt` / `load_pipeline_points`; imports NO `cv2`; prints the G2 table.
-  - `tests/test_point_map_score.py` — pins: no `cv2`/seek; increasing + in-range frames; the aggregate keys exist; a synthetic map reproduces a known offset distribution.
+  - `scripts/score_point_map.py` — imports `probe_point_map`'s loaders; imports NO `cv2`; prints every number the steps require.
+  - `tests/test_point_map_score.py` — pins: no `cv2`/seek; the step-1 anchor rule (one serve per point, serve is earliest) on the real GT; the pairing is ordinal; the aggregates exist; the verdict truth table.
   - `docs/point_map_alignment.md`, `logs/point_map_report.md`.
-- **STATUS edits when done:** open point 22 — append a `#64c` line with the G2 numbers (`offset min/max/median`, `point_map_alignment` x/33) or `DECLINED`; *Where we are* *Active next* item 1 — replace with `PG1 <RATIFIED|DECLINED> (#65)` and name the next task (architect card for the opener, or SR4-FAR stays blocked); *Last updated* — one-line refresh; the Session index — one line. **Do NOT write a new task card** and do NOT reorder the cards; do NOT archive the Log.
-- **stop and ask if:** the owner has not supplied the anchors (STOP — this is the card's whole point); a `start_frame` would have to be guessed or interpolated; the GT file already contains conflicting point starts; `output/` lacks `game_state.points`; or any step would require touching `src/` or running the pipeline.
-- **est. cost:** owner time for 33 anchors (the expensive part); then ~30 min, no decode.
+- **STATUS edits when done:** open point 22 — append a `#65:` line with `start_hits_within_15f`, `offsets_nonnegative`, the offset triple and the in-window/gap split; open point 21 — append the same one line; *Where we are* *Active next* item 0 — replace with `PG1 DONE (#65): <PASS|FAIL> — <headline numbers>` and name the next task (architect card for the opener, or SR4-FAR stays blocked); *Last updated* — one-line refresh; the Session index — one line. **Do NOT write a new task card** and do NOT reorder the cards; do NOT archive the Log.
+- **stop and ask if:** step 1's anchor rule does not reproduce; `game_state.points` or the GT contacts are absent; the two tools disagree on a paired offset (G2); or any step would require touching `src/` or running the pipeline.
+- **est. cost:** ~30 min, no decode, 0 pipeline minutes.
 
 ### CARD PM1 — the point-map probe: why 0 of 17 far serves fall inside their own point window, no `src/` change
 - **status:** DONE (#64): `FAIL=blocked` — UNBOUND (frame, side) **16/17 far hits
@@ -1011,10 +1012,15 @@ point number in `docs/history/`.
     so the episodes~=rallies check is unavailable, not failed) and **confirmation ratio
     0.939** = 31/33 points, with the confirmed windows spanning f216-f25776 (last
     window 7.2 s / 5 actions, so P32/P33 are absent entirely, not truncated).
-    **So the next task is an OWNER-RATE pass, not code: ratify per-point start frames
-    for the match (the winners are already dictated; only starts are missing).** With
-    those anchors, #64's alignment becomes a measured quantity with a pass/fail gate, and
-    a point-map change becomes testable instead of unfalsifiable. Until then SR4-FAR
+    **So the next task is a SCORER, not an owner pass and not new GT — CORRECTED BY THE
+    OWNER 2026-10-02 ("the 33 points start with the start frame, which I already provided
+    the GT").** The anchor exists: every one of the 33 GT points carries exactly one
+    `serve` contact and in every point the serve IS the earliest contact, so the
+    owner-dictated serve frame is the point's start frame (+-15 f by construction). What
+    is missing is only the metric that compares it to `game_state.points`, which is why
+    the evaluator keeps printing `Not scored`. CARD PG1 builds that scorer (post-hoc, no
+    `src/` change); with it, #64's alignment becomes a pass/fail quantity and a
+    point-map change becomes testable instead of unfalsifiable. Until PG1 lands SR4-FAR
     stays blocked and open point 30 stays where it is.
 
 21. **Owner's match-feedback backlog** (agreed order; GT exists for all).
@@ -1279,7 +1285,7 @@ point number in `docs/history/`.
 
 ## Learnings (standing)
 
-- **TWO "point start" sources in `ground_truth/` are PREDICTIONS, not anchors — never offer them as GT for the point map (measured #64b).** (a) `ground_truth/20260920_match_contacts.json`'s `points[].match_start_frame`: all **33** carry `window_source: "episode_map_emission_window"` + `window_is_prediction: true` (built by `scripts/build_match_contact_gt.py:131`); spread vs the first owner-dictated contact is **-1723 … +746 f**, i.e. the same map #64 is trying to validate. (b) `ground_truth/gt_point_start_end.txt`: **the GAME-STATE VIDEO's** GT (`video_entreno_game_state.mp4`, 13 mm:ss pairs, dev era — commit 48f8222), a different video entirely. Consequence: `scripts/evaluate_match_points.py` can only ever report `segmentation_starts: requires owner-ratified frame anchors per GT point`, and the point map has NEVER been validated against GT — which is why CARD PG1 (an owner gate for 33 per-point start frames) exists.
+- **TWO "point start" sources in `ground_truth/` are PREDICTIONS, not anchors — and the OWNER'S OWN anchor is the serve frame (measured #64b, corrected by the owner).** (a) `ground_truth/20260920_match_contacts.json`'s `points[].match_start_frame`: all **33** carry `window_source: "episode_map_emission_window"` + `window_is_prediction: true` (built by `scripts/build_match_contact_gt.py:131`); spread vs the first owner-dictated contact is **-1723 … +746 f**. (b) `ground_truth/gt_point_start_end.txt`: **the GAME-STATE VIDEO's** GT (`video_entreno_game_state.mp4`, 13 mm:ss pairs, dev era — commit 48f8222), a different video. **The owner-ratified per-point start frame is the `serve` contact's `match_frame`** — verified #64b: all **33** GT points carry exactly one `serve`, and in **every** point the serve IS the earliest contact (0 of 33 exceptions), so `points[].contacts` already defines the point start within its stated +-15 f. Do NOT ask the owner to re-annotate point starts; do NOT read the two prediction sources above as anchors. The only consequence is that `scripts/evaluate_match_points.py` has no segment-start metric wired (it reports `segmentation_starts: requires owner-ratified frame anchors per GT point`) — that is a SCORER gap, not missing GT, and CARD PG1 closes it.
 
 - **DELEGATION HARNESS: a prompt over ~1 KB kills the child `pi` instantly (`Killed: 9` / `EXIT 137`, zero output) on every model.** Measured #62+ by bisection on all three worker models (`stealth/space-bunny-alpha`, `anthropic/claude-opus-5.5`, `deepseek/deepseek-v4.1-flash`): 800 B survives, 1000 B dies, reproducible across 3+ repeats, independent of model, THINK level, `PI_CODING_AGENT_DIR`, and `-ne/-ns/-np/-nc`. Neutral filler text dies at the same size, so it is the prompt bytes, not the content. **Rule: keep the delegating prompt to a few hundred bytes and make the child READ a brief file** (`/tmp/<brief>.md`) instead of inlining it — exactly as `scripts/run_task_openrouter.sh` already builds `$(cat "$1")`, so the fix is to pass a short pointer, not the brief. This is why `cat .pi/prompts/architect.md /tmp/architect_brief.md > /tmp/architect_full.md` (the documented route-4 recipe) **cannot work today**; the architect prompt alone is 7.3 KB. Note `EXIT 1` with an OpenRouter billing body (not 137) is a different failure: the 128k max_tokens request exceeds the remaining credit, so architect-sized runs need the balance topped up or `max_tokens` lowered.
 
