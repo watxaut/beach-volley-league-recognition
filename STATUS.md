@@ -17,24 +17,28 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-02 (sixty-fifth session, **PG1 verdict:
-`point_map_gate = REFUTED/1` — the pipeline's point starts do NOT match the
-owner's per-point start frames**, `docs/point_map_alignment.md`,
-`logs/point_map_report.md`, `scripts/score_point_map.py`, open points **22** /
-**21.3**). Post-hoc, committed artifacts only: no `src/` change, no decode, no
-seek, no GT edit, held-out session untouched. **The three numbers:**
-`start_hits_within_15f` = **1 of 33** (PASS bar ≥ 20; only P1, +6 f),
-`offsets_nonnegative` = **31 of 31 paired**, offset min/max/median
-**+6 / +3153 / +1700 f** → reading **uniformly late**, not one-point-behind and
-not noise; **0 of 31** paired windows contain their own serve, and GT P32/P33
-have no pipeline point (the 31-vs-33 shortfall). G2 parity with #64's
-`output/pm1/probe.json`: **PASS, 0 offset mismatches**. Gap side pinned:
-inside any window **16 of 33** (far 2/17, near 14/16), inside any inter-point gap
-**16 of 33** (far 14/17, near 2/16), inside the gap immediately before its own
-holder only **1 of 33**. FAIL ⇒ the map's STRUCTURE is the suspect, not a
-constant offset, so the corrected-opener architect card (the PASS branch) is
-**not** auto-justified. **Next: open point 22**; SR4-FAR stays blocked behind it.
-Suite 1237 passed (1214 + 23 new pins).
+**Last updated:** 2026-10-02 (sixty-sixth session, **PG2 verdict:
+`point_map_alignment = PG1_VERDICT_IS_A_PAIRING_ARTIFACT`** — PG1's
+`REFUTED/1` was an artifact of its ordinal pairing; the window starts ARE
+serve-anchored**, `docs/point_map_seam.md`, `logs/pg2_report.md`,
+`scripts/score_point_map_alignment.py`, open points **22** / **21.3**). Post-hoc,
+committed artifacts only: no `src/` change, no decode, no seek, no GT edit, held-out
+session untouched. **The three pre-registered criteria, all PASS:** (i) **14 of 31**
+window starts within ±15 f of ANY GT serve (23/31 at ±30 f, 25/31 at ±60 f),
+(ii) **11.56×** the seeded Monte-Carlo chance baseline of **1.21 of 31** (20 000
+draws, seed 20261002; serve balls cover 3.93 % of the 26 061 frames),
+(iii) **14 pairs within ±15 f at every skip cost** 60/120/240 f (27–28 pairs,
+median −6/−8 f). PG1's own numbers reproduce exactly (1 of 33, 31 of 31
+non-negative, +6/+3153/+1700 f) and now decide nothing. Seam: far serves **AT a
+window start** (11/17 at_seam, 0 interior, 6 in a gap), near serves **INSIDE** one
+(11/16) — #65's "far 14/17 in the gaps" is a seam. Step 5 narrow `far_flight`
+(`width_start <= 28`) on window starts: 11/17 far, 0/16 near misclaimed, 5
+unanchored at ±10 and ±15 f — **IN-SAMPLE, not shippable** (STOP list).
+**SR4-FAR is MIS-KEYED, not blocked**; the corrected-opener architect card is NOT
+justified either. Card defect logged: 1(e) asks for a "sign-free" median of −6 f,
+which cannot be negative (nearest-boundary signed median −6 f, nearest-start
+signed −1 f, sign-free +17 f) — all three serve-anchored. Suite **1286 passed**
+(1237 + 49 new pins).
 
 **#64 (previous session):** 2026-10-02 (sixty-fourth session, **PM1 verdict: `FAIL=blocked` —
 the far-serve record cannot bypass the point map; SR4-FAR is BLOCKED on open point
@@ -277,23 +281,7 @@ VFR. Both are allow-listed in `tests/test_vfr_seek_guard.py`. Fix the annotator
 before any frame-shown annotation pass.
 
 **Active next (ranked) — execute via the task cards below (`/next-task`):**
-0. **PG1 DONE (#65) BUT ITS VERDICT IS PAIRING-DEPENDENT (#66 correction, `docs/pg1_correction.md`): PG2 is READY and re-tests it.** What PG1 measured — `FAIL` = `point_map_gate = REFUTED/1` — `docs/point_map_alignment.md`,
-   `logs/point_map_report.md`, `scripts/score_point_map.py` (imports `probe_point_map`'s
-   loaders, no `cv2`), `tests/test_point_map_score.py` (+23; suite **1237** = 1214 + 23).
-   The owner anchor reproduced (all 33 GT points: one serve each, serve earliest), so the
-   scorer exists and the metric is now falsifiable. Ordinal pairing (GT P ↔ pipeline P-1):
-   **`start_hits_within_15f` = 1 of 33** (PASS bar ≥ 20; only P1, +6 f),
-   **`offsets_nonnegative` = 31 of 31**, offset min/max/median **+6 / +3153 / +1700 f**,
-   **0 of 31 windows contain their own serve**, GT P32/P33 unpaired. G2 parity with
-   `output/pm1/probe.json`: **PASS, 0 mismatches**. Gap side: inside any window **16/33**
-   (far 2/17, near 14/16); inside any inter-point gap **16/33** (far 14/17, near 2/16);
-   inside the gap immediately before its own holder **1/33**. Reading: **uniformly late**.
-   **Next task:** open point 22 — but #66 found the FAIL is an artifact of PG1's ordinal
-   pairing: with 31 windows for 33 points the ordinal index accumulates a phase shift, and
-   a **pairing-independent** count gives **14 of 31** window starts within ±15 f of a GT
-   serve against a Monte-Carlo chance of **1.21 of 31** (median −6 f); far serves sit *at* a
-   window start (11/17) while near serves sit *inside* one (14/16). **CARD PG2 (READY) is
-   the re-test.** The corrected-opener architect card is NOT auto-justified by either run.
+0. **PG2 DONE (#67): `point_map_alignment = PG1_VERDICT_IS_A_PAIRING_ARTIFACT` — PASS. PG1's `point_map_gate = REFUTED/1` ("uniformly late") is an ARTIFACT of its ordinal pairing (GT *P* ↔ pipeline *P−1*); the window starts ARE serve-anchored, so SR4-FAR is MIS-KEYED, not blocked.** `docs/point_map_seam.md`, `logs/pg2_report.md`, `scripts/score_point_map_alignment.py` (imports `score_point_map` → `probe_point_map`, no `cv2`, exit 2 on FAIL), `tests/test_point_map_alignment.py` (+49; suite **1286** = 1237 + 49). Pairing-independent, all three pre-registered criteria PASS: **14 of 31** window starts within ±15 f of ANY GT serve (23/31 at ±30 f, 25/31 at ±60 f) vs a seeded Monte-Carlo chance baseline of **1.21 of 31** (20 000 draws, seed 20261002, serve balls cover 3.93 % of frames) = **11.56×** (bar ≥ 5×); monotone order-preserving DP keeps **14 pairs within ±15 f at every skip cost** 60/120/240 f (27–28 pairs, median −6/−8 f). PG1's ordinal numbers reproduce exactly (1 of 33, 31 of 31 non-negative, +6/+3153/+1700 f) and now decide nothing. Seam: far serves **AT a window start** (11/17 at_seam, 0 interior, 6 in a gap), near serves **INSIDE** one (11/16, geometrically 14/16) — #65's "far 14/17 in the gaps" is a seam. Step 5 narrow `far_flight` (`width_start <= 28`, fixed) keyed on window starts: **11/17 far, 0/16 near misclaimed, 5 unanchored** at ±10 and ±15 f — **IN-SAMPLE re-test target, NOT shippable** (STOP list, AGENTS.md §5). Card defect logged: 1(e) asks for a "sign-free" median of −6 f (impossible); −6 f is the nearest-**boundary** signed median (nearest-start signed −1 f, sign-free +17 f) — all three readings serve-anchored, so the verdict does not turn on it. **Next task (coordinator's):** the far-serve rule keyed on WINDOW STARTS, re-tested OUT of sample against a non-serve control (AGENTS.md §6 rules) — the corrected-opener architect card is NOT justified by either run, and SR4-FAR stays OFF until that rule has an out-of-sample score. No card written or reordered by this card.
 1. **PM1 DONE (#64): `FAIL=blocked`** — `docs/pm1_point_map.md`,
    `logs/pm1_report.md`. The probe ran both gates green (G1 baseline reproduced
    near 8/16 / far 0/17 / 12 FP; G2 plateau re-derived far 16-27 px vs near
@@ -351,7 +339,7 @@ The full #54 block (production facts, G0-G4/S0-S4 histories) is archived verbati
 > reports. It does not fill gaps.
 
 ### CARD PG2 — RE-TEST the point map with a pairing-independent metric: is its opener serve-anchored, or was PG1's "uniformly late" a pairing artifact? no `src/` change
-- **status:** READY
+- **status:** DONE (#67): `point_map_alignment = PG1_VERDICT_IS_A_PAIRING_ARTIFACT` — PASS. See *Active next* item 0.
 - **type:** measurement (diagnose-only)
 - **goal:** replace PG1's pairing-dependent verdict with a pairing-independent one, and decide whether SR4-FAR is blocked or merely mis-keyed. Moves open point 22 and 21.3.
 - **why:** the coordinator's step-4 review of #65 found that the headline `point_map_gate = REFUTED/1` is decided by PG1's **ordinal pairing** (GT point *P* ↔ pipeline point *P−1*). With 31 windows for 33 points, any skipped GT point shifts every later pair by one, accumulating the +6…+3153 f spread PG1 read as "uniformly late". Re-measured on the same committed artifacts (`docs/pg1_correction.md`, `logs/pg1_correction_stdout.txt`): pairwise-independent **14 of 31** window starts fall within ±15 f of a GT serve vs a Monte-Carlo chance of **1.21 of 31** (33 serve anchors cover 3.92 % of frames), median offset **−6 f**; far serves sit **at** a window start (**11 of 17**) while near serves sit **inside** a window (**14 of 16**). PG1's gate is not wrong arithmetic — it answers a question about ordinal correspondence, not about frame alignment.
@@ -380,7 +368,8 @@ The full #54 block (production facts, G0-G4/S0-S4 histories) is archived verbati
 
 
 ### CARD PG1 — POINT-MAP SCORING: the segment-start metric on the ground truth you already gave, no `src/` change
-- **status:** DONE (#65): `point_map_gate = REFUTED/1` — BUT SEE #66: the verdict is pairing-dependent (`docs/pg1_correction.md`) and PG2 re-tests it. Unrun: nothing.
+- **status:** DONE (#65): `point_map_gate = REFUTED/1` — SUPERSEDED by #66/#67 (PG2): the verdict is a pairing artifact. Not re-runnable.
+- **status (after #67):** DONE — `point_map_alignment = PG1_VERDICT_IS_A_PAIRING_ARTIFACT` (PASS on all three criteria). Unrun: nothing.
 - **type:** measurement (diagnose-only)
 - **goal:** put the point map behind a pass/fail gate using the owner's existing ground truth. Moves open point 22 and 21.3; it is the gate SR4-FAR waits on.
 - **why:** #64 measured that `game_state.points` opens each point **+6 … +3153 f AFTER its own serve on all 31 pairs** (one-signed, uniform), 31 points vs 33 GT, and that this — not the serve signal — blocks the far-side serve record (16/17 detected, 294 false serves unbound; best binding 11/17 with 35 FP). `docs/pm1_point_map.md`. The owner approved changing the map in principle (#64b) but it has never been validated. **The GT start frames EXIST** — see the correction in step 1.
@@ -911,7 +900,7 @@ point number in `docs/history/`.
         detection at the hit — none exists. **Next: card SR4a**, then SR4, then
         the held-out run once, then SR5 → SR6.
 
-22. **Far-side serves** — **[#55: SUPERSEDED by point 30. The far-serve contact chase is STOPPED, and its runway/structural evidence is reused as SR4 inputs. The '14/17 at zero FP' figure is IN-SAMPLE (swept on all 17); the held-out binding is 4/12.]** **[#53 SOLVED AS EVIDENCE: 14/17 at ZERO false
+22. **Far-side serves** — **[#67, PG2 DONE — `point_map_alignment = PG1_VERDICT_IS_A_PAIRING_ARTIFACT`: SR4-FAR is MIS-KEYED, not blocked. Pairwise-independent on the same artifacts: 14 of 31 window starts within ±15 f of ANY GT serve vs 1.21 of 31 Monte-Carlo chance (20 000 draws, seed 20261002, serve balls cover 3.93 % of frames) = 11.56× (bar ≥ 5×); monotone order-preserving DP keeps 14 pairs within ±15 f at every skip cost 60/120/240 f (27-28 pairs, median −6/−8 f); PG1's ordinal numbers reproduce exactly (1 of 33, 31 of 31 non-negative, +6/+3153/+1700 f) and now decide nothing. Seam split: far 11/17 sit AT a window start, 0 in a window interior, 6 in a genuine gap; near 3/16 at a start, 11/16 inside a window — #65's "far 14/17 in the gaps" is a SEAM, not a gap. Step 5 narrow `far_flight` (`width_start <= 28`, fixed) keyed on window starts: 11/17 far, 0/16 near misclaimed, 5 unanchored at ±10 and ±15 f — IN-SAMPLE re-test target, NOT a shippable rule (STOP list, AGENTS.md §5). Card defect: 1(e) asks for a "sign-free" median of −6 f (impossible); −6 f is the nearest-boundary signed median (nearest-start signed −1 f, sign-free +17 f) and all three readings are serve-anchored (`docs/point_map_seam.md` §6, `logs/pg2_report.md`, `scripts/score_point_map_alignment.py` +49 pins, suite **1286**). The remaining work is the coordinator's far-serve rule keyed on window starts, not an opener re-tune.]** **[#55: SUPERSEDED by point 30. The far-serve contact chase is STOPPED, and its runway/structural evidence is reused as SR4 inputs. The '14/17 at zero FP' figure is IN-SAMPLE (swept on all 17); the held-out binding is 4/12.]** **[#53 SOLVED AS EVIDENCE: 14/17 at ZERO false
     positives, from 0/17.]** Status: the mechanism is MEASURED and the owner
     decision is the OPERATING POINT; the implementation step is a post-hoc
     consumer (S4), not a `src/` label. T5 (tracker), R1 (departure gate), S1
@@ -1093,6 +1082,27 @@ point number in `docs/history/`.
     only **1 of 33**. FAIL ⇒ the map's STRUCTURE is the suspect, not a constant offset;
     **SR4-FAR stays BLOCKED on open point 22** and the corrected-opener architect card is
     NOT justified by this run (that was the PASS branch).]
+    **[#67, PG2 DONE — `point_map_alignment = PG1_VERDICT_IS_A_PAIRING_ARTIFACT`,
+    PASS on all three pre-registered criteria (`docs/point_map_seam.md`,
+    `logs/pg2_report.md`, `scripts/score_point_map_alignment.py`,
+    `tests/test_point_map_alignment.py`; suite **1286** = 1237 + 49).** PG1's ordinal
+    `REFUTED/1` is an artifact of its GT *P* ↔ pipeline *P−1* pairing, not of the video:
+    pairwise-independent, **14 of 31** window starts fall within ±15 f of ANY GT serve
+    (23/31 at ±30 f, 25/31 at ±60 f) vs a seeded Monte-Carlo chance baseline of
+    **1.21 of 31** (20 000 draws, serve balls cover 3.93 % of frames) = **11.56×**;
+    monotone order-preserving DP keeps **14 pairs within ±15 f at every skip cost
+    60/120/240 f** (27-28 pairs, median −6 to −8 f). PG1's own numbers reproduce exactly
+    (1 of 33, 31 of 31 non-negative, +6/+3153/+1700 f) and now decide nothing. Seam:
+    far serves sit **AT a window start** (11 of 17 at_seam, 0 in a window interior,
+    6 in a genuine gap), near serves **INSIDE** one (11 of 16) — so #65's "far 14/17 in
+    the gaps" is a seam, not a gap. Step 5's narrow `far_flight` (`width_start <= 28`) keyed
+    on window starts scores **11/17 far, 0/16 near misclaimed, 5 unanchored** at ±10 and
+    ±15 f — **IN-SAMPLE, a re-test target, NOT shippable** (STOP list, AGENTS.md §5).
+    **SR4-FAR is MIS-KEYED, not blocked**; the corrected-opener architect card is NOT
+    justified either. Card defect logged: step 1(e) asks for a "sign-free" median of −6 f,
+    which cannot be negative — −6 f is the nearest-**boundary** signed median (nearest-start
+    signed −1 f, sign-free +17 f); all three readings are serve-anchored, so the verdict
+    does not turn on it (`docs/point_map_seam.md` §6).**
 
 21. **Owner's match-feedback backlog** (agreed order; GT exists for all).
     **[#42 order: (4) side-switch = S3, then (3) winner = S4 — both after S1's
@@ -1109,6 +1119,13 @@ point number in `docs/history/`.
     pipeline point (`docs/point_map_alignment.md`). The window COUNT binds
     31/33, but the window STARTS do not, so re-tuning cannot reach the GT starts
     without moving the opener; SR4-FAR stays blocked on 22.]**
+    **[#67: that "starts do not bind" reading is CORRECTED — it was PG1's pairing,
+    not the map. Pairwise-independent: 14 of 31 window starts within ±15 f of ANY GT
+    serve vs 1.21 of 31 chance (11.56×), median −6 f, stable 14/14/14 pairs across the
+    skip-cost sweep; far 11/17 sit AT a start, near 11/16 INSIDE a window
+    (`docs/point_map_seam.md`). So the starts ARE serve-anchored and re-tuning the
+    opener is NOT the lever; SR4-FAR moves from blocked to MIS-KEYED (its rule still
+    to be keyed on window starts, still off/IN-SAMPLE).]**
     (2) *Per-point + per-action confidence:* gesture × attribution
     certainty (width votes/abstain) × ball-track continuity; points:
     n_actions + confidences + tracked fraction + serve presence; incl.
@@ -1787,6 +1804,7 @@ survive across sessions; provenance in the archives.
 - **A player box with no detector behind it can read "behind the line" and do no harm, and a backward-looking fix for it costs as much as it gains** (#60). Fifteen match contacts had `behind_baseline` read off a carried-forward or absent track; the owner confirmed only 2 are serves and the other 13 were vetoed by the serve label's second condition (they did not open a rally). The 2 real serves DEPEND on that read — their player has no real detection at or before the hit (it returns 1-7 f LATER) — so a rule that looks backwards for a cleaner position trades +P11/+P12 for −P17/−P19; P9/P10 read false at K = 5, 10 and 15 (stance feet y = 750/747 vs the 761 px line). Corollary for any reproduction gate: a diag dump's per-frame player list is NOT the classifier's snapshot (a contact is confirmed 7 f late and the last REAL position is used), so a probe cannot reproduce the shipped read on the ~6% of contacts whose toucher is coasting.
 
 ## Session index (one line each)
+- #66b **PG2 DONE, `point_map_alignment = PG1_VERDICT_IS_A_PAIRING_ARTIFACT`: PG1's `REFUTED/1` is a PAIRING artifact — window starts ARE serve-anchored; SR4-FAR is mis-keyed, not blocked** — `docs/point_map_seam.md`, `logs/pg2_report.md`, `logs/pg2_run.log`, `scripts/score_point_map_alignment.py`, `tests/test_point_map_alignment.py` (+49 tests; suite **1286** = 1237 + 49), plus a `## 7. Correction` pointer appended to `docs/point_map_alignment.md` (§1–§6 left byte-identical). Committed artifacts only: no `src/` change, no decode, no seek, no GT edit, held-out session `20260928_entreno_vall_dhebron` untouched, `scripts/score_point_map.py` unmodified. All three pre-registered criteria PASS: (i) **14 of 31** window starts within ±15 f of ANY GT serve (23/31 at ±30 f, 25/31 at ±60 f); (ii) **11.56×** chance — seeded Monte-Carlo `random.Random(20261002)`, 20 000 draws × 31 uniform starts over `[0, 26061)`, tol ±15 → **1.21 of 31** (observed range 0–7), while the ±15 f serve balls cover only **3.93 %** of frames (1023/26061); (iii) monotone order-preserving DP keeps **14 pairs within ±15 f at every skip cost** 60/120/240 f (27/28/28 pairs, unmatched 4/3/3, median −6/−8/−8 f, min −32/−171/−171). **G2 parity exact**: PG1's own scorer gives `start_hits_within_15f` = 1, `offsets_nonnegative` = 31, min/max/median **+6 / +3153 / +1700 f**, reading `uniformly late` — reproduced, and it decides nothing. **Seam**: far 11/17 `at_seam` (nearest start within ±15 f), **0** in a window interior, 6 in a genuine gap; near 3/16 `at_seam`, 11/16 inside — so #65's "far 14/17 in the gaps" is a **seam**, and PG1's geometric `inside_any_window` (far 2/17, near 14/16) is the same 16 serves bucketed differently (both geometric far rows P23/P25 are also `at_seam`; the scorer prints both). **Step 5** narrow `far_flight` (`width_start <= 28`, no sweep) keyed on window starts, one claim per start: ±10 and ±15 f → 16 claims, **far 11/17, near misclaimed 0/16, 5 unanchored**; ±20 f → 17/12/0/5. **IN-SAMPLE on the same 17 far serves — a re-test target, NOT a shippable rule** (STOP list, AGENTS.md §5), so SR4-FAR stays OFF. Two implementation notes recorded so nobody re-tunes them blind: the DP needs the tolerance-hinge reward (`100 − distance` inside ±15 f, `−distance` outside) — a plain `−|offset|` reward yields only 13 within-15 pairs; and card step 1(e) asks for a "sign-free" median of **−6 f**, which cannot be negative — the −6 f is the nearest-**boundary** signed median (nearest-start signed **−1 f**, sign-free **+17 f**, DP median at skip 60 −6 f), all three readings serve-anchored, so the verdict does not turn on it (reported to the owner, nothing re-tuned). Next task is the coordinator's far-serve rule keyed on window starts, re-tested out of sample with a non-serve control; the corrected-opener architect card is NOT justified by either run. No new task card, no cards reordered, Log not archived.
 - #65 **PG1 DONE, `point_map_gate = REFUTED/1` — the point map is uniformly LATE, not aligned; SR4-FAR stays blocked on open point 22** — `docs/point_map_alignment.md`, `logs/point_map_report.md`, `logs/point_map_score_stdout.txt`, `scripts/score_point_map.py`, `tests/test_point_map_score.py` (+23 tests; suite **1237** = 1214 + 23). Committed artifacts only: no `src/` change, no decode, no seek, no GT edit, held-out session untouched. **Step-1 anchor REPRODUCED**: all 33 GT points carry exactly one `serve` contact and the serve IS the earliest contact, so the owner-dictated serve frame is the per-point start frame (the predicted `match_start_frame`, `window_is_prediction: true`, and `ground_truth/gt_point_start_end.txt` are explicitly NOT read). Ordinal pairing (GT P ↔ pipeline P-1): **`start_hits_within_15f` = 1 of 33** (bar ≥ 20; only P1 at +6 f), **`offsets_nonnegative` = 31 of 31** (the sign half of the gate PASSES), offset min/max/median **+6 / +3153 / +1700 f** → **uniformly late**; **0 of 31** windows contain their own serve; GT P32 (f25375) and P33 (f25807) have no pipeline point. **G2 parity PASS**, all 31 offsets identical to `output/pm1/probe.json` (0 mismatches). Gap side #64's claim scored: inside any window **16/33** (far **2/17**, near **14/16**), inside any inter-point gap **16/33** (far 14/17, near 2/16), inside the gap immediately before its own holder only **1/33**. Pre-registered **FAIL** ⇒ the map's STRUCTURE is the suspect (a constant re-timing cannot close a +1700 f median and still leaves far's 14/17-gap population unclaimed), so the corrected-opener architect card (the PASS branch) is NOT justified by this run and **SR4-FAR stays BLOCKED on 22**. No new task card, no cards reordered, Log not archived.
 - #64 **PM1 `FAIL=blocked`: the far-serve record cannot bypass the point map; SR4-FAR is blocked on open point 22** — `docs/pm1_point_map.md`, `logs/pm1_report.md`, `logs/pm1_probe_stdout.txt`, `output/pm1/probe.json`, `scripts/probe_point_map.py`, `tests/test_point_map.py` (+23 tests; suite **1214** = 1191 + 23). Committed artifacts only: no `src/` change, no decode, no seek, held-out session untouched. Both gates green (G1 near 8/16, far 0/17, 12 FP; G2 plateau re-derived: far 16-27 px vs near 39-50 px, **16/17 far and 0/16 near at every cut 26/28/30/32**). Pre-registered FAIL: **UNBOUND (frame, side) 16/17 far hits with 294 false serves** (bar: >= 15/0 — first half PASS, second FAIL); **binding rule (iii) gap 11/17 with 35 FP**; **(ii) first-after 16/17 with 288 FP**; (i) contain 10/17 with 253 FP. So the *signal* is complete and no *binding* can make it precise — **the point map is the lever.** Reproduced #63: 31 pipeline points vs 33 GT points (P32/P33 have none), **0 of 17 far serves inside their own window**, and the ordinal-pairing offset is **one-signed +6 … +3153 f on all 31 pairs** (uniformly late, not noisy; #63's "1-1466 f" is the nearest-window offset, extreme -731 f at P32). **Far 2/17 inside any window vs near 14/16**; **16/33 serves sit in inter-point gaps**; 29/30 gaps clear `GAP_SERVE_MIN` 143 so the chasm rule selects nothing. [inferred] `_finalize_group` opens a point on a flight burst before the rally's first action. **Constraint handed to open point 22: move the opener to the serve / its rally.** No new task card written (per card), no cards reordered, Log not archived.
 - #63 **SR4 REFUTED AS SPECIFIED (architect call + coordinator re-measurement; nothing built, `src/` untouched)** — `docs/sr4_architect_call.md`, memo run in `logs/architect_sr4_ds_run.log`. The serve record cannot be a single post-hoc rule. **Near coverage ceiling is 13/16** (P5 -81 f, P7 -108 f, P24 +29 f: no own-side action within +-15 f), so the planned 15/16 bar is unreachable by hindsight work and **SR4-NEAR is parked on perception**. **The far-side side signal is new and strong**: ball width at flight onset 14-23 px at all 17 far serves vs 39-52 px at the 3 near serves that have one, plateau 26-32 px -> **far 16/17, near 0/16 misclaimed**. **But 0 of 17 far serves fall inside their own point window** (31 pipeline points vs 33 GT points; each point starts 1-1466 f AFTER its own serve), so binding costs 5-7 true serves for 2-8 false records and every suppression rule trades them 1-for-1. **Next = the point-map probe** (post-hoc, decides bypass vs open point 22), then SR4-FAR. Also fixed a delegation harness bug (prompts >~1 KB kill the child `pi` with EXIT 137 on every model — briefs must be files the child reads).

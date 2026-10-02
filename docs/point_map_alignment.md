@@ -138,3 +138,16 @@ described as a **seam** (the few frames straddling a window boundary).
 **This does not ship anything.** No mechanism is changed by it, and the
 far-record table it permits is **in-sample** on the 17 match far serves (STOP
 list, AGENTS.md §5). CARD PG2 re-tests it with a pre-registered gate.
+
+**Resolved by #67 (CARD PG2, PASS).** The pairing-independent re-test on the
+same committed artifacts returns `PG1_VERDICT_IS_A_PAIRING_ARTIFACT`:
+14 of 31 starts within ±15 f of a serve (**11.56×** the 1.21/31 chance
+baseline), 14 pairs within ±15 f at every skip cost 60/120/240 f, median
+−6 f. Read the §2 headline (`REFUTED/1`) as an artifact of the ordinal
+pairing, not of the video. **SR4-FAR is mis-keyed, not blocked** — it is
+blocked on open point 22 only as a *rule* still to be keyed on window starts,
+and its own far-record table stays IN-SAMPLE / off (STOP list, AGENTS.md §5).
+Full numbers, the seam table and the card-1(e) wording reconciliation:
+`docs/point_map_seam.md`; transcript and tests: `logs/pg2_report.md`,
+`logs/pg2_run.log`, `scripts/score_point_map_alignment.py`,
+`tests/test_point_map_alignment.py`.
