@@ -53,27 +53,65 @@ problem, not a perception problem.
 
 ## 3. The touch count is the lever (verified by replay)
 
+**CORRECTION (2026-10-02, coordinator, after CARD TC1's executor refused G1).**
+The first version of this table labeled a *replay* row "the real pipeline". That
+is wrong: the `accepted` rows of `output/g3r1/match_bw03_diag.jsonl` carry **no
+`behind_baseline` field** (0 of 185), and `_decide` reads it for its serve
+branch, so an offline replay **cannot reproduce the shipped label stream** — it
+replays fidelity only **168/185**, and it scores **0/12 on the serves** against
+the dump's own 7/12. The measurements below are the corrected ones; the touched
+conclusion is unchanged (it is in fact slightly larger on the subset a replay
+can faithfully model).
+
 Replaying the *unmodified* `ActionContextResolver._decide` over the 185 accepted
 candidates, substituting one input at a time (the GT `touch_number` lives in
 `points[].events[].touch_number`, **not** in `points[].contacts[]` — a trap that
 silently produced a 0/139 wrong answer before it was caught):
 
-| arm | correct labels (of 139 found) | accuracy |
+| arm | all 139 found | non-serve 127 (replay-faithful) |
 |---|---|---|
-| as emitted (the real pipeline) | 79 | **0.568** |
-| with the **real GT touch_number** fed in | 110 | **0.791** |
-| `touch_number` accuracy itself | 96/139 | **0.691** |
+| **the shipped stream** (the dump's own `action`, incl. the serve branch) | **85 = 0.612** | 78 = 0.614 |
+| replay of `_decide(behind_baseline=False)`, as-emitted touch | 79 = 0.568¹ | **79 = 0.622** |
+| replay, **real GT `touch_number`** fed in | 110 = **0.791** | **110 = 0.866** |
+| `touch_number` accuracy itself | 96/139 = 0.691 | — |
 
-Feeding only the true touch number lifts label accuracy by **+0.223** with the
-prerendered resolver untouched. That is a larger single lever than any other
-measured on this GT: the 12 far serves are +0.066 total, the 13 overpass labels
-+0.071, the 14 `set↔dig` swaps +0.077.
+¹ 0.568 is a **replay artifact, not the production baseline** — the 12 serves
+are unreachable without `behind_baseline`, and they are 7/12 in the shipped
+stream. Do not quote 0.568 as "production". For reference,
+`output/20260920_match_ari_joan_lost/pipeline_output.json` (the 207-action
+stream) gives **83/141 = 0.589** on the same GT and tolerance (the recorded
+0.590); the three figures differ only in which stream is matched and whether the
+`accepted` dump is used.
 
-Residual confusions after the substitution: `overpass→spike` 10, `serve→dig` 9,
-`serve→spike` 3, `overpass→dig` 3, `spike→block` 2, `spike→set` 1,
+**On the 127 non-serve contacts, where an offline replay IS faithful, the true
+touch number lifts label accuracy 79/127 = 0.622 → 110/127 = 0.866 (+0.244)**
+with the resolver untouched. Lever comparison, all measured on the same GT and
+the same `pipeline_output.json` base of **83/141 = 0.589** (a perfect arm adds
+`found+correct` entries where the contact is currently missed):
+
+| lever | n | class-acc gain |
+|---|---|---|
+| all 25 region serves perfect | 25 | **+0.177** |
+| **all 12 far serves perfect** | 12 | **+0.032** |
+| the 13 held-out overpass labels | 13 | +0.092 |
+| the 15 `set↔dig` swaps | 15 | +0.106 |
+| **the touch count, on the replay-faithful 127** | — | **+0.244** (0.622→0.866) |
+
+So the touch count is the largest lever and the far serve the smallest. (The
+near serve is where the serve lever actually lives: 13 of the 25.)
+
+Residual confusions after the substitution (all 139): `overpass→spike` 10,
+`serve→dig` 9, `serve→spike` 3, `overpass→dig` 3, `spike→block` 2, `spike→set` 1,
 `set→overpass` 1. So a perfect touch count is necessary but not sufficient:
 `overpass` still fails on its own rule (`touch == 2 and no follow`), and the
-`serve` cases fail because the near serve is a touch-1 `bump_set`.
+`serve` cases fail because the near serve is a touch-1 `bump_set` (and because
+the replay cannot see `behind_baseline` at all).
+
+**Second correction.** `_decide` also takes an `own_side_drive_block` argument
+(`src/recognition/action_context.py:216` region) that the dump does not record;
+the replay passes `False`. Combined with the missing `behind_baseline`, the 7 of
+185 replay mismatches are **not** attributable to the touch count and the card
+below is written against `behind_baseline=False` explicitly.
 
 ## 4. Where the touch error comes from (mechanism, first cut)
 
