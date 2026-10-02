@@ -108,3 +108,33 @@ nominally attached to.
 
 Test status: `venv/bin/python -m pytest tests/ -o addopts="" -q` → **1237 passed**
 (1214 baseline + 23 new in `tests/test_point_map_score.py`).
+## 7. Correction (#66/#67) — this verdict is PAIRING-DEPENDENT
+
+**Added by the coordinator during the step-4 review of #65.** §1-§6 above stand
+as the #65 record, but the headline must be read with the pairing in mind.
+
+The `FAIL` rests on PG1's **ordinal** pairing (GT point *P* ↔ pipeline point
+*P−1*). The pipeline emits **31** windows for **33** GT points, so once the
+pipeline skips a point the ordinal index accumulates a permanent phase shift and
+every later pair compares a window to the *wrong* serve. That accumulated shift
+is what the +1700 f median measures.
+
+Re-measured on the same committed artifacts, pairing-independently
+(`docs/pg1_correction.md`, transcript `logs/pg1_correction_stdout.txt`):
+
+| pairing | pairs | within ±15 f | median offset |
+|---|---|---|---|
+| ordinal (§2 above) | 31 | 1 | +1700 f |
+| nearest window start per serve | 33 | **14** | **−6 f** |
+| monotone order-preserving DP (skip 60/120/240 f) | 27-28 | **14** | **−6 f** |
+
+Chance baseline: 33 serve anchors cover **3.92 %** of the match's frames; 31
+uniform random starts give **1.21 of 31** within ±15 f (20 000 draws). Measured
+**14 of 31**, i.e. ~11× chance — the starts are serve-anchored. And by side: far
+serves sit **at** a window start (**11 of 17**), near serves sit **inside** a
+window (**14 of 16**), so §5's "the far side's 14/17-gap population" is better
+described as a **seam** (the few frames straddling a window boundary).
+
+**This does not ship anything.** No mechanism is changed by it, and the
+far-record table it permits is **in-sample** on the 17 match far serves (STOP
+list, AGENTS.md §5). CARD PG2 re-tests it with a pre-registered gate.
