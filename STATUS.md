@@ -17,7 +17,29 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-02 (sixty-third session, **the serve record is REFUTED as
+**Last updated:** 2026-10-02 (sixty-fourth session, **PM1 verdict: `FAIL=blocked` —
+the far-serve record cannot bypass the point map; SR4-FAR is BLOCKED on open point
+22**, `docs/pm1_point_map.md`, `logs/pm1_report.md`, `scripts/probe_point_map.py`,
+open point **30**). Post-hoc, committed artifacts only: no `src/` change, no decode,
+no seek, held-out session untouched. **The three numbers:** the UNBOUND (frame,
+side) form emits **16 of 17 far serves with 0/16 near misclaimed** (>= 15 required,
+PASS) but carries **294 false serves** (<= 0 required, FAIL); the best binding
+rule by precision is the gap rule at **11 of 17 far hits with 35 false serves**
+(need >= 12/17 and <= 3); the most generous rule, first `start_frame` after,
+keeps **16 of 17** but carries **288 false serves**. So the signal is complete and
+the *map* is what cannot be worked around. Reproduced and extended #63: **31
+pipeline points vs 33 GT points**, **0 of 17 far serves inside their own window**,
+and the ordinal-pairing offset is **one-signed +6 … +3153 f on all 31 pairs** (the
+map is uniformly *late*, not noisy) — while only **2 of 17 far serves** sit inside
+any window and **16 of 33 serves sit in inter-point gaps** (near is the opposite:
+14 of 16 inside). [inferred] cause: `_finalize_group` opens a point on a flight
+burst *before* the rally's first action, so the opener precedes the serve it
+belongs to. **Next: open point 22** (move the point opener to the serve / its
+rally) before SR4-FAR; the width plateau (far 16-27 px, near 39-50 px, any cut in
+26-32 -> 16/17 far, 0/16 near) survives as a Learning and is a detection result
+only. Suite 1214 passed (1191 + 23 new pins).
+
+**#63 (previous session):** 2026-10-02 (sixty-third session, **the serve record is REFUTED as
 specified, and the reason is the point map, not the signal: 0 of 17 far serves fall
 inside their own point window** — `docs/sr4_architect_call.md`, open point **30**).
 Tier-2 architect call (route 4) + coordinator re-measurement. No `src/` change, no
@@ -236,15 +258,18 @@ VFR. Both are allow-listed in `tests/test_vfr_seek_guard.py`. Fix the annotator
 before any frame-shown annotation pass.
 
 **Active next (ranked) — execute via the task cards below (`/next-task`):**
-1. **The point-map probe** (NEW, no card yet — write it with the task-card skill
-   first). The architect call proved the serve record cannot be bound to a point:
-   **0 of 17 far serves fall inside their own point window**, `game_state.points`
-   has 31 entries vs 33 GT points, and each point starts 1-1466 f after its own
-   serve. Probe: per-serve offset to its own window, and whether the 31-vs-33
-   mismatch and the backdated onsets share one cause. Pure post-hoc, no `src/`, no
-   decode. Decides whether SR4-FAR is a one-rule job (emit (frame, side), bypass
-   the point map — the width band already detects **far 16/17 with 0/16 near
-   misclaimed**) or is blocked on open point 22. Source: `docs/sr4_architect_call.md`.
+1. **PM1 DONE (#64): `FAIL=blocked`** — `docs/pm1_point_map.md`,
+   `logs/pm1_report.md`. The probe ran both gates green (G1 baseline reproduced
+   near 8/16 / far 0/17 / 12 FP; G2 plateau re-derived far 16-27 px vs near
+   39-50 px, 16/17 far and 0/16 near at every cut 26-32) and returned the
+   pre-registered FAIL: unbound (frame, side) = **16/17 far hits with 294 false
+   serves**; best binding rule = **11/17 with 35 false serves**; first-after =
+   **16/17 with 288**. **The next task is open point 22** (the episode->point map):
+   PM1 shows the far-serve signal is complete (16/17) and that no binding rule can
+   make it precise, because the map's window opener is one-signed **+6 … +3153 f
+   late** and the far serves sit in inter-point gaps (16 of 33) while the near ones
+   sit in windows (14 of 16) — the fix must move the opener to the serve or to the
+   rally it heads. SR4-FAR stays blocked behind that; it is not the next card.
 2. **SR4a** (DONE #62+, `docs/sr4a_near_openings.md`): the near-opening table —
    G1 reproduced on both arms (near 8/16, far 0/17, 12 FP, drills 3/5); the 8 near
    misses bucket into **2 mislabeled_opener + 3 not_opener + 3 not_emitted**.
@@ -254,10 +279,12 @@ before any frame-shown annotation pass.
    on the near side by #63: the near record's bar (15/16) is above its measured
    coverage ceiling (13/16), so **SR4-NEAR does not get built as planned** — it
    waits on perception.
-3. **SR4-FAR** (next after the probe): the far-side serve record. Detection exists
-   (ball width 14-23 px far vs 39-52 px near, plateau 26-32 px, far 16/17, near
-   0/16); the record does not, because binding costs 5-7 false records and 5-7 true
-   ones. Keep the cut per-session (camera-scale biased, AGENTS.md §5), never frozen.
+3. **SR4-FAR is BLOCKED behind open point 22** (was "next after the probe"; #64
+   measured why): the detection exists (ball width 16-27 px far vs 39-50 px near,
+   plateau 26-32 px, far 16/17, near 0/16) but **no binding rule makes it precise**
+   — unbound 16/17 with 294 false serves, best binding 11/17 with 35. It becomes a
+   one-rule job only AFTER the point map opens at the serve. Keep the cut
+   per-session (camera-scale biased, AGENTS.md §5), never frozen.
 4. **SR3 worker half, ONCE, after the rules are frozen**: teach `score_serves.py`
    the `serve-anchors-v1` format, run the held-out session, score it once. Still
    not run — the serve rules are not frozen, so the freeze gate is not met.
@@ -288,7 +315,12 @@ The full #54 block (production facts, G0-G4/S0-S4 histories) is archived verbati
 > reports. It does not fill gaps.
 
 ### CARD PM1 — the point-map probe: why 0 of 17 far serves fall inside their own point window, no `src/` change
-- **status:** READY
+- **status:** DONE (#64): `FAIL=blocked` — UNBOUND (frame, side) **16/17 far hits
+  with 294 false serves** (bar >= 15/0); binding rule (iii) gap **11/17 with 35 FP**,
+  (ii) first-after **16/17 with 288 FP**, (i) contain **10/17 with 253 FP**. Neither
+  bar met, so **SR4-FAR is BLOCKED on open point 22**; the signal is complete (16/17)
+  and the point map is the lever. **Do NOT re-run**; the probe's verdict is pinned in
+  `tests/test_point_map.py`.
 - **type:** measurement (diagnose-only)
 - **goal:** decide whether SR4-FAR (the far-side serve record) is a one-rule job that bypasses the point map, or is blocked on open point 22 (episode→point map). Moves open point 30.
 - **why:** the architect call (`docs/sr4_architect_call.md`, #63) refuted SR4 as specified and named the root cause: `game_state.points` has **31** entries against 33 ground-truth points, and **0 of 17 far serves fall inside their own point window** — each point's `start_frame` sits **1–1466 f AFTER its own serve** (the session-56 backdated rally onset). Meanwhile the far-side *detection* is already solved: ball width at flight onset is **14–23 px at all 17 far serves** vs **39–52 px** at the 3 near serves that have a flight event, a plateau at any cut in **26–32 px** giving **far 16/17, near 0/16 misclaimed**. If the point map can be bypassed, SR4-FAR is one rule; if not, it waits on open point 22 and the next ranked task changes.
@@ -665,6 +697,25 @@ point number in `docs/history/`.
       - **Next = the POINT-MAP PROBE** (post-hoc, no `src/`, no decode): per-serve offset
         to its own window, and whether the 31-vs-33 mismatch and the backdated onsets
         have one cause. Then SR4-FAR as a record; SR4-NEAR only with perception.
+      - **#64: PM1 `FAIL=blocked`** (`docs/pm1_point_map.md`, `logs/pm1_report.md`,
+        `scripts/probe_point_map.py`; artifacts unchanged). UNBOUND (frame, side) far hits
+        **16/17** with **294** false serves; best binding rule (gap) **11/17** with
+        **35** false serves; first-after rule **16/17** with **288** false serves.
+        **The point map is the lever, not the binding rule, and not the width cut.**
+        Reproduced: 31 pipeline points vs 33 GT points; **0 of 17 far serves inside
+        their own window**; ordinal-pairing offset one-signed **+6 … +3153 f** on all
+        31 pairs (map uniformly LATE, not noisy — the #63 "1-1466 f" figure is the
+        *nearest-window* offset, extreme -731 f at P32); **2 of 17 far serves** inside
+        any window vs **14 of 16 near**; **16 of 33 serves** in inter-point gaps;
+        29 of 30 gaps clear `GAP_SERVE_MIN` (143), so the chasm rule selects nothing
+        here. [inferred] `_finalize_group` backdates the episode onset to a flight
+        burst before the rally's first action, so the point opener precedes its own
+        serve; the 31-vs-33 shortfall is P32/P33 and is unresolved between two
+        `game_state_manager` causes (below `point_min_actions` vs merge-then-split) —
+        deliberately NOT separated by this card. **Constraint handed to open point
+        22: the opener must move to the serve / its rally**; a map that opens there
+        makes rule (i) natural and is the only shape where a per-point record is both
+        complete and precise. Width plateau survives as a Learning (detection only).
     - **Problem:** production serve recall is 8/33 (near 8/16, far 0/17) and
       precision 0.40. The far evidence layer is 13/17 covered (**in-sample**),
       4/12 held-out binding. The near side's losses are now MEASURED (#58): contact-frame
@@ -882,6 +933,26 @@ point number in `docs/history/`.
     an ep45 verdict.
     **Infra rule: VFR file — never CAP_PROP_POS_FRAMES seeks; decode
     sequentially.**
+    **[#64: the episode->point map is now MEASURED as the blocker for the far
+    serve, and open point 30's SR4-FAR waits on it.]** Measured over the 33 GT
+    serves against `game_state.points`: **31 pipeline points vs 33 GT points**
+    (P32/P33 have none), and under the only pairing the two vocabularies support
+    (GT point *P* <-> pipeline point *P-1*) the offset `start_frame - own
+    serve_frame` is **one-signed +6 f ... +3153 f on all 31 pairs** — the opener is
+    uniformly LATE, not noisy, so **0 of 17 far serves (and 0 of 31 windows) sit
+    inside their own window**. Only **16 of 33** serves fall inside *any* window,
+    and the split is stark: **far 2 of 17** vs **near 14 of 16** — the far serves
+    live in inter-point gaps (16 of 33), the near ones inside windows. Consequence
+    for the serve record: the far-side *detection* is complete (ball width at
+    flight onset **16-27 px** at every far serve vs **39-50 px** at the 3 near
+    serves that have an event, plateau 26-32 px -> **16/17 far, 0/16 near
+    misclaimed** at every cut), but **no binding rule makes it precise**: unbound
+    16/17 with 294 false serves, in-window 10/17 with 253, first-start-after
+    16/17 with 288, gap 11/17 with 35. **So the fix is HERE, not in the serve
+    logic: move the point opener to the serve or to the rally it heads**
+    ([inferred] from `_finalize_group`: the opener is a pre-serve flight burst,
+    backdated after a quiet interval, and the point layer never sees a serve).
+    Next = card for that; SR4-FAR is not buildable until it lands.
 
 21. **Owner's match-feedback backlog** (agreed order; GT exists for all).
     **[#42 order: (4) side-switch = S3, then (3) winner = S4 — both after S1's
@@ -1567,6 +1638,7 @@ survive across sessions; provenance in the archives.
 - **A player box with no detector behind it can read "behind the line" and do no harm, and a backward-looking fix for it costs as much as it gains** (#60). Fifteen match contacts had `behind_baseline` read off a carried-forward or absent track; the owner confirmed only 2 are serves and the other 13 were vetoed by the serve label's second condition (they did not open a rally). The 2 real serves DEPEND on that read — their player has no real detection at or before the hit (it returns 1-7 f LATER) — so a rule that looks backwards for a cleaner position trades +P11/+P12 for −P17/−P19; P9/P10 read false at K = 5, 10 and 15 (stance feet y = 750/747 vs the 761 px line). Corollary for any reproduction gate: a diag dump's per-frame player list is NOT the classifier's snapshot (a contact is confirmed 7 f late and the last REAL position is used), so a probe cannot reproduce the shipped read on the ~6% of contacts whose toucher is coasting.
 
 ## Session index (one line each)
+- #64 **PM1 `FAIL=blocked`: the far-serve record cannot bypass the point map; SR4-FAR is blocked on open point 22** — `docs/pm1_point_map.md`, `logs/pm1_report.md`, `logs/pm1_probe_stdout.txt`, `output/pm1/probe.json`, `scripts/probe_point_map.py`, `tests/test_point_map.py` (+23 tests; suite **1214** = 1191 + 23). Committed artifacts only: no `src/` change, no decode, no seek, held-out session untouched. Both gates green (G1 near 8/16, far 0/17, 12 FP; G2 plateau re-derived: far 16-27 px vs near 39-50 px, **16/17 far and 0/16 near at every cut 26/28/30/32**). Pre-registered FAIL: **UNBOUND (frame, side) 16/17 far hits with 294 false serves** (bar: >= 15/0 — first half PASS, second FAIL); **binding rule (iii) gap 11/17 with 35 FP**; **(ii) first-after 16/17 with 288 FP**; (i) contain 10/17 with 253 FP. So the *signal* is complete and no *binding* can make it precise — **the point map is the lever.** Reproduced #63: 31 pipeline points vs 33 GT points (P32/P33 have none), **0 of 17 far serves inside their own window**, and the ordinal-pairing offset is **one-signed +6 … +3153 f on all 31 pairs** (uniformly late, not noisy; #63's "1-1466 f" is the nearest-window offset, extreme -731 f at P32). **Far 2/17 inside any window vs near 14/16**; **16/33 serves sit in inter-point gaps**; 29/30 gaps clear `GAP_SERVE_MIN` 143 so the chasm rule selects nothing. [inferred] `_finalize_group` opens a point on a flight burst before the rally's first action. **Constraint handed to open point 22: move the opener to the serve / its rally.** No new task card written (per card), no cards reordered, Log not archived.
 - #63 **SR4 REFUTED AS SPECIFIED (architect call + coordinator re-measurement; nothing built, `src/` untouched)** — `docs/sr4_architect_call.md`, memo run in `logs/architect_sr4_ds_run.log`. The serve record cannot be a single post-hoc rule. **Near coverage ceiling is 13/16** (P5 -81 f, P7 -108 f, P24 +29 f: no own-side action within +-15 f), so the planned 15/16 bar is unreachable by hindsight work and **SR4-NEAR is parked on perception**. **The far-side side signal is new and strong**: ball width at flight onset 14-23 px at all 17 far serves vs 39-52 px at the 3 near serves that have one, plateau 26-32 px -> **far 16/17, near 0/16 misclaimed**. **But 0 of 17 far serves fall inside their own point window** (31 pipeline points vs 33 GT points; each point starts 1-1466 f AFTER its own serve), so binding costs 5-7 true serves for 2-8 false records and every suppression rule trades them 1-for-1. **Next = the point-map probe** (post-hoc, decides bypass vs open point 22), then SR4-FAR. Also fixed a delegation harness bug (prompts >~1 KB kill the child `pi` with EXIT 137 on every model — briefs must be files the child reads).
 - #62+ **SR4a DONE (delegated worker card; diagnose-only, `src/` untouched)** — `scripts/probe_near_openings.py`, `docs/sr4a_near_openings.md`, `logs/sr4a_report.md`, `tests/test_near_openings.py` (+35 tests; suite **1191** = 1156 + 35). G1 reproduced on both arms before any bucket was read: near 8/16, far 0/17, 12 false serves, drills e2-e7 3/5. The 8 match near misses bucket into **2 `emitted_mislabeled_opener` + 3 `emitted_not_opener` + 3 `not_emitted`**; drills into 3 hit / 1 mislabeled / 1 not_emitted. **G2 verdict 1: SR4's near side PROCEEDS after the fact — 5 repairable of 8** (rule >= 4). **G2 verdict 2: M-b is REOPENED as a fresh architect call only (NOT a build) — 3 never produced, 2 of them coasting** (P5 f2575 and P7 f3747, lowest-foot same-team track `predicted: true`; rules >= 3 AND >= 2); the diag dump has NO recorded arm, so the call must re-run with the arm named. SR4 still goes first (no `src/` change). Trap guard `far_unseen_near_reception_first` = **0** of 17. Design constraint for SR4 (inferred): only 4 of the 8 hits have a `serve` as their window opener, and 6 of the 12 false serves sit inside a near-miss window. One card deviation disclosed (the clip-opening serve has no preceding action; the probe follows `relabel_serves.resolve_point` and opens at video start, else G1 fails at 0/5).
 - #62 D4 DECIDED (architect, on `docs/d4_gate_brief.md`; nothing built, `src/` untouched): M-a stays CLOSED and **M-b is PARKED** — the serve-zone exemption's ceiling is +1 near serve of 16 (+2 with P5) against a 0.90 bar needing 15, and the blunt version measured net 0 (+P7 / −P18, false serves 12→14). **#62 re-reads P18: an attribution swap, not a rally_start failure** (same ball point 867.5,313 in both arms, touch 1, new rally, toucher track 3→2 = server→partner; the lift renumbers tracks match-wide, f2494 track 1→4), so a hold exemption's cost is only bounded by a full-match run. Next: card **SR4a** (near-opening table, no decode), then SR4, then the held-out run once, then SR5 → SR6. Also: the stale `player_off_court_hold_frames` comment at `src/utils/config.py:101` is now on the deferred list (comment-only, inside the next session that touches `src/` anyway).
