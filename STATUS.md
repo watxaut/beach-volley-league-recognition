@@ -17,10 +17,32 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-02 (sixty-second session + delegated worker, **SR4a DONE:
-5 of the 8 near-serve misses are repairable after the fact, so the per-point serve
-record can be built without touching the main pipeline; the tracking exemption
-reopens as an architect call only**, `docs/sr4a_near_openings.md`,
+**Last updated:** 2026-10-02 (sixty-third session, **the serve record is REFUTED as
+specified, and the reason is the point map, not the signal: 0 of 17 far serves fall
+inside their own point window** — `docs/sr4_architect_call.md`, open point **30**).
+Tier-2 architect call (route 4) + coordinator re-measurement. No `src/` change, no
+decode, held-out session untouched. Three measured results, all reproducible from
+committed artifacts: (1) **NEAR has a hard coverage ceiling of 13/16** — three near
+serves have no action on the serving side within +/-15 f (P5 -81 f, P7 -108 f,
+P24 +29 f), so the planned bar of 15/16 is above the ceiling and SR4-NEAR must not
+be built; (2) **the far-side side signal is the strongest in the project and was not
+in the brief** — the ball leaving the far half is 14-23 px wide at all 17 far serves
+vs 39-52 px at the 3 near serves that have a flight event, a plateau at any cut in
+26-32 px giving **far 16/17 with 0/16 near misclaimed**; (3) **binding it to points
+collapses it** — 9-11/17 with 2-8 false records in-window, 432 candidates unscoped,
+and every suppression rule tried trades true serves for false ones 1-for-1. Root
+cause: `game_state.points` has 31 entries against 33 GT points and every point starts
+1-1466 f AFTER its own serve (the session-56 backdated onset). Next (ranked):
+**(a) the point-map probe** (pure post-hoc, decides whether SR4-FAR is a 1-rule job
+or blocked on open point 22), then SR4-FAR, then SR4-NEAR on perception, then the
+held-out session once, then SR5 -> SR6. Also measured: a delegation harness bug —
+prompts over ~1 KB kill the child `pi` with `EXIT 137` on every model; briefs must be
+files the child reads (see *Learnings*).
+
+**#63 (previous session):** 2026-10-02 (sixty-second session + delegated worker,
+**SR4a DONE: 5 of the 8 near-serve misses are repairable after the fact, so the
+per-point serve record can be built without touching the main pipeline; the tracking
+exemption reopens as an architect call only**, `docs/sr4a_near_openings.md`,
 `scripts/probe_near_openings.py`, open point **30**, commit `0bd2a28`). No `src/`
 change, no decode. Buckets over the 8 misses: 2 wrong label, 3 present-but-misplaced,
 3 never produced. **Design constraint measured, not assumed: a record keyed on the
@@ -214,20 +236,33 @@ VFR. Both are allow-listed in `tests/test_vfr_seek_guard.py`. Fix the annotator
 before any frame-shown annotation pass.
 
 **Active next (ranked) — execute via the task cards below (`/next-task`):**
-1. **SR4a** (DONE #62+, `docs/sr4a_near_openings.md`): the near-opening table —
+1. **The point-map probe** (NEW, no card yet — write it with the task-card skill
+   first). The architect call proved the serve record cannot be bound to a point:
+   **0 of 17 far serves fall inside their own point window**, `game_state.points`
+   has 31 entries vs 33 GT points, and each point starts 1-1466 f after its own
+   serve. Probe: per-serve offset to its own window, and whether the 31-vs-33
+   mismatch and the backdated onsets share one cause. Pure post-hoc, no `src/`, no
+   decode. Decides whether SR4-FAR is a one-rule job (emit (frame, side), bypass
+   the point map — the width band already detects **far 16/17 with 0/16 near
+   misclaimed**) or is blocked on open point 22. Source: `docs/sr4_architect_call.md`.
+2. **SR4a** (DONE #62+, `docs/sr4a_near_openings.md`): the near-opening table —
    G1 reproduced on both arms (near 8/16, far 0/17, 12 FP, drills 3/5); the 8 near
    misses bucket into **2 mislabeled_opener + 3 not_opener + 3 not_emitted**.
    **G2 verdicts: SR4's near side proceeds after the fact (5 repairable of 8, rule
    >= 4) and M-b is REOPENED as a fresh architect call only (3 never produced, 2 of
-   them coasting, rules >= 3 AND >= 2) — nothing ships.** Trap guard 0.
-2. **SR4** (next): the per-point serve record — far side from rally onset time +
-   side vote, near side from the after-the-fact opener rule. **Read
-   `docs/sr4a_near_openings.md` §2 and §5 first:** the opener key alone recovers
-   only 4 of the 8 hits and 6 of the 12 false serves sit inside near-miss windows.
-3. **SR3 worker half, ONCE, after the rules are frozen**: teach `score_serves.py`
-   the `serve-anchors-v1` format, run the held-out session, score it once.
-4. **SR5 → SR6.**
-5. **Deferred edit, not a card:** the `player_off_court_hold_frames` comment at
+   them coasting, rules >= 3 AND >= 2) — nothing ships.** Trap guard 0. Superseded
+   on the near side by #63: the near record's bar (15/16) is above its measured
+   coverage ceiling (13/16), so **SR4-NEAR does not get built as planned** — it
+   waits on perception.
+3. **SR4-FAR** (next after the probe): the far-side serve record. Detection exists
+   (ball width 14-23 px far vs 39-52 px near, plateau 26-32 px, far 16/17, near
+   0/16); the record does not, because binding costs 5-7 false records and 5-7 true
+   ones. Keep the cut per-session (camera-scale biased, AGENTS.md §5), never frozen.
+4. **SR3 worker half, ONCE, after the rules are frozen**: teach `score_serves.py`
+   the `serve-anchors-v1` format, run the held-out session, score it once. Still
+   not run — the serve rules are not frozen, so the freeze gate is not met.
+5. **SR5 -> SR6.**
+6. **Deferred edit, not a card:** the `player_off_court_hold_frames` comment at
    `src/utils/config.py:101` is **STALE** (it credits the 90 f horizon with killing
    e2's sideline bystander; that bystander is fed on **400 of 423** frames at the
    horizon today, #61). Fix it **comment-only**, inside whichever session next
@@ -569,6 +604,38 @@ point number in `docs/history/`.
         same-side contact within tolerance, not on the window opener alone. The chasm
         rule (`GAP_SERVE_MIN`, imported, never re-tuned) rejects only **1 of 12** false
         serves.
+      **[#63: SR4 REFUTED AS SPECIFIED (architect call + coordinator re-measurement,
+      `docs/sr4_architect_call.md`). This supersedes the "Next = card SR4a; SR4 still
+      goes first" line above.]**
+      - **NEAR has a hard coverage ceiling of 13/16** [measured]: three near serves have
+        NO action on the serving side within +-15 f of GT (P5 f2575 nearest -81 f
+        `overpass` A, P7 f3747 nearest -108 f `dig` A, P24 f18135 nearest +29 f `dig` B).
+        The planned bar of 15/16 is above the ceiling -> **SR4-NEAR is not built**; it
+        waits on perception (M-b fixes P5/P7 at best; P24 has a real detected player and
+        no own-side action, so M-b alone does not reach the bar).
+      - **The far-side side signal is the strongest measured in the project and was NOT
+        in the plan** [measured]: ball width at flight onset is **14-23 px at all 17 far
+        serves** and **39-52 px** at the 3 near serves that have a flight event (13 of 16
+        have none within +-15 f). A cut anywhere in the **26-32 px plateau** claims
+        **far 16/17 with 0/16 near misclaimed**. Keep the cut PER SESSION (camera-scale
+        biased, AGENTS.md §5), never frozen as a constant.
+      - **ROOT CAUSE of the record's failure is the POINT MAP, not the signal** [measured]:
+        **0 of 17 far serves fall inside their own point window.** `game_state.points` has
+        **31** entries vs 33 GT points, and each point's `start_frame` sits **1-1466 f
+        AFTER its own serve** (the session-56 backdated rally onset). Binding in-window
+        gives far 9-11/17 with 2-8 false records; unscoped there are **432** narrow
+        candidates for 33 serves; and every suppression rule tried (drop on next-action
+        within 15/30/60/120 f) trades true serves for false ones ~1-for-1 (far hits fall
+        16 -> 8 -> 2 -> 0 while false records fall 416 -> 256 -> 183 -> 141).
+      - **Decisions:** SR4-NEAR parked on perception; SR4-FAR becomes a detection-only
+        result until the point map is fixed or bypassed; P12 stays a rally-boundary defect
+        (same root cause); the +-15 f tolerance stays (P33's -25 f must NOT be admitted —
+        it would also admit the far false serve f8534 at +16 f); wrong-label repairs
+        (P9/P10/P11) do NOT violate the STOP list because a serve RECORD never mutates
+        `actions_pass2` and never relabels the reception.
+      - **Next = the POINT-MAP PROBE** (post-hoc, no `src/`, no decode): per-serve offset
+        to its own window, and whether the 31-vs-33 mismatch and the backdated onsets
+        have one cause. Then SR4-FAR as a record; SR4-NEAR only with perception.
     - **Problem:** production serve recall is 8/33 (near 8/16, far 0/17) and
       precision 0.40. The far evidence layer is 13/17 covered (**in-sample**),
       4/12 held-out binding. The near side's losses are now MEASURED (#58): contact-frame
@@ -1049,6 +1116,8 @@ point number in `docs/history/`.
 
 ## Learnings (standing)
 
+- **DELEGATION HARNESS: a prompt over ~1 KB kills the child `pi` instantly (`Killed: 9` / `EXIT 137`, zero output) on every model.** Measured #62+ by bisection on all three worker models (`stealth/space-bunny-alpha`, `anthropic/claude-opus-5.5`, `deepseek/deepseek-v4.1-flash`): 800 B survives, 1000 B dies, reproducible across 3+ repeats, independent of model, THINK level, `PI_CODING_AGENT_DIR`, and `-ne/-ns/-np/-nc`. Neutral filler text dies at the same size, so it is the prompt bytes, not the content. **Rule: keep the delegating prompt to a few hundred bytes and make the child READ a brief file** (`/tmp/<brief>.md`) instead of inlining it — exactly as `scripts/run_task_openrouter.sh` already builds `$(cat "$1")`, so the fix is to pass a short pointer, not the brief. This is why `cat .pi/prompts/architect.md /tmp/architect_brief.md > /tmp/architect_full.md` (the documented route-4 recipe) **cannot work today**; the architect prompt alone is 7.3 KB. Note `EXIT 1` with an OpenRouter billing body (not 137) is a different failure: the 128k max_tokens request exceeds the remaining credit, so architect-sized runs need the balance topped up or `max_tokens` lowered.
+
 - **The serve-window opener is a weak key: measured #62+ on the 20260920 match, only 4 of the 8 production near hits have a `serve` as their window's first action (the other 4 windows open 326-471 f earlier on a dig/far serve/spike), and 6 of the 12 false serves sit INSIDE a near-miss window, 5 of them as its first action.** A post-hoc per-point serve record (SR4) must key on the same-side contact within tolerance, not on the window opener. Related: the chasm rule (`GAP_SERVE_MIN = 143`, imported from `relabel_serves.py`) rejects only **1 of 12** false serves, and rally onsets sit 10-19 f BEFORE the serve on 12 of 15 near rows (P12 -662 f, P20 +630 f), so an onset is not a serve marker at ±15 f. Source: `docs/sr4a_near_openings.md`.
 
 - Calibration `frame_dimensions` is (h,w) and is NOT a scale hint: points are used verbatim, only the court mask is sized from it — a smaller calibration on a bigger video silently drops near-half players. `src/main.py` now hard-errors on missing/mismatched calibration (`--allow-uncalibrated` to waive; T1, session 31). Probe scripts share it via `src/detection/calibration_readiness.py` (T1b); they decode at native res, so point them at `_up1080` for sub-1080p sources.
@@ -1469,6 +1538,7 @@ survive across sessions; provenance in the archives.
 - **A player box with no detector behind it can read "behind the line" and do no harm, and a backward-looking fix for it costs as much as it gains** (#60). Fifteen match contacts had `behind_baseline` read off a carried-forward or absent track; the owner confirmed only 2 are serves and the other 13 were vetoed by the serve label's second condition (they did not open a rally). The 2 real serves DEPEND on that read — their player has no real detection at or before the hit (it returns 1-7 f LATER) — so a rule that looks backwards for a cleaner position trades +P11/+P12 for −P17/−P19; P9/P10 read false at K = 5, 10 and 15 (stance feet y = 750/747 vs the 761 px line). Corollary for any reproduction gate: a diag dump's per-frame player list is NOT the classifier's snapshot (a contact is confirmed 7 f late and the last REAL position is used), so a probe cannot reproduce the shipped read on the ~6% of contacts whose toucher is coasting.
 
 ## Session index (one line each)
+- #63 **SR4 REFUTED AS SPECIFIED (architect call + coordinator re-measurement; nothing built, `src/` untouched)** — `docs/sr4_architect_call.md`, memo run in `logs/architect_sr4_ds_run.log`. The serve record cannot be a single post-hoc rule. **Near coverage ceiling is 13/16** (P5 -81 f, P7 -108 f, P24 +29 f: no own-side action within +-15 f), so the planned 15/16 bar is unreachable by hindsight work and **SR4-NEAR is parked on perception**. **The far-side side signal is new and strong**: ball width at flight onset 14-23 px at all 17 far serves vs 39-52 px at the 3 near serves that have one, plateau 26-32 px -> **far 16/17, near 0/16 misclaimed**. **But 0 of 17 far serves fall inside their own point window** (31 pipeline points vs 33 GT points; each point starts 1-1466 f AFTER its own serve), so binding costs 5-7 true serves for 2-8 false records and every suppression rule trades them 1-for-1. **Next = the point-map probe** (post-hoc, decides bypass vs open point 22), then SR4-FAR. Also fixed a delegation harness bug (prompts >~1 KB kill the child `pi` with EXIT 137 on every model — briefs must be files the child reads).
 - #62+ **SR4a DONE (delegated worker card; diagnose-only, `src/` untouched)** — `scripts/probe_near_openings.py`, `docs/sr4a_near_openings.md`, `logs/sr4a_report.md`, `tests/test_near_openings.py` (+35 tests; suite **1191** = 1156 + 35). G1 reproduced on both arms before any bucket was read: near 8/16, far 0/17, 12 false serves, drills e2-e7 3/5. The 8 match near misses bucket into **2 `emitted_mislabeled_opener` + 3 `emitted_not_opener` + 3 `not_emitted`**; drills into 3 hit / 1 mislabeled / 1 not_emitted. **G2 verdict 1: SR4's near side PROCEEDS after the fact — 5 repairable of 8** (rule >= 4). **G2 verdict 2: M-b is REOPENED as a fresh architect call only (NOT a build) — 3 never produced, 2 of them coasting** (P5 f2575 and P7 f3747, lowest-foot same-team track `predicted: true`; rules >= 3 AND >= 2); the diag dump has NO recorded arm, so the call must re-run with the arm named. SR4 still goes first (no `src/` change). Trap guard `far_unseen_near_reception_first` = **0** of 17. Design constraint for SR4 (inferred): only 4 of the 8 hits have a `serve` as their window opener, and 6 of the 12 false serves sit inside a near-miss window. One card deviation disclosed (the clip-opening serve has no preceding action; the probe follows `relabel_serves.resolve_point` and opens at video start, else G1 fails at 0/5).
 - #62 D4 DECIDED (architect, on `docs/d4_gate_brief.md`; nothing built, `src/` untouched): M-a stays CLOSED and **M-b is PARKED** — the serve-zone exemption's ceiling is +1 near serve of 16 (+2 with P5) against a 0.90 bar needing 15, and the blunt version measured net 0 (+P7 / −P18, false serves 12→14). **#62 re-reads P18: an attribution swap, not a rally_start failure** (same ball point 867.5,313 in both arms, touch 1, new rally, toucher track 3→2 = server→partner; the lift renumbers tracks match-wide, f2494 track 1→4), so a hold exemption's cost is only bounded by a full-match run. Next: card **SR4a** (near-opening table, no decode), then SR4, then the held-out run once, then SR5 → SR6. Also: the stale `player_off_court_hold_frames` comment at `src/utils/config.py:101` is now on the deferred list (comment-only, inside the next session that touches `src/` anyway).
 - #61 SR1d DONE — `global lift REFUTED` (`docs/sr1d_hold_horizon_cost.md`, no `src/` change): the 90 f off-court hold lifted to 100000 changes the 7 practice clips not at all (action streams byte-identical, ΔF1 0.000) but feeds e2's sideline bystander 423 f vs 400 f, and on the full match leaves near serves at 8/16 while the composition churns (+P7 at delta +0, −P18 as `serve`→`dig` at the same frame), FP 12→14, actions 207→212. So M-b must be geometric, not a bigger horizon. One card step needed an owner-sanctioned fix (the `evaluate.py` invocation graded nothing); adapter validated against the recorded per-clip F1s.
@@ -1573,6 +1643,74 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+### 2026-10-02 (sixty-third session) — SR4 is REFUTED as specified: the near bar is above the coverage ceiling, and the point map is why the far bar fails
+
+**Asked:** continue the coordinator loop toward G3 — reliably track actions across
+videos, target >70% of actions correct against the match ground truth without the
+practice drills dropping below 90%.
+
+**Step 0 (read).** STATUS *Active next* ranked SR4 (the per-point serve record) as
+the needle-mover; nothing was carded for it. SR4a had just landed (see the #62+
+entry) and its G2 verdicts said the near side was repairable after the fact and the
+tracking exemption should reopen as an architect call only.
+
+**Step 1 (rank).** Serve reliability is the active defect (near 8/16, far 0/17,
+12 false emissions; held-out contacts F1 0.772). NOT worth doing now, per STATUS:
+the audio-onset probe (timing is not the bottleneck — the far TIME is already
+nearly free at 11/17 within +-15 f), the beach-rules serve-sequence decoding
+(needs SR4's records first), and the stale off-court-hold comment (comment-only,
+deferred into a session that touches `src/` anyway).
+
+**Step 3.5 (escalate).** SR4 has no card and its design hinges on an unverified
+premise — that a serve can be located post-hoc — so it went to the architect
+(route 4) with the SR4a evidence attached. **The first three attempts died on a
+harness bug, not on the model:** `cat .pi/prompts/architect.md /tmp/brief.md >
+full.md` (the documented route-4 recipe) makes a ~15 KB prompt, and a delegated
+prompt over ~1 KB kills the child `pi` with `Killed: 9` / `EXIT 137` and zero
+output, on every model, at every THINK level, independent of agent directory. Found
+by bisection (800 B survives, 1000 B dies, neutral filler text dies at the same
+size, 3+ repeats each). The owner's recollection was right: the brief must be a
+file the child reads. Re-run as a 451-byte pointer, and the architect ran 24 min
+and returned a **refutation**. Log: `logs/architect_sr4_ds_run.log`. (A later
+attempt with opus returned an OpenRouter billing error instead — 128k max_tokens
+against the remaining credit — so the architect tier also needs credit or a
+`max_tokens` cap. Recorded as a Learning.)
+
+**Step 4 (verify, own commands).** Re-ran the architect's own two probe scripts and
+the ceiling claim from committed artifacts, all reproduce:
+- Near coverage ceiling **13/16**: only 13 of the 16 ground-truth near serves have
+  ANY action on the serving side within +-15 f; P5 f2575 nearest -81 f (`overpass`
+  A), P7 f3747 nearest -108 f (`dig` A), P24 f18135 nearest +29 f (`dig` B). The
+  planned 15/16 bar is above the ceiling, so SR4-NEAR is not buildable as planned.
+- Far side signal (new, not in the brief): ball width at flight onset **14-23 px at
+  all 17 far serves** vs **39-52 px** at the 3 near serves that have a flight event
+  (13 of 16 have none within +-15 f); a cut anywhere in the **26-32 px plateau**
+  claims **far 16/17, near 0/16 misclaimed**.
+- Binding kills it: **0 of 17 far serves fall inside their own point window**.
+  `game_state.points` has **31** entries vs 33 GT points and each point's
+  `start_frame` sits **1-1466 f AFTER its own serve** (the session-56 backdated
+  onset). In-window binding: far 9-11/17 with 2-8 false records; leading-gap
+  binding: 5-7/33 side-correct with 22-25 false; unscoped: 432 narrow candidates for
+  33 serves; suppression by next-action distance N=15/30/60/120 gives far hits
+  16/8/2/0 with 329/256/183/141 false. Every lever trades true serves for false
+  ones ~1-for-1. **Root cause = the point map, not the signal.**
+
+**Verdict:** architect refutation ACCEPTED, and extended with the root cause. No
+`src/` change, no decode, held-out session untouched, full suite green (1191).
+Written up in `docs/sr4_architect_call.md` (new file).
+
+**Decisions:** SR4-NEAR parked on perception (its ceiling is 13/16 and M-b fixes
+P5/P7 at best, not P24); SR4-FAR demoted to a detection-only result until the point
+map is fixed or bypassed; the +-15 f tolerance stays (admitting P33's -25 f would
+also admit the far false serve f8534 at +16 f); wrong-label repairs do not violate
+the STOP list because a serve record never mutates `actions_pass2`. **Next is the
+point-map probe** — post-hoc, no `src/`, decides bypass vs open point 22 — and it
+needs a card written before an executor can run it.
+
+**Not done this session (deliberate):** no task card for the point-map probe yet
+(the card-writing is a planning act; the owner asked for results), and the owner
+gate on the near bar (lower it to 13/16, or make it explicitly contingent on M-b) is
+left for the owner because it changes an acceptance criterion in open point 30.
 ### 2026-10-02 (sixty-second session) — D4 DECIDED: the serve-zone exemption is PARKED; next is the near-opening table, and the worker tier is quota-blocked
 
 **Asked:** take the architect's answer to `docs/d4_gate_brief.md`, fold the decision
