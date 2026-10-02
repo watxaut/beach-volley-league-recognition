@@ -17,15 +17,17 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-02 (sixty-second session, **D4 DECIDED: the serve-zone
-exemption from the off-court hold is PARKED; card SR4a (the near-opening table) is
-READY and unrun because the worker models are quota-blocked until 2026-10-03 18:49**,
-`docs/d4_gate_brief.md`, open point **30**). No `src/` change, no decode. M-b's
-ceiling is +1 near serve of 16 (+2 with P5) against a 0.90 bar that needs 15, and
-the only measured version was net 0; its cost is match-wide identity churn (#62
-re-read of P18: an attribution swap, not a rally_start failure), so it is priced
-only by a full-match run. Next: run card **SR4a** (`/next-task`), then SR4, then
-the held-out session once, then SR5 -> SR6.
+**Last updated:** 2026-10-02 (sixty-second session + delegated worker, **SR4a DONE:
+5 of the 8 near-serve misses are repairable after the fact, so the per-point serve
+record can be built without touching the main pipeline; the tracking exemption
+reopens as an architect call only**, `docs/sr4a_near_openings.md`,
+`scripts/probe_near_openings.py`, open point **30**, commit `0bd2a28`). No `src/`
+change, no decode. Buckets over the 8 misses: 2 wrong label, 3 present-but-misplaced,
+3 never produced. **Design constraint measured, not assumed: a record keyed on the
+window's first action would recover only 4 of the 8 true serves, and 6 of the 12
+false serves sit inside a near-miss window — the record must key on the same-side
+contact within tolerance.** Next: write card **SR4** (no card exists for it yet),
+then the held-out session once, then SR5 -> SR6.
 
 **#58 (previous session):** 2026-10-02 (fifty-eighth session, **SR1b: review of SR0/SR1 —
 the near serve has three measured causes, not one**, `docs/sr1b_near_serve_causes.md`,
@@ -388,7 +390,12 @@ The full #54 block (production facts, G0-G4/S0-S4 histories) is archived verbati
   M-b (serve-zone exemption)? A cheap executor that reaches this card STOPS.
 
 ### CARD SR4a — the near-opening table: what the pipeline emitted around every serve, no `src/` change
-- **status:** READY
+- **status:** **DONE (#62+, delegated worker; `docs/sr4a_near_openings.md`, open
+  point 30)** — G1 reproduced on both arms; 8 near misses = 2 mislabeled_opener +
+  3 not_opener + 3 not_emitted. **G2: SR4's near side PROCEEDS (5 of 8 repairable,
+  rule ≥4); M-b REOPENED as a fresh architect call only (3 never produced, 2
+  coasting, rules ≥3 AND ≥2); trap 0.** Retained below for provenance — do NOT
+  re-run.
 - **type:** measurement (diagnose-only)
 - **goal:** split the 8 match near-serve misses into "repairable after the fact"
   (wrong label / wrong rally opening) and "never produced" (reach gate, ball not
