@@ -3247,3 +3247,44 @@ extended; Log #54 moved VERBATIM to `docs/history/status_log_archive.md`. Suite
 a side + rally-opening test for the serve record that does not read the emitted
 label. One open sub-question, cheap to close: was the server detected but
 untracked at P5/P7 (one more prefix pass with `--serve-events`)?
+
+### 2026-10-02 (fifty-eighth session) — SR1b: SR0/SR1 reviewed; the near serve has three measured causes; task cards for cheap executors
+
+**Asked:** review the serve plan plus SR0/SR1 ("are we going in the right
+direction?"), explore through the cheap-model runner; then write it up, correct
+STATUS, commit the vall_dhebron GT, and create a prompt + skill so that smaller
+LLMs pick up the next STATUS task without inferring work.
+
+**Verdict on direction:** the strategy holds (D3 per-point record, one scorer,
+held-out discipline, far stop list). SR1's cause analysis did not: 4 of its 5
+`behind_baseline` verdicts were inferred (`behind_baseline_measured: null`), and
+"not a tracking problem" checked the ball only.
+
+**Measured (worker, read-only; `docs/sr1b_worker_report.md`):** one sequential
+production pass over the match [0, 15000] with `--diag-dump` (MPS, parity
+**111/111**), the SR1 entreno dumps, and a config-only counterfactual [0, 8000]
+with `player_off_court_hold_frames = 100000`:
+- P9-P12: server track FED, contact emitted, `rally_start` true;
+  `behind_baseline` false because the toucher's CONTACT-frame foot is 0.8-24.5 px
+  inside 761 px (6-12 px past it 7 f later). Hits P3/P16-P20 at 809-835.
+- P5/P7: the server track goes `predicted` exactly 91 f after its last in-court
+  sighting (hold = 90) and coasts frozen through the serve → reach gate.
+  Counterfactual: P7 hit; P5 → `dig` (rally_start killed by a handling 78 f
+  earlier); P9-P12 identical to the decimal; 53 → 55 actions, one non-GT flip.
+- e2: server never tracked (sideline bystander in the 4th slot). e5: ball.
+- Far P1-P20: far server track FED at 7/8, ball track `none` at 7/8.
+
+**Written:** `docs/sr1b_near_serve_causes.md` (review), `docs/sr1b_worker_report.md`
+(verbatim worker report), correction banner on `docs/sr1_near_serve_misses.md`;
+STATUS: header, *Where we are* (cause table, held-out lock, SR2 demoted), new
+**Next task cards** section (SR1c, SR1d READY; D4 owner gate), open point 30
+(SR1b/SR1c/SR1d, SR3, D4), Learnings (+6, 2 SR1 lines flagged), session index;
+Log #55 moved verbatim to `docs/history/status_log_archive.md` and header #55 to
+`docs/history/status_where_we_are_archive.md`. Committed
+`ground_truth/20290928_entreno_vall_dhebron_serve_anchors.json` (owner SR3, 19
+serves). Harness: `.pi/prompts/next-task.md` (executor contract) and
+`.pi/skills/task-card/SKILL.md` (how planners write cards); AGENTS.md §10.
+
+**Nothing in `src/` changed.** Suite unchanged (1091).
+
+**Next:** card SR1c, then SR1d (one decode at a time), then owner gate D4.
