@@ -2482,3 +2482,19 @@ is 'consume the events post-hoc (S4)' vs 'keep pushing the ball side'.]**
   preconditions (`docs/g3_r2_confidence_calibration.md` §6; S0 supplies
   precondition 1). `track_frac_15f` remains the one within-clip-stable ordinal
   (review-UI flag candidate, not a calibrated replacement).
+
+## Archived 2026-10-02 (#58): header paragraph #55, verbatim
+
+**#55:** 2026-10-02 (fifty-fifth session, **planning only: the
+serve-reliability plan and a course correction**, `docs/serve_reliability_plan.md`,
+open point **30**). Measured honestly, serves are unreliable on BOTH sides. At
+contact level (±15 f, match P1-P33) the production stream gets near **8/16**, far
+**0/17**, with 12 false serve emissions (recall 0.24, precision 0.40). The far-only
+evidence layer's "14/17 at zero FP" is **in-sample**: the operating point was swept
+on all 17 far serves, and its held-out binding is **4/12**. The far-serve track had
+been optimising a proxy (a frame-exact far contact in the action stream) on one
+match. The plan replaces it with a per-point **serve record** covering both sides
+(time, side/squad, server, outcome), built post-hoc from the existing evidence plus
+two signals never used before: the **audio track** (real AAC in every video, never
+read) and the **beach serving rules** (decoded jointly across the match). It also
+asks the owner for cheap serve-only GT on one new session.

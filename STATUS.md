@@ -17,7 +17,23 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-02 (fifty-seventh session, **SR1 DONE: the near-serve miss
+**Last updated:** 2026-10-02 (fifty-eighth session, **SR1b: review of SR0/SR1 —
+the near serve has three measured causes, not one**, `docs/sr1b_near_serve_causes.md`,
+open point **30**). Diagnose-only, no `src/` change. One sequential production pass
+over the match [0, 15000] (parity **111/111**) plus a config-only counterfactual
+measured what SR1 had inferred: **P9-P12** are lost because `behind_baseline` reads
+the toucher's foot on the CONTACT frame (0.8-24.5 px inside the 761 px threshold; 7 f
+later the same tracks are past it) — the server is tracked and attributed; **P5/P7**
+are lost because the near server's PLAYER track stops being fed exactly 91 f after
+its last in-court sighting (`player_off_court_hold_frames = 90`) and coasts frozen
+through the serve (lifting the horizon makes **P7 a hit**; P5 then dies on
+`rally_start` behind a pre-serve handling 78 f earlier); **e2**'s server is never
+tracked. SR1's "not a tracking problem" was about the ball only. SR3 GT has
+**arrived** (vall_dhebron, 19 serves: 8 near / 11 far) and is committed as the
+held-out session. Next = task card **SR1c** below (measurement, no `src/`).
+A cheap-model executor prompt (`/next-task`) and the `task-card` skill were added.
+
+**#57 (previous session):** 2026-10-02 (fifty-seventh session, **SR1 DONE: the near-serve miss
 taxonomy**, `scripts/probe_near_serve_misses.py` + `docs/sr1_near_serve_misses.md`,
 open point **30**). Diagnose-only, no `src/` change. Across 10 missed near serves
 (match 8 + practice 2, all from **fresh production runs**): **6 `label`, 3
@@ -33,7 +49,7 @@ server is not among the four tracks at the contact) and e5 (stage 3,
 `no_ball_sighting` x15/31f). Near-side serve recall is **11/21 = 0.52** on
 current artifacts, and the practice figure is **3/5, not the plan's 4/5**.
 
-**#56 (previous session):** 2026-10-02 (fifty-sixth session, **SR0 DONE: one serve scorer**,
+**#56:** 2026-10-02 (fifty-sixth session, **SR0 DONE: one serve scorer**,
 `scripts/score_serves.py` + `docs/sr0_serve_scorer.md`, open point **30**). The
 scorer reproduces the plan's pre-registered baseline exactly (production near
 **8/16**, far **0/17**, 12 FP, ±15 f) and adds the numbers the backlog was
@@ -46,20 +62,6 @@ proposal step must be per side; (2) the near serves production *does* emit are
 all within ±2 f, so the 8 near misses are missing emissions, not late ones
 (SR1's job, now cheap); (3) 8 of the 12 false emissions are dead-time handlings
 and only 3 are mislabeled rally contacts (named). Nothing in `src/` changed.
-
-**#55:** 2026-10-02 (fifty-fifth session, **planning only: the
-serve-reliability plan and a course correction**, `docs/serve_reliability_plan.md`,
-open point **30**). Measured honestly, serves are unreliable on BOTH sides. At
-contact level (±15 f, match P1-P33) the production stream gets near **8/16**, far
-**0/17**, with 12 false serve emissions (recall 0.24, precision 0.40). The far-only
-evidence layer's "14/17 at zero FP" is **in-sample**: the operating point was swept
-on all 17 far serves, and its held-out binding is **4/12**. The far-serve track had
-been optimising a proxy (a frame-exact far contact in the action stream) on one
-match. The plan replaces it with a per-point **serve record** covering both sides
-(time, side/squad, server, outcome), built post-hoc from the existing evidence plus
-two signals never used before: the **audio track** (real AAC in every video, never
-read) and the **beach serving rules** (decoded jointly across the match). It also
-asks the owner for cheap serve-only GT on one new session.
 
 Earlier sessions: see the *Session index* below.
 
@@ -114,9 +116,9 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
-**Serves are the active track and they are NOT reliable (#56: SR0 measured them
-properly; `docs/serve_reliability_plan.md` + `docs/sr0_serve_scorer.md`, open
-point 30).**
+**Serves are the active track and they are NOT reliable (#56 SR0 measured them;
+#58 SR1b measured WHY the near side fails; `docs/serve_reliability_plan.md`,
+`docs/sr0_serve_scorer.md`, `docs/sr1b_near_serve_causes.md`, open point 30).**
 
 Honest per-side serve baseline, all from `scripts/score_serves.py` (contact
 level, ±15 f, greedy one-to-one, side-correct; match P1-P33, 33 owner serves):
@@ -129,34 +131,42 @@ level, ±15 f, greedy one-to-one, side-correct; match P1-P33, 33 owner serves):
 | far-only evidence layer | not observed | **13/17** coverage (**in-sample**), **9/17** bound (held-out **4/12**) | precision 0.47 as a claim; 1 owner FP |
 | entreno e2-e7, fresh runs | 3/5 (e3 +0, e6 +1, e7 +0) | — | e2 f32, e5 f20 missed; near recall 11/21 = 0.52 overall |
 
-Near-side misses, bucketed (SR1): **6 `label`** (5 = `behind_baseline` false at a
-rally-opening contact, 1 = `rally_start` suppressed by our own early serve
-emission), **3 `no_contact`** (P5/P7 die at the **reach gate**, 448 / 204 px vs
-140; e5 has no ball sighting), **1 `other_side_contact`** (P24). Near serves are
-not a detection or tracking problem: the ball was tracked in all 10 and a contact
-candidate existed in 9.
+**Why near serves are lost — MEASURED (#58, supersedes SR1's inferred story):**
+
+| misses | mechanism | candidate fix (owner gate before `src/`) |
+|---|---|---|
+| P9, P10, P11, P12 | `behind_baseline` reads the toucher's foot on the CONTACT frame; airborne/landing feet sit 0.8-24.5 px inside the 761 px threshold (past it 7 f later). Server tracked and attributed. | **M-a** takeoff stance (pre-contact foot) — measured next as card SR1c |
+| P5, P7 | the near server's PLAYER track stops being fed 91 f after its last in-court sighting (`player_off_court_hold_frames = 90`, tuned on drills) and coasts frozen through the serve; contact dies at the reach gate. Lifting it: P7 → hit; P5 → `dig` (rally_start killed by a pre-serve handling 78 f earlier) | **M-b** serve-zone exemption from the hold — cost measured as card SR1d |
+| e2 | server never tracked (sideline bystander holds the 4th slot from bootstrap) | none planned (drill artefact) |
+| e5 | ball not sighted | none planned |
+| P24, P33 | not re-measured (outside the [0,15000] pass); P33 = rally_start cascade from our own early serve | — |
 
 `docs/g3_heldout_p9_p33.md`'s near 11/13 counts production OR pass-2 serves. The
 production stream alone is 7/13.
 
+**Held-out lock (#58):** `ground_truth/20290928_entreno_vall_dhebron_serve_anchors.json`
+(SR3, owner-dictated 2026-10-01: 19 serves, 8 near / 11 far, 1 `ace`, 1 `net`) is the
+held-out session. The video has NEVER been run. Do not run, score or look at
+pipeline output on it until a card says "score held-out once" with frozen rules.
+With 8 near serves, "≥0.90" passes only at 8/8 (Wilson 95% CI on 8/8 = [0.68, 1.0]):
+report counts + CI, never a bare rate.
+
 **Plan: SR0-SR7.**
-- **SR0:** DONE (#56) — `scripts/score_serves.py`, gate PASS.
-- **SR1:** DONE (#57) — `scripts/probe_near_serve_misses.py` + fresh production
-  runs of the 7 entreno clips (their old artifacts predate the v3 model). The
-  near side is a LABEL problem, not a perception one.
-- **SR2:** audio onset probe (diagnose-only) -- the only symmetric timing signal.
-- **SR3:** OWNER serve-only GT on `20290928_entreno_vall_dhebron.mp4` (the
-  05-05-2025 video was dropped, D2). Worker half: run both with `--serve-events`,
-  and re-run the seven entreno clips whose artifacts predate the v3 model.
-- **SR4:** per-point serve record, both sides, post-hoc. Its proposal step must
-  be per side (far timing is free, near timing is not).
-- **SR5:** beach-rules serve-sequence decoding.
-- **SR6:** ace / service fault.
-- **SR7:** learned detector, deferred until ≥3 sessions of serve GT.
+- **SR0:** DONE (#56). **SR1:** DONE (#57), corrected by **SR1b** (#58).
+- **SR1c / SR1d:** the two near-side measurements below (task cards).
+- **SR2:** audio onset probe — DEMOTED (#58): timing is not the bottleneck on either
+  side. Run only after the near-side mechanisms, if far binding stays the gap.
+- **SR3:** owner half DONE (vall_dhebron GT committed, #58). Worker half (the run) is
+  held behind the held-out lock.
+- **SR4:** per-point serve record, both sides, post-hoc. Near side consumes the
+  production near label once M-a/M-b land; far side = rally onset time + side vote.
+- **SR5:** beach-rules serve-sequence decoding (server identity needs the server's
+  track at the serve — M-b). Confirm with the owner that vall_dhebron is game play.
+- **SR6:** ace / service fault. **SR7:** learned detector, deferred.
 
 **STOP list:** no more px-space or contact-geometry far-serve thresholds, selector
 constants, or tracker admission tuned on the 17 match far serves. No relabeling of
-the reception as the serve.
+the reception as the serve. No look at vall_dhebron outputs (held-out lock).
 
 **Production state (unchanged since #54):**
 - **Weights:** `models/volleyball_ball_best.pt` v3. The match is native 720p,
@@ -186,18 +196,17 @@ signal, overpass width crossing, R2 confidence calibration.
 VFR. Both are allow-listed in `tests/test_vfr_seek_guard.py`. Fix the annotator
 before any frame-shown annotation pass.
 
-**Active next (ranked):**
-1. SR2 (audio onsets, diagnose-only), or the SR4 design decision SR1 makes
-   answerable: a side + rally-opening test for the serve record that does not
-   depend on the emitted label. One mechanism per session.
-2. Now and in parallel: SR3 (owner). Worker half, cheap: one more match prefix
-   pass with `--serve-events` to answer whether the server was detected but
-   untracked at P5/P7.
-3. SR4, then SR5, then SR6.
+**Active next (ranked) — execute via the task cards below (`/next-task`):**
+1. **SR1c** (READY): measure M-a (takeoff-stance `behind_baseline`) over existing
+   and one new diag dump. No `src/` change.
+2. **SR1d** (READY, independent of SR1c): measure the entreno + full-match cost of
+   lifting the 90 f hold horizon. No `src/` change.
+3. **Owner gate D4** after SR1c/SR1d: approve (or not) the `src/` A/B of M-a and/or
+   M-b, one per session.
+4. Then SR4 → SR5 → SR6.
 
 The non-serve backlog is unchanged: the label bucket (open point 9), the reach-gate
-bucket, e4/e5/e6 re-adjudication, and the first run of the vall_dhebron video
-(folded into SR3).
+bucket, e4/e5/e6 re-adjudication.
 
 **Deferred triggers:** unchanged (detector v4, T7/T10, T6, T8, T12, R2), with one
 exception. T9's PTS timebase is pulled forward, because SR2/SR3 map audio and
@@ -205,6 +214,146 @@ dictated timestamps to frames by PTS.
 
 The full #54 block (production facts, G0-G4/S0-S4 histories) is archived verbatim in
 `docs/history/status_where_we_are_archive.md`.
+
+## Next task cards
+
+> Executable briefs for the next sessions, written by a planning session with the
+> `task-card` skill (`.pi/skills/task-card/SKILL.md`). A cheap executor runs ONE
+> card via `/next-task` (`.pi/prompts/next-task.md`) and does exactly what it says.
+> Take the first card whose status is `READY`. A card is the whole brief: if it
+> is ambiguous, wrong, or reality disagrees with it, the executor STOPS and
+> reports. It does not fill gaps.
+
+### CARD SR1c — measure the takeoff-stance `behind_baseline` (M-a), no `src/` change
+- **status:** READY
+- **type:** measurement (diagnose-only)
+- **goal:** decide with numbers whether judging `behind_baseline` on the pre-contact
+  stance recovers the near serves P9-P12 without creating false serves (open point
+  30, near recall 8/16).
+- **why:** `docs/sr1b_near_serve_causes.md` §2: at P9-P12 the toucher's foot on the
+  contact frame is 0.8-24.5 px inside the 761 px threshold (team A, match).
+- **read first (nothing else):** AGENTS.md; this card; `docs/sr1b_near_serve_causes.md`;
+  `src/recognition/action_classifier.py` `_build_contact` and the
+  `candidate_passed_gates` diag record; `src/recognition/action_context.py`
+  `resolve` + `_decide`; `src/detection/court_calibration.py` `is_behind_baseline`;
+  `scripts/probe_near_serve_misses.py` (`sequential_diag_pass`, `emit_diag`,
+  `load_diag_frames`); `scripts/score_serves.py` (`build_match_session`,
+  `build_entreno_session`, GT loaders).
+- **may create:** `scripts/probe_takeoff_stance.py`, `tests/test_takeoff_stance.py`,
+  `docs/sr1c_takeoff_stance.md`, anything under `output/sr1c/`.
+- **may modify:** `STATUS.md` (only the edits listed below).
+- **must not touch:** `src/`, `ground_truth/`, other scripts/tests, `AGENTS.md`,
+  any vall_dhebron input or output.
+- **steps:**
+  1. Full-match diag dump, ONE sequential pass (~35 min on MPS):
+     `mkdir -p output/sr1c && nohup venv/bin/python scripts/probe_near_serve_misses.py --emit-diag output/sr1c/match_full_diag.jsonl --end-frame 999999 --device mps > output/sr1c/match_full_run.log 2>&1 &`
+     then poll (`sleep 300; tail -3 output/sr1c/match_full_run.log`). Defaults give
+     the match video, calibration and reference artifact. The log ends with a JSON
+     block.
+  2. **Gate G1 (parity):** in that JSON block, `parity_vs_reference.identical` must
+     be `true` (207 shipped actions). If false: STOP, report the diff.
+  3. Write `scripts/probe_takeoff_stance.py`. Inputs: `output/sr1c/match_full_diag.jsonl`
+     (calibration `calibrations/20260920_match_ari_joan_lost.json`) and
+     `output/sr1/entreno_{1..7}_diag.jsonl` (calibrations `calibrations/video_entreno_N.json`).
+     For every `candidate_passed_gates` record (contact frame `c`, `track_id`,
+     `team`, `gesture`, `behind_baseline`):
+     - foot(t) = (bbox x-centre, bbox[3]) of that `track_id` in frame record `t`'s
+       `players`, NON-predicted only;
+     - `bb_K` = `CourtCalibration.is_behind_baseline(foot, team)` using the foot
+       with the max y (team A) / min y (team B) over frames `[c-K, c]`; import the
+       real class, never re-implement the test;
+     - K = 0 recomputes the shipped value; **K = 10 is the pre-registered rule**;
+       K = 5 and 15 are reported as sensitivity only and decide nothing.
+  4. **Gate G2 (reproduction):** `bb_0` must equal the dumped `behind_baseline` on
+     ≥ 98% of records per session (SR1b measured 104/106). Else STOP.
+  5. First-order flip simulation (no cascade): an EMITTED action flips to `serve`
+     iff its action is `spike` or `dig`, `rally_start` is true (gap to the previous
+     emitted contact > 90 f, or first contact), shipped `behind_baseline` is false,
+     and `bb_10` is true. Emitted actions = the dump frame records' `actions`.
+  6. Score every flip against GT (±15 f, side letter A = near): `recovered` (a GT
+     serve of that side, not already hit by a production serve), `false_dead_time`
+     (no GT contact within ±15 f), `false_breaks_gt` (a GT non-serve contact within
+     ±15 f). Match GT = `ground_truth/20260920_match_contacts.json` via the
+     score_serves loaders; entreno GT via `build_entreno_session`.
+  7. Tests: `bb_K` window logic, predicted-frame skipping, the flip rule, the
+     bucket rule, on synthetic records. Run the full suite:
+     `venv/bin/python -m pytest tests/ -o addopts=""` (was 1091; must stay green).
+- **pre-registered decision (K = 10, not re-tunable):**
+  - **PASS** = ≥ 3 of {P9, P10, P11, P12} `recovered` AND match `false_breaks_gt`
+    = 0 AND match `false_dead_time` ≤ 1 AND entreno false flips = 0.
+  - **FAIL** = anything else. Report it as REFUTED; do not try another K or rule.
+- **deliverables:** the script + tests; `docs/sr1c_takeoff_stance.md` (method,
+  G1/G2 results, a per-flip table, the per-K sensitivity table, the verdict line);
+  `output/sr1c/takeoff_stance.json`.
+- **STATUS edits when done:** set this card's status to `DONE (#<session>): PASS|FAIL
+  — <one line with the numbers>`; add the result to open point 30's SR1c line;
+  add one Learnings line; add a Session index line and a Log entry (move the
+  oldest Log entry verbatim to `docs/history/status_log_archive.md`). Do NOT write
+  a new card and do NOT start owner gate D4. Commit ONLY the card's files + STATUS
+  (+ the archive) in one commit: `#<session>: SR1c DONE - <PASS|FAIL> <one line>`.
+- **stop and ask if:** a gate fails; a field named here does not exist; the full
+  pass dies; the result would need a different K or rule to pass.
+- **est. cost:** ~35 min decode + ~1 h code.
+
+### CARD SR1d — measure the cost of lifting the 90 f off-court hold (M-b), no `src/` change
+- **status:** READY (independent of SR1c; never run both decodes at once — §8)
+- **type:** measurement (diagnose-only)
+- **goal:** know what lifting `player_off_court_hold_frames` costs on the entreno
+  gate and on the full match before anyone designs the serve-zone exemption.
+- **why:** `docs/sr1b_near_serve_causes.md` §3: lifting it made P7 a hit on
+  [0, 8000], but the e2 sideline-bystander regression it was built for (08-29)
+  was never re-measured.
+- **read first:** AGENTS.md; this card; `docs/sr1b_near_serve_causes.md`;
+  `src/tracking/player_tracker.py` `_may_feed_track`; `src/utils/config.py`
+  (`player_off_court_hold_frames`) and `Config.load`; `src/main.py` arguments.
+- **may create:** `output/sr1d/**`, `docs/sr1d_hold_horizon_cost.md`.
+- **may modify:** `STATUS.md` (only the edits listed below).
+- **must not touch:** `src/`, `scripts/`, `tests/`, `ground_truth/`, any vall_dhebron
+  input or output.
+- **steps:**
+  1. Write `output/sr1d/hold_off.yaml` containing only
+     `player_off_court_hold_frames: 100000`. Confirm from `Config.load` that it
+     MERGES over the defaults (other keys unchanged); if it replaces them, STOP.
+  2. For N in 1..7: `venv/bin/python -m src.main resources/video_entreno_N.mp4 --output-dir output/sr1d/hold_off/entreno_N --config output/sr1d/hold_off.yaml --device mps --skip-visualization --diag-dump output/sr1d/hold_off/entreno_N_diag.jsonl`.
+     Baseline arm = the existing `output/sr1/entreno_N/` (MPS, produced at
+     `006e343`). If `git diff --stat 006e343 HEAD -- src/` is NOT empty, re-run
+     the baseline too (same command without `--config`) into
+     `output/sr1d/base/entreno_N`.
+  3. For both arms, all 7 clips:
+     `venv/bin/python scripts/evaluate.py --predictions <arm dir>/entreno_N --ground-truth ground_truth/video_entreno_N_annotations.json --component actions --ignore-player`.
+     Record F1 / precision / recall per clip. If the baseline differs from the
+     STATUS entreno gate record, report both and continue (the arms are compared
+     with each other, not with the record).
+  4. e2 bystander check: from both diag dumps, the frames the right-side
+     sideline-straddling track (foot x ≈ 1550-1700, foot y ≈ 700-720 at f0-f40)
+     stays fed. Report the count per arm.
+  5. Full match, counterfactual arm only (~35 min):
+     `venv/bin/python -m src.main resources/full_videos/20260920_match_ari_joan_lost_up1080.mp4 --output-dir output/sr1d/hold_off/match --config output/sr1d/hold_off.yaml --device mps --skip-visualization --serve-events`,
+     then report near/far serve hits and the total action count with a short
+     one-off script under `output/sr1d/` that imports `scripts/score_serves.py`
+     (`serve_rows_from_contact_gt`, `production_candidates`, `match_candidates`;
+     never re-implement the matching). `score_serves.py` has no pipeline-path
+     flag; do not add one. Baseline arm = `output/20260920_match_ari_joan_lost/`.
+- **pre-registered reading (descriptive, nothing ships):**
+  - `global lift is SAFE-LOOKING` = every entreno F1 within ±0.01 of baseline AND
+    the e2 bystander is not fed longer than in baseline.
+  - otherwise `global lift REFUTED` → the serve-zone exemption needs design
+    (architect / owner), which is the expected outcome.
+- **deliverables:** `docs/sr1d_hold_horizon_cost.md` (per-clip table both arms,
+  e2 bystander counts, match serve hits near/far + total action count both arms).
+- **STATUS edits when done:** card status → `DONE (#<session>): <reading> — <numbers>`;
+  open point 30 SR1d line; Learnings line; Session index line; Log entry (archive
+  the oldest verbatim). Do NOT write a new card. Commit ONLY the doc + STATUS (+
+  the archive) in one commit: `#<session>: SR1d DONE - <reading>`. `output/` is
+  git-ignored; never force-add it.
+- **stop and ask if:** the config does not merge; any run crashes; the baseline
+  artifacts are older than the current `src/`.
+- **est. cost:** ~15 min entreno + ~35 min match.
+
+### CARD D4 — owner gate (not executable by a worker)
+- **status:** BLOCKED (needs SR1c and SR1d DONE, then the owner)
+- The planner presents SR1c/SR1d to the owner and asks: A/B M-a in `src/`? design
+  M-b (serve-zone exemption)? A cheap executor that reaches this card STOPS.
 
 ## Open points
 
@@ -217,13 +366,14 @@ point number in `docs/history/`.
 
 30. **Serve reliability, BOTH sides (new, #55; supersedes point 22's
     far-only framing).**
-    - **Status:** PLANNED (`docs/serve_reliability_plan.md`); **SR0 DONE #56**
-      (`scripts/score_serves.py` + `docs/sr0_serve_scorer.md`, +33 tests, gate
-      PASS, no `src/` change, no decode).
+    - **Status:** IN PROGRESS (`docs/serve_reliability_plan.md`). SR0 DONE #56,
+      SR1 DONE #57, **SR1b (review) DONE #58**, SR3 owner half DONE #58. Next =
+      task cards SR1c / SR1d (section *Next task cards*).
     - **Problem:** production serve recall is 8/33 (near 8/16, far 0/17) and
       precision 0.40. The far evidence layer is 13/17 covered (**in-sample**),
-      4/12 held-out binding. The near side has no plan. Audio and the beach
-      serving rules are unused.
+      4/12 held-out binding. The near side's losses are now MEASURED (#58): contact-frame
+      foot for `behind_baseline` (P9-P12), the 90 f off-court hold (P5/P7), e2
+      server never tracked, e5 no ball. Audio and the beach serving rules are unused.
     - **Acceptance** (on a session NOT used for design, ±15 f): recall ≥0.90 on
       each side, side/squad ≥0.95, ≤0.1 false records per point, server identity
       ≥0.90 after SR5. If SR4 is below 0.75 on either side held-out, stop hand
@@ -246,23 +396,34 @@ point number in `docs/history/`.
         contact, 5/6; the 6th is a `rally_start` cascade from our own early serve
         emission at P33). `no_contact` splits P5/P7 (stage 4 **reach gate**,
         448/204 px vs 140) and e5 (stage 3, `no_ball_sighting` x15/31f).
-        **Next (SR4 design input):** a side + rally-opening test that does not
-        depend on the emitted label. Open sub-question: was the server detected
-        but untracked at P5/P7 (one prefix pass with `--serve-events` answers it).
-      - [ ] **SR2** `scripts/probe_audio_onsets.py`, diagnose-only, PTS-mapped.
+        **[#58: superseded by SR1b]** the "one mechanism / not a tracking problem"
+        reading and the "label-free SR4 test" next step are withdrawn.
+      - [x] **SR1b** review, diagnose-only (`docs/sr1b_near_serve_causes.md`,
+        worker report `docs/sr1b_worker_report.md`; match [0,15000] pass, parity
+        111/111, + hold-off counterfactual [0,8000]): P9-P12 = contact-frame foot
+        0.8-24.5 px inside the threshold (server tracked); P5/P7 = server track
+        coasts from exactly 91 f after its last in-court sighting (hold = 90);
+        lifting the hold makes P7 a hit, P5 a `dig` (rally_start killed by a
+        handling 78 f earlier). `NEAR_NET_PX = 120` covers ~80% of the beach near half.
+      - [ ] **SR1c** (card) takeoff-stance `behind_baseline` measured over diag dumps.
+      - [ ] **SR1d** (card) cost of lifting the hold horizon on entreno + full match.
+      - [ ] **SR2** (DEMOTED #58: timing is not the bottleneck) `scripts/probe_audio_onsets.py`, diagnose-only, PTS-mapped.
         Kills: K1 onset at <70% of serves on either side; K2 dead-time-onset
         proposer precision <0.8 on dev; K3 far onset rate more than 15 pts below
         near.
-      - [ ] **SR3 (OWNER)** serve-only GT (`mm:ss.s near|far server outcome`) on
-        vall_dhebron only (05-05-2025 dropped by the owner). Every serve,
-        both sides. Worker: run both videos with `--serve-events`.
+      - [~] **SR3** owner half DONE (#58 committed
+        `ground_truth/20290928_entreno_vall_dhebron_serve_anchors.json`, schema
+        `serve-anchors-v1`, 19 serves: 8 near / 11 far, `ace` f10981, `net` f2095).
+        **Held-out lock:** never run / scored until rules are frozen. Worker half:
+        teach `score_serves.py` the `serve-anchors-v1` format, then one run with
+        `--serve-events`, scored once. Owner question: is it game play under beach
+        serving rules (SR5 assumes it)?
       - [ ] **SR4** per-point serve record (`output/serve_records.json`): opener
         gate, then a side vote (runway / behind-baseline / width trend / first
         receiver side / structural arm), then the time (audio if SR2 survives;
         **on the far side the rally onset already gives the time at |offset| 3 f**
-        -- SR0). **SR1 says the near side needs a rally-opening + side test that
-        does not read the emitted label** (5 of 6 near misses are `behind_baseline`
-        false at a contact that is already in the stream). Optional toss/pose
+        -- SR0). Near side: consume the production near label once M-a / M-b land
+        (#58 SR1b; the label-free test is withdrawn). Optional toss/pose
         check for the pre-serve-handling FPs (8 of the 12 measured). Promotion =
         INSERT a serve into `actions_pass2`/DB after acceptance on ≥2 sessions,
         never relabel.
@@ -283,7 +444,10 @@ point number in `docs/history/`.
         "every serve in vall_dhebron, both sides".
       - **D3: APPROVED.** The post-hoc per-point serve record (SR4 evidence for
         when and which side, plus SR5 beach-rules decoding for who served) is THE
-        serve product. The causal far-serve contact chase stops.
+        serve product. The causal far-serve contact chase stops. (#58: near-side
+        perception fixes M-a/M-b are NOT the far chase and are compatible with D3.)
+      - **D4: PENDING (after SR1c + SR1d).** Approve a `src/` A/B of M-a (takeoff
+        stance) and/or the design of M-b (serve-zone exemption from the hold).
 
 22. **Far-side serves** — **[#55: SUPERSEDED by point 30. The far-serve contact chase is STOPPED, and its runway/structural evidence is reused as SR4 inputs. The '14/17 at zero FP' figure is IN-SAMPLE (swept on all 17); the held-out binding is 4/12.]** **[#53 SOLVED AS EVIDENCE: 14/17 at ZERO false
     positives, from 0/17.]** Status: the mechanism is MEASURED and the owner
@@ -1066,12 +1230,20 @@ survive across sessions; provenance in the archives.
 - **The near serves production emits are all within ±2 f of the owner frame** (8/8, median 1 f), so the 8 missing near match serves are missing EMISSIONS (proposal / label / gate), not late ones — SR1 should look at the emit path, not at timing (session 56).
 - **The shipped far-serve evidence covers 13/17 far serves, not 14.** 14 records land within ±15 f of a serve of any side, but the 14th is on a NEAR serve (P12 f7777, record f7762); 14/17 was a sweep figure on the recording, and the consumer's precision as a claim is 0.47 (19 bound records, 9 on their own serve) — the zero-FP claim was measured against mid-rally controls and owner FALSE/OFFGAME moments, which is a different and still true number (session 56).
 - **A pipeline artifact in `output/` can be silently stale.** The seven `output/video_entreno_*/pipeline_output.json` files date from 2026-09-04/06 (commits `239490c`/`8150694`), i.e. before the v3 ball detector (09-26) and the pose gates (09-27); they read as 3/5 serves where the plan quotes 4/5 from a run whose artifacts are gone. `score_serves.py` prints each stream's `processed_at` + commit and now prefers a fresh run, for exactly this reason (sessions 56-57). On fresh runs the practice serves are **3/5** (e3 +0, e6 +1, e7 +0; e2 f32 and e5 f20 missed) — the same count as the stale artifacts but a DIFFERENT set of hits, so the coincidence is not evidence the old numbers were right.
-- **The near-side serve loss is the LABEL, and one condition of it.** `ActionContextResolver._decide` emits SERVE only when `behind_baseline AND rally_start`; otherwise a bump gesture becomes DIG and an attack gesture SPIKE. Across 10 missed near serves (match 8 + practice 2), 5 fail on `behind_baseline` with `rally_start` certainly true (gaps of 204-478 f) — the contact is detected, attributed and opens the rally, it is simply not judged behind the baseline, and e2's diag dump measures `behind_baseline: false` on that exact contact. The 6th (P33) is a **cascade**: our own serve emitted 25 f early suppresses `rally_start` 16 f later, so the real serve is read as a dig (session 57).
-- **A serve contact can die at the REACH GATE with the server nowhere near the contact point.** P5 f2575 (candidate rejected: ball-to-box 448.3 px vs reach 140) and P7 f3747 (204.0 vs 140): the ball is tracked, the geometry fires, and all four tracked boxes are elsewhere on court — the same reach-gate family as open point 7, now measured for the serve. The dump carries only TRACKED players, so "detected but untracked" needs one pass with `--serve-events` to answer; tracker admission is a refuted lever (T5) and must not be assumed (session 57).
+- **[#58 CORRECTED — see the SR1b lines below; 4 of the 5 `behind_baseline` verdicts here were INFERRED, and the cause is the contact-frame foot, not the gesture]** **The near-side serve loss is the LABEL, and one condition of it.** `ActionContextResolver._decide` emits SERVE only when `behind_baseline AND rally_start`; otherwise a bump gesture becomes DIG and an attack gesture SPIKE. Across 10 missed near serves (match 8 + practice 2), 5 fail on `behind_baseline` with `rally_start` certainly true (gaps of 204-478 f) — the contact is detected, attributed and opens the rally, it is simply not judged behind the baseline, and e2's diag dump measures `behind_baseline: false` on that exact contact. The 6th (P33) is a **cascade**: our own serve emitted 25 f early suppresses `rally_start` 16 f later, so the real serve is read as a dig (session 57).
+- **[#58 ANSWERED: the server's track is COASTING under the 90 f hold horizon, see below]** **A serve contact can die at the REACH GATE with the server nowhere near the contact point.** P5 f2575 (candidate rejected: ball-to-box 448.3 px vs reach 140) and P7 f3747 (204.0 vs 140): the ball is tracked, the geometry fires, and all four tracked boxes are elsewhere on court — the same reach-gate family as open point 7, now measured for the serve. The dump carries only TRACKED players, so "detected but untracked" needs one pass with `--serve-events` to answer; tracker admission is a refuted lever (T5) and must not be assumed (session 57).
 - **"No diagnostic records in the window" is NOT "no detection in the window".** A prefix diag dump covers a span and the T4 waterfall reports both as stage 1; scoring match rows past the prefix produced six phantom `1_raw_detection` stages before `diag_stage` learned to check the dump's coverage (session 57).
 - **A SEQUENTIAL prefix pass is production-faithful when it reproduces the shipped actions**: match [0,4000] on MPS reproduced 23/23 `(frame, action, team)` triples of the committed artifact, which is the gate that makes its diag dump usable (session 57).
 
+- **`behind_baseline` is read on the CONTACT-frame foot, which is airborne/landing at a serve** (#58, `docs/sr1b_near_serve_causes.md`). Match P9-P12: toucher foot 736.5-760.2 vs the 761 px threshold (team A, `max(near corner y) - 30`), past it 7 f later; near hits sit at 809-835. Same physics as SpikeAnalyzer's takeoff-stance fix for `attack_zone`.
+- **`player_off_court_hold_frames = 90` loses the near server during match dead time** (#58). P5/P7: the server's track goes `predicted` exactly 91 f after its last in-court sighting and coasts frozen (0.0/0.3 px) through the serve; dwell behind the baseline was 174/120 f. The horizon's "real players max out at 46f (e6)" comes from 1-point drill clips; match servers wait 120-324 f. Lifting it (config) turned P7 into a hit on [0,8000] with one non-GT label change.
+- **Dead-time handlings cost serve RECALL, not only precision** (#58): a pre-serve handling contact emitted <90 f before the serve kills `rally_start` (P5 under the counterfactual at 78 f; P33 at 16 f).
+- **`NEAR_NET_PX = 120` is venue-coupled**: the beach match near half is ~147 px deep, so `near_net` is true over ~80% of it, including the P9-P12 serve contacts (#58).
+- **"The ball was tracked" is not "the player was tracked"**: SR1's "not a tracking problem" checked the ball only. Check the attributed player's track (`predicted`, foot, track id) in the diag dump before calling a miss a label problem (#58).
+- **A cause in a headline must be MEASURED.** If a verdict is reached by elimination (e.g. from `_decide`'s logic), write "inferred" next to it; SR1's `behind_baseline_measured: null` rows were reported as the mechanism and a review session was needed to measure it (#58).
+
 ## Session index (one line each)
+- #58 SR1b review: SR0/SR1 checked by a worker pass over match [0,15000] (parity 111/111) + a hold-off counterfactual; the near serve has three measured causes (contact-frame foot P9-P12, 90 f off-court hold P5/P7, e2 server untracked), SR2 demoted, vall_dhebron serve GT committed under a held-out lock, task cards SR1c/SR1d/D4 + `/next-task` prompt + `task-card` skill added (`docs/sr1b_near_serve_causes.md`).
 - #57 SR1 DONE: the near-serve miss taxonomy (`scripts/probe_near_serve_misses.py` + `docs/sr1_near_serve_misses.md`, +21 tests; fresh production runs of all 7 entreno clips + a parity-checked match prefix dump): 10 misses = 6 `label` (5 = `behind_baseline` false at a rally-opening contact, 1 = `rally_start` cascade from our own early serve) / 3 `no_contact` (P5/P7 reach gate, e5 no ball sighting) / 1 `other_side_contact`. Near recall 11/21; practice 3/5, not 4/5.
 - #56 SR0 DONE: one serve scorer for every stream and side (`scripts/score_serves.py` + `docs/sr0_serve_scorer.md`, +33 tests, gate PASS): baseline reproduced (near 8/16, far 0/17, 12 FP), the record corrected (13/17 far covered not 14; evidence precision 0.47 not 1.00), and three SR4-steering findings (rally onset times 11/17 far at |offset| 3 f; near hits all within ±2 f so the misses are missing emissions; 8 of 12 FPs are dead-time handlings). Entreno artifacts found stale.
 - #55 planning only: serve-reliability plan SR0-SR7 (`docs/serve_reliability_plan.md`, open point 30). Honest baseline near 8/16 / far 0/17 / 12 FP. The far-serve track is declared a proxy fit on one match. Audio and beach-rule decoding are proposed. STATUS lean-trimmed (header chain, Where we are, Log #50-#52 archived verbatim).
@@ -1170,6 +1342,47 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+
+### 2026-10-02 (fifty-eighth session) — SR1b: SR0/SR1 reviewed; the near serve has three measured causes; task cards for cheap executors
+
+**Asked:** review the serve plan plus SR0/SR1 ("are we going in the right
+direction?"), explore through the cheap-model runner; then write it up, correct
+STATUS, commit the vall_dhebron GT, and create a prompt + skill so that smaller
+LLMs pick up the next STATUS task without inferring work.
+
+**Verdict on direction:** the strategy holds (D3 per-point record, one scorer,
+held-out discipline, far stop list). SR1's cause analysis did not: 4 of its 5
+`behind_baseline` verdicts were inferred (`behind_baseline_measured: null`), and
+"not a tracking problem" checked the ball only.
+
+**Measured (worker, read-only; `docs/sr1b_worker_report.md`):** one sequential
+production pass over the match [0, 15000] with `--diag-dump` (MPS, parity
+**111/111**), the SR1 entreno dumps, and a config-only counterfactual [0, 8000]
+with `player_off_court_hold_frames = 100000`:
+- P9-P12: server track FED, contact emitted, `rally_start` true;
+  `behind_baseline` false because the toucher's CONTACT-frame foot is 0.8-24.5 px
+  inside 761 px (6-12 px past it 7 f later). Hits P3/P16-P20 at 809-835.
+- P5/P7: the server track goes `predicted` exactly 91 f after its last in-court
+  sighting (hold = 90) and coasts frozen through the serve → reach gate.
+  Counterfactual: P7 hit; P5 → `dig` (rally_start killed by a handling 78 f
+  earlier); P9-P12 identical to the decimal; 53 → 55 actions, one non-GT flip.
+- e2: server never tracked (sideline bystander in the 4th slot). e5: ball.
+- Far P1-P20: far server track FED at 7/8, ball track `none` at 7/8.
+
+**Written:** `docs/sr1b_near_serve_causes.md` (review), `docs/sr1b_worker_report.md`
+(verbatim worker report), correction banner on `docs/sr1_near_serve_misses.md`;
+STATUS: header, *Where we are* (cause table, held-out lock, SR2 demoted), new
+**Next task cards** section (SR1c, SR1d READY; D4 owner gate), open point 30
+(SR1b/SR1c/SR1d, SR3, D4), Learnings (+6, 2 SR1 lines flagged), session index;
+Log #55 moved verbatim to `docs/history/status_log_archive.md` and header #55 to
+`docs/history/status_where_we_are_archive.md`. Committed
+`ground_truth/20290928_entreno_vall_dhebron_serve_anchors.json` (owner SR3, 19
+serves). Harness: `.pi/prompts/next-task.md` (executor contract) and
+`.pi/skills/task-card/SKILL.md` (how planners write cards); AGENTS.md §10.
+
+**Nothing in `src/` changed.** Suite unchanged (1091).
+
+**Next:** card SR1c, then SR1d (one decode at a time), then owner gate D4.
 
 ### 2026-10-02 (fifty-seventh session) — SR1 DONE: the near serve is lost at the LABEL, and 5 of 6 misses are one condition
 
@@ -1311,47 +1524,3 @@ short clips is queued with the SR3 worker half.
 
 **Next:** SR1 (near-serve miss taxonomy) or SR2 (audio onsets), one mechanism per
 session. Owner: SR3 on vall_dhebron.
-
-### 2026-10-02 (fifty-fifth session): serve-reliability plan; the far-serve track is a proxy (planning only)
-
-**Asked:** "So far what we have tried to see if we can get serves reliably has
-failed… come up with a plan to make serve be detected reliably… if you think we
-are going in the wrong direction also state it explicitly." Low-credit session.
-Only AGENTS.md and STATUS.md were read directly. One read-only fact probe ran in a
-sub-agent (no decode, no repo change).
-
-**Facts the probe established:**
-- Every video has real audio, and nothing uses it.
-- Production serves at contact level: near 8/16, far 0/17, 12 FP.
-- `docs/g3_heldout_p9_p33.md`'s near 11/13 is production OR pass-2. Production
-  alone is 7/13.
-- Entreno near serves: 4/5.
-- The serve-evidence consumer is far-only by design.
-- Far server bboxes are 90-160 px, and pose already runs on them. No serve branch
-  uses pose.
-- Unlabeled footage: vall_dhebron (695 s, calibrated, never run) and a 55-min
-  05-05-2025 session that includes matches (uncalibrated).
-
-**Verdict, stated explicitly: yes, the direction was wrong in five ways.**
-1. We chased a proxy: a ±15 f far contact in the causal action stream, instead of
-   a per-point serve record.
-2. We fit everything on the 17 far serves of one match. The 14/17 is in-sample;
-   held-out binding is 4/12.
-3. The near side, the easy one, is a coin flip and has no plan.
-4. Audio and the beach serving rules were never used.
-5. The headlines over-claimed ("SOLVED AS EVIDENCE").
-
-What stays right: the §6 causal/post-hoc split, the opener gate, the structural
-and runway evidence as proposals, and evidence-not-labels until validated.
-
-**Plan:** `docs/serve_reliability_plan.md`, tasks SR0-SR7 with pre-registered
-kills and acceptance criteria. They are tracked as open point **30**, which
-supersedes 22's framing.
-
-**Housekeeping:** STATUS was 1885 lines against the lean convention. The #48-#54
-header chain and the #54 "Where we are" block moved verbatim to
-`docs/history/status_where_we_are_archive.md`. Log #50-#52 moved verbatim to
-`docs/history/status_log_archive.md`. Nothing was deleted.
-
-**Next:** SR0 (worker). In parallel, the owner does SR3 (serve-only GT on two new
-sessions) and answers D3.

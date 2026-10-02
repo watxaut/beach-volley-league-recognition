@@ -283,3 +283,15 @@ score read 6/17 when it was really 11/17 with -9 f offsets.
   before blaming the tracker or the resolution: the "0-1 tracked frames" figures
   in the far-serve docs are tracker counts, and the detector sees the far ball
   in 14-31 of 31 frames at every GT far serve except one.
+
+### 10. Task cards for cheaper executors (owner-stated 2026-10-02)
+
+Work handed to a smaller / cheaper model goes through an **executable task card**
+in STATUS.md's `## Next task cards` section, never through a free-form "next
+step" line. Planning sessions write cards with the `task-card` skill
+(`.pi/skills/task-card/SKILL.md`: literal commands, grepped names, a gate before
+any result, a pre-registered PASS/FAIL rule, explicit scope fences, the exact
+STATUS edits on completion). Executors run one card via `/next-task`
+(`.pi/prompts/next-task.md`) and STOP on any ambiguity, failed gate, or missing
+name instead of inferring. An executor never writes, edits or reorders cards,
+and never crosses an owner-gate card.

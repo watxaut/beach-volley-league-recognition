@@ -1,5 +1,12 @@
 # SR1 — the near-serve miss taxonomy (session 57, 2026-10-02)
 
+> **[#58 CORRECTION]** The bucket counts below stand, but two conclusions do not:
+> "not a tracking problem" is false for P5/P7 (the server's PLAYER track coasts
+> under the 90 f off-court hold horizon) and e2 (server never tracked), and the
+> `behind_baseline` story for P9-P12 was inferred, not measured — the measured
+> cause is the toucher's CONTACT-frame foot 0.8-24.5 px inside the threshold.
+> See `docs/sr1b_near_serve_causes.md`.
+
 `scripts/probe_near_serve_misses.py` (+21 tests,
 `tests/test_near_serve_misses.py`). Task **SR1** of
 `docs/serve_reliability_plan.md`, tracked as open point **30**. Diagnose-only:

@@ -3062,3 +3062,47 @@ Suite **1036**.
 the 19/33 points that already carry a record. The label bucket (`overpass` 0/18)
 is still the largest held-out perception loss, and the owner-GT-annotator seek
 that `tests/test_vfr_seek_guard.py` flagged still wants a sequential-cursor fix.
+
+### 2026-10-02 (fifty-fifth session): serve-reliability plan; the far-serve track is a proxy (planning only)
+
+**Asked:** "So far what we have tried to see if we can get serves reliably has
+failed… come up with a plan to make serve be detected reliably… if you think we
+are going in the wrong direction also state it explicitly." Low-credit session.
+Only AGENTS.md and STATUS.md were read directly. One read-only fact probe ran in a
+sub-agent (no decode, no repo change).
+
+**Facts the probe established:**
+- Every video has real audio, and nothing uses it.
+- Production serves at contact level: near 8/16, far 0/17, 12 FP.
+- `docs/g3_heldout_p9_p33.md`'s near 11/13 is production OR pass-2. Production
+  alone is 7/13.
+- Entreno near serves: 4/5.
+- The serve-evidence consumer is far-only by design.
+- Far server bboxes are 90-160 px, and pose already runs on them. No serve branch
+  uses pose.
+- Unlabeled footage: vall_dhebron (695 s, calibrated, never run) and a 55-min
+  05-05-2025 session that includes matches (uncalibrated).
+
+**Verdict, stated explicitly: yes, the direction was wrong in five ways.**
+1. We chased a proxy: a ±15 f far contact in the causal action stream, instead of
+   a per-point serve record.
+2. We fit everything on the 17 far serves of one match. The 14/17 is in-sample;
+   held-out binding is 4/12.
+3. The near side, the easy one, is a coin flip and has no plan.
+4. Audio and the beach serving rules were never used.
+5. The headlines over-claimed ("SOLVED AS EVIDENCE").
+
+What stays right: the §6 causal/post-hoc split, the opener gate, the structural
+and runway evidence as proposals, and evidence-not-labels until validated.
+
+**Plan:** `docs/serve_reliability_plan.md`, tasks SR0-SR7 with pre-registered
+kills and acceptance criteria. They are tracked as open point **30**, which
+supersedes 22's framing.
+
+**Housekeeping:** STATUS was 1885 lines against the lean convention. The #48-#54
+header chain and the #54 "Where we are" block moved verbatim to
+`docs/history/status_where_we_are_archive.md`. Log #50-#52 moved verbatim to
+`docs/history/status_log_archive.md`. Nothing was deleted.
+
+**Next:** SR0 (worker). In parallel, the owner does SR3 (serve-only GT on two new
+sessions) and answers D3.
