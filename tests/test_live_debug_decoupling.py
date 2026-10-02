@@ -61,6 +61,8 @@ class StubFrameProcessor:
         self.reset_calls = 0
         self.setup_fps_calls = []
         self.setup_dim_calls = []
+        # No action_classifier / diag: the panel's guarded reads must degrade
+        # to "-" instead of raising on a component that lacks them.
 
     def process_frame(self, frame, idx, enable_court_redetection=True):
         self.process_calls.append(idx)
@@ -131,7 +133,7 @@ class RecordingWriter:
         self.released = True
 
 
-def make_processor(n=N_FRAMES):
+def make_processor(n=N_FRAMES, panel=False):
     """A LiveDebugProcessor skeleton without the heavy __init__ (parity: the
     real __init__ only wires FrameProcessor/court detector, which the stubs
     replace)."""
@@ -142,6 +144,12 @@ def make_processor(n=N_FRAMES):
     proc.frame_processor = StubFrameProcessor()
     proc.court_detector = StubCourtDetector()
     proc._spike_log_state = []
+    # Signal panel state the live path owns (tests exercise it separately).
+    proc._panel_enabled = panel
+    proc._event_plan = lldp.debug_panel.EventPlan()
+    proc._probe_mirror = False
+    proc._last_ball = None
+    proc._last_ball_pt = None
     cap = StubCap(n)
     return proc, cap
 
@@ -152,6 +160,8 @@ def guiless(monkeypatch):
     monkeypatch.setattr(lldp.cv2, "imshow", lambda *a, **k: None)
     monkeypatch.setattr(lldp.cv2, "waitKey", lambda *a, **k: -1)
     monkeypatch.setattr(lldp.cv2, "destroyAllWindows", lambda *a, **k: None)
+    monkeypatch.setattr(lldp.cv2, "namedWindow", lambda *a, **k: None)
+    monkeypatch.setattr(lldp.cv2, "resizeWindow", lambda *a, **k: None)
     RecordingWriter.instances = []
     monkeypatch.setattr(lldp.cv2, "VideoWriter", RecordingWriter)
     return None
@@ -325,6 +335,70 @@ class TestConsumerLoop:
                             lambda self, f, i, *a, **k: shown.append(i) or f)
         proc._process_buffered_live("fake.mp4")
         assert shown == list(range(20))
+
+    def test_panel_is_display_only(self, guiless, monkeypatch):
+        """The side panel widens the window but never the saved video, and it
+        does not touch the processing path (the producer call sequence is the
+        same as with the panel off)."""
+        proc, cap = make_processor(panel=True)
+        patch_open(monkeypatch, cap)
+        displayed = []
+        monkeypatch.setattr(lldp.cv2, "imshow",
+                            lambda _n, img: displayed.append(img.shape))
+        monkeypatch.setattr(lldp.LiveDebugProcessor, "_draw_overlay",
+                            lambda self, f, i, *a, **k: f)
+        proc._process_buffered_live("fake.mp4", save_video="fake_out.mp4")
+        writer = RecordingWriter.instances[-1]
+        w, h = 64, 48
+        assert all(f.shape == (h, w, 3) for f in writer.frames)      # unpanelled
+        assert all(s == (h, w + lldp.debug_panel.PANEL_WIDTH, 3) for s in displayed)
+        assert proc.frame_processor.process_calls == list(range(cap.n))
+
+    def test_panel_toggle_key_p(self, guiless, monkeypatch):
+        """'p' flips the panel; the run continues and the flag persists."""
+        proc, cap = make_processor(panel=True)
+        patch_open(monkeypatch, cap)
+        shapes = []
+        state = {"shown": 0}
+
+        def show(_n, img):
+            shapes.append(img.shape[1])
+            state["shown"] += 1
+
+        def key_once(*a, **k):
+            if state["shown"] >= 2 and not state.get("sent"):
+                state["sent"] = True
+                return ord('p')
+            return -1
+
+        monkeypatch.setattr(lldp.cv2, "imshow", show)
+        monkeypatch.setattr(lldp.cv2, "waitKey", key_once)
+        monkeypatch.setattr(lldp.LiveDebugProcessor, "_draw_overlay",
+                            lambda self, f, i, *a, **k: f)
+        proc._process_buffered_live("fake.mp4")
+        assert proc._panel_enabled is False
+        assert 64 in shapes and 64 + lldp.debug_panel.PANEL_WIDTH in shapes
+
+    def test_panel_toggle_survives_restart(self, guiless, monkeypatch):
+        proc, cap = make_processor(panel=False)
+        patch_open(monkeypatch, cap)
+        state = {"shown": 0, "restarted": 0}
+
+        def key(*a, **k):
+            state["shown"] += 1
+            if state["shown"] == 1:
+                return ord('p')
+            if state["shown"] == 2:
+                state["restarted"] = 1
+                return ord('r')
+            return -1
+
+        monkeypatch.setattr(lldp.cv2, "waitKey", key)
+        monkeypatch.setattr(lldp.LiveDebugProcessor, "_draw_overlay",
+                            lambda self, f, i, *a, **k: f)
+        proc._process_buffered_live("fake.mp4")
+        assert proc._panel_enabled is True      # the toggle is a session setting
+        assert proc.frame_processor.reset_calls == 1
 
 
 # --------------------------------------------------------------------- #

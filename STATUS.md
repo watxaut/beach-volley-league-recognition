@@ -17,7 +17,15 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-02 (fifty-eighth session, **SR1b: review of SR0/SR1 —
+**Last updated:** 2026-10-02 (fifty-ninth session, **live-debug HUD: readable
+frame counter + a signal/event side panel**, `src/analysis/debug_panel.py`,
+display-only, `p` toggles it). No pipeline behaviour changed. The panel mirrors
+what the frame already produced — ball pos/size/velocity, the classifier's own
+width-side verdict and staleness, per-player team/near-net/ball distance, the
+contact probe and the held-back contact — and an event log keyed on each
+action's TRUE contact frame, so a live frame shows what fired on it.
+
+**#58 (previous session):** 2026-10-02 (fifty-eighth session, **SR1b: review of SR0/SR1 —
 the near serve has three measured causes, not one**, `docs/sr1b_near_serve_causes.md`,
 open point **30**). Diagnose-only, no `src/` change. One sequential production pass
 over the match [0, 15000] (parity **111/111**) plus a config-only counterfactual
@@ -1242,8 +1250,11 @@ survive across sessions; provenance in the archives.
 - **`NEAR_NET_PX = 120` is venue-coupled**: the beach match near half is ~147 px deep, so `near_net` is true over ~80% of it, including the P9-P12 serve contacts (#58).
 - **"The ball was tracked" is not "the player was tracked"**: SR1's "not a tracking problem" checked the ball only. Check the attributed player's track (`predicted`, foot, track id) in the diag dump before calling a miss a label problem (#58).
 - **A cause in a headline must be MEASURED.** If a verdict is reached by elimination (e.g. from `_decide`'s logic), write "inferred" next to it; SR1's `behind_baseline_measured: null` rows were reported as the mechanism and a review session was needed to measure it (#58).
+- **A debugging HUD is a mirror, not a second classifier** (#59). The live-debug side panel is only trustworthy because every number in it is read out of a value the frame already produced — the width-side verdict from the classifier's own `_width_side`, `CONTACT_REACH`/`NEAR_NET_PX` from its class constants, the ball width at a contact from its `_ball_history`, the probe from its own `_diag` records (the same sink `--diag-dump` uses, skipped when a `DiagRecorder` owns them). Duplicating a threshold in the panel is how a HUD starts lying. Corollary: an event anchored on its TRUE contact frame only exists because the live render is ~3 s behind the producer — a panel cannot show, on a frame, something the pipeline had not yet decided at that frame.
+- **A HUD that blanks a signal when its producer drops it is useless exactly when it matters** (#59). The ball tracker returns None for ~12% of the frames in a 240-frame entreno window, and the panel's BALL block used to disappear with it. Holding the LAST sighting (pos / size / width-side read / speed / conf) answers the real question ("what was the last thing the pipeline saw, and how long ago?") instead of showing nothing — and the flag belongs ON the section header, not on an extra row, so the block keeps its layout and the eye does not have to re-find it. Same rule for any observer: hold the value, flag its age on the header, never silently substitute a blank (#59).
 
 ## Session index (one line each)
+- #59 live-debug HUD: the frame counter gets a solid black plate and +1 px, and a new display-only side panel (`src/analysis/debug_panel.py`, `p` toggles) shows the per-frame signals (ball px size + the classifier's own width-side read, staleness, player team/near-net/ball distance vs `CONTACT_REACH`, game badge, the contact probe with the refusing gate, the held-back look-ahead contact) and an event log keyed on each action's TRUE contact frame with the signals that produced it. Follow-up in the same session: panel text +3 px (scale 0.55, strip 600 px) and a **held ball readout** — a dropped track keeps the last pos/size/width with its age instead of blanking the block. Processing path untouched (producer sequence pinned), saved video unpanelled; verified on two real live runs of `video_entreno_3.mp4`; suite 1155.
 - #58 SR1b review: SR0/SR1 checked by a worker pass over match [0,15000] (parity 111/111) + a hold-off counterfactual; the near serve has three measured causes (contact-frame foot P9-P12, 90 f off-court hold P5/P7, e2 server untracked), SR2 demoted, vall_dhebron serve GT committed under a held-out lock, task cards SR1c/SR1d/D4 + `/next-task` prompt + `task-card` skill added (`docs/sr1b_near_serve_causes.md`).
 - #57 SR1 DONE: the near-serve miss taxonomy (`scripts/probe_near_serve_misses.py` + `docs/sr1_near_serve_misses.md`, +21 tests; fresh production runs of all 7 entreno clips + a parity-checked match prefix dump): 10 misses = 6 `label` (5 = `behind_baseline` false at a rally-opening contact, 1 = `rally_start` cascade from our own early serve) / 3 `no_contact` (P5/P7 reach gate, e5 no ball sighting) / 1 `other_side_contact`. Near recall 11/21; practice 3/5, not 4/5.
 - #56 SR0 DONE: one serve scorer for every stream and side (`scripts/score_serves.py` + `docs/sr0_serve_scorer.md`, +33 tests, gate PASS): baseline reproduced (near 8/16, far 0/17, 12 FP), the record corrected (13/17 far covered not 14; evidence precision 0.47 not 1.00), and three SR4-steering findings (rally onset times 11/17 far at |offset| 3 f; near hits all within ±2 f so the misses are missing emissions; 8 of 12 FPs are dead-time handlings). Entreno artifacts found stale.
@@ -1343,6 +1354,86 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+
+### 2026-10-02 (fifty-ninth session) — live debug: readable frame counter + a signal/event side panel
+
+**Asked** (two changes, both HUD-only): the frame counter is hard to read, and
+live debug needs a side panel showing which events fire on which frame and what
+the signals were (ball px width first), so "something is very wrong" is visible
+at plain sight.
+
+**1. Frame counter.** `overlay.draw_frame_counter` now paints a SOLID black
+plate (8 px padding, drawn first) instead of relying on a thin black text
+underlay, and the scale is 0.55 → **0.60** (+1 px cap height). Pinned by
+`tests/test_overlay_frame_counter.py` (plate black in all four corners/padding,
+frame outside untouched, and the scale delta so it cannot silently revert).
+Same helper the standalone action script draws with, so both entry points stay
+aligned.
+
+**2. Side panel** (`src/analysis/debug_panel.py`, display-only, `p` toggles it):
+a 600 px strip composited to the RIGHT of the annotated frame by the live
+consumer, built from a per-frame snapshot the PRODUCER takes right after
+`process_frame` (`LiveDebugProcessor._signals`), so the render thread never
+touches tracker/classifier state. Body text scale **0.55** (owner follow-up:
++3 px over 0.40), row height 20 px, rows clipped to the strip by MEASURED width
+so a dense signal row degrades to `~` instead of running off the edge. It
+prints, per frame:
+- **BALL** — pos, bbox size in px, the classifier's OWN width-side read
+  (`_width_side`: `A (near)` / `B (far)` / `-` abstain, with vote count), speed
+  px/f, detection confidence, real vs `PREDICTED`, frames since the last real
+  sighting. **A dropped track HOLDS the last sighting** (owner follow-up: the
+  block used to vanish and the row became unreadable mid-rally): pos / size /
+  width-side / speed / conf stay on screen, with the flag riding ON the section
+  header (`-- BALL -- NOT TRACKED (last f147, 8f ago)`, no extra row — the held
+  block has exactly as many rows as the tracked one) and `track HELD stale Nf`
+  on the track row, so the last known signal is visible while the tracker is
+  blind. Predicted coasting points still update it (flagged `PREDICTED`), player
+  distances keep measuring against the held point (dimmed + `[ball not tracked]`
+  on the section header), and the hold is cleared on restart;
+- **PLAYERS** — `P<id> team net/ghost` + point-to-BBOX distance to the ball,
+  coloured by whether it is inside `CONTACT_REACH` (the exact value the reach
+  gate used);
+- **GAME** — the on/off badge value + point count;
+- **CONTACT PROBE / LOOK-AHEAD** — what `_detect_contact` did at `t-7` this
+  frame (`found drive d=41px/140px`) or WHICH GATE refused it (`refused: reach`),
+  plus the contact the classifier is currently holding back for the one-contact
+  look-ahead;
+- **EVENTS** — every emitted action and every resolved spike outcome, keyed on
+  the action's **TRUE contact frame** (`EventPlan`, thread-safe, producer writes
+  / consumer reads) and marked `>>` on that frame. The second row carries the
+  signals that produced the label: `gesture/kind net= behind= bbl= src= w=<ball
+  px width at the contact>`.
+
+**Invariants kept.** No processing-path change: the producer runs the same
+call sequence (a test pins it), the panel only reads values the frame already
+produced (no duplicated thresholds — `CONTACT_REACH`/`NEAR_NET_PX` are read off
+the classifier class, the width verdict is its own method), and every read is
+guarded so a stubbed processor renders "-" instead of raising. The probe mirror
+reuses `ActionClassifier._diag` (the `diag_dump` writer's own inert record) and
+is **skipped when a `DiagRecorder` owns those records**, so live debug can never
+steal entries from a dump. Display only: `writer.write()` still gets the
+unpanelled frame, `--save-video` and the two-pass path are untouched, and the
+window asks for `WINDOW_NORMAL` (an autosized window wider than the screen
+clips its RIGHT edge, which is exactly where the panel lives).
+
+**Verified:** two real live runs of `video_entreno_3.mp4` with the actual
+pipeline (GUI patched, CPU). Run 1 (420 frames): 420/420 shown at 2350 px
+composed, events landing on their contact frames (f29 serve, f74 dig, f130 set,
+f177 spike with its `out → dug` resolution steps, f212 dig). Run 2 (240 frames,
+after the follow-up): **30 held frames / 14 never-seen** — e.g. at f155 the
+ball was last seen at f147 (pos 1164,11, 27x23 px, conf 0.21, i.e. gone off the
+top of the frame) and the panel kept all of it, flagged. Suite **1155** (+40
+total: `tests/test_debug_panel.py` 34, `tests/test_overlay_frame_counter.py` 5,
+3 panel/wiring cases in `tests/test_live_debug_decoupling.py`).
+
+**Note for the next session:** an event whose emission lag exceeds the 3 s
+display delay cannot appear on its contact frame (same limitation the player
+labels have); the measured lags stay inside it, but that is what to check if an
+event ever seems to be missing from the panel. The panel is drawn at 1:1 in the
+composed frame and OpenCV then scales that into the window (requested
+`min(composed, 1900)`), so the on-screen glyphs are ~0.75 of the composed size
+— the window is `WINDOW_NORMAL`, so dragging it bigger is a free legibility
+knob.
 
 ### 2026-10-02 (fifty-eighth session) — SR1b: SR0/SR1 reviewed; the near serve has three measured causes; task cards for cheap executors
 
@@ -1456,72 +1547,3 @@ extended; Log #54 moved VERBATIM to `docs/history/status_log_archive.md`. Suite
 a side + rally-opening test for the serve record that does not read the emitted
 label. One open sub-question, cheap to close: was the server detected but
 untracked at P5/P7 (one more prefix pass with `--serve-events`)?
-
-### 2026-10-02 (fifty-sixth session) — SR0 DONE: one serve scorer, and the record corrected
-
-**Asked:** "read agents, start with the next task" — the next task being SR0, the
-first task of the serve-reliability plan: one scorer, per side, dev vs held-out.
-Scorer only: no decode, no `src/` change, no label emitted (AGENTS.md §6).
-
-**Shipped.** `scripts/score_serves.py` (+33 tests, `tests/test_serve_scorer.py`),
-`docs/sr0_serve_scorer.md`, artifact `output/serves/sr0.json`. Sessions are
-declared, not discovered, so a stream can never be silently swapped; each stream
-declares what it SPEAKS (court side / squad / time only), whether it CLAIMS a
-serve per candidate, and whether it is point-bound. Five measurement rules, each
-of which prevented a wrong number from being printed:
-
-- one matching rule for everything (greedy one-to-one, nearest first, inside each
-  owner contact's own `frame_tolerance`), side-correct by default;
-- **side accuracy is scored on the POSITIONAL match** — under side-aware matching
-  it is tautologically 1.00;
-- **a proposal is not a claim**: the raw evidence records and the rally onset
-  report no precision at all ("74 false serves" and "precision 1.000" were both
-  one line away);
-- **coverage ≠ binding**: `point_bound` reproduces what a consumer claims, and it
-  is the whole 13-vs-9 gap;
-- **side ≠ squad**: pass-2's side read is the emitted letter, never its
-  winner-serves-derived squad (which is flagged GT-derived), and a squad is
-  compared through the switch parity imported from `resolve_side_switches`.
-
-**Gate PASSES** exactly as pre-registered: production near **8/16**, far **0/17**,
-12 false emissions. The script exits non-zero if those move.
-
-**The record, corrected twice.** The shipped far-serve evidence covers **13/17**
-far serves, not 14 — 14 records land within ±15 f of a serve of any side and the
-fourteenth is on a **near** serve (P12 f7777, record f7762); 14/17 was a sweep
-figure on the recording, not a property of the shipped artifact. And scored as the
-claim it is, the consumer's precision is **0.47** (19 bound records, 9 on their
-own serve), while its zero-FP property (1 FP on 24 mid-rally controls + 9 owner
-FALSE/OFFGAME moments) remains exactly as true as before. Both are printed.
-
-**Three findings that steer SR4.**
-1. **Far-side serve TIME is nearly free.** The `game_on` backdated burst start —
-   already computed, zero extra work — lands within ±15 f of **11/17** far
-   serves at median |offset| **3 f** (range −6…+6), against **3/16** near at 14 f
-   (all late). At ±120 f it covers 27/33. A far serve IS the rally onset; a near
-   serve is not, because the onset there belongs to the reception. So SR4's
-   proposal step must be **per side**: a side vote on a known time far side, a
-   real proposer near side.
-2. **The near misses are not timing.** Every near serve production emits is
-   within **±2 f** of the owner frame (8/8, median 1 f), so the 8 missing near
-   match serves are missing *emissions*. SR1 is unblocked and cheap.
-3. **The 12 false emissions are mostly dead time**: 8 handlings with no owner
-   contact within 80 f, 3 rally contacts with the wrong label (f3856 a `set`,
-   f8534 and f10070 `dig`s) and 1 serve 25 f late. The toss sub-probe in SR4 is
-   worth spending on the 8, not the 3.
-
-**A stale-artifact defect found while scoring the other sessions.** The seven
-`output/video_entreno_*/pipeline_output.json` files date from 2026-09-04/06
-(commits `239490c` / `8150694`) — before the v3 ball detector (09-26) and the pose
-gates (09-27) — so their 3/5 is not the current production number and the plan's
-4/5 came from a run whose artifacts are gone. The scorer prints each stream's
-`processed_at` + commit so this cannot be read as current; re-running the seven
-short clips is queued with the SR3 worker half.
-
-**Housekeeping:** STATUS's *Where we are* rewritten on the SR0 numbers; open point
-30's SR0 marked done with its findings folded into SR1/SR4; seven Learnings added
-(one per durable fact); session index extended; Log entry #53 moved VERBATIM to
-`docs/history/status_log_archive.md`. Suite **1069** (1036 + 33).
-
-**Next:** SR1 (near-serve miss taxonomy) or SR2 (audio onsets), one mechanism per
-session. Owner: SR3 on vall_dhebron.

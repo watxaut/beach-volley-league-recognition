@@ -171,19 +171,25 @@ def draw_player(
 
 
 def draw_frame_counter(frame, frame_idx: int, total: Optional[int] = None) -> None:
-    """Draw a small frame counter in the top-right corner (in place).
+    """Draw the frame counter on a black plate in the top-right corner (in place).
 
     Events are referenced by frame number throughout the project (GT
     annotations, STATUS.md, eval reports), so burning the number into each
-    rendered frame keeps live scrubbing cross-referenceable. White text over
-    a thin black underlay so it reads on bright sand and dark backgrounds
-    alike. ``total`` (frame count) is appended when known and non-zero.
+    rendered frame keeps live scrubbing cross-referenceable. The plate is a
+    solid black rectangle (drawn first, like the game-state badge) so the
+    number reads the same on blown-out sand, dark background and the live
+    debug panel's own strip -- the thin black text underlay alone was not
+    enough contrast over bright pixels at this size. Scale is 0.60 (was
+    0.55: +1 px cap height). ``total`` (frame count) is appended when known
+    and non-zero.
     """
     label = f"f{frame_idx}" if not total else f"f{frame_idx}/{total}"
-    (tw, _), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
-    org = (frame.shape[1] - tw - 12, 28)
-    cv2.putText(frame, label, org, cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 4)
-    cv2.putText(frame, label, org, cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
+    scale = 0.6
+    (tw, th), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
+    x, y = frame.shape[1] - tw - 12, 28          # y = text baseline
+    cv2.rectangle(frame, (x - 8, y - th - 8), (x + tw + 8, y + baseline), (0, 0, 0), -1)
+    cv2.putText(frame, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 0, 0), 4)
+    cv2.putText(frame, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, scale, (255, 255, 255), 1)
 
 
 def draw_game_state(frame, state: str, points: int = 0, provisional: bool = False) -> None:

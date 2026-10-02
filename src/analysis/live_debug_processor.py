@@ -32,6 +32,8 @@ import cv2
 import numpy as np
 
 from .frame_processor import FrameProcessor
+from ..recognition.action_classifier import ActionClassifier
+from . import debug_panel
 from src.output_gen import overlay
 
 # Overlay data cached per frame for the deferred render.
@@ -41,6 +43,10 @@ PlayerOverlay = List[Tuple[int, List[int]]]             # [(track_id, [x1,y1,x2,
 # Sentinel the producer thread queues after its final flush; tells the
 # consumer the source is exhausted and the label plan is final.
 _PRODUCER_DONE = object()
+
+# cv2 window name (shared by the live consumer loop and the panel's resizable
+# window setup).
+WINDOW_NAME = "Volleyball Analysis"
 
 
 class _ThreadSafeLabelPlan(overlay.LabelPlan):
@@ -102,6 +108,10 @@ class LiveDebugProcessor:
       a recent action for that player is on screen, anchored on its contact frame
     - A small frame counter, top-right (this processor only; the standalone
       action script does not draw one)
+    - ``--debug-live`` only: a signal/event side panel on the right (toggle
+      with ``p``), composited from data cached by the producer -- see
+      ``debug_panel``. Display-only: it never touches the saved video or the
+      processing path.
     """
 
     # Live display/write lag, in seconds. Must exceed the classifier's worst
@@ -125,6 +135,19 @@ class LiveDebugProcessor:
 
         # (contact_frame, outcome) already logged per resolved spike record.
         self._spike_log_state: List[Tuple[int, str]] = []
+
+        # --- signal/event side panel (--debug-live display only) ---
+        # ON by default in the live window; the saved video never carries it.
+        self._panel_enabled: bool = True
+        self._event_plan = debug_panel.EventPlan()
+        # The panel also mirrors the classifier's contact probe; enabled once
+        # the live path starts (skipped when a DiagRecorder owns those
+        # records). See _enable_probe_mirror.
+        self._probe_mirror: bool = False
+        # Last real ball sighting + its point, so the panel can hold the ball
+        # readout while the track is dropped instead of blanking it.
+        self._last_ball: Optional[Dict[str, Any]] = None
+        self._last_ball_pt: Optional[Tuple[float, float]] = None
 
         # Court calibration, used to draw the court boundary each frame.
         self.court_detector = self.frame_processor.get_court_detector()
@@ -169,11 +192,14 @@ class LiveDebugProcessor:
                 plan.add(rec["track_id"], rec["frame"], f"spike {rec['spike_type']}")
 
     def _ingest_actions(self, actions: List[Dict[str, Any]], plan: overlay.LabelPlan) -> None:
-        """Feed emitted actions into the label plan at their true contact frame."""
+        """Feed emitted actions into the label plan at their true contact frame.
+
+        Also mirrors each action into the panel's event plan, keyed the same
+        way (its true contact frame), so the panel shows the event on the frame
+        the contact happened instead of the frame the look-ahead released it.
+        """
         for action in actions:
             tid = action.get("track_id")
-            if tid is None:
-                continue
             name = action.get("action", "?")
             if name == "spike":
                 # Typed spike label ("spike hard"/"spike touch") when the
@@ -183,6 +209,12 @@ class LiveDebugProcessor:
                 )
                 if stype in ("hard", "touch"):
                     name = f"spike {stype}"
+            # The panel wants EVERY action (it is keyed on the contact frame,
+            # not a track), so it is recorded before the track-id guard that
+            # the label plan and the log below have always had.
+            self._record_action_event(action, name)
+            if tid is None:
+                continue
             plan.add(tid, action.get("frame_number"), name,
                      action.get("confidence", 0.0))
             detail = ""
@@ -198,6 +230,226 @@ class LiveDebugProcessor:
                 action.get("action"), action.get("confidence", 0.0), detail,
             )
 
+    # --- signal/event panel data -------------------------------------------
+
+    def _record_action_event(self, action: Dict[str, Any], label: str) -> None:
+        """Mirror one emitted action into the panel's contact-frame event log.
+
+        The second row carries the signals that produced the label -- gesture,
+        contact kind, court context and the attribution evidence (ball side +
+        source) -- plus the ball's pixel width AT THE CONTACT, looked up in the
+        classifier's ball history (the width-side signal the classifier itself
+        reads). That is the row to read when a label looks wrong.
+        """
+        cf = action.get("frame_number")
+        conf = action.get("confidence")
+        conf_txt = "-" if conf is None else f"{float(conf):.2f}"
+        title = "f{}  {}  {}  t{}  {}".format(
+            cf, label.upper(), conf_txt, action.get("touch_number", "?"),
+            action.get("team") or "?")
+
+        width = self._ball_width_at(cf)
+        details = [
+            "{}/{}".format(action.get("gesture") or "?", action.get("contact_kind") or "?"),
+            "net={}".format(int(bool(action.get("near_net")))),
+            "behind={}".format(int(bool(action.get("behind_baseline")))),
+            "bbl={}".format(action.get("ball_side") or "-"),
+            "src={}".format(action.get("attribution_source") or "-"),
+        ]
+        if width is not None:
+            details.append("w={}px".format(int(width)))
+        self._event_plan.add(cf, title, " ".join(details),
+                             overlay.ACTION_COLORS.get(label, (225, 225, 225)))
+
+    def _ball_width_at(self, contact_frame: Optional[int]) -> Optional[float]:
+        """Ball bbox width (px) at a contact frame, from the classifier's history.
+
+        Render-side read of a value the classifier already keeps; ``None`` when
+        the ball was not seen then. Never raises.
+        """
+        ac = getattr(self.frame_processor, "action_classifier", None)
+        if ac is None or contact_frame is None:
+            return None
+        try:
+            for p in ac._ball_history:
+                if p[0] == contact_frame:
+                    return float(p[3])
+        except Exception:      # pragma: no cover - defensive, render-only
+            return None
+        return None
+
+    def _signals(self, frame_result: Dict[str, Any], frame_idx: int) -> Dict[str, Any]:
+        """Snapshot this frame's signals for the panel (render-only mirror).
+
+        Reads ONLY what ``process_frame`` just produced -- tracked ball
+        position/size/velocity/confidence, the tracked players' court team and
+        distance to the ball, the game-state badge -- plus the classifier's own
+        already-computed reads: its ball-width side verdict, the frames since
+        the last real ball sighting, the contact it is holding back for
+        look-ahead, and its contact-probe records (popped here; see
+        :meth:`_enable_probe_mirror`). No threshold is duplicated and no
+        inference is re-run, so the panel cannot drift from the pipeline's
+        decisions. Every read is guarded: a missing field renders as "-" and
+        never breaks the render.
+        """
+        fp = self.frame_processor
+        ac = getattr(fp, "action_classifier", None)
+        snapshot: Dict[str, Any] = {
+            "frame": frame_idx,
+            "ball": None,
+            "players": [],
+            "game": frame_result.get("game_state") or {},
+            "probe": [],
+            "pending": None,
+        }
+
+        # --- ball: position, pixel size, speed, classifier's width-side read
+        # A dropped track does NOT blank the panel: the last real sighting is
+        # carried forward (``present: False`` + the frame it happened on), so
+        # pos / size / width / speed stay readable with an age instead of the
+        # block vanishing mid-rally. Predicted points still update it (the
+        # tracker is coasting, not lost) and keep their own PREDICTED flag.
+        tb = frame_result.get("tracked_ball") or {}
+        center = tb.get("center") or [None, None]
+        ball_pt: Optional[Tuple[float, float]] = None
+        if center and center[0] is not None and center[1] is not None:
+            ball_pt = (float(center[0]), float(center[1]))
+            bbox = tb.get("bbox") or []
+            w = int(round(bbox[2] - bbox[0])) if len(bbox) == 4 else 0
+            h = int(round(bbox[3] - bbox[1])) if len(bbox) == 4 else 0
+            vel = tb.get("velocity") or []
+            speed = (float(np.hypot(float(vel[0]), float(vel[1])))
+                     if len(vel) >= 2 else None)
+            side = side_name = None
+            votes, stale = 0, None
+            if ac is not None:
+                try:
+                    side, votes = ac._width_side(frame_idx)
+                    side_name = {"A": "near", "B": "far"}.get(side)
+                    stale = ac._ball_stale_frames(frame_idx)
+                except Exception:      # pragma: no cover - defensive, render-only
+                    side = None
+            snapshot["ball"] = {
+                "present": True,
+                "x": int(ball_pt[0]), "y": int(ball_pt[1]),
+                "w": w, "h": h,
+                "predicted": bool(tb.get("is_predicted", False)),
+                "conf": tb.get("confidence"),
+                "speed": speed,
+                "side": side, "side_name": side_name,
+                "side_votes": votes, "stale": stale,
+            }
+            self._last_ball = dict(snapshot["ball"], held_from=frame_idx)
+            self._last_ball_pt = ball_pt
+        elif self._last_ball is not None:
+            snapshot["ball"] = dict(
+                self._last_ball, present=False,
+                stale=frame_idx - self._last_ball["held_from"])
+            # Player distances keep measuring against the last known point.
+            ball_pt = self._last_ball_pt
+
+        # --- players: court team, near-net, distance from the ball
+        reach_px = getattr(ac, "CONTACT_REACH", ActionClassifier.CONTACT_REACH)
+        for p in frame_result.get("tracked_players", []):
+            bbox = p.get("bbox") or []
+            if len(bbox) != 4:
+                continue
+            near_net = False
+            court = self.court_detector
+            if court is not None and getattr(court, "is_calibrated", False):
+                try:
+                    foot = (int((bbox[0] + bbox[2]) / 2), int(bbox[3]))
+                    near_net = bool(court.is_near_net(
+                        foot, threshold_px=ActionClassifier.NEAR_NET_PX))
+                except Exception:      # pragma: no cover - defensive
+                    near_net = False
+            dist = None
+            if ball_pt is not None:
+                try:
+                    dist = float(ActionClassifier._point_to_bbox_distance(
+                        list(ball_pt), bbox, p.get("center")))
+                except Exception:      # pragma: no cover - defensive
+                    dist = None
+            snapshot["players"].append({
+                "tid": p.get("track_id"),
+                "team": p.get("team"),
+                "near_net": near_net,
+                "predicted": bool(p.get("predicted", False)),
+                "dist": dist,
+                "reach": None if dist is None else bool(dist <= reach_px),
+            })
+
+        # --- classifier probe: what fired at t-7, or which gate refused it
+        if self._probe_mirror and ac is not None:
+            try:
+                snapshot["probe"] = ac.pop_diag() or []
+            except Exception:          # pragma: no cover - defensive
+                snapshot["probe"] = []
+        if ac is not None:
+            pend = getattr(ac, "_pending", None)
+            if isinstance(pend, dict):
+                gest = pend.get("gesture")
+                snapshot["pending"] = {
+                    "frame": pend.get("frame"),
+                    "player_id": pend.get("player_id"),
+                    "gesture": getattr(gest, "value", gest),
+                    "team": pend.get("team"),
+                    "kind": pend.get("contact_kind"),
+                }
+        return snapshot
+
+    def _enable_probe_mirror(self) -> bool:
+        """Turn the classifier's contact-probe mirror on for the panel.
+
+        ``ActionClassifier._diag`` is the pipeline's own inert probe record
+        (the ``diag_dump`` writer is its other consumer): a few dicts per
+        frame, read by no threshold, branch or return value. Skipped when a
+        ``DiagRecorder`` owns those records, so live debug can never steal
+        entries from a dump, and never enabled outside this live path.
+        """
+        fp = self.frame_processor
+        ac = getattr(fp, "action_classifier", None)
+        if ac is None or getattr(fp, "diag", None) is not None:
+            return False
+        ac.diag_enabled = True
+        return True
+
+    def _compose_panel(self, frame: np.ndarray, snapshot: Optional[Dict[str, Any]],
+                       total: Optional[int]) -> np.ndarray:
+        """Composite the side panel for DISPLAY (the writer gets the bare frame).
+
+        Failures degrade to the plain annotated frame: the panel is a debugging
+        convenience and must never take the live window down.
+        """
+        if not self._panel_enabled:
+            return frame
+        snap = dict(snapshot or {})
+        snap.setdefault("total", total)
+        try:
+            events = self._event_plan.at(snap.get("frame"))
+            return debug_panel.compose(frame, snap, events)
+        except Exception as e:
+            self.logger.error("Debug panel failed at frame %s: %s",
+                              snap.get("frame"), e)
+            return frame
+
+    def _setup_window(self, width: int, height: int) -> None:
+        """Resizable window sized to hold the panel strip beside the frame.
+
+        An autosized window wider than the display clips its RIGHT edge -- which
+        is exactly where the panel lives -- so the live path asks for a
+        resizable window and fits the composed width to the screen.
+        """
+        try:
+            cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(
+                WINDOW_NAME,
+                min(width + debug_panel.PANEL_WIDTH, 1900),
+                min(height, 1000),
+            )
+        except cv2.error as e:      # headless / no window system
+            self.logger.warning("Could not resize the debug window: %s", e)
+
     def _log_resolved_spikes(self) -> None:
         """Log each spike record once its outcome resolves -- origin zone plus
         where the ball ended up. A pending-dug record that later flips to
@@ -211,6 +463,15 @@ class LiveDebugProcessor:
                     "Spike resolved: contact frame %s player %s %s",
                     rec.get("frame"), rec.get("track_id"),
                     describe_spike_record(rec),
+                )
+                # Same row in the panel, on the spike's contact frame.
+                self._event_plan.add(
+                    rec.get("frame"),
+                    "f{}  SPIKE {}".format(rec.get("frame"),
+                                           str(rec.get("spike_type") or "?").upper()),
+                    describe_spike_record(rec),
+                    overlay.ACTION_COLORS.get(rec.get("spike_type") or "spike",
+                                              (225, 225, 225)),
                 )
                 if i >= len(self._spike_log_state):
                     self._spike_log_state.append(sig)
@@ -379,7 +640,10 @@ class LiveDebugProcessor:
         still drawn first, from exactly this frame's post-process state).
 
         ``out_queue`` (bounded) throttles the producer to the consumer's
-        delay window. ``stop`` ends the loop WITHOUT a flush (restart/quit
+        delay window. The per-frame signal snapshot (``_signals``) is taken
+        HERE, on the pipeline's own thread, so the consumer only ever reads a
+        cached plain dict and never touches tracker/classifier state from the
+        render thread. ``stop`` ends the loop WITHOUT a flush (restart/quit
         discard the tail, like the old serial loop); the natural end of
         source flushes the held-back contact and typed spikes exactly as the
         serial loop did. A sentinel follows every exit path, and ``done`` is
@@ -406,9 +670,10 @@ class LiveDebugProcessor:
                 self._ingest_actions(result.get("actions", []), plan)
                 self._log_resolved_spikes()
                 ball, players, gs = self._overlay_data(result)
+                signals = self._signals(result, frame_idx)
                 if self.court_detector is not None:
                     frame = self.court_detector.draw_court_overlay(frame)
-                out_queue.put((frame, frame_idx, ball, players, gs))
+                out_queue.put((frame, frame_idx, ball, players, gs, signals))
                 frame_idx += 1
         except Exception:
             self.logger.exception("Producer thread failed at frame %s", frame_idx)
@@ -459,10 +724,13 @@ class LiveDebugProcessor:
 
         delay_frames = min(int(round((fps or 30) * self.LIVE_DELAY_SECONDS)), self.LIVE_DELAY_MAX_FRAMES)
         self.logger.info(
-            "Press 'q' to quit, SPACE to pause/resume, 'r' to restart "
-            "(labels shown on a %d-frame delay so they land on the contact frame)",
+            "Press 'q' to quit, SPACE to pause/resume, 'r' to restart, "
+            "'p' to toggle the signal panel (labels shown on a %d-frame delay "
+            "so they land on the contact frame)",
             delay_frames,
         )
+        self._probe_mirror = self._enable_probe_mirror()
+        self._setup_window(width, height)
 
         restart = True
         while restart:
@@ -504,12 +772,13 @@ class LiveDebugProcessor:
                 if item is _PRODUCER_DONE:
                     drained = True
                 elif item is not None:
-                    frame, idx, ball, players, gs = item
+                    frame, idx, ball, players, gs, signals = item
                     shown = self._draw_overlay(frame, idx, ball, players, plan,
                                                total_frames=total, game_state=gs)
                     if writer is not None:
-                        writer.write(shown)
-                    cv2.imshow('Volleyball Analysis', shown)
+                        writer.write(shown)   # the saved video stays unpanelled
+                    display = self._compose_panel(shown, signals, total)
+                    cv2.imshow(WINDOW_NAME, display)
                     key = cv2.waitKey(frame_delay_ms) & 0xFF
                     showed = True
                 elif drained and frames_out.empty() and not paused.is_set():
@@ -538,9 +807,20 @@ class LiveDebugProcessor:
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     self.frame_processor.reset_trackers()
                     self._spike_log_state = []
+                    self._event_plan.reset()
+                    # Fresh run: the held ball readout must not survive into
+                    # the restarted video.
+                    self._last_ball = None
+                    self._last_ball_pt = None
                     self.logger.info("Video restarted")
                     restart = True
                     break
+                elif key == ord('p'):
+                    self._panel_enabled = not self._panel_enabled
+                    self.logger.info("Signal panel %s",
+                                     "ON" if self._panel_enabled else "OFF")
+                    if self._panel_enabled:
+                        self._setup_window(width, height)
 
         cap.release()
         if writer is not None:

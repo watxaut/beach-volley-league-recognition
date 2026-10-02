@@ -3106,3 +3106,72 @@ header chain and the #54 "Where we are" block moved verbatim to
 
 **Next:** SR0 (worker). In parallel, the owner does SR3 (serve-only GT on two new
 sessions) and answers D3.
+
+### 2026-10-02 (fifty-sixth session) — SR0 DONE: one serve scorer, and the record corrected
+
+**Asked:** "read agents, start with the next task" — the next task being SR0, the
+first task of the serve-reliability plan: one scorer, per side, dev vs held-out.
+Scorer only: no decode, no `src/` change, no label emitted (AGENTS.md §6).
+
+**Shipped.** `scripts/score_serves.py` (+33 tests, `tests/test_serve_scorer.py`),
+`docs/sr0_serve_scorer.md`, artifact `output/serves/sr0.json`. Sessions are
+declared, not discovered, so a stream can never be silently swapped; each stream
+declares what it SPEAKS (court side / squad / time only), whether it CLAIMS a
+serve per candidate, and whether it is point-bound. Five measurement rules, each
+of which prevented a wrong number from being printed:
+
+- one matching rule for everything (greedy one-to-one, nearest first, inside each
+  owner contact's own `frame_tolerance`), side-correct by default;
+- **side accuracy is scored on the POSITIONAL match** — under side-aware matching
+  it is tautologically 1.00;
+- **a proposal is not a claim**: the raw evidence records and the rally onset
+  report no precision at all ("74 false serves" and "precision 1.000" were both
+  one line away);
+- **coverage ≠ binding**: `point_bound` reproduces what a consumer claims, and it
+  is the whole 13-vs-9 gap;
+- **side ≠ squad**: pass-2's side read is the emitted letter, never its
+  winner-serves-derived squad (which is flagged GT-derived), and a squad is
+  compared through the switch parity imported from `resolve_side_switches`.
+
+**Gate PASSES** exactly as pre-registered: production near **8/16**, far **0/17**,
+12 false emissions. The script exits non-zero if those move.
+
+**The record, corrected twice.** The shipped far-serve evidence covers **13/17**
+far serves, not 14 — 14 records land within ±15 f of a serve of any side and the
+fourteenth is on a **near** serve (P12 f7777, record f7762); 14/17 was a sweep
+figure on the recording, not a property of the shipped artifact. And scored as the
+claim it is, the consumer's precision is **0.47** (19 bound records, 9 on their
+own serve), while its zero-FP property (1 FP on 24 mid-rally controls + 9 owner
+FALSE/OFFGAME moments) remains exactly as true as before. Both are printed.
+
+**Three findings that steer SR4.**
+1. **Far-side serve TIME is nearly free.** The `game_on` backdated burst start —
+   already computed, zero extra work — lands within ±15 f of **11/17** far
+   serves at median |offset| **3 f** (range −6…+6), against **3/16** near at 14 f
+   (all late). At ±120 f it covers 27/33. A far serve IS the rally onset; a near
+   serve is not, because the onset there belongs to the reception. So SR4's
+   proposal step must be **per side**: a side vote on a known time far side, a
+   real proposer near side.
+2. **The near misses are not timing.** Every near serve production emits is
+   within **±2 f** of the owner frame (8/8, median 1 f), so the 8 missing near
+   match serves are missing *emissions*. SR1 is unblocked and cheap.
+3. **The 12 false emissions are mostly dead time**: 8 handlings with no owner
+   contact within 80 f, 3 rally contacts with the wrong label (f3856 a `set`,
+   f8534 and f10070 `dig`s) and 1 serve 25 f late. The toss sub-probe in SR4 is
+   worth spending on the 8, not the 3.
+
+**A stale-artifact defect found while scoring the other sessions.** The seven
+`output/video_entreno_*/pipeline_output.json` files date from 2026-09-04/06
+(commits `239490c` / `8150694`) — before the v3 ball detector (09-26) and the pose
+gates (09-27) — so their 3/5 is not the current production number and the plan's
+4/5 came from a run whose artifacts are gone. The scorer prints each stream's
+`processed_at` + commit so this cannot be read as current; re-running the seven
+short clips is queued with the SR3 worker half.
+
+**Housekeeping:** STATUS's *Where we are* rewritten on the SR0 numbers; open point
+30's SR0 marked done with its findings folded into SR1/SR4; seven Learnings added
+(one per durable fact); session index extended; Log entry #53 moved VERBATIM to
+`docs/history/status_log_archive.md`. Suite **1069** (1036 + 33).
+
+**Next:** SR1 (near-serve miss taxonomy) or SR2 (audio onsets), one mechanism per
+session. Owner: SR3 on vall_dhebron.
