@@ -1744,7 +1744,55 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
-### 2026-10-02 (sixty-third session) — SR4 is REFUTED as specified: the near bar is above the coverage ceiling, and the point map is why the far bar fails
+### 2026-10-02 (sixty-fourth session) — PM1 DONE (`FAIL=blocked`): the far-serve signal is COMPLETE (16/17) and no binding rule makes it precise (294 false serves unbound) — the point map is the lever, and open point 22 inherits the constraint
+
+**Asked:** continue the coordinator loop toward G3 (owner, verbatim: "Continue"
+after telling me not to use gemini/sonnet/opus and to pass briefs as files).
+
+**Step 0 (read).** STATUS *Active next* ranked PM1 (the point-map probe, carded by me
+at the end of #63) first. Ran it the way the owner prescribed: a **197-byte pointer**
+prompt telling the child to read its card out of STATUS.md, on
+`stealth/space-bunny-alpha` (route #2; the GLM subagent tier is quota-blocked until
+2026-10-03 per the coordinator prompt).
+
+**Step 4 (verify, own commands).** Suite **1214** = 1191 + 23 new, green.
+`git diff` shows the four STATUS edits the card listed and nothing else; no `src/`,
+no `ground_truth/`, no decode, no seek, held-out session never read. `grep` confirms
+the probe imports no `cv2` and opens no capture (the §9 seek guard). I corrected one
+defect the worker left: it rewrote the STATUS prose to the verdict but never flipped
+the card's own `status:` line off READY (the same defect as #62+).
+
+**Result (both gates green, pre-registered FAIL fires).**
+- **G1** reproduced: near 8/16, far 0/17, 12 false serves.
+- **G2** reproduced: `far_flight.width_start` **16-27 px** at every far serve vs
+  **39-50 px** at the 3 near serves that have an event; every cut in 26/28/30/32
+  claims **16/17 far, 0/16 near**.
+- The bypass test: **unbound (frame, side) = 16/17 far hits with 294 false serves**
+  (bar: >= 15/17 AND 0 new false serves). Binding rules: in-window 10/17 (253 FP),
+  first-start-after 16/17 (288 FP), inter-point gap 11/17 (35 FP) — bar was >= 12/17
+  with <= 3 FP. **FAIL** on both halves; SR4-FAR is **BLOCKED on open point 22**.
+- #63's root cause re-derived and sharpened: 31 pipeline points vs 33 GT points
+  (P32/P33 have none); under the only workable pairing the opener offset is
+  **one-signed +6 … +3153 f on all 31 pairs** (uniformly late, not noisy); **far 2/17**
+  serves sit inside any window vs **near 14/16**; 29/30 inter-point gaps clear
+  `GAP_SERVE_MIN` 143, so the chasm rule selects nothing. [inferred] `_finalize_group`
+  opens a point on a pre-serve flight burst, backdated after a quiet interval — the
+  point layer never sees a serve.
+
+**Decisions.** SR4-FAR is not the next card; the point map is. I wrote the constraint
+into open point 22 (move the opener to the serve or the rally it heads) and demoted
+SR4-FAR in *Active next* item 3 (it contradicted item 1 before the fix). SR4-NEAR
+stays parked on perception. Nothing shipped; a refutation that pins the blocker is a
+success of the session.
+
+**Hygiene:** the sixtieth-session Log entry was archived VERBATIM to
+`docs/history/status_log_archive.md` (Log back to 3 entries), per the Lean-STATUS
+convention. New pins: 23 tests in `tests/test_point_map.py` (mechanical + the literal
+#63/#64 counts + the verdict truth table).
+
+**Not done (deliberate):** no card for the point-map fix yet — it is a `src/`
+mechanism design, which is tier-2 (architect) work by the coordinator prompt's Step
+3.5, and it needs an owner decision on whether the point map may change at all.
 
 **Asked:** continue the coordinator loop toward G3 — reliably track actions across
 videos, target >70% of actions correct against the match ground truth without the
@@ -1926,56 +1974,3 @@ SET of recovered/lost serves, not the aggregate: 8/16 → 8/16 hides the whole
 finding.
 
 **Nothing in `src/` changed.** Suite not run (no `scripts/` or `tests/` touched).
-
-### 2026-10-02 (sixtieth session) — SR1c closed: the takeoff-stance read could not be trusted, and the fix it pointed at is a trade, not a gain
-
-**Asked:** run card SR1c — decide with numbers whether judging "behind the
-baseline" on where the server stood just before the hit recovers the four missed
-near serves, without inventing false serves. Diagnose-only.
-
-**What happened.** One sequential full-match diagnostic pass (26061 frames,
-1888 s, MPS, no seek). Its parity check passed: the 207 emitted actions matched
-the shipped artifact exactly. Then the card's second check — can the probe
-reproduce the reading the pipeline actually made? — **failed**: 194 of 207 on the
-match, 6 of 7 and 13 of 14 on two practice clips, against a 98% requirement. A
-failed check is a stop, so the decision rule was never read and nothing was
-tuned to get past it.
-
-**Why it failed, all 15 cases the same.** Each disagreement is a contact where
-the player had no fresh detection at the moment of the hit — the box over them
-was being carried forward, or they had briefly dropped off the tracked list. The
-probe had been told to ignore carried-forward positions, so it had nothing to
-read, while the pipeline had read the player's last genuinely detected position,
-which can be a few frames *after* the hit. The frames were rendered as evidence:
-in every case the player is visible and moving under a frozen box.
-
-**What the owner established.** Looking at those frames: only two of the fifteen
-are serves, and the committed ground truth agrees (the other thirteen are
-spikes, digs, sets and overpasses). That is also why the bad reading was mostly
-harmless — a serve needs the hit to open a rally as well as the player to be
-behind the line, and on all thirteen the rally was already under way, so the
-pipeline read the position wrong and then did nothing with it.
-
-**Why the fix is a trade.** The two serves that currently work are the two where
-the player's real position is available only *after* the hit, so a rule that
-looks backwards for a cleaner position loses them. At the pre-registered window
-the same rule gains two other near serves (of the four missed) and cannot reach
-the other two at any window. Two gained, two lost — the same total with a
-different set of hits, before counting knock-on effects, which were not measured.
-
-**Outcome:** closed with nothing shipped; no source file touched; owner chose to
-leave the near side as is. Written up in `docs/sr1c_takeoff_stance.md`.
-
-**Housekeeping / a warning.** Suite **1156** green (1134 collected at HEAD plus
-the 22 new tests; `scripts/probe_takeoff_stance.py`, `tests/test_takeoff_stance.py`).
-Note for the next session: commit `d402f65` (#59) landed on this tree at
-**15:31:21 the same day, while this session was running**, so a second session
-was active on the shared working tree (AGENTS.md §8). Nothing was lost — this
-session's files are its own and no stash/checkout was used — but an earlier test
-count in this session read 1113 because the tree was still pre-#59 at that
-moment. Serialize sessions, or give each one its own worktree.
-
-**Next:** card SR1d (the cost of lifting the 90-frame off-court hold) is the
-other open measurement; any change to the serve logic still needs both of them
-plus an owner decision.
-

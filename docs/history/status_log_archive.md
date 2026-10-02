@@ -3368,3 +3368,57 @@ composed frame and OpenCV then scales that into the window (requested
 `min(composed, 1900)`), so the on-screen glyphs are ~0.75 of the composed size
 — the window is `WINDOW_NORMAL`, so dragging it bigger is a free legibility
 knob.
+
+
+### 2026-10-02 (sixtieth session) — SR1c closed: the takeoff-stance read could not be trusted, and the fix it pointed at is a trade, not a gain
+
+**Asked:** run card SR1c — decide with numbers whether judging "behind the
+baseline" on where the server stood just before the hit recovers the four missed
+near serves, without inventing false serves. Diagnose-only.
+
+**What happened.** One sequential full-match diagnostic pass (26061 frames,
+1888 s, MPS, no seek). Its parity check passed: the 207 emitted actions matched
+the shipped artifact exactly. Then the card's second check — can the probe
+reproduce the reading the pipeline actually made? — **failed**: 194 of 207 on the
+match, 6 of 7 and 13 of 14 on two practice clips, against a 98% requirement. A
+failed check is a stop, so the decision rule was never read and nothing was
+tuned to get past it.
+
+**Why it failed, all 15 cases the same.** Each disagreement is a contact where
+the player had no fresh detection at the moment of the hit — the box over them
+was being carried forward, or they had briefly dropped off the tracked list. The
+probe had been told to ignore carried-forward positions, so it had nothing to
+read, while the pipeline had read the player's last genuinely detected position,
+which can be a few frames *after* the hit. The frames were rendered as evidence:
+in every case the player is visible and moving under a frozen box.
+
+**What the owner established.** Looking at those frames: only two of the fifteen
+are serves, and the committed ground truth agrees (the other thirteen are
+spikes, digs, sets and overpasses). That is also why the bad reading was mostly
+harmless — a serve needs the hit to open a rally as well as the player to be
+behind the line, and on all thirteen the rally was already under way, so the
+pipeline read the position wrong and then did nothing with it.
+
+**Why the fix is a trade.** The two serves that currently work are the two where
+the player's real position is available only *after* the hit, so a rule that
+looks backwards for a cleaner position loses them. At the pre-registered window
+the same rule gains two other near serves (of the four missed) and cannot reach
+the other two at any window. Two gained, two lost — the same total with a
+different set of hits, before counting knock-on effects, which were not measured.
+
+**Outcome:** closed with nothing shipped; no source file touched; owner chose to
+leave the near side as is. Written up in `docs/sr1c_takeoff_stance.md`.
+
+**Housekeeping / a warning.** Suite **1156** green (1134 collected at HEAD plus
+the 22 new tests; `scripts/probe_takeoff_stance.py`, `tests/test_takeoff_stance.py`).
+Note for the next session: commit `d402f65` (#59) landed on this tree at
+**15:31:21 the same day, while this session was running**, so a second session
+was active on the shared working tree (AGENTS.md §8). Nothing was lost — this
+session's files are its own and no stash/checkout was used — but an earlier test
+count in this session read 1113 because the tree was still pre-#59 at that
+moment. Serialize sessions, or give each one its own worktree.
+
+**Next:** card SR1d (the cost of lifting the 90-frame off-court hold) is the
+other open measurement; any change to the serve logic still needs both of them
+plus an owner decision.
+
