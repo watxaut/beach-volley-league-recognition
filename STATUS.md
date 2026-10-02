@@ -212,13 +212,16 @@ VFR. Both are allow-listed in `tests/test_vfr_seek_guard.py`. Fix the annotator
 before any frame-shown annotation pass.
 
 **Active next (ranked) — execute via the task cards below (`/next-task`):**
-1. **SR4a** (READY): the near-opening table — for every serve, what the pipeline
-   already emitted around it, bucketed into hit / wrong label / wrong rally opening
-   / never produced. No `src/` change, no decode. Decides whether the after-the-fact
-   serve record is worth building, and reopens the tracking exemption only on a
-   pre-registered count.
-2. **SR4** (after SR4a reads): the per-point serve record — far side from rally
-   onset time + side vote, near side from the after-the-fact opener rule.
+1. **SR4a** (DONE #62+, `docs/sr4a_near_openings.md`): the near-opening table —
+   G1 reproduced on both arms (near 8/16, far 0/17, 12 FP, drills 3/5); the 8 near
+   misses bucket into **2 mislabeled_opener + 3 not_opener + 3 not_emitted**.
+   **G2 verdicts: SR4's near side proceeds after the fact (5 repairable of 8, rule
+   >= 4) and M-b is REOPENED as a fresh architect call only (3 never produced, 2 of
+   them coasting, rules >= 3 AND >= 2) — nothing ships.** Trap guard 0.
+2. **SR4** (next): the per-point serve record — far side from rally onset time +
+   side vote, near side from the after-the-fact opener rule. **Read
+   `docs/sr4a_near_openings.md` §2 and §5 first:** the opener key alone recovers
+   only 4 of the 8 hits and 6 of the 12 false serves sit inside near-miss windows.
 3. **SR3 worker half, ONCE, after the rules are frozen**: teach `score_serves.py`
    the `serve-anchors-v1` format, run the held-out session, score it once.
 4. **SR5 → SR6.**
@@ -534,6 +537,31 @@ point number in `docs/history/`.
       `not_emitted >= 3` of the 8 match near misses with the server coasting in
       >= 2 of them — and then only as a fresh architect call with a lift-arm
       diag dump.
+      **[#62 +1: SR4a DONE (`docs/sr4a_near_openings.md`, `scripts/probe_near_openings.py`,
+      `logs/sr4a_report.md`). G1 reproduced on both arms: near 8/16, far 0/17, 12 false
+      serves, drills e2-e7 3/5. The 8 near misses bucket into 2 `emitted_mislabeled_opener`
+      + 3 `emitted_not_opener` + 3 `not_emitted`.]**
+      - **SR4a G2 verdict 1 — SR4 near side PROCEEDS after the fact: 5 repairable of 8**
+        (rule >= 4). The 5 are three different defects: wrong label on a correctly
+        opened rally (P9 `spike`, P10, P11), a same-side `serve` emitted **25 f**
+        before the GT frame (P33, the scorer's own `serve_outside_tolerance`), and a
+        rally-boundary case where the window opener sits 9 actions earlier (P12).
+      - **SR4a G2 verdict 2 — M-b is REOPENED as a fresh architect call (NOT a build):
+        3 never produced and 2 of them coasting** (rules >= 3 AND >= 2). The two
+        coasting reads are P5 f2575 and P7 f3747, lowest-foot same-team track
+        `predicted: true`; the other 6 misses have a `predicted: false` same-team
+        track at the GT frame. **`output/sr1c/match_full_diag.jsonl` has NO recorded
+        arm**, so the reopen call must re-run with the arm named. SR4 still goes first
+        (no `src/` change).
+      - **SR4a trap guard `far_unseen_near_reception_first` = 0** of 17 far serves, so no
+        onset-side guard is demanded — but 12 of 15 near onsets sit 10-19 f BEFORE the
+        serve, so the guard's +-15 f onset window is narrow by construction.
+      - **SR4a design constraint (inferred, not a rule):** only **4 of the 8 hits** have
+        a `serve` as their window's opener, and **6 of the 12 false serves sit inside a
+        near-miss window** (5 of them as its first action). SR4 must key on the
+        same-side contact within tolerance, not on the window opener alone. The chasm
+        rule (`GAP_SERVE_MIN`, imported, never re-tuned) rejects only **1 of 12** false
+        serves.
     - **Problem:** production serve recall is 8/33 (near 8/16, far 0/17) and
       precision 0.40. The far evidence layer is 13/17 covered (**in-sample**),
       4/12 held-out binding. The near side's losses are now MEASURED (#58): contact-frame
@@ -1014,6 +1042,8 @@ point number in `docs/history/`.
 
 ## Learnings (standing)
 
+- **The serve-window opener is a weak key: measured #62+ on the 20260920 match, only 4 of the 8 production near hits have a `serve` as their window's first action (the other 4 windows open 326-471 f earlier on a dig/far serve/spike), and 6 of the 12 false serves sit INSIDE a near-miss window, 5 of them as its first action.** A post-hoc per-point serve record (SR4) must key on the same-side contact within tolerance, not on the window opener. Related: the chasm rule (`GAP_SERVE_MIN = 143`, imported from `relabel_serves.py`) rejects only **1 of 12** false serves, and rally onsets sit 10-19 f BEFORE the serve on 12 of 15 near rows (P12 -662 f, P20 +630 f), so an onset is not a serve marker at ±15 f. Source: `docs/sr4a_near_openings.md`.
+
 - Calibration `frame_dimensions` is (h,w) and is NOT a scale hint: points are used verbatim, only the court mask is sized from it — a smaller calibration on a bigger video silently drops near-half players. `src/main.py` now hard-errors on missing/mismatched calibration (`--allow-uncalibrated` to waive; T1, session 31). Probe scripts share it via `src/detection/calibration_readiness.py` (T1b); they decode at native res, so point them at `_up1080` for sub-1080p sources.
 
 Protocol rules live in **AGENTS.md** (entreno validation, live-debug
@@ -1432,6 +1462,7 @@ survive across sessions; provenance in the archives.
 - **A player box with no detector behind it can read "behind the line" and do no harm, and a backward-looking fix for it costs as much as it gains** (#60). Fifteen match contacts had `behind_baseline` read off a carried-forward or absent track; the owner confirmed only 2 are serves and the other 13 were vetoed by the serve label's second condition (they did not open a rally). The 2 real serves DEPEND on that read — their player has no real detection at or before the hit (it returns 1-7 f LATER) — so a rule that looks backwards for a cleaner position trades +P11/+P12 for −P17/−P19; P9/P10 read false at K = 5, 10 and 15 (stance feet y = 750/747 vs the 761 px line). Corollary for any reproduction gate: a diag dump's per-frame player list is NOT the classifier's snapshot (a contact is confirmed 7 f late and the last REAL position is used), so a probe cannot reproduce the shipped read on the ~6% of contacts whose toucher is coasting.
 
 ## Session index (one line each)
+- #62+ **SR4a DONE (delegated worker card; diagnose-only, `src/` untouched)** — `scripts/probe_near_openings.py`, `docs/sr4a_near_openings.md`, `logs/sr4a_report.md`, `tests/test_near_openings.py` (+35 tests; suite **1191** = 1156 + 35). G1 reproduced on both arms before any bucket was read: near 8/16, far 0/17, 12 false serves, drills e2-e7 3/5. The 8 match near misses bucket into **2 `emitted_mislabeled_opener` + 3 `emitted_not_opener` + 3 `not_emitted`**; drills into 3 hit / 1 mislabeled / 1 not_emitted. **G2 verdict 1: SR4's near side PROCEEDS after the fact — 5 repairable of 8** (rule >= 4). **G2 verdict 2: M-b is REOPENED as a fresh architect call only (NOT a build) — 3 never produced, 2 of them coasting** (P5 f2575 and P7 f3747, lowest-foot same-team track `predicted: true`; rules >= 3 AND >= 2); the diag dump has NO recorded arm, so the call must re-run with the arm named. SR4 still goes first (no `src/` change). Trap guard `far_unseen_near_reception_first` = **0** of 17. Design constraint for SR4 (inferred): only 4 of the 8 hits have a `serve` as their window opener, and 6 of the 12 false serves sit inside a near-miss window. One card deviation disclosed (the clip-opening serve has no preceding action; the probe follows `relabel_serves.resolve_point` and opens at video start, else G1 fails at 0/5).
 - #62 D4 DECIDED (architect, on `docs/d4_gate_brief.md`; nothing built, `src/` untouched): M-a stays CLOSED and **M-b is PARKED** — the serve-zone exemption's ceiling is +1 near serve of 16 (+2 with P5) against a 0.90 bar needing 15, and the blunt version measured net 0 (+P7 / −P18, false serves 12→14). **#62 re-reads P18: an attribution swap, not a rally_start failure** (same ball point 867.5,313 in both arms, touch 1, new rally, toucher track 3→2 = server→partner; the lift renumbers tracks match-wide, f2494 track 1→4), so a hold exemption's cost is only bounded by a full-match run. Next: card **SR4a** (near-opening table, no decode), then SR4, then the held-out run once, then SR5 → SR6. Also: the stale `player_off_court_hold_frames` comment at `src/utils/config.py:101` is now on the deferred list (comment-only, inside the next session that touches `src/` anyway).
 - #61 SR1d DONE — `global lift REFUTED` (`docs/sr1d_hold_horizon_cost.md`, no `src/` change): the 90 f off-court hold lifted to 100000 changes the 7 practice clips not at all (action streams byte-identical, ΔF1 0.000) but feeds e2's sideline bystander 423 f vs 400 f, and on the full match leaves near serves at 8/16 while the composition churns (+P7 at delta +0, −P18 as `serve`→`dig` at the same frame), FP 12→14, actions 207→212. So M-b must be geometric, not a bigger horizon. One card step needed an owner-sanctioned fix (the `evaluate.py` invocation graded nothing); adapter validated against the recorded per-clip F1s.
 - #60 SR1c CLOSED (stopped at its own reproduction gate — 194/207 match, 6/7 and 13/14 practice, vs ≥98% — nothing shipped; owner "leave as is"): all 15 disagreements are contacts whose toucher had no fresh detection at the hit (box carried forward or absent from the tracked list), while the pipeline read their last real position up to 7 frames later. The owner checked the rendered frames: 13 of the 15 are not serves (the existing rally-opening condition already vetoed them) and the 2 real ones are exactly those a backward-looking stance read would lose. New probe + 22 tests (`scripts/probe_takeoff_stance.py`, `tests/test_takeoff_stance.py`), write-up `docs/sr1c_takeoff_stance.md`. Suite 1156 (1134 at HEAD + the 22 new; an earlier count in this session read 1113 against the pre-#59 tree — see the Log).
@@ -1572,6 +1603,25 @@ and `zai/glm-5.3-flash` both return `429 code 1310 Weekly/Monthly Limit Exhauste
 (reset 2026-10-03 18:49), `openrouter` has no API key and `amazon-bedrock` no region.
 Three delegate attempts, zero files written, working tree untouched. **The card is the
 first READY card, so `/next-task` runs it as soon as a worker model is reachable.**
+
+**SR4a (delegated step).** The card ran later the same day, in a worker session, with
+no `src/` change and no decode: `scripts/probe_near_openings.py` (imports
+`score_serves` and `relabel_serves`, contains no `cv2`), `docs/sr4a_near_openings.md`,
+`logs/sr4a_report.md`, `tests/test_near_openings.py` (+35; suite **1191**). **G1 was
+run before a single bucket was read and passed on both arms** (near 8/16, far 0/17,
+12 false serves, drills e2-e7 3/5). The 8 match near misses bucket into
+**2 `emitted_mislabeled_opener` + 3 `emitted_not_opener` + 3 `not_emitted`**;
+**G2 verdict 1: SR4's near side proceeds after the fact, 5 repairable of 8** (rule
+>= 4); **G2 verdict 2: M-b is REOPENED as a fresh architect call only, not a build —
+3 never produced, 2 of them coasting** (P5 f2575, P7 f3747; rules >= 3 AND >= 2),
+with the caveat that `output/sr1c/match_full_diag.jsonl` has **no recorded arm**, so
+the reopen must re-run with the arm named. Trap guard **0** of 17. Two things the
+next card must inherit: only **4 of the 8 hits** have a `serve` as their window
+opener, and **6 of the 12 false serves** sit inside a near-miss window, so an
+opener-keyed SR4 record is not yet safe. One card deviation is disclosed in the doc:
+the card's window rule leaves the clip-opening serve undefined (4 of 5 drills, P1),
+and the probe follows `relabel_serves.resolve_point` (video start is an anchor)
+because the literal reading scores the drills 0/5 and fails G1.
 
 
 ### 2026-10-02 (sixty-first session) — SR1d: lifting the 90 f off-court hold is REFUTED; it recovers P7 exactly and still buys nothing
