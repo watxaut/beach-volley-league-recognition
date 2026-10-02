@@ -49,6 +49,13 @@ reference for any action A/B), `dump_player_tracks.py` +
 `evaluate_match_points.py`, `annotate_player_gt.py` / `annotate_video.py`
 (owner GT passes).
 
+> **Warning (measured #61): `evaluate.py --predictions <dir>` grades ZERO
+> predictions on `src.main` output.** It expects an entry named `actions` in a
+> directory and reads a `frame` key; `src.main` writes `frame_number`. Convert
+> with the frame-key adapter (`frame_number` -> `frame`) and confirm the BASE arm
+> reproduces the recorded `evaluate --ignore-player` F1 per clip before comparing
+> arms — otherwise both arms read 0.000 and the comparison is vacuous.
+
 ## Architecture snapshot
 
 Fixed camera on the court's LONG AXIS, net facing the camera; near half =
