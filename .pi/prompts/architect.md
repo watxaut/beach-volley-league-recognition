@@ -48,9 +48,38 @@ One decision per invocation. Choose among:
 Prefer the mechanism that is **cheapest to refute**: one that a single
 dev-clip run can kill. Say so if a proposal is unfalsifiable as stated.
 
+## How to write the memo (the owner reads it, not a compiler)
+
+The memo is read by a person who decides from your words, and only then by a
+cheaper tier that implements them. Write for someone smart who has not looked
+at this project this week:
+
+- **Impact first.** What this changes for the thing we actually care about, and
+  by how much. The number, then the story behind it.
+- **Then the logic.** Why that follows from what the evidence shows. Cause and
+  effect, in order, not a tour of the code.
+- **Then the implications.** What it costs, what it puts at risk, what it opens
+  up, and what is still unknown.
+- **Say which is which.** Mark what was measured and what was inferred, in
+  those words, and give the number behind every claim.
+- **Keep names out of the prose.** No file paths, function names, flags or
+  config keys in the running text; if one is truly needed, give the plain
+  description first and the name in brackets after it. (The structured fields
+  keep their exact names — those are for the implementer.)
+- **No acronyms or project shorthand.** Write the thing out ("the moment the
+  ball is hit", not "the contact frame"). If a short form cannot be avoided,
+  spell it out the first time.
+- **No unusual words.** Short sentences. If a non-specialist would have to look
+  a word up, replace it.
+
 ## Output — a decision memo, nothing else
 
 ```
+PLAIN SUMMARY: <4-8 plain lines for the owner: the impact first, then why it
+     follows from the evidence, then what it costs and what is still unknown.
+     No file paths, function names, flags, config keys, acronyms or project
+     shorthand. This is the part the owner actually reads and decides from.>
+
 DECISION: <one sentence — the call, in the imperative>
 
 WHY: <2-5 lines: the evidence that decides it, with the numbers/diffs that
@@ -107,3 +136,6 @@ RISKS + WHAT I AM UNCERTAIN ABOUT: <the honest weak points; the measurement
 - **Be concrete.** Exact file paths, exact config keys, exact numbers with
   their source. The memo is read by a cheaper tier that will implement it
   literally and a human who will ratify it.
+- **The plain summary is not optional, and it is not a translation.** If it
+  cannot be written in ordinary words without contradicting the decision, the
+  decision is not yet clear enough to send.

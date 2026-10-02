@@ -59,6 +59,34 @@ make, STOP and report them (AGENTS.md §8: another session may be active).
 - **Stop-and-ask list.** Also STOP if any situation in the card's "stop and ask
   if" field happens, if a run crashes twice, or if you are about to guess.
 
+## 3.5 How to write the owner's summary
+
+A person decides from your words, not from the code. Write for someone smart
+who has not looked at this project this week:
+
+- **Impact first.** What changed for the thing we actually care about, and by
+  how much. The number, then the story behind it.
+- **Then the logic.** Why that follows from what you saw. Cause and effect, in
+  order, not a tour of the code.
+- **Then the implications.** What it costs, what it puts at risk, what it opens
+  up, and what is still unknown.
+- **Say which is which.** Mark what you measured and what you inferred, in
+  those words, and give the number behind every claim.
+- **Keep names out of the prose.** No file paths, function names, flags or
+  config keys in the main answer; if one is truly needed, give the plain
+  description first and the name in brackets after it.
+- **No acronyms or project shorthand.** Write the thing out ("the moment the
+  ball is hit", not "the contact frame"). If a short form cannot be avoided,
+  spell it out the first time.
+- **No unusual words.** Short sentences. If a non-specialist would have to look
+  a word up, replace it.
+- **End with what happens next** — the decision, who makes it, and the one open
+  question that would settle whatever is still undecided.
+
+The machine-readable block below is for the record and for the coordinator's
+verification; it does not replace this summary, and its fields must not be
+renamed or dropped.
+
 ## 4. Finish
 
 1. Run the test suite if you touched `scripts/` or `tests/`:
@@ -72,7 +100,9 @@ make, STOP and report them (AGENTS.md §8: another session may be active).
    the next card.
 4. Commit only if the card says to; otherwise leave the changes for the owner
    and list them. Never commit files outside the card's scope.
-5. Final message, in this exact shape:
+5. Final message: the **plain-language summary first** (section 3.5), then the
+   machine-readable block in this exact shape — the coordinator verifies against
+   these fields, so do not rename or drop them:
 
 ```
 CARD: <id>  RESULT: PASS | FAIL | STOPPED at step <n>
@@ -84,5 +114,6 @@ OBSERVED, NOT ACTED ON: <bullets, or "none">
 SELF-CHECK: 1 scope PASS/FAIL — <evidence> | 2 gates PASS/FAIL | 3 frozen rule PASS/FAIL | 4 no src/ PASS/FAIL | 5 numbers sourced PASS/FAIL | 6 STATUS edits only as listed PASS/FAIL
 ```
 
-If you STOPPED, the message says exactly what you saw, which step, and what
-decision the planner or owner has to make. Nothing else.
+If you STOPPED, lead with the plain-language paragraph: what you tried, what you
+saw, and the decision the planner or owner now has to make. Then the block, for
+the record.

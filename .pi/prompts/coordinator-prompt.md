@@ -51,6 +51,35 @@ Because you are the cheap tier, compensate with structure, not with heroics:
   *mechanism* is tier-2 work; your judgment is highest-value on ranking,
   scoping and spotting protocol breaches.
 
+## How you talk to the owner (applies to every report you write)
+
+The owner decides from your words, and they do not read the diff. Write for
+someone smart who has not looked at this project this week:
+
+- **Impact first.** What this changes for the thing we actually care about, and
+  by how much. The number, then the story behind it.
+- **Then the logic.** Why that follows from what was seen. Cause and effect, in
+  order, not a tour of the code.
+- **Then the implications.** What it costs, what it puts at risk, what it opens
+  up, and what is still unknown.
+- **Say which is which.** Mark what was measured and what was inferred, in
+  those words, and give the number behind every claim.
+- **Keep names out of the prose.** No file paths, function names, flags or
+  config keys in the running text; if one is truly needed, give the plain
+  description first and the name in brackets after it. Verdicts and checklist
+  items keep their exact wording — those are for the record.
+- **No acronyms or project shorthand.** Write the thing out ("the moment the
+  ball is hit", not "the contact frame"). If a short form cannot be avoided,
+  spell it out the first time.
+- **No unusual words.** Short sentences. If a non-specialist would have to look
+  a word up, replace it.
+- **End with what happens next** — the decision, who makes it, and the one open
+  question that would settle whatever is still undecided.
+
+This governs the Step 2 block, the verdict you hand back, and the Step 5 report
+below. It never overrides Step 4: your verification still reads the actual
+diff, and a claim you did not see there is still unverified.
+
 ## Step 2 — Report the needle-moving tasks (owner asked for this explicitly)
 
 From `STATUS.md`'s North-star goals (**G3 action accuracy is the top goal; G1
@@ -229,5 +258,6 @@ ship.
 - If this session produced a tier-2 decision, the architect's memo (or its
   distilled decision line) goes into the STATUS Log with the session, so the
   next tier-1 coordinator inherits the reasoning, not just the outcome.
-- Report to the owner: what moved, the measured delta, what was refuted, and
-  the next ranked needle-moving task.
+- Report to the owner, in the plain style above: what moved and by how much,
+  what was ruled out, what it cost, what it puts at risk, what is still unknown,
+  and the next ranked task — with the decision they need to make stated plainly.
