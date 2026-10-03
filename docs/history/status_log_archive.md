@@ -3422,3 +3422,234 @@ moment. Serialize sessions, or give each one its own worktree.
 other open measurement; any change to the serve logic still needs both of them
 plus an owner decision.
 
+
+### 2026-10-02 (sixty-fourth session) — PM1 DONE (`FAIL=blocked`): the far-serve signal is COMPLETE (16/17) and no binding rule makes it precise (294 false serves unbound) — the point map is the lever, and open point 22 inherits the constraint
+
+**Asked:** continue the coordinator loop toward G3 (owner, verbatim: "Continue"
+after telling me not to use gemini/sonnet/opus and to pass briefs as files).
+
+**Step 0 (read).** STATUS *Active next* ranked PM1 (the point-map probe, carded by me
+at the end of #63) first. Ran it the way the owner prescribed: a **197-byte pointer**
+prompt telling the child to read its card out of STATUS.md, on
+`stealth/space-bunny-alpha` (route #2; the GLM subagent tier is quota-blocked until
+2026-10-03 per the coordinator prompt).
+
+**Step 4 (verify, own commands).** Suite **1214** = 1191 + 23 new, green.
+`git diff` shows the four STATUS edits the card listed and nothing else; no `src/`,
+no `ground_truth/`, no decode, no seek, held-out session never read. `grep` confirms
+the probe imports no `cv2` and opens no capture (the §9 seek guard). I corrected one
+defect the worker left: it rewrote the STATUS prose to the verdict but never flipped
+the card's own `status:` line off READY (the same defect as #62+).
+
+**Result (both gates green, pre-registered FAIL fires).**
+- **G1** reproduced: near 8/16, far 0/17, 12 false serves.
+- **G2** reproduced: `far_flight.width_start` **16-27 px** at every far serve vs
+  **39-50 px** at the 3 near serves that have an event; every cut in 26/28/30/32
+  claims **16/17 far, 0/16 near**.
+- The bypass test: **unbound (frame, side) = 16/17 far hits with 294 false serves**
+  (bar: >= 15/17 AND 0 new false serves). Binding rules: in-window 10/17 (253 FP),
+  first-start-after 16/17 (288 FP), inter-point gap 11/17 (35 FP) — bar was >= 12/17
+  with <= 3 FP. **FAIL** on both halves; SR4-FAR is **BLOCKED on open point 22**.
+- #63's root cause re-derived and sharpened: 31 pipeline points vs 33 GT points
+  (P32/P33 have none); under the only workable pairing the opener offset is
+  **one-signed +6 … +3153 f on all 31 pairs** (uniformly late, not noisy); **far 2/17**
+  serves sit inside any window vs **near 14/16**; 29/30 inter-point gaps clear
+  `GAP_SERVE_MIN` 143, so the chasm rule selects nothing. [inferred] `_finalize_group`
+  opens a point on a pre-serve flight burst, backdated after a quiet interval — the
+  point layer never sees a serve.
+
+**Decisions.** SR4-FAR is not the next card; the point map is. I wrote the constraint
+into open point 22 (move the opener to the serve or the rally it heads) and demoted
+SR4-FAR in *Active next* item 3 (it contradicted item 1 before the fix). SR4-NEAR
+stays parked on perception. Nothing shipped; a refutation that pins the blocker is a
+success of the session.
+
+**Hygiene:** the sixtieth-session Log entry was archived VERBATIM to
+`docs/history/status_log_archive.md` (Log back to 3 entries), per the Lean-STATUS
+convention. New pins: 23 tests in `tests/test_point_map.py` (mechanical + the literal
+#63/#64 counts + the verdict truth table).
+
+**Not done (deliberate):** no card for the point-map fix yet — it is a `src/`
+mechanism design, which is tier-2 (architect) work by the coordinator prompt's Step
+3.5, and it needs an owner decision on whether the point map may change at all.
+
+**Asked:** continue the coordinator loop toward G3 — reliably track actions across
+videos, target >70% of actions correct against the match ground truth without the
+practice drills dropping below 90%.
+
+**Step 0 (read).** STATUS *Active next* ranked SR4 (the per-point serve record) as
+the needle-mover; nothing was carded for it. SR4a had just landed (see the #62+
+entry) and its G2 verdicts said the near side was repairable after the fact and the
+tracking exemption should reopen as an architect call only.
+
+**Step 1 (rank).** Serve reliability is the active defect (near 8/16, far 0/17,
+12 false emissions; held-out contacts F1 0.772). NOT worth doing now, per STATUS:
+the audio-onset probe (timing is not the bottleneck — the far TIME is already
+nearly free at 11/17 within +-15 f), the beach-rules serve-sequence decoding
+(needs SR4's records first), and the stale off-court-hold comment (comment-only,
+deferred into a session that touches `src/` anyway).
+
+**Step 3.5 (escalate).** SR4 has no card and its design hinges on an unverified
+premise — that a serve can be located post-hoc — so it went to the architect
+(route 4) with the SR4a evidence attached. **The first three attempts died on a
+harness bug, not on the model:** `cat .pi/prompts/architect.md /tmp/brief.md >
+full.md` (the documented route-4 recipe) makes a ~15 KB prompt, and a delegated
+prompt over ~1 KB kills the child `pi` with `Killed: 9` / `EXIT 137` and zero
+output, on every model, at every THINK level, independent of agent directory. Found
+by bisection (800 B survives, 1000 B dies, neutral filler text dies at the same
+size, 3+ repeats each). The owner's recollection was right: the brief must be a
+file the child reads. Re-run as a 451-byte pointer, and the architect ran 24 min
+and returned a **refutation**. Log: `logs/architect_sr4_ds_run.log`. (A later
+attempt with opus returned an OpenRouter billing error instead — 128k max_tokens
+against the remaining credit — so the architect tier also needs credit or a
+`max_tokens` cap. Recorded as a Learning.)
+
+**Step 4 (verify, own commands).** Re-ran the architect's own two probe scripts and
+the ceiling claim from committed artifacts, all reproduce:
+- Near coverage ceiling **13/16**: only 13 of the 16 ground-truth near serves have
+  ANY action on the serving side within +-15 f; P5 f2575 nearest -81 f (`overpass`
+  A), P7 f3747 nearest -108 f (`dig` A), P24 f18135 nearest +29 f (`dig` B). The
+  planned 15/16 bar is above the ceiling, so SR4-NEAR is not buildable as planned.
+- Far side signal (new, not in the brief): ball width at flight onset **14-23 px at
+  all 17 far serves** vs **39-52 px** at the 3 near serves that have a flight event
+  (13 of 16 have none within +-15 f); a cut anywhere in the **26-32 px plateau**
+  claims **far 16/17, near 0/16 misclaimed**.
+- Binding kills it: **0 of 17 far serves fall inside their own point window**.
+  `game_state.points` has **31** entries vs 33 GT points and each point's
+  `start_frame` sits **1-1466 f AFTER its own serve** (the session-56 backdated
+  onset). In-window binding: far 9-11/17 with 2-8 false records; leading-gap
+  binding: 5-7/33 side-correct with 22-25 false; unscoped: 432 narrow candidates for
+  33 serves; suppression by next-action distance N=15/30/60/120 gives far hits
+  16/8/2/0 with 329/256/183/141 false. Every lever trades true serves for false
+  ones ~1-for-1. **Root cause = the point map, not the signal.**
+
+**Verdict:** architect refutation ACCEPTED, and extended with the root cause. No
+`src/` change, no decode, held-out session untouched, full suite green (1191).
+Written up in `docs/sr4_architect_call.md` (new file).
+
+**Decisions:** SR4-NEAR parked on perception (its ceiling is 13/16 and M-b fixes
+P5/P7 at best, not P24); SR4-FAR demoted to a detection-only result until the point
+map is fixed or bypassed; the +-15 f tolerance stays (admitting P33's -25 f would
+also admit the far false serve f8534 at +16 f); wrong-label repairs do not violate
+the STOP list because a serve record never mutates `actions_pass2`. **Next is the
+point-map probe** — post-hoc, no `src/`, decides bypass vs open point 22 — and it
+needs a card written before an executor can run it.
+
+**Not done this session (deliberate):** no task card for the point-map probe yet
+(the card-writing is a planning act; the owner asked for results), and the owner
+gate on the near bar (lower it to 13/16, or make it explicitly contingent on M-b) is
+left for the owner because it changes an acceptance criterion in open point 30.
+### 2026-10-02 (sixty-second session) — D4 DECIDED: the serve-zone exemption is PARKED; next is the near-opening table, and the worker tier is quota-blocked
+
+**Asked:** take the architect's answer to `docs/d4_gate_brief.md`, fold the decision
+into STATUS, and start the next task (the SR4a near-opening table, carded with the
+`task-card` skill).
+
+**The decision (architect, relayed by the owner 2026-10-02).** M-a stays CLOSED.
+**M-b (the serve-zone exemption from the 90 f off-court hold) is PARKED, not built**:
+its ceiling is **+1 near serve of 16** (+2 only with P5, which needs a second
+mechanism) against a 0.90 bar that needs 15 of 16, and the blunt version measured
+**net 0** (+P7, -P18, false serves 12 -> 14, actions 207 -> 212). Why the cost cannot
+be bounded from #61: **P18 is an attribution swap, not a rally_start failure** — the
+same ball point (867.5, 313) in both arms, touch 1 in both, a NEW rally in both, and
+the toucher track goes 3 -> 2, i.e. the hit is credited to the server's PARTNER, so
+the contact reads `dig`; the lift also renumbers tracks match-wide (f2494: track 1 ->
+4). Any exemption changes identity wherever it fires, so its price is only
+measurable on a full-match run, which is the most expensive kind of refutation. The
+geometric alternative was rejected as designed-blind (the two new false serves sit at
+the right edge of the image, x ~1552-1576, and no foot-behind-the-line test has been
+measured against them), and the comment it would be built around is stale: that
+bystander is fed on 400 of 423 frames at today's horizon.
+
+**What was done in `src/`: nothing.** No `src/` change, no decode, no new run. STATUS
+only: open point 30's status + SR1d lines, the D4 owner decision and card, the SR4a
+card, a Learning (a hold exemption's price shows up as identity churn elsewhere), the
+Active-next ranking, and the AGENTS.md warning that `evaluate.py --predictions <dir>`
+grades ZERO predictions on `src.main` output (it wants a `frame` key, `src.main`
+writes `frame_number` — measured #61, it cost a vacuous 0.000-vs-0.000 "PASS" then).
+The stale `player_off_court_hold_frames` comment at `src/utils/config.py:101` is now
+on the deferred list: comment-only, inside the next session that touches `src/` anyway.
+
+**Delegation BLOCKED — card SR4a is READY and UNRUN.** The `subagent` tool was not
+exposed in this session, so the `scripts/run_task.sh` fallback was used: `zai/glm-5.3`
+and `zai/glm-5.3-flash` both return `429 code 1310 Weekly/Monthly Limit Exhausted`
+(reset 2026-10-03 18:49), `openrouter` has no API key and `amazon-bedrock` no region.
+Three delegate attempts, zero files written, working tree untouched. **The card is the
+first READY card, so `/next-task` runs it as soon as a worker model is reachable.**
+
+**SR4a (delegated step).** The card ran later the same day, in a worker session, with
+no `src/` change and no decode: `scripts/probe_near_openings.py` (imports
+`score_serves` and `relabel_serves`, contains no `cv2`), `docs/sr4a_near_openings.md`,
+`logs/sr4a_report.md`, `tests/test_near_openings.py` (+35; suite **1191**). **G1 was
+run before a single bucket was read and passed on both arms** (near 8/16, far 0/17,
+12 false serves, drills e2-e7 3/5). The 8 match near misses bucket into
+**2 `emitted_mislabeled_opener` + 3 `emitted_not_opener` + 3 `not_emitted`**;
+**G2 verdict 1: SR4's near side proceeds after the fact, 5 repairable of 8** (rule
+>= 4); **G2 verdict 2: M-b is REOPENED as a fresh architect call only, not a build —
+3 never produced, 2 of them coasting** (P5 f2575, P7 f3747; rules >= 3 AND >= 2),
+with the caveat that `output/sr1c/match_full_diag.jsonl` has **no recorded arm**, so
+the reopen must re-run with the arm named. Trap guard **0** of 17. Two things the
+next card must inherit: only **4 of the 8 hits** have a `serve` as their window
+opener, and **6 of the 12 false serves** sit inside a near-miss window, so an
+opener-keyed SR4 record is not yet safe. One card deviation is disclosed in the doc:
+the card's window rule leaves the clip-opening serve undefined (4 of 5 drills, P1),
+and the probe follows `relabel_serves.resolve_point` (video start is an anchor)
+because the literal reading scores the drills 0/5 and fails G1.
+
+
+### 2026-10-02 (sixty-first session) — SR1d: lifting the 90 f off-court hold is REFUTED; it recovers P7 exactly and still buys nothing
+
+**Asked:** run card SR1d — measure the cost of lifting
+`player_off_court_hold_frames` from 90 to 100000 on the 7 entreno clips and the
+full match, before anyone designs the serve-zone exemption (M-b). Measure only,
+no `src/` change. Full report: `docs/sr1d_hold_horizon_cost.md`; artifacts in
+the git-ignored `output/sr1d/`.
+
+**Method.** `Config.load` merges (118 keys in / out, 1 changed, verified), so
+`output/sr1d/hold_off.yaml` overrides exactly one key. 14 runs, all exit 0, MPS,
+sequential, one decode at a time. `src/` had drifted from `006e343` (`d402f65`,
+the #59 live-debug panel), so step 2's condition fired and the baseline arm was
+re-run too — and it comes out identical to the SR1-era artifacts on labels +
+frames for all 7 clips, which is the evidence that the drift is inert for a
+`--skip-visualization` batch run.
+
+**Gate.** Step 3's frozen `evaluate.py --predictions <run dir>` command grades
+**nothing**: 0 predictions on all 14 runs AND on the SR1-era artifacts (record:
+e3 1.0), because the tool looks for an entry named `actions` in a directory and
+takes `frame` where `src.main` writes `frame_number`. Both F1s would have been
+0.000 vs 0.000 — a vacuous "SAFE-LOOKING" PASS. Executor STOPPED and reported;
+**the owner authorised fixing the grading by naming the artifact** and the run
+continued. The adapter renames the frame key and nothing else; validated by the
+baseline arm reproducing the recorded F1s on 6 of 7 clips (e2 0.400 vs the
+record's 0.571 is the documented pre-existing action-script path gap).
+
+**Result.**
+- Entreno: **ΔF1 0.000 on 7 of 7** — and not merely equal, the two arms' action
+  streams are byte-identical event for event. The drills have nothing to gain.
+- e2 bystander (the regression the 90 f horizon was built for): fed **423 f**
+  with the lift vs **400 f** at baseline, i.e. fed **longer**, straight through.
+  Side finding: it is fed on 400 of 423 frames at the 90 f horizon *today* — 08-29's
+  "held a slot for 415 f" no longer describes it, and the horizon now buys only
+  23 coasting frames.
+- Match (26 061 f): near **8/16 → 8/16**, far 0/17 → 0/17, FP **12 → 14**,
+  actions **207 → 212**, all hit timings within ±2 f. The aggregate is flat, the
+  composition is not: **+P7** (serve emitted at f3747, delta +0, SR1b's
+  prediction reproduces) and **−P18** — P18's contact is still emitted at the
+  same f11996 but relabels `serve` → `dig`, the `rally_start` family SR1b found
+  at P5 (still missed in both arms). The two extra false serves are f17749, f17943.
+
+**Verdict: `global lift REFUTED`** (F1 criterion passes, bystander criterion
+fails) → the serve-zone exemption needs design (architect / owner), which is the
+expected outcome. This is **not** evidence against a *geometric* exemption: the
+server is behind the own baseline and the bystander straddles the sideline, and
+this run only shows the crude global version cannot separate them. What it adds
+to the price list: the `rally_start` coupling at P5/P18.
+
+**Card hygiene for the planner.** (1) Step 3's command should name a readable
+artifact; it cost the session a STOP. (2) "stop if the baseline artifacts are
+older than the current `src/`" is TRUE here while step 2 explicitly says to
+re-run the baseline in that case — reconcile the two. (3) Report the per-point
+SET of recovered/lost serves, not the aggregate: 8/16 → 8/16 hides the whole
+finding.
+
+**Nothing in `src/` changed.** Suite not run (no `scripts/` or `tests/` touched).

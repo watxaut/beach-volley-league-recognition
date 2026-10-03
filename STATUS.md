@@ -17,43 +17,56 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-02 (seventieth session, **the TOUCH-COUNT LEVER
-(#68) — the label bucket is Layer 2's possession count, not Layer 1's gesture,
-and the far serve is the SMALLEST lever on the goal metric**,
-`docs/g3_touch_count_lever.md`, `logs/touch_lever_stdout.txt`, open point 9).
+**Last updated:** 2026-10-02 (seventy-first session, **CARD TC1 DONE —
+`touch_rule_gate = TOUCH_COUNT_LEVER_REFUTED/0.6187`: the possession count is
+NOT re-derivable from the emitted contacts, so #68's +0.223 lever stays an
+in-sample upper bound and NOTHING ships. The follow-up diagnosis then located
+the UPSTREAM cause: the REACH GATE blocks the missing contacts — 44 of 183
+held-out GT contacts have no accepted contact within ±15 f and **20 of them
+carry a `reach` rejection (9.78× enriched)**, recoverable at 1.2×→6, 1.3×→9,
+2.0×→16 — but the match's own dev split cannot select the threshold (12-15
+admissions carrying ZERO GT contacts) and admitted rows are B/A = 64/6, so this
+is a RECALL lever worth ~+0.08 total-correct and ~0.00 class-accuracy, NOT the
+label fix**,
+`docs/tc1_touch_rules.md`, `docs/g3_reach_gate_bucket.md`, `logs/tc1_report.md`,
+`logs/tc1_stdout.txt`, `scripts/probe_touch_rules.py`, open points 9 / 7).
 Committed artifacts only: no `src/` change, no decode, no seek, no GT edit,
-held-out session untouched. **Three measured facts** on
-`output/20260920_match_ari_joan_lost/pipeline_output.json` +
-`output/g3r1/match_bw03_diag.jsonl` (185 accepted) vs the 182 held-out GT
-events f5240–f26147 at ±15 f: (1) **timing is NOT the bottleneck** — the
-signed delta to the nearest emission is median **−2 f** for dig (55) / set (46)
-/ spike (38) / overpass (18), and only `serve` is late (**+23 f**, 25), so a
-global re-timing pays nothing (recorded class acc reproduces exactly:
-**83/141 = 0.589**); (2) **Layer 1 is degenerate — 157 of 185 (85 %) accepted
-match contacts carry the single gesture `bump_set`** (attack 16, block 12), so
-the whole `dig`/`set`/`overpass`/`serve` decision is
-`ActionContextResolver._decide` (`src/recognition/action_context.py:175-219`)
-keyed on `_poss_touch`; (3) **the lever** — substituting the real GT
-`touch_number` into the UNMODIFIED `_decide` lifts label accuracy
-**79/139 = 0.568 → 110/139 = 0.791 (+0.223)**, and on the 127 non-serve
-contacts where a replay is faithful **79/127 = 0.622 → 110/127 = 0.866
-(+0.244)**, while `touch_number` itself is only **96/139 = 0.691**; touch
-errors cluster where the pipeline emitted FEWER contacts than the owner listed
-(11 points `accepted >= GT`: 11/37; 14 points `accepted < GT`: **32/102**).
-**Baseline hygiene (caught by TC1's executor refusing G1, and it was right): the
-shipped stream is 85/139 = 0.612 / 83/141 = 0.589, NOT 0.568** — the `accepted`
-rows carry no `behind_baseline`, so a replay is 168/185 faithful and scores
-0/12 on serves. **In-sample upper bound, no rule proposed, nothing shipped** —
-**CARD TC1** (READY, first card) tests a re-derived count offline on
-dev+entreno with ONE held-out shot (PASS ≥ 0.700 = +0.132 over the R0 replay
-control / PARTIAL ≥ 0.650 / FAIL). Trap: the GT touch number is in
-`points[].events[].touch_number`, not `points[].contacts[]` — reading the wrong
-one returns 0/139 silently. Deferred
-defect: the duplicated unreachable `return VolleyballAction.BLOCK, 0.7` at
-`src/recognition/action_context.py:193-194` (dead code, found in passing, fix
-only inside a session already touching `src/`). Suite **1286 passed**.
+held-out session untouched. G1 reproduced #68 exactly (185 accepted, 157
+bump_set, 139 found, touch 96/139 = 0.691, R0 replay control 79/139 = 0.568,
+GT-touch substitution 110/139 = 0.791, serve median +23 f, shipped stream
+85/139 = 0.612 / 0.589). Rule search offline on dev+entreno only chose R4 (R0
+5.577 / R1-R3 5.591 / R4 5.745 summed F1) and its ONE held-out shot scored
+label accuracy **86/139 = 0.6187** (**+0.050** over R0, bars were +0.132 PASS /
++0.082 PARTIAL) at touch accuracy **103/139 = 0.741**; non-serve
+**86/127 = 0.677** vs the GT-touch arm's 110/127 = 0.866. **The 43 wrong-touch
+found contacts are STARVED, not mis-reset**: `under_counted` 20 +
+`previous_contact_missing` 13 = **33 of 43 (77 %)**, `team_change_not_reset` 5,
+`over_counted` 4, `attack_not_reset` 1 — so the fix is upstream (emit the
+missing contacts, open points 2/5) and touch-count surgery buys at most +0.050.
+Three card defects reported, not reinterpreted: criterion (ii) is unsatisfiable
+by an offline replay (the R0 replay is off-record on 4 of 7 drills); R2 is a
+no-op by construction (the card also mandates keeping the resolver's own
+`attack_before` reset in every arm); G1's two reference figures need
+production-stream semantics the card did not state. Suite **1327 passed**
+(+41). No task card written or reordered.
 
-**#64 (previous session):** 2026-10-02 (sixty-fourth session, **PM1 verdict: `FAIL=blocked` —
+**#68 (previous session):** the TOUCH-COUNT LEVER diagnosis — Layer 1 is
+degenerate (157 of 185 accepted contacts carry `bump_set`), so every
+`dig`/`set`/`overpass`/`serve` decision is `ActionContextResolver._decide`
+(`src/recognition/action_context.py:175-219`) keyed on `_poss_touch`;
+substituting the real GT `touch_number` into the UNMODIFIED `_decide` lifts
+label accuracy 79/139 = 0.568 → 110/139 = 0.791 (non-serve 0.622 → 0.866) while
+`touch_number` itself is only 96/139 = 0.691. Timing is NOT the bottleneck
+(median **−2 f** for dig/set/spike/overpass; only `serve` is late at **+23 f**),
+so the far serve is the SMALLEST lever on the goal metric. **Baseline hygiene,
+corrected in that session after CARD TC1's executor refused its own G1 and was
+right: the shipped stream is 85/139 = 0.612 (dump `action`) / 83/141 = 0.589
+(`pipeline_output.json`), NOT 0.568** — the `accepted` rows carry no
+`behind_baseline`, so a replay is 168/185 faithful and scores 0/12 on serves.
+Full detail: `docs/g3_touch_count_lever.md`, `logs/touch_lever_stdout.txt`,
+open point 9, Session index #68/#70.
+
+**#64 (earlier session):** 2026-10-02 (sixty-fourth session, **PM1 verdict: `FAIL=blocked` —
 the far-serve record cannot bypass the point map; SR4-FAR is BLOCKED on open point
 22**, `docs/pm1_point_map.md`, `logs/pm1_report.md`, `scripts/probe_point_map.py`,
 open point **30**). Post-hoc, committed artifacts only: no `src/` change, no decode,
@@ -294,7 +307,8 @@ VFR. Both are allow-listed in `tests/test_vfr_seek_guard.py`. Fix the annotator
 before any frame-shown annotation pass.
 
 **Active next (ranked) — execute via the task cards below (`/next-task`):**
-0. **TC1 READY (#68 diagnose) — THE TOUCH-COUNT LEVER: the label bucket is Layer 2's possession count, not Layer 1's gesture.** `docs/g3_touch_count_lever.md`, transcript `logs/touch_lever_stdout.txt` (all committed artifacts; no `src/`, no decode, no seek, held-out untouched). Three measured facts: (1) emissions are already frame-accurate — signed delta to the nearest emission is median **−2 f** for dig/set/spike/overpass, only `serve` runs **+23 f** — so a global timing fix pays nothing; (2) **Layer 1 is degenerate: 157 of 185 (85 %) accepted match contacts carry the single gesture `bump_set`**, so the entire `dig`/`set`/`overpass`/`serve` decision is `ActionContextResolver._decide` keyed on `_poss_touch` (`src/recognition/action_context.py`, `_decide` 175-219, `_poss_touch` 127-135); (3) substituting the **real GT `touch_number`** into the *unmodified* `_decide` lifts label accuracy **79/139 = 0.568 → 110/139 = 0.791 (+0.223)**, or **79/127 = 0.622 → 110/127 = 0.866 (+0.244)** on the 127 non-serve contacts where a replay is faithful, while `touch_number` itself is only **96/139 = 0.691** — the largest single lever measured on this GT (all 25 serves +0.177, 13 overpass labels +0.092, 15 `set↔dig` swaps +0.106, **the 12 far serves only +0.032**). **Baseline hygiene (corrected 2026-10-02 after TC1's executor refused G1 and was right): the shipped stream is 85/139 = 0.612 (the dump's `action` field) / 83/141 = 0.589 (`pipeline_output.json`); the 0.568 replay control is NOT production** — the `accepted` rows carry no `behind_baseline` (0 of 185), so a replay is 168/185 faithful and scores **0/12 on serves**. TC1's gate is therefore stated as a gain over the R0 replay control, which is baseline-independent. Touch errors concentrate where the pipeline emitted FEWER contacts than the owner listed (11 points `accepted >= GT`: 11/37; 14 points `accepted < GT`: **32/102**). **CARD TC1 (READY, first card below)** decides it offline on dev+entreno and scores the chosen rule once on held-out; **nothing ships from it** — a PASS means the next step is an architect call for the `src/` touch-count change, a FAIL kills the count as the lever. Trap: the GT touch number lives in `points[].events[].touch_number`, **not** `points[].contacts[]` (reading the wrong one returns 0/139).
+0. **TC1 DONE (#69): `touch_rule_gate = TOUCH_COUNT_LEVER_REFUTED/0.6187` — the possession count is NOT re-derivable from the emitted contacts; nothing ships, no architect card is justified.** `docs/tc1_touch_rules.md`, `logs/tc1_report.md`, transcript `logs/tc1_stdout.txt`, `scripts/probe_touch_rules.py` (imports `ActionContextResolver` + the existing matchers, no `cv2`, no decode, no seek, exit 2 on FAIL), `tests/test_touch_rules.py` (+41; suite **1327**). G1 reproduced #68 EXACTLY (185 accepted; bump_set 157 / attack 16 / block 12; 139 found; touch accuracy **96/139 = 0.691**; R0 replay control **79/139 = 0.568**; GT-touch substitution **110/139 = 0.791**; timing medians dig/set/spike/overpass **−2 f**, serve **+23 f**; shipped stream 85/139 = 0.612 / 0.589). **Step 2 is the centre: the 43 wrong-touch found contacts are STARVED, not mis-reset** — `under_counted` **20** + `previous_contact_missing` **13** = **33 of 43 (77 %)**, `team_change_not_reset` **5**, `over_counted` **4**, `attack_not_reset` **1** — which independently re-confirms #68's "errors cluster where fewer contacts were emitted" mechanism and says the fix is UPSTREAM (emit the missing contacts; open points 2/5), not in the counter. **Step 3 (dev + e1–e7 only; R0 = emitted count, R1 = +reset on any team change, R2 = +reset after an attack gesture, R3 = +reset on `rally_id` change, R4 = +ball-width cross confirmation, abstaining where `ball_side is None` — 64 of 185; every rule replayed through the UNMODIFIED `_decide`)**: summed F1 R0 5.577 / R1–R3 5.591 / R4 **5.745 → R4 chosen**; per-drill R0 is never beaten on more than one drill (e5 0.923 → 0.769 under R1–R3). **Step 4, ONE held-out shot: label accuracy 86/139 = 0.6187 = +0.050 over the R0 control** (PASS bar +0.132, PARTIAL +0.082 → **neither met**) at touch accuracy **103/139 = 0.741**; the non-serve arm is **86/127 = 0.677** vs R0 79/127 = 0.622 and the GT-touch arm 110/127 = 0.866 — a perfect count is worth +0.244, the best re-derived count +0.055. **Step 5 (offline approximation, NOT the real gate): R4 vs the recorded F1 — e1 0.706→0.706, e2 0.571→0.533, e3 1.000→0.929, e4 0.933→0.933, e5 0.923→0.923, e6 0.933→0.800, e7 0.750→0.500 — 4 of 7 outside ±0.01, but the R0 REPLAY is itself off-record on 4 of 7 (e2 −0.171, e3 −0.071, e6 −0.133, e7 −0.250), so criterion (ii) as literally written is unsatisfiable by any replay; reported, NOT reinterpreted (the verdict already fails on (i)). Rule-relative, R4 made no drill worse than R0 (+0.133 on e2, 0.000 elsewhere). **Step 6: NO `src/` change** — #68's +0.223 survives as a DIAGNOSTIC lever only; what is refuted is recovering it by re-deriving the count. Three card defects reported to the coordinator: (a) (ii) as above; (b) **R2 is a no-op by construction** — the card also mandates keeping the resolver's own `attack_before` reset in EVERY arm, which IS R2, so R2 ≡ R1 always (pinned by `test_r2_is_subsumed_by_the_base_attack_reset`); (c) G1's timing / 0.589 references only reproduce on the PRODUCTION stream over ALL region events, not on the found subset. **Next task (coordinator's):** the upstream contact-recall question — since 77 % of the count error is a MISSING contact, the next probe is a contact-recall/attribution diagnosis on the same 14 `accepted < GT` points (open points 2/5), NOT a second touch-rule search. No card written or reordered by this card.
+0z. **REACH-GATE BUCKET — the upstream cause of the missing contacts (coordinator diagnosis #71, `docs/g3_reach_gate_bucket.md`), and now the ranked next step.** 44 of 183 held-out GT contacts have no accepted contact within ±15 f (median nearest 33 f); every one has a rejected row within 15 f. Base-rate-normalised against frame coverage, **`reach` is 9.78× enriched** (71 rejections, 4.65 % coverage → 20 observed misses vs 2.05 expected) while `no_contact_geometry` is the residual bucket (1.76×, blocks 43 of 44 but not itself actionable), `no_ball_sighting` sits at chance (0.99×) and `min_contact_gap` is DEPLETED (0.42×). Every rejected row carries `distance`/`reach`, so the gate re-scores offline: 1.1× 4/4 (1.00), **1.2× 14/14 (1.00)**, 1.3× 21/19 (0.90), 2.0× 48/32 (0.67). Of the 20 reach-carrying misses: 2 within 1.05×, 6 within 1.2×, 9 within 1.3×, 16 within 2.0×; the other 24 of 44 have no candidate geometry at all. **This is the first link of the `recall → count → label` chain** (TC1: 77 % of touch error is a STARVED count; #68: a perfect count is worth +0.244 on the 127 non-serve contacts), which is why it outranks the remaining serve work. **Three measured reasons it cannot ship from this diagnosis alone:** (i) the match's OWN dev split (P≤8, cut f4910) admits 12-15 candidates carrying **ZERO** GT contacts at every threshold, so the threshold is NOT selectable out of sample from the match — only the standalone dev clip + 7 drills (27 rejections, 91 GT) can select it, and a dev-selected 2.0× gate (dev precision 0.80) generalises to held-out at 32/36 = 0.89 while admitting 6 false contacts on the drills; (ii) at the best frame-precision gate (1.2×) only **6 of 14** carry the correct `target_team`, and across all 71 rejections `target_team` is **B 64 / A 6**; (iii) `CONTACT_REACH = 140 px` is a px constant on GT-validated action logic, venue-coupled (206 px vs 464-479 px court depth, AGENTS.md §7), with **no config key** (`ActionClassifier.__init__` takes none; read as `self.CONTACT_REACH` at `src/recognition/action_classifier.py:416`). So only a REAL A/B run can tell what an admitted candidate resolves to — an offline cut cannot, because rejected rows carry no `contact_point` and cannot be pushed through `_build_contact` → the resolver → the confidence threshold. Card **RG1**.
 0b. **PG2 DONE (#67): `point_map_alignment = PG1_VERDICT_IS_A_PAIRING_ARTIFACT` — PASS. PG1's `point_map_gate = REFUTED/1` ("uniformly late") is an ARTIFACT of its ordinal pairing (GT *P* ↔ pipeline *P−1*); the window starts ARE serve-anchored, so SR4-FAR is MIS-KEYED, not blocked.** `docs/point_map_seam.md`, `logs/pg2_report.md`, `scripts/score_point_map_alignment.py` (imports `score_point_map` → `probe_point_map`, no `cv2`, exit 2 on FAIL), `tests/test_point_map_alignment.py` (+49; suite **1286** = 1237 + 49). Pairing-independent, all three pre-registered criteria PASS: **14 of 31** window starts within ±15 f of ANY GT serve (23/31 at ±30 f, 25/31 at ±60 f) vs a seeded Monte-Carlo chance baseline of **1.21 of 31** (20 000 draws, seed 20261002, serve balls cover 3.93 % of frames) = **11.56×** (bar ≥ 5×); monotone order-preserving DP keeps **14 pairs within ±15 f at every skip cost** 60/120/240 f (27–28 pairs, median −6/−8 f). PG1's ordinal numbers reproduce exactly (1 of 33, 31 of 31 non-negative, +6/+3153/+1700 f) and now decide nothing. Seam: far serves **AT a window start** (11/17 at_seam, 0 interior, 6 in a gap), near serves **INSIDE** one (11/16, geometrically 14/16) — #65's "far 14/17 in the gaps" is a seam. Step 5 narrow `far_flight` (`width_start <= 28`, fixed) keyed on window starts: **11/17 far, 0/16 near misclaimed, 5 unanchored** at ±10 and ±15 f — **IN-SAMPLE re-test target, NOT shippable** (STOP list, AGENTS.md §5). Card defect logged: 1(e) asks for a "sign-free" median of −6 f (impossible); −6 f is the nearest-**boundary** signed median (nearest-start signed −1 f, sign-free +17 f) — all three readings serve-anchored, so the verdict does not turn on it. **Next task (coordinator's):** the far-serve rule keyed on WINDOW STARTS, re-tested OUT of sample against a non-serve control (AGENTS.md §6 rules) — the corrected-opener architect card is NOT justified by either run, and SR4-FAR stays OFF until that rule has an out-of-sample score. No card written or reordered by this card.
 1. **PM1 DONE (#64): `FAIL=blocked`** — `docs/pm1_point_map.md`,
    `logs/pm1_report.md`. The probe ran both gates green (G1 baseline reproduced
@@ -1422,6 +1436,32 @@ point number in `docs/history/`.
     from #68; **CARD TC1** (READY, first card) tests a re-derived count offline
     on dev+entreno with one held-out shot (PASS >= 0.700 = +0.132 over R0 /
     PARTIAL >= 0.650 / FAIL).]**
+    **[#69 (2026-10-02) — CARD TC1 ran the whole decision: `touch_rule_gate =
+    TOUCH_COUNT_LEVER_REFUTED/0.6187`. Nothing ships and no architect card is
+    justified. `docs/tc1_touch_rules.md`, `logs/tc1_report.md`,
+    `logs/tc1_stdout.txt`, `scripts/probe_touch_rules.py`,
+    `tests/test_touch_rules.py` (+41; suite **1327**). G1 reproduced every
+    #68 number exactly (185 / 157 / 139 / 96 / 79 / 110, medians -2 f and
+    serve +23 f, shipped stream 85/139 = 0.612 / 0.589). R0-R4 were replayed
+    through the UNMODIFIED `_decide` on dev + e1-e7 only; summed F1 R0 5.577 /
+    R1-R3 5.591 / R4 **5.745**, so **R4 was chosen there** and scored ONCE on
+    held-out: label accuracy **86/139 = 0.6187 (+0.050 over the R0 control)**,
+    touch accuracy **103/139 = 0.741**, non-serve **86/127 = 0.677** vs the
+    GT-touch arm's 110/127 = 0.866. **The 43 wrong-touch found contacts are
+    STARVED, not mis-reset**: `under_counted` 20 + `previous_contact_missing`
+    13 = **33 of 43 (77 %)**, `team_change_not_reset` 5, `over_counted` 4,
+    `attack_not_reset` 1 — so the counter is downstream of a MISSING-CONTACT
+    problem (open points 2/5) and a re-derived count buys at most +0.055 of
+    #68's +0.223/#68's non-serve +0.244. **#68's lever stands as an in-sample
+    UPPER BOUND / diagnostic, not as a shippable rule set.** Step 5 (offline
+    approximation of the STATUS gate) is 4 of 7 drills outside +-0.01, but the
+    R0 replay is itself off-record on 4 of 7, so that criterion cannot be met
+    by any replay. Three card defects reported, not reinterpreted: criterion
+    (ii) is unsatisfiable as written; **R2 is a no-op** (the card also mandates
+    keeping the resolver's own `attack_before` reset in every arm, which IS
+    R2, so R2 == R1); and G1's timing / 0.589 references only reproduce on the
+    PRODUCTION stream over ALL region events. Next = the upstream contact-recall
+    diagnosis, not another touch-rule search.]**
 
 13. **Ace metric (parked) — needs point-outcome detection.** Paths: (a)
     derived heuristic in the metrics layer (serve whose rally has no
@@ -1475,6 +1515,7 @@ tracker in multi-tracker harnesses). The distilled technical facts below
 survive across sessions; provenance in the archives.
 
 **Measurement & eval conventions**
+- **An offline replay is not a baseline, and a "median offset to the nearest emission" needs its POPULATION stated — three separate measurement traps, all hit while running CARD TC1 (measured #69, reusing #68/#70's numbers).** (1) **Replay fidelity**: `ActionContextResolver._decide` reads `behind_baseline`, which the `accepted` rows of `output/g3r1/match_bw03_diag.jsonl` do not carry (0 of 185), so any replay over that dump scores **0/12 on serves** and reads 79/139 = 0.568 while the shipped streams are 85/139 = 0.612 (the dump's own `action` field) and 83/141 = 0.589 (`pipeline_output.json`) — gate on a GAIN over the replay control, never on its absolute. (2) **Population**: #68's serve median of **+23 f** only reproduces on the PRODUCTION `pipeline_output.json` actions over ALL 183 region events, found or not (nearest-ANY action); on the 12 FOUND serves alone the median is **-0.5 f**, because the 13 far serves at +23…+125 f carry the class. (3) **Matcher policy**: #68's 139 found contacts (137 DISTINCT contacts — two contacts serve two GT events under a non-exclusive matcher) require non-exclusive nearest-within-±15 f; `evaluate_timed.match_events`'s one-to-one assignment on the same data gives 137, and `evaluate.py` on the same data grades 0.437 rather than 0.589 (different population). Corollary on rule ladders: when a probe must keep the shipped resolver's own resets in every arm, **an arm that re-adds one of them is a no-op** — CARD TC1's R2 ("reset after an attack gesture") was exactly the resolver's existing `attack_before` reset, so R2 ≡ R1 by construction and the ladder's apparent depth was fake; pin such an arm with a test instead of reading it as a distinct rule.
 - `evaluate_match_points.py`'s 31/33 ratio compares counts, not temporally matched recall; the episode map/serve relabel results use GT structure and owner corrections, so autonomous winner/scoring evaluation must exclude those inputs (#30 assessment).
 - Canonical `pipeline_output.json` persists events, point segments and sparse thumbnail snapshots, not the dense ball/player/pose sequence; temporal-model experiments need a feature sidecar, not just existing event JSON (`json_exporter.py`, #30 assessment).
 - The 4-corner ground homography is **badly wrong at the far end** of the beach
@@ -1885,6 +1926,7 @@ survive across sessions; provenance in the archives.
 - **A player box with no detector behind it can read "behind the line" and do no harm, and a backward-looking fix for it costs as much as it gains** (#60). Fifteen match contacts had `behind_baseline` read off a carried-forward or absent track; the owner confirmed only 2 are serves and the other 13 were vetoed by the serve label's second condition (they did not open a rally). The 2 real serves DEPEND on that read — their player has no real detection at or before the hit (it returns 1-7 f LATER) — so a rule that looks backwards for a cleaner position trades +P11/+P12 for −P17/−P19; P9/P10 read false at K = 5, 10 and 15 (stance feet y = 750/747 vs the 761 px line). Corollary for any reproduction gate: a diag dump's per-frame player list is NOT the classifier's snapshot (a contact is confirmed 7 f late and the last REAL position is used), so a probe cannot reproduce the shipped read on the ~6% of contacts whose toucher is coasting.
 
 ## Session index (one line each)
+- #71 **CARD TC1 DONE: `touch_rule_gate = TOUCH_COUNT_LEVER_REFUTED/0.6187` — the possession count is NOT re-derivable from the emitted contacts; nothing ships, no architect card is justified** — `docs/tc1_touch_rules.md`, `logs/tc1_report.md`, transcript `logs/tc1_stdout.txt`, `scripts/probe_touch_rules.py` (imports `ActionContextResolver` + the existing matchers; no `cv2`, no decode, no seek; exit 2 on FAIL), `tests/test_touch_rules.py` (+41 tests; suite **1327** = 1286 + 41). Committed artifacts only: no `src/` change, no decode, no seek, no GT edit, held-out session untouched. **G1 reproduced #68 EXACTLY**: 185 accepted (bump_set 157 / attack 16 / block 12), 139 found, touch accuracy **96/139 = 0.691**, R0 replay control **79/139 = 0.568**, GT-touch substitution **110/139 = 0.791**, timing medians dig/set/spike/overpass **-2 f** and serve **+23 f**, shipped stream 85/139 = 0.612 (dump `action`) / 0.589 (`pipeline_output.json`). **Step 2, the deliverable's centre: the 43 wrong-touch found contacts are STARVED, not mis-reset** — `under_counted` **20** + `previous_contact_missing` **13** = **33 of 43 (77 %)**, `team_change_not_reset` **5**, `over_counted` **4**, `attack_not_reset` **1**; this independently re-confirms #68's mechanism (errors cluster on the 14 points where the pipeline emitted FEWER contacts) and localises the fix UPSTREAM. **Step 3, dev + e1-e7 only, every rule replayed through the UNMODIFIED `_decide`** (R0 emitted count; R1 +reset on any team change; R2 +reset after an attack gesture; R3 +reset on `rally_id` change; R4 +ball-width cross confirmation, abstaining where `ball_side is None` = 64 of 185): summed F1 R0 5.577 / R1-R3 5.591 / R4 **5.745 → R4 chosen on dev+entreno**; per-drill R0 is beaten on at most one drill (e5 0.923 → 0.769). **Step 4, ONE held-out shot with R4: label accuracy 86/139 = 0.6187, i.e. +0.050 over the R0 control** — PASS bar +0.132 and PARTIAL bar +0.082 are BOTH unmet — at touch accuracy **103/139 = 0.741**; the card's non-gating non-serve arms read **86/127 = 0.677** vs R0 79/127 = 0.622 and the GT-touch arm 110/127 = 0.866, so a perfect count is worth +0.244 and the best re-derived count +0.055. **Step 5 (offline approximation of the STATUS gate, explicitly not the real gate): e1 0.706→0.706, e2 0.571→0.533, e3 1.000→0.929, e4 0.933→0.933, e5 0.923→0.923, e6 0.933→0.800, e7 0.750→0.500** — 4 of 7 outside ±0.01, but the R0 REPLAY is already off-record on 4 of 7 (e2 -0.171, e3 -0.071, e6 -0.133, e7 -0.250), so criterion (ii) as literally written is unsatisfiable by any replay; reported, not reinterpreted, and the verdict already fails on (i). Rule-relative R4 made no drill worse than R0 (+0.133 on e2, 0.000 elsewhere). **Step 6: NO `src/` change** — #68's +0.223 (non-serve +0.244) survives as an in-sample upper bound / diagnostic lever; what is refuted is recovering it by re-deriving the count from emitted contacts. **Three card defects reported to the coordinator (none reinterpreted into the verdict):** (a) criterion (ii) unsatisfiable as written; (b) **R2 is a no-op by construction** — the card mandates keeping the resolver's own `attack_before` reset in EVERY arm, which is exactly R2, so R2 ≡ R1 always (pinned by `test_r2_is_subsumed_by_the_base_attack_reset`); (c) G1's timing table and 0.589 reference only reproduce on the PRODUCTION stream over ALL region events — on the 12 FOUND serves alone the median is -0.5 f, not +23 f, and `evaluate.py` on the same data grades 0.437, not 0.589. **Next task (coordinator's):** the upstream contact-recall diagnosis on the same 14 `accepted < GT` points (open points 2/5), NOT a second touch-rule search. No new task card, no cards reordered, Log not archived.
 - #70 **#68's LABEL BASELINE CORRECTED — the shipped stream is 85/139 = 0.612 (dump `action`) / 83/141 = 0.589 (`pipeline_output.json`), NOT 79/139 = 0.568; that figure is a REPLAY artifact** — caught by CARD TC1's executor, which refused its own G1 and reported instead of proceeding (the card working as designed). Cause: the `accepted` rows of `output/g3r1/match_bw03_diag.jsonl` carry **no `behind_baseline`** (0 of 185) while `src/recognition/action_context.py:167` reads it for the serve branch, so an offline replay is only **168/185** faithful and scores **0/12 on serves** against the dump's own 7/12. Four arms verified by the coordinator: dump `action` **85/139**, replay `behind_baseline=False` **79/139**, replay + real GT `touch_number` **110/139**, `pipeline_output.json` **83/141 = 0.589**. Split: non-serve 127 -> 78 / **79** / **110 (0.866)**; serve 12 -> 7 / 0 / 0. **The touch-count lever is untouched** (96/139 and 110/139 both reproduce exactly) and is in fact LARGER on the replay-faithful subset (**+0.244**). Corrected my own lever table too: all 25 region serves +0.177, 13 overpass labels **+0.092**, 15 `set↔dig` swaps **+0.106**, 12 far serves **+0.032**. Repairs: `docs/g3_touch_count_lever.md` §3 rewritten with a CORRECTION note and the `own_side_drive_block` caveat; CARD TC1's G1 expects the replay control and carries a REQUIRED CAVEAT, and its gate is restated as a **gain over the R0 control** (PASS >= 0.700 = +0.132 / PARTIAL >= 0.650 / FAIL) so it cannot turn on the baseline; open point 9 + the #68 index line amended. No `src/` change, no decode, no seek, no GT edit, held-out untouched; suite **1286**. Durable lesson: a replay arm is not a baseline until its fidelity to the shipped stream is measured.
 - #68 **THE TOUCH-COUNT LEVER: the largest held-out label loss is Layer 2's possession count, not Layer 1's gesture** — `docs/g3_touch_count_lever.md`, transcript `logs/touch_lever_stdout.txt` (committed artifacts only; no `src/`, no decode, no seek, no GT edit, held-out session untouched). Three measured facts on `output/20260920_match_ari_joan_lost/pipeline_output.json` + `output/g3r1/match_bw03_diag.jsonl` (185 `accepted` rows) vs the 182 held-out GT events in f5240–f26147 at ±15 f: (1) **timing is NOT the bottleneck** — the signed delta to the nearest emission is median **−2 f** for dig (n=55) / set (46) / spike (38) / overpass (18), and only `serve` runs late (**+23 f**, n=25), so the #48 "41 of 44 missed contacts 7–69 f away" story is serve-specific and a global re-timing pays nothing; the recorded class accuracy reproduces exactly (**83/141 = 0.589**, record 0.590); (2) **Layer 1 is degenerate: the 185 accepted match contacts carry only 3 gestures — `bump_set` 157 (85 %), `attack` 16, `block` 12** — and the one gesture becomes dig 73 / set 40 / spike 24 / serve 16 / overpass 4, so the whole `dig`/`set`/`overpass`/`serve` decision is `ActionContextResolver._decide` (`src/recognition/action_context.py:175-219`) keyed on `_poss_touch` (lines 127-135); (3) **the lever is verified by replay** — substituting the real GT `touch_number` into the *unmodified* `_decide` over the 139 found held-out contacts lifts label accuracy **79/139 = 0.568 → 110/139 = 0.791 (+0.223)**, and on the **127 non-serve** contacts where an offline replay is faithful **79/127 = 0.622 → 110/127 = 0.866 (+0.244)**, while `touch_number` itself is only **96/139 = 0.691** — the largest single lever measured on this GT (all 25 region serves +0.177, 13 overpass labels +0.092, 15 `set↔dig` swaps +0.106, and the **12 far serves only +0.032**). **BASELINE CORRECTED in-session (seventieth session) after CARD TC1's executor refused G1 and was right: the shipped streams are 85/139 = 0.612 (the dump's `action` field) and 83/141 = 0.589 (`pipeline_output.json`) — 0.568 is a REPLAY artifact, NOT production.** The `accepted` rows carry **no `behind_baseline`** (0 of 185) and `_decide` reads it for its serve branch, so an offline replay is only **168/185** faithful and scores **0/12 on the serves** against the dump's own 7/12. TC1's gate is therefore restated as a gain over the R0 replay control. Residual after a perfect count: `overpass→spike` 10, `serve→dig` 9, `serve→spike` 3, `overpass→dig` 3, `spike→block` 2, `spike→set` 1, `set→overpass` 1 — so the count is necessary but not sufficient (`overpass` still fails its own `touch == 2 and no follow` rule). **Mechanism, first cut:** touch errors cluster where the pipeline emitted FEWER contacts than the owner listed — 11 points with `accepted >= GT`: touch errors 11/37; 14 points with `accepted < GT`: **32/102** (P19 18/13/**7**, P25 18/12/**6**, P26 11/8/**6**, P30 18/15/**5**, P23 7/6/**4**, P29 6/7/**4**, P33 4/5/**3**, P10 2, P13 2, P15 2, P22 1) — i.e. a missing contact starves `_poss_touch` and every later touch in that possession is numbered low; P18 (16/15) and P24 (7/6) are clean, so it is the *placement* of the missing contact, not the raw count. **In-sample upper bound, no rule proposed, nothing shipped** — wrote **CARD TC1** (READY, first card) to test a re-derived count offline on dev+entreno with one held-out shot, pre-registered PASS ≥0.700 / PARTIAL ≥0.650 / FAIL, and re-ranked *Active next* to put the label lever ahead of the far serve. **Trap found:** the GT touch number lives in `points[].events[].touch_number`, **not** in `points[].contacts[]` (only `events` carries it; reading `contacts` silently returns 0/139 — it bit me mid-session). **Defect found in passing (deferred, do not fix alone):** `src/recognition/action_context.py:193-194` is a duplicated unreachable `return VolleyballAction.BLOCK, 0.7` — dead code, no symptom, a landmine for the next editor of that gate.
 - #66b **PG2 DONE, `point_map_alignment = PG1_VERDICT_IS_A_PAIRING_ARTIFACT`: PG1's `REFUTED/1` is a PAIRING artifact — window starts ARE serve-anchored; SR4-FAR is mis-keyed, not blocked** — `docs/point_map_seam.md`, `logs/pg2_report.md`, `logs/pg2_run.log`, `scripts/score_point_map_alignment.py`, `tests/test_point_map_alignment.py` (+49 tests; suite **1286** = 1237 + 49), plus a `## 7. Correction` pointer appended to `docs/point_map_alignment.md` (§1–§6 left byte-identical). Committed artifacts only: no `src/` change, no decode, no seek, no GT edit, held-out session `20260928_entreno_vall_dhebron` untouched, `scripts/score_point_map.py` unmodified. All three pre-registered criteria PASS: (i) **14 of 31** window starts within ±15 f of ANY GT serve (23/31 at ±30 f, 25/31 at ±60 f); (ii) **11.56×** chance — seeded Monte-Carlo `random.Random(20261002)`, 20 000 draws × 31 uniform starts over `[0, 26061)`, tol ±15 → **1.21 of 31** (observed range 0–7), while the ±15 f serve balls cover only **3.93 %** of frames (1023/26061); (iii) monotone order-preserving DP keeps **14 pairs within ±15 f at every skip cost** 60/120/240 f (27/28/28 pairs, unmatched 4/3/3, median −6/−8/−8 f, min −32/−171/−171). **G2 parity exact**: PG1's own scorer gives `start_hits_within_15f` = 1, `offsets_nonnegative` = 31, min/max/median **+6 / +3153 / +1700 f**, reading `uniformly late` — reproduced, and it decides nothing. **Seam**: far 11/17 `at_seam` (nearest start within ±15 f), **0** in a window interior, 6 in a genuine gap; near 3/16 `at_seam`, 11/16 inside — so #65's "far 14/17 in the gaps" is a **seam**, and PG1's geometric `inside_any_window` (far 2/17, near 14/16) is the same 16 serves bucketed differently (both geometric far rows P23/P25 are also `at_seam`; the scorer prints both). **Step 5** narrow `far_flight` (`width_start <= 28`, no sweep) keyed on window starts, one claim per start: ±10 and ±15 f → 16 claims, **far 11/17, near misclaimed 0/16, 5 unanchored**; ±20 f → 17/12/0/5. **IN-SAMPLE on the same 17 far serves — a re-test target, NOT a shippable rule** (STOP list, AGENTS.md §5), so SR4-FAR stays OFF. Two implementation notes recorded so nobody re-tunes them blind: the DP needs the tolerance-hinge reward (`100 − distance` inside ±15 f, `−distance` outside) — a plain `−|offset|` reward yields only 13 within-15 pairs; and card step 1(e) asks for a "sign-free" median of **−6 f**, which cannot be negative — the −6 f is the nearest-**boundary** signed median (nearest-start signed **−1 f**, sign-free **+17 f**, DP median at skip 60 −6 f), all three readings serve-anchored, so the verdict does not turn on it (reported to the owner, nothing re-tuned). Next task is the coordinator's far-serve rule keyed on window starts, re-tested out of sample with a non-serve control; the corrected-opener architect card is NOT justified by either run. No new task card, no cards reordered, Log not archived.
@@ -1995,6 +2037,69 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+### 2026-10-02 (seventy-first session) — CARD TC1 DONE: `TOUCH_COUNT_LEVER_REFUTED/0.6187` — the count is not re-derivable, the fix is UPSTREAM (emit the missing contacts); the reach-gate bucket is the measured upstream cause
+
+**Asked:** continue the coordinator loop toward G3 (standing "Continue", m00266).
+
+**Step 0.** CARD TC1 re-issued in #70 with a baseline-independent gate (a gain over the
+R0 replay control, so which stream is quoted cannot move the verdict), delegated on
+`stealth/space-bunny-alpha THINK=high` via a **202-byte pointer** `/tmp/tc1_run.md`
+(`EXIT 0`, ~17 min, log buffered until exit).
+
+**Step 4 (verify, own commands).** `probe_touch_rules.py` imports the UNMODIFIED
+`ActionContextResolver` and the existing matchers, opens no capture, imports no `cv2`
+(`grep` clean); `git status` shows no `src/` change. Suite **1327** = 1286 + 41, green.
+G1 reproduction matched #68 exactly (I re-ran each figure myself: 185 accepted; 157
+`bump_set` / 16 `attack` / 12 `block`; 139 found; touch 96/139; R0 79/139; GT-touch
+110/139; serve median +23 f; 85/139 and 83/141 shipped). Worker again left the card's
+`status:` line at READY; I set it to DONE (#71).
+
+**Result — the pre-registered FAIL fires, and step 2 is the real deliverable.** Chosen
+rule R4 (dev+entreno summed F1 5.745 vs R0 5.577) scored **86/139 = 0.6187 = +0.050**
+over R0 (bars +0.132 PASS / +0.082 PARTIAL) at touch accuracy 103/139 = 0.741;
+non-serve 86/127 = 0.677 vs R0 0.622 and the GT-touch arm 0.866 — so a perfect count is
+worth +0.244 and the best re-derived count +0.055. **The 43 wrong-touch found contacts
+are STARVED, not mis-reset**: `under_counted` 20 + `previous_contact_missing` 13 = **33
+of 43 (77 %)**, `team_change_not_reset` 5, `over_counted` 4, `attack_not_reset` 1.
+The fix is therefore **upstream — emit the missing contacts** (open points 2/5), not
+better counting. Three card defects reported and NOT reinterpreted into the verdict:
+(ii) is unsatisfiable by any offline replay (the R0 replay is off-record on 4 of 7 drills);
+**R2 is a no-op by construction** (the card keeps the resolver's own `attack_before` reset
+in every arm, which IS R2, so R2 ≡ R1 — pinned by a test); G1's timing/0.589 references
+only reproduce on the production stream over ALL region events.
+
+**Step 5 (the coordinator's own follow-up, because step 2 named the fix but not its
+cause).** Diagnosed the upstream recall loss on the same committed artifacts
+(`docs/g3_reach_gate_bucket.md`): **44 of 183 held-out GT contacts have no accepted
+contact within ±15 f** (median nearest 33 f), and every one has a rejected row within
+15 f. Base-rate-normalised against frame coverage, two reasons are enriched and
+`reach` is the actionable one: **`reach` 71 rejections / 4.65 % coverage → 20 observed
+misses vs 2.05 expected = 9.78×**; `no_contact_geometry` blocks 43 of 44 but is the
+residual bucket (1.76×); `no_ball_sighting` is exactly at chance (0.99×) and
+`min_contact_gap` is DEPLETED (0.42×). Every rejected row carries its own
+`distance`/`reach`, so the gate re-scores offline: **1.2× admits 14/14 (prec 1.00),
+1.3× 21/19 (0.90), 2.0× 48/32 (0.67)**; of the 20 reach-carrying misses, **2 are
+within 1.05×, 6 within 1.2×, 9 within 1.3×, 16 within 2.0×, and 24 of the 44 have no
+candidate geometry at all.** **But two hard caveats stop it shipping:** (a) the
+match's OWN dev split (P≤8, cut f4910) admits **12-15 candidates carrying ZERO GT
+contacts at every threshold**, so the match cannot select the gate — in-sample only;
+(b) at the best frame-precision gate (1.2×) only **6 of 14** carry the correct
+`target_team`, and across all 71 rejections `target_team` is **B 64 / A 6** — so this
+recall comes with wrong-team contacts. It is a **recall lever worth ~+0.08
+total-correct and ~0.00 class-accuracy**, not the label fix.
+
+**Deliverables / state.** `docs/tc1_touch_rules.md`, `scripts/probe_touch_rules.py`,
+`tests/test_touch_rules.py` (+41), `docs/g3_reach_gate_bucket.md` (new, coordinator),
+`docs/g3_touch_count_lever.md` §3 corrected. No `src/` change, no decode, no seek, no
+GT edit, held-out session untouched. Suite **1327**.
+
+**Next.** The reach relaxation is a px constant on GT-validated action logic and is
+venue-coupled (206 px vs 464-479 px court depth, AGENTS.md §7) **and is not
+selectable out of sample** — so it needs a real A/B run (a `src/` change ⇒ architect
+tier) or it does not ship. The cheapest decisive step is a **real A/B run of the
+reach arm**, scored on the match AND all 7 drills, because only a run can tell what an
+admitted candidate resolves to (the dump has no `contact_point` on rejected rows).
+
 ### 2026-10-02 (seventieth session) — #68's headline baseline was WRONG and a cheap executor caught it: the shipped stream is 0.612, not 0.568 (replay artifact); CARD TC1 re-issued with a baseline-independent gate
 
 **Asked:** continue the coordinator loop toward G3 (standing "Continue", m00266).
@@ -2103,234 +2208,3 @@ TC1** (READY, first card) and the re-ranked *Active next*.
 22) is now measurably the SMALLEST lever on the goal metric, so the label work goes first.
 That does not cancel the owner's serve priority — it re-orders it — so it is written up here
 rather than assumed.
-
-### 2026-10-02 (sixty-fourth session) — PM1 DONE (`FAIL=blocked`): the far-serve signal is COMPLETE (16/17) and no binding rule makes it precise (294 false serves unbound) — the point map is the lever, and open point 22 inherits the constraint
-
-**Asked:** continue the coordinator loop toward G3 (owner, verbatim: "Continue"
-after telling me not to use gemini/sonnet/opus and to pass briefs as files).
-
-**Step 0 (read).** STATUS *Active next* ranked PM1 (the point-map probe, carded by me
-at the end of #63) first. Ran it the way the owner prescribed: a **197-byte pointer**
-prompt telling the child to read its card out of STATUS.md, on
-`stealth/space-bunny-alpha` (route #2; the GLM subagent tier is quota-blocked until
-2026-10-03 per the coordinator prompt).
-
-**Step 4 (verify, own commands).** Suite **1214** = 1191 + 23 new, green.
-`git diff` shows the four STATUS edits the card listed and nothing else; no `src/`,
-no `ground_truth/`, no decode, no seek, held-out session never read. `grep` confirms
-the probe imports no `cv2` and opens no capture (the §9 seek guard). I corrected one
-defect the worker left: it rewrote the STATUS prose to the verdict but never flipped
-the card's own `status:` line off READY (the same defect as #62+).
-
-**Result (both gates green, pre-registered FAIL fires).**
-- **G1** reproduced: near 8/16, far 0/17, 12 false serves.
-- **G2** reproduced: `far_flight.width_start` **16-27 px** at every far serve vs
-  **39-50 px** at the 3 near serves that have an event; every cut in 26/28/30/32
-  claims **16/17 far, 0/16 near**.
-- The bypass test: **unbound (frame, side) = 16/17 far hits with 294 false serves**
-  (bar: >= 15/17 AND 0 new false serves). Binding rules: in-window 10/17 (253 FP),
-  first-start-after 16/17 (288 FP), inter-point gap 11/17 (35 FP) — bar was >= 12/17
-  with <= 3 FP. **FAIL** on both halves; SR4-FAR is **BLOCKED on open point 22**.
-- #63's root cause re-derived and sharpened: 31 pipeline points vs 33 GT points
-  (P32/P33 have none); under the only workable pairing the opener offset is
-  **one-signed +6 … +3153 f on all 31 pairs** (uniformly late, not noisy); **far 2/17**
-  serves sit inside any window vs **near 14/16**; 29/30 inter-point gaps clear
-  `GAP_SERVE_MIN` 143, so the chasm rule selects nothing. [inferred] `_finalize_group`
-  opens a point on a pre-serve flight burst, backdated after a quiet interval — the
-  point layer never sees a serve.
-
-**Decisions.** SR4-FAR is not the next card; the point map is. I wrote the constraint
-into open point 22 (move the opener to the serve or the rally it heads) and demoted
-SR4-FAR in *Active next* item 3 (it contradicted item 1 before the fix). SR4-NEAR
-stays parked on perception. Nothing shipped; a refutation that pins the blocker is a
-success of the session.
-
-**Hygiene:** the sixtieth-session Log entry was archived VERBATIM to
-`docs/history/status_log_archive.md` (Log back to 3 entries), per the Lean-STATUS
-convention. New pins: 23 tests in `tests/test_point_map.py` (mechanical + the literal
-#63/#64 counts + the verdict truth table).
-
-**Not done (deliberate):** no card for the point-map fix yet — it is a `src/`
-mechanism design, which is tier-2 (architect) work by the coordinator prompt's Step
-3.5, and it needs an owner decision on whether the point map may change at all.
-
-**Asked:** continue the coordinator loop toward G3 — reliably track actions across
-videos, target >70% of actions correct against the match ground truth without the
-practice drills dropping below 90%.
-
-**Step 0 (read).** STATUS *Active next* ranked SR4 (the per-point serve record) as
-the needle-mover; nothing was carded for it. SR4a had just landed (see the #62+
-entry) and its G2 verdicts said the near side was repairable after the fact and the
-tracking exemption should reopen as an architect call only.
-
-**Step 1 (rank).** Serve reliability is the active defect (near 8/16, far 0/17,
-12 false emissions; held-out contacts F1 0.772). NOT worth doing now, per STATUS:
-the audio-onset probe (timing is not the bottleneck — the far TIME is already
-nearly free at 11/17 within +-15 f), the beach-rules serve-sequence decoding
-(needs SR4's records first), and the stale off-court-hold comment (comment-only,
-deferred into a session that touches `src/` anyway).
-
-**Step 3.5 (escalate).** SR4 has no card and its design hinges on an unverified
-premise — that a serve can be located post-hoc — so it went to the architect
-(route 4) with the SR4a evidence attached. **The first three attempts died on a
-harness bug, not on the model:** `cat .pi/prompts/architect.md /tmp/brief.md >
-full.md` (the documented route-4 recipe) makes a ~15 KB prompt, and a delegated
-prompt over ~1 KB kills the child `pi` with `Killed: 9` / `EXIT 137` and zero
-output, on every model, at every THINK level, independent of agent directory. Found
-by bisection (800 B survives, 1000 B dies, neutral filler text dies at the same
-size, 3+ repeats each). The owner's recollection was right: the brief must be a
-file the child reads. Re-run as a 451-byte pointer, and the architect ran 24 min
-and returned a **refutation**. Log: `logs/architect_sr4_ds_run.log`. (A later
-attempt with opus returned an OpenRouter billing error instead — 128k max_tokens
-against the remaining credit — so the architect tier also needs credit or a
-`max_tokens` cap. Recorded as a Learning.)
-
-**Step 4 (verify, own commands).** Re-ran the architect's own two probe scripts and
-the ceiling claim from committed artifacts, all reproduce:
-- Near coverage ceiling **13/16**: only 13 of the 16 ground-truth near serves have
-  ANY action on the serving side within +-15 f; P5 f2575 nearest -81 f (`overpass`
-  A), P7 f3747 nearest -108 f (`dig` A), P24 f18135 nearest +29 f (`dig` B). The
-  planned 15/16 bar is above the ceiling, so SR4-NEAR is not buildable as planned.
-- Far side signal (new, not in the brief): ball width at flight onset **14-23 px at
-  all 17 far serves** vs **39-52 px** at the 3 near serves that have a flight event
-  (13 of 16 have none within +-15 f); a cut anywhere in the **26-32 px plateau**
-  claims **far 16/17, near 0/16 misclaimed**.
-- Binding kills it: **0 of 17 far serves fall inside their own point window**.
-  `game_state.points` has **31** entries vs 33 GT points and each point's
-  `start_frame` sits **1-1466 f AFTER its own serve** (the session-56 backdated
-  onset). In-window binding: far 9-11/17 with 2-8 false records; leading-gap
-  binding: 5-7/33 side-correct with 22-25 false; unscoped: 432 narrow candidates for
-  33 serves; suppression by next-action distance N=15/30/60/120 gives far hits
-  16/8/2/0 with 329/256/183/141 false. Every lever trades true serves for false
-  ones ~1-for-1. **Root cause = the point map, not the signal.**
-
-**Verdict:** architect refutation ACCEPTED, and extended with the root cause. No
-`src/` change, no decode, held-out session untouched, full suite green (1191).
-Written up in `docs/sr4_architect_call.md` (new file).
-
-**Decisions:** SR4-NEAR parked on perception (its ceiling is 13/16 and M-b fixes
-P5/P7 at best, not P24); SR4-FAR demoted to a detection-only result until the point
-map is fixed or bypassed; the +-15 f tolerance stays (admitting P33's -25 f would
-also admit the far false serve f8534 at +16 f); wrong-label repairs do not violate
-the STOP list because a serve record never mutates `actions_pass2`. **Next is the
-point-map probe** — post-hoc, no `src/`, decides bypass vs open point 22 — and it
-needs a card written before an executor can run it.
-
-**Not done this session (deliberate):** no task card for the point-map probe yet
-(the card-writing is a planning act; the owner asked for results), and the owner
-gate on the near bar (lower it to 13/16, or make it explicitly contingent on M-b) is
-left for the owner because it changes an acceptance criterion in open point 30.
-### 2026-10-02 (sixty-second session) — D4 DECIDED: the serve-zone exemption is PARKED; next is the near-opening table, and the worker tier is quota-blocked
-
-**Asked:** take the architect's answer to `docs/d4_gate_brief.md`, fold the decision
-into STATUS, and start the next task (the SR4a near-opening table, carded with the
-`task-card` skill).
-
-**The decision (architect, relayed by the owner 2026-10-02).** M-a stays CLOSED.
-**M-b (the serve-zone exemption from the 90 f off-court hold) is PARKED, not built**:
-its ceiling is **+1 near serve of 16** (+2 only with P5, which needs a second
-mechanism) against a 0.90 bar that needs 15 of 16, and the blunt version measured
-**net 0** (+P7, -P18, false serves 12 -> 14, actions 207 -> 212). Why the cost cannot
-be bounded from #61: **P18 is an attribution swap, not a rally_start failure** — the
-same ball point (867.5, 313) in both arms, touch 1 in both, a NEW rally in both, and
-the toucher track goes 3 -> 2, i.e. the hit is credited to the server's PARTNER, so
-the contact reads `dig`; the lift also renumbers tracks match-wide (f2494: track 1 ->
-4). Any exemption changes identity wherever it fires, so its price is only
-measurable on a full-match run, which is the most expensive kind of refutation. The
-geometric alternative was rejected as designed-blind (the two new false serves sit at
-the right edge of the image, x ~1552-1576, and no foot-behind-the-line test has been
-measured against them), and the comment it would be built around is stale: that
-bystander is fed on 400 of 423 frames at today's horizon.
-
-**What was done in `src/`: nothing.** No `src/` change, no decode, no new run. STATUS
-only: open point 30's status + SR1d lines, the D4 owner decision and card, the SR4a
-card, a Learning (a hold exemption's price shows up as identity churn elsewhere), the
-Active-next ranking, and the AGENTS.md warning that `evaluate.py --predictions <dir>`
-grades ZERO predictions on `src.main` output (it wants a `frame` key, `src.main`
-writes `frame_number` — measured #61, it cost a vacuous 0.000-vs-0.000 "PASS" then).
-The stale `player_off_court_hold_frames` comment at `src/utils/config.py:101` is now
-on the deferred list: comment-only, inside the next session that touches `src/` anyway.
-
-**Delegation BLOCKED — card SR4a is READY and UNRUN.** The `subagent` tool was not
-exposed in this session, so the `scripts/run_task.sh` fallback was used: `zai/glm-5.3`
-and `zai/glm-5.3-flash` both return `429 code 1310 Weekly/Monthly Limit Exhausted`
-(reset 2026-10-03 18:49), `openrouter` has no API key and `amazon-bedrock` no region.
-Three delegate attempts, zero files written, working tree untouched. **The card is the
-first READY card, so `/next-task` runs it as soon as a worker model is reachable.**
-
-**SR4a (delegated step).** The card ran later the same day, in a worker session, with
-no `src/` change and no decode: `scripts/probe_near_openings.py` (imports
-`score_serves` and `relabel_serves`, contains no `cv2`), `docs/sr4a_near_openings.md`,
-`logs/sr4a_report.md`, `tests/test_near_openings.py` (+35; suite **1191**). **G1 was
-run before a single bucket was read and passed on both arms** (near 8/16, far 0/17,
-12 false serves, drills e2-e7 3/5). The 8 match near misses bucket into
-**2 `emitted_mislabeled_opener` + 3 `emitted_not_opener` + 3 `not_emitted`**;
-**G2 verdict 1: SR4's near side proceeds after the fact, 5 repairable of 8** (rule
->= 4); **G2 verdict 2: M-b is REOPENED as a fresh architect call only, not a build —
-3 never produced, 2 of them coasting** (P5 f2575, P7 f3747; rules >= 3 AND >= 2),
-with the caveat that `output/sr1c/match_full_diag.jsonl` has **no recorded arm**, so
-the reopen must re-run with the arm named. Trap guard **0** of 17. Two things the
-next card must inherit: only **4 of the 8 hits** have a `serve` as their window
-opener, and **6 of the 12 false serves** sit inside a near-miss window, so an
-opener-keyed SR4 record is not yet safe. One card deviation is disclosed in the doc:
-the card's window rule leaves the clip-opening serve undefined (4 of 5 drills, P1),
-and the probe follows `relabel_serves.resolve_point` (video start is an anchor)
-because the literal reading scores the drills 0/5 and fails G1.
-
-
-### 2026-10-02 (sixty-first session) — SR1d: lifting the 90 f off-court hold is REFUTED; it recovers P7 exactly and still buys nothing
-
-**Asked:** run card SR1d — measure the cost of lifting
-`player_off_court_hold_frames` from 90 to 100000 on the 7 entreno clips and the
-full match, before anyone designs the serve-zone exemption (M-b). Measure only,
-no `src/` change. Full report: `docs/sr1d_hold_horizon_cost.md`; artifacts in
-the git-ignored `output/sr1d/`.
-
-**Method.** `Config.load` merges (118 keys in / out, 1 changed, verified), so
-`output/sr1d/hold_off.yaml` overrides exactly one key. 14 runs, all exit 0, MPS,
-sequential, one decode at a time. `src/` had drifted from `006e343` (`d402f65`,
-the #59 live-debug panel), so step 2's condition fired and the baseline arm was
-re-run too — and it comes out identical to the SR1-era artifacts on labels +
-frames for all 7 clips, which is the evidence that the drift is inert for a
-`--skip-visualization` batch run.
-
-**Gate.** Step 3's frozen `evaluate.py --predictions <run dir>` command grades
-**nothing**: 0 predictions on all 14 runs AND on the SR1-era artifacts (record:
-e3 1.0), because the tool looks for an entry named `actions` in a directory and
-takes `frame` where `src.main` writes `frame_number`. Both F1s would have been
-0.000 vs 0.000 — a vacuous "SAFE-LOOKING" PASS. Executor STOPPED and reported;
-**the owner authorised fixing the grading by naming the artifact** and the run
-continued. The adapter renames the frame key and nothing else; validated by the
-baseline arm reproducing the recorded F1s on 6 of 7 clips (e2 0.400 vs the
-record's 0.571 is the documented pre-existing action-script path gap).
-
-**Result.**
-- Entreno: **ΔF1 0.000 on 7 of 7** — and not merely equal, the two arms' action
-  streams are byte-identical event for event. The drills have nothing to gain.
-- e2 bystander (the regression the 90 f horizon was built for): fed **423 f**
-  with the lift vs **400 f** at baseline, i.e. fed **longer**, straight through.
-  Side finding: it is fed on 400 of 423 frames at the 90 f horizon *today* — 08-29's
-  "held a slot for 415 f" no longer describes it, and the horizon now buys only
-  23 coasting frames.
-- Match (26 061 f): near **8/16 → 8/16**, far 0/17 → 0/17, FP **12 → 14**,
-  actions **207 → 212**, all hit timings within ±2 f. The aggregate is flat, the
-  composition is not: **+P7** (serve emitted at f3747, delta +0, SR1b's
-  prediction reproduces) and **−P18** — P18's contact is still emitted at the
-  same f11996 but relabels `serve` → `dig`, the `rally_start` family SR1b found
-  at P5 (still missed in both arms). The two extra false serves are f17749, f17943.
-
-**Verdict: `global lift REFUTED`** (F1 criterion passes, bystander criterion
-fails) → the serve-zone exemption needs design (architect / owner), which is the
-expected outcome. This is **not** evidence against a *geometric* exemption: the
-server is behind the own baseline and the bystander straddles the sideline, and
-this run only shows the crude global version cannot separate them. What it adds
-to the price list: the `rally_start` coupling at P5/P18.
-
-**Card hygiene for the planner.** (1) Step 3's command should name a readable
-artifact; it cost the session a STOP. (2) "stop if the baseline artifacts are
-older than the current `src/`" is TRUE here while step 2 explicitly says to
-re-run the baseline in that case — reconcile the two. (3) Report the per-point
-SET of recovered/lost serves, not the aggregate: 8/16 → 8/16 hides the whole
-finding.
-
-**Nothing in `src/` changed.** Suite not run (no `scripts/` or `tests/` touched).
