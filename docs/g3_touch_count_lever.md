@@ -100,6 +100,17 @@ the same `pipeline_output.json` base of **83/141 = 0.589** (a perfect arm adds
 So the touch count is the largest lever and the far serve the smallest. (The
 near serve is where the serve lever actually lives: 13 of the 25.)
 
+**CORRECTION (2026-10-03, #74b, from `logs/serve_bucket_report.md` §1).** The
+**+0.032 far line does not reproduce** as "all 12 far serves perfect": that
+substitution measures **12/141 = 0.0851** (near: 13/141 = 0.0922; together
+25/141 = 0.1773 ✓). The measured bucket split explains the gap: **all 12 far
+serves are NOT-FOUND** (no emission within ±15 f at all), so "far perfect" is a
+recall substitution, not a label substitution; the documented +0.032 is closest
+to what the far serves the production stream can *convert today* contribute
+(≈4.5/141). Until the owner rules on the convention, read the far line as
+"≈4.5 far serves convert", not "12/12". The near/far split and the +0.177 total
+are confirmed exact.
+
 Residual confusions after the substitution (all 139): `overpass→spike` 10,
 `serve→dig` 9, `serve→spike` 3, `overpass→dig` 3, `spike→block` 2, `spike→set` 1,
 `set→overpass` 1. So a perfect touch count is necessary but not sufficient:
