@@ -1,0 +1,35 @@
+tests/test_set_dig_swaps.py
+  s_64f9e7ad2b4ff8::t_6b88068c89b323 1-136
+scripts/probe_set_dig_swaps.py
+  s_64f9e7ad2b4ff8::t_cd2a38c72cd278 1-475,482-538
+  s_64f9e7ad2b4ff8::t_cf4751c3d6e663 476-481
+STATUS.md
+  s_0d530c1e5ad472::t_934a2b2f1adc48 303,1924,2038-2083
+  s_0d530c1e5ad472::t_b6a124ac1237a3 20-21
+docs/history/status_log_archive.md
+  s_0d530c1e5ad472::t_3d7ee16bc61f9e 3713-3867
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "5c847f4dc1ff3c8f7ee06ddddf6d3d432fc86493",
+  "prompts": {},
+  "sessions": {
+    "s_0d530c1e5ad472": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1039a-94c7-70ec-8f23-5186d117f513",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    },
+    "s_64f9e7ad2b4ff8": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a103af-43c4-71e3-a7ea-722c3643c48f",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
