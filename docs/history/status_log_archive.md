@@ -3710,3 +3710,158 @@ TC1** (READY, first card) and the re-ranked *Active next*.
 22) is now measurably the SMALLEST lever on the goal metric, so the label work goes first.
 That does not cancel the owner's serve priority — it re-orders it — so it is written up here
 rather than assumed.
+
+### 2026-10-02 (seventy-first session) — CARD TC1 DONE: `TOUCH_COUNT_LEVER_REFUTED/0.6187` — the count is not re-derivable, the fix is UPSTREAM (emit the missing contacts); the reach-gate bucket is the measured upstream cause, and the tier-2 architect call proposes a POSE-ANCHORED reach
+
+**Asked:** continue the coordinator loop toward G3 (standing "Continue", m00266).
+
+**Step 0.** CARD TC1 re-issued in #70 with a baseline-independent gate (a gain over the
+R0 replay control, so which stream is quoted cannot move the verdict), delegated on
+`stealth/space-bunny-alpha THINK=high` via a **202-byte pointer** `/tmp/tc1_run.md`
+(`EXIT 0`, ~17 min, log buffered until exit).
+
+**Step 4 (verify, own commands).** `probe_touch_rules.py` imports the UNMODIFIED
+`ActionContextResolver` and the existing matchers, opens no capture, imports no `cv2`
+(`grep` clean); `git status` shows no `src/` change. Suite **1327** = 1286 + 41, green.
+G1 reproduction matched #68 exactly (I re-ran each figure myself: 185 accepted; 157
+`bump_set` / 16 `attack` / 12 `block`; 139 found; touch 96/139; R0 79/139; GT-touch
+110/139; serve median +23 f; 85/139 and 83/141 shipped). Worker again left the card's
+`status:` line at READY; I set it to DONE (#71).
+
+**Result — the pre-registered FAIL fires, and step 2 is the real deliverable.** Chosen
+rule R4 (dev+entreno summed F1 5.745 vs R0 5.577) scored **86/139 = 0.6187 = +0.050**
+over R0 (bars +0.132 PASS / +0.082 PARTIAL) at touch accuracy 103/139 = 0.741;
+non-serve 86/127 = 0.677 vs R0 0.622 and the GT-touch arm 0.866 — so a perfect count is
+worth +0.244 and the best re-derived count +0.055. **The 43 wrong-touch found contacts
+are STARVED, not mis-reset**: `under_counted` 20 + `previous_contact_missing` 13 = **33
+of 43 (77 %)**, `team_change_not_reset` 5, `over_counted` 4, `attack_not_reset` 1.
+The fix is therefore **upstream — emit the missing contacts** (open points 2/5), not
+better counting. Three card defects reported and NOT reinterpreted into the verdict:
+(ii) is unsatisfiable by any offline replay (the R0 replay is off-record on 4 of 7 drills);
+**R2 is a no-op by construction** (the card keeps the resolver's own `attack_before` reset
+in every arm, which IS R2, so R2 ≡ R1 — pinned by a test); G1's timing/0.589 references
+only reproduce on the production stream over ALL region events.
+
+**Step 5 (the coordinator's own follow-up, because step 2 named the fix but not its
+cause).** Diagnosed the upstream recall loss on the same committed artifacts
+(`docs/g3_reach_gate_bucket.md`): **44 of 183 held-out GT contacts have no accepted
+contact within ±15 f** (median nearest 33 f), and every one has a rejected row within
+15 f. Base-rate-normalised against frame coverage, two reasons are enriched and
+`reach` is the actionable one: **`reach` 71 rejections / 4.65 % coverage → 20 observed
+misses vs 2.05 expected = 9.78×**; `no_contact_geometry` blocks 43 of 44 but is the
+residual bucket (1.76×); `no_ball_sighting` is exactly at chance (0.99×) and
+`min_contact_gap` is DEPLETED (0.42×). Every rejected row carries its own
+`distance`/`reach`, so the gate re-scores offline: **1.2× admits 14/14 (prec 1.00),
+1.3× 21/19 (0.90), 2.0× 48/32 (0.67)**; of the 20 reach-carrying misses, **2 are
+within 1.05×, 6 within 1.2×, 9 within 1.3×, 16 within 2.0×, and 24 of the 44 have no
+candidate geometry at all.** **But two hard caveats stop it shipping:** (a) the
+match's OWN dev split (P≤8, cut f4910) admits **12-15 candidates carrying ZERO GT
+contacts at every threshold**, so the match cannot select the gate — in-sample only;
+(b) at the best frame-precision gate (1.2×) only **6 of 14** carry the correct
+`target_team`, and across all 71 rejections `target_team` is **B 64 / A 6** — so this
+recall comes with wrong-team contacts. It is a **recall lever worth ~+0.08
+total-correct and ~0.00 class-accuracy**, not the label fix.
+
+**Deliverables / state.** `docs/tc1_touch_rules.md`, `scripts/probe_touch_rules.py`,
+`tests/test_touch_rules.py` (+41), `docs/g3_reach_gate_bucket.md` (new, coordinator),
+`docs/g3_touch_count_lever.md` §3 corrected. No `src/` change, no decode, no seek, no
+GT edit, held-out session untouched. Suite **1327**.
+
+**Next.** The reach relaxation is a px constant on GT-validated action logic and is
+venue-coupled (206 px vs 464-479 px court depth, AGENTS.md §7) **and is not
+selectable out of sample** — so it needs a real A/B run (a `src/` change ⇒ architect
+tier) or it does not ship. The cheapest decisive step is a **real A/B run of the
+reach arm**, scored on the match AND all 7 drills, because only a run can tell what an
+admitted candidate resolves to (the dump has no `contact_point` on rejected rows).
+
+**Tier-2 architect call DONE (same session).** Delegated on a 531-byte pointer to
+`/tmp/reach_brief.md`; memo saved verbatim as `docs/reach_gate_architect_call.md`.
+Verdict: **do NOT widen the 140 px scalar** (venue-coupled; +0.08 total-correct
+ceiling; admits 6 false contacts on the drills at 2.0×). Instead **replace the
+ball-to-box reach with a POSE-ANCHORED reach**: accept when the ball is within the
+140 px box OR within `0.5 × bbox_width_px` of a confident wrist keypoint
+(MediaPipe 15/16), fall back to the box-only test when pose is absent/stale, guard
+with a new class constant `CONTACT_HAND_REACH = False` (no new `Config` key, so
+the config-drift guard is untouched). Rationale: a touched ball is always beside
+the hand regardless of apparent size, so the test is scale-free and it directly
+targets the recorded airborne-toucher failure (open point 7, e2 f167).
+**Coordinator verified the memo's load-bearing claim by grep:** `CONTACT_REACH =
+140.0` (`src/recognition/action_classifier.py:53`) and `SERVE_REACH_PX = 160.0`
+(line 158) are CLASS attributes read as `self.` (lines 416, 419), and the
+`_player_pose_history` snapshot carries the full pose dict (lines 378-383) with
+wrist indices 15/16 (`src/recognition/pose_estimator.py:55`). **Scope of that
+finding — corrected after checking the construction site: only the SCALAR arm is
+measurable with no `src/` change** (monkeypatch `ActionClassifier.CONTACT_REACH`,
+T5 precedent `scripts/departure_gate_harness.py`). **The architect's POSE-ANCHORED
+branch is new logic inside `_closest_player_at`, so that arm needs either (a) a
+`src/` change, or (b) a `ProbeClassifier(ActionClassifier)` subclass in `scripts/`
+overriding `_closest_player_at`, injected by patching the symbol
+`FrameProcessor` reads at `src/analysis/frame_processor.py:210`** — T5 kept its
+subclass out of `src/` the same way, though T5 drove the classifier directly
+rather than through `FrameProcessor`, so (b) is a new harness shape. Either way
+the SHIP needs owner ratification of the mechanism. Pre-registered A/B gates in the memo: **PASS** = ≥ +5 recovered
+correct held-out contacts (≥ +0.03 contact F1), no drill F1 drop > 0.02 vs control,
+no new control-window false actions, AND admitted-row team precision > 0.43;
+**FAIL** = F1 gain < +0.02, OR any drill F1 drop > 0.05, OR team precision ≤ 0.43.
+Neutrality provable on e3/e6 (ZERO reach rejections → arm B byte-identical);
+harness MUST `cv2.setRNGSeed(0)` per `PlayerTracker` (AGENTS.md §3).
+
+**Owner gate (left for the owner, not resolved unilaterally):** the pose-anchored
+reach is a change to GT-validated action logic, so the coordinator surfaced the
+mechanism for ratification rather than shipping it. Two honest caveats recorded in
+the memo: the whole lever is ~+0.08 total-correct and ~0.00 class accuracy (so if
+the priority is the 0.70 class-accuracy half of G3, this is NOT the path), and the
+0.5× bbox-width hand radius is inferred, not measured.
+
+### 2026-10-02 (seventieth session) — #68's headline baseline was WRONG and a cheap executor caught it: the shipped stream is 0.612, not 0.568 (replay artifact); CARD TC1 re-issued with a baseline-independent gate
+
+**Asked:** continue the coordinator loop toward G3 (standing "Continue", m00266).
+
+**Step 0.** #68 was committed (`1c03447`) with CARD TC1 (READY, first card) and its
+executor delegated on `stealth/space-bunny-alpha` via a **217-byte pointer** to
+`/tmp/tc1_run.md` (`EXIT 0`, 5 min). Per the card's own step 1 it had to reproduce #68
+before touching anything, and it **stopped and reported instead of proceeding** — exactly
+the behaviour the card is designed to force.
+
+**What it reported, and it was right.** Its step-1 reproduction gave **85/139 = 0.611**
+for the label control where the card said **79/139 = 0.568**, and it noticed the replay
+cannot reproduce the shipped stream: the `accepted` rows of
+`output/g3r1/match_bw03_diag.jsonl` carry **no `behind_baseline` field** (0 of 185), while
+`src/recognition/action_context.py:167` reads it for the serve branch. It also flagged that
+my residual-confusion table was quoted from the *post-substitution* arm while it read the
+*as-emitted* arm — two different measurements. It created nothing, made no STATUS edits and
+issued no `touch_rule_gate` token.
+
+**Verify (my own commands, all four arms).** `ARM A` the dump's own `action` field vs GT =
+**85/139**; `ARM B` replay `_decide(behind_baseline=False, own_side_drive_block=False)`
+as-emitted touch = **79/139**; `ARM C` same replay with the real GT `touch_number` =
+**110/139**; `ARM D` the 207-action `pipeline_output.json` = **83/141 = 0.589** (the
+recorded 0.590). Replay fidelity to the dumped `action` = **168/185**. Split by serve:
+**non-serve 127 -> emitted 78 (0.614) / replay 79 (0.622) / replay+GT-touch 110 (0.866)**;
+**serve 12 -> emitted 7 (0.583) / replay 0 (0.000) / replay+GT-touch 0 (0.000)**.
+
+**Verdict.** My #68 "as emitted (the real pipeline) 79 = 0.568" row is **wrong** — 0.568 is
+a replay artifact of the missing `behind_baseline`, and the serves are unreachable in any
+offline replay. The **touch-count lever is untouched** (96/139 touch as-emitted and 110/139
+under substitution both reproduce exactly); only the label figure it was quoted against was
+mislabeled, and on the subset a replay can faithfully model the lever is **larger**, not
+smaller (**+0.244** on the 127 non-serve). I also re-measured the lever comparison table,
+which had two more of my own quoted numbers wrong: all 25 region serves +0.177 (near serves
+are where the serve lever lives), the 13 overpass labels **+0.092** (I wrote 0.071), the 15
+`set↔dig` swaps **+0.106** (I wrote 0.077), and the 12 far serves **+0.032** class /
++0.066 total-correct.
+
+**Repairs.** `docs/g3_touch_count_lever.md` §3 rewritten (corrected table, an explicit
+CORRECTION note, a second note that `own_side_drive_block` is also unrecoverable, and the
+corrected lever table); CARD TC1's G1 now expects the replay control explicitly and carries
+a REQUIRED CAVEAT telling the executor not to re-investigate the missing flag; TC1's
+pre-registered gate is restated as a **gain over the R0 replay control** (PASS >= 0.700 =
++0.132, PARTIAL >= 0.650, FAIL below) so the verdict cannot turn on which baseline is
+quoted, plus a report-only arm on the faithful 127; open point 9 and the #68 index line
+carry the correction. Nothing in `src/` changed, no decode, no seek, no GT edit, held-out
+session untouched. Suite **1286 passed**.
+
+**Lesson (durable).** A replay arm is not a baseline until its fidelity to the shipped
+stream is measured, and a diag dump that omits one `_decide` input makes that fidelity
+unachievable for a whole class of contacts. Quote the shipped stream's own score, and state
+every gate as a delta over the arm the tooling can actually produce.
