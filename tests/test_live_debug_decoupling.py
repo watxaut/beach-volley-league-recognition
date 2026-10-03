@@ -53,9 +53,25 @@ class StubSpikeAnalyzer:
         return None
 
 
+class StubBallDetector:
+    """The detector side channel the 'b' overlay reads (raw_detections)."""
+
+    def __init__(self):
+        # One dict that survives static suppression and one that it removed --
+        # the same objects, distinguished by identity exactly as production is.
+        self.play = {"bbox": [16, 16, 24, 24], "center": [20.0, 20.0],
+                     "confidence": 0.81}
+        self.spare = {"bbox": [40, 30, 46, 36], "center": [43.0, 33.0],
+                      "confidence": 0.62, "stationary_suspect": True}
+        self.removed = {"bbox": [8, 40, 14, 46], "center": [11.0, 43.0],
+                        "confidence": 0.93}
+        self.raw_detections = [self.play, self.spare, self.removed]
+
+
 class StubFrameProcessor:
     def __init__(self):
         self.spike_analyzer = StubSpikeAnalyzer()
+        self.ball_detector = StubBallDetector()
         self.process_calls = []
         self.flush_calls = 0
         self.reset_calls = 0
@@ -70,8 +86,12 @@ class StubFrameProcessor:
         if idx % 10 == 0:
             actions.append({"track_id": 1, "frame_number": idx,
                             "action": "bump", "confidence": 0.9})
+        bd = self.ball_detector
         return {"actions": actions, "tracked_ball": None,
-                "tracked_players": [], "game_state": None}
+                "tracked_players": [], "game_state": None,
+                # static suppression keeps the play ball + the suspect, drops
+                # the third (same dict objects as raw_detections).
+                "ball_detections": [bd.play, bd.spare]}
 
     def flush_actions(self):
         self.flush_calls += 1
@@ -97,13 +117,16 @@ class StubCourtDetector:
 
 
 class StubCap:
-    def __init__(self, n):
+    def __init__(self, n, slow=0.0):
         self.n = n
         self.i = 0
+        self.slow = slow          # per-read pause; lets a test outrun the producer
         self.set_calls = []
         self.released = False
 
     def read(self):
+        if self.slow:
+            time.sleep(self.slow)
         if self.i < self.n:
             self.i += 1
             return True, _frame(self.i - 1)
@@ -133,7 +156,7 @@ class RecordingWriter:
         self.released = True
 
 
-def make_processor(n=N_FRAMES, panel=False):
+def make_processor(n=N_FRAMES, panel=False, candidates=False, slow=0.0):
     """A LiveDebugProcessor skeleton without the heavy __init__ (parity: the
     real __init__ only wires FrameProcessor/court detector, which the stubs
     replace)."""
@@ -146,11 +169,12 @@ def make_processor(n=N_FRAMES, panel=False):
     proc._spike_log_state = []
     # Signal panel state the live path owns (tests exercise it separately).
     proc._panel_enabled = panel
+    proc._candidates_enabled = candidates
     proc._event_plan = lldp.debug_panel.EventPlan()
     proc._probe_mirror = False
     proc._last_ball = None
     proc._last_ball_pt = None
-    cap = StubCap(n)
+    cap = StubCap(n, slow=slow)
     return proc, cap
 
 
@@ -198,7 +222,10 @@ class TestProducer:
         assert done.is_set()
 
     def test_stop_without_flush_discards_tail(self):
-        proc, cap = make_processor(n=50)
+        # slow: the producer must not reach the (naturally ending) source before
+        # stop.set() lands -- at full stub speed the 50 frames finish in
+        # microseconds and the natural-end flush wins the race (flaky ~1/10).
+        proc, cap = make_processor(n=50, slow=0.002)
         fp = proc.frame_processor
         q = queue.Queue()
         stop, paused, done = threading.Event(), threading.Event(), threading.Event()
@@ -243,6 +270,31 @@ class TestProducer:
         lldp.LiveDebugProcessor._stop_producer(t, q, stop)
         assert time.perf_counter() - t0 < 4.0  # well under the join timeout
         assert not t.is_alive()
+
+    def test_candidates_snapshotted_only_when_enabled(self):
+        """The 'b' overlay's data is cached on the producer thread (like every
+        other signal) and is EMPTY while the toggle is off, so the default live
+        run costs nothing extra."""
+        proc, cap = make_processor(n=3)
+        q = queue.Queue()
+        stop, paused, done = threading.Event(), threading.Event(), threading.Event()
+        plan = overlay.LabelPlan()
+        proc._produce_frames(cap, q, stop, paused, plan, done)
+        while q.get(timeout=5) is not lldp._PRODUCER_DONE:
+            pass
+        assert proc._ball_candidates({"ball_detections": []})  # data available
+
+        proc2, cap2 = make_processor(n=3, candidates=True)
+        q2 = queue.Queue()
+        proc2._produce_frames(cap2, q2, stop, paused, plan, done)
+        cands = None
+        while True:
+            item = q2.get(timeout=5)
+            if item is lldp._PRODUCER_DONE:
+                break
+            cands = item[5]["candidates"]
+        assert [(c["conf"], c["flag"]) for c in cands] == [
+            (0.81, ""), (0.62, "sus"), (0.93, "rm")]
 
     def test_typed_spikes_ingested_on_flush(self):
         proc, cap = make_processor(n=5)
@@ -378,6 +430,52 @@ class TestConsumerLoop:
         proc._process_buffered_live("fake.mp4")
         assert proc._panel_enabled is False
         assert 64 in shapes and 64 + lldp.debug_panel.PANEL_WIDTH in shapes
+
+    def test_candidates_toggle_key_b(self, guiless, monkeypatch):
+        """'b' flips the ball-candidate overlay; the saved video stays bare."""
+        proc, cap = make_processor()
+        patch_open(monkeypatch, cap)
+        drawn = []
+        state = {"shown": 0}
+
+        def rec_draw(self, f, i, *a, **kw):
+            cands = kw.get("candidates")
+            drawn.append(cands)
+            state["shown"] += 1
+            return f
+
+        def key(*a, **k):
+            if state["shown"] >= 2 and not state.get("sent"):
+                state["sent"] = True
+                return ord('b')
+            return -1
+
+        monkeypatch.setattr(lldp.cv2, "waitKey", key)
+        monkeypatch.setattr(lldp.LiveDebugProcessor, "_draw_overlay", rec_draw)
+        proc._process_buffered_live("fake.mp4", save_video="fake_out.mp4")
+        assert proc._candidates_enabled is True
+        assert drawn[0] == [] and len(drawn[-1]) == 3   # off, then all three
+        assert all(f.shape == (48, 64, 3) for f in RecordingWriter.instances[-1].frames)
+
+    def test_candidates_toggle_survives_restart(self, guiless, monkeypatch):
+        proc, cap = make_processor()
+        patch_open(monkeypatch, cap)
+        state = {"shown": 0}
+
+        def key(*a, **k):
+            state["shown"] += 1
+            if state["shown"] == 1:
+                return ord('b')
+            if state["shown"] == 2:
+                return ord('r')
+            return -1
+
+        monkeypatch.setattr(lldp.cv2, "waitKey", key)
+        monkeypatch.setattr(lldp.LiveDebugProcessor, "_draw_overlay",
+                            lambda self, f, i, *a, **k: f)
+        proc._process_buffered_live("fake.mp4")
+        assert proc._candidates_enabled is True
+        assert proc.frame_processor.reset_calls == 1
 
     def test_panel_toggle_survives_restart(self, guiless, monkeypatch):
         proc, cap = make_processor(panel=False)

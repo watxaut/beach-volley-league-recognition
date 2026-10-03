@@ -112,6 +112,9 @@ class LiveDebugProcessor:
       with ``p``), composited from data cached by the producer -- see
       ``debug_panel``. Display-only: it never touches the saved video or the
       processing path.
+    - ``--debug-live`` only, ``b`` toggle: a hollow box + confidence on every
+      ball the detector returned this frame (see :attr:`_candidates_enabled`).
+      ON by default; ``b`` turns it off and back on.
     """
 
     # Live display/write lag, in seconds. Must exceed the classifier's worst
@@ -148,6 +151,12 @@ class LiveDebugProcessor:
         # readout while the track is dropped instead of blanking it.
         self._last_ball: Optional[Dict[str, Any]] = None
         self._last_ball_pt: Optional[Tuple[float, float]] = None
+
+        # --- every ball the detector saw (--debug-live display only) ---
+        # ON by default; 'b' toggles. Draws each candidate the tracker
+        # actually received this frame (hollow box + confidence) so a lost ball
+        # can be read as "seen but not admitted" instead of "detector missed".
+        self._candidates_enabled: bool = True
 
         # Court calibration, used to draw the court boundary each frame.
         self.court_detector = self.frame_processor.get_court_detector()
@@ -301,6 +310,8 @@ class LiveDebugProcessor:
             "game": frame_result.get("game_state") or {},
             "probe": [],
             "pending": None,
+            "candidates": (self._ball_candidates(frame_result)
+                          if getattr(self, "_candidates_enabled", False) else []),
         }
 
         # --- ball: position, pixel size, speed, classifier's width-side read
@@ -397,6 +408,43 @@ class LiveDebugProcessor:
                     "kind": pend.get("contact_kind"),
                 }
         return snapshot
+
+    def _ball_candidates(self, frame_result: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Every ball candidate the DETECTOR produced this frame, with the
+        detector's own verdict on each (``""`` / ``"sus"`` / ``"rm"``).
+
+        Reads the pipeline's two already-computed lists, no re-inference: the
+        survivors of static suppression (what the tracker was handed) and
+        ``BallDetector.raw_detections``, the pre-suppression side channel that
+        keeps the candidates the tracker never saw. The two lists share dict
+        objects, so an entry missing from the survivor list is exactly the one
+        suppression removed -- the flag is looked up, never re-derived. Empty
+        when the detector produced nothing or a component is absent (the stubs
+        in tests, a partially built processor).
+        """
+        raw = list(getattr(getattr(self.frame_processor, "ball_detector", None),
+                           "raw_detections", None) or [])
+        survivors = {id(d) for d in (frame_result.get("ball_detections") or [])}
+        out: List[Dict[str, Any]] = []
+        for d in raw:
+            center = d.get("center") or []
+            bbox = d.get("bbox")
+            if not ((len(center) >= 2 and center[0] is not None)
+                    or (bbox and len(bbox) == 4)):
+                continue
+            if id(d) not in survivors:
+                flag = "rm"                    # dropped by static suppression
+            elif d.get("stationary_suspect"):
+                flag = "sus"                   # kept, but distrusted downstream
+            else:
+                flag = ""
+            out.append({
+                "center": [float(center[0]), float(center[1])] if len(center) >= 2 else None,
+                "bbox": list(bbox) if bbox and len(bbox) == 4 else None,
+                "conf": d.get("confidence"),
+                "flag": flag,
+            })
+        return out
 
     def _enable_probe_mirror(self) -> bool:
         """Turn the classifier's contact-probe mirror on for the panel.
@@ -499,7 +547,9 @@ class LiveDebugProcessor:
     def _render_frame(self, frame: np.ndarray, frame_idx: int, ball: BallOverlay,
                       players: PlayerOverlay, plan: overlay.LabelPlan,
                       total_frames: Optional[int] = None,
-                      game_state: Optional[Dict[str, Any]] = None) -> np.ndarray:
+                      game_state: Optional[Dict[str, Any]] = None,
+                      candidates: Optional[List[Dict[str, Any]]] = None
+                      ) -> np.ndarray:
         """Draw court + ball + player boxes (labels anchored on contact frames)."""
         out = frame
         try:
@@ -510,12 +560,15 @@ class LiveDebugProcessor:
             cv2.putText(out, f"Render Error: {str(e)[:50]}",
                         (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
         return self._draw_overlay(out, frame_idx, ball, players, plan,
-                                  total_frames=total_frames, game_state=game_state)
+                                  total_frames=total_frames, game_state=game_state,
+                                  candidates=candidates)
 
     def _draw_overlay(self, frame: np.ndarray, frame_idx: int, ball: BallOverlay,
                       players: PlayerOverlay, plan: overlay.LabelPlan,
                       total_frames: Optional[int] = None,
-                      game_state: Optional[Dict[str, Any]] = None) -> np.ndarray:
+                      game_state: Optional[Dict[str, Any]] = None,
+                      candidates: Optional[List[Dict[str, Any]]] = None
+                      ) -> np.ndarray:
         """Draw everything EXCEPT the court lines, in ``_render_frame`` order.
 
         Split so the buffered live render can draw the court on the producer
@@ -525,6 +578,13 @@ class LiveDebugProcessor:
         """
         out = frame
         try:
+            # Every detector candidate, under the tracked ball so the filled
+            # circle stays readable. Empty list / None = overlay off.
+            for cand in candidates or []:
+                overlay.draw_ball_candidate(
+                    out, cand.get("bbox"), cand.get("center"),
+                    cand.get("conf"), cand.get("flag", ""))
+
             if ball is not None:
                 bx, by, pred = ball
                 overlay.draw_ball(out, bx, by, predicted=pred)
@@ -725,8 +785,9 @@ class LiveDebugProcessor:
         delay_frames = min(int(round((fps or 30) * self.LIVE_DELAY_SECONDS)), self.LIVE_DELAY_MAX_FRAMES)
         self.logger.info(
             "Press 'q' to quit, SPACE to pause/resume, 'r' to restart, "
-            "'p' to toggle the signal panel (labels shown on a %d-frame delay "
-            "so they land on the contact frame)",
+            "'p' to toggle the signal panel, 'b' to toggle the ball-candidate "
+            "overlay (labels shown on a %d-frame delay so they land on the "
+            "contact frame)",
             delay_frames,
         )
         self._probe_mirror = self._enable_probe_mirror()
@@ -774,7 +835,8 @@ class LiveDebugProcessor:
                 elif item is not None:
                     frame, idx, ball, players, gs, signals = item
                     shown = self._draw_overlay(frame, idx, ball, players, plan,
-                                               total_frames=total, game_state=gs)
+                                               total_frames=total, game_state=gs,
+                                               candidates=(signals or {}).get("candidates"))
                     if writer is not None:
                         writer.write(shown)   # the saved video stays unpanelled
                     display = self._compose_panel(shown, signals, total)
@@ -821,6 +883,13 @@ class LiveDebugProcessor:
                                      "ON" if self._panel_enabled else "OFF")
                     if self._panel_enabled:
                         self._setup_window(width, height)
+                elif key == ord('b'):
+                    self._candidates_enabled = not self._candidates_enabled
+                    self.logger.info(
+                        "Ball candidates %s (every detector ball with its "
+                        "confidence; sus = stationary suspect, rm = removed by "
+                        "static suppression)",
+                        "ON" if self._candidates_enabled else "OFF")
 
         cap.release()
         if writer is not None:

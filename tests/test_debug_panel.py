@@ -15,12 +15,16 @@ trustworthy:
 
 import threading
 
+import types
+
+import cv2
 import numpy as np
 import pytest
 
 import src.analysis.debug_panel as dp
 from src.analysis.debug_panel import EventPlan, build_rows, compose
 from src.analysis.live_debug_processor import LiveDebugProcessor
+from src.output_gen import overlay
 from src.recognition.action_classifier import ActionClassifier
 
 
@@ -253,6 +257,7 @@ def _processor(ac=None):
     proc.court_detector = _StubCourt()
     proc._spike_log_state = []
     proc._panel_enabled = True
+    proc._candidates_enabled = False
     proc._probe_mirror = False
     proc._last_ball = None
     proc._last_ball_pt = None
@@ -326,6 +331,62 @@ class TestSignalsSnapshot:
         snap = proc._signals(_lost_frame_result(), 241)
         assert snap["ball"] is None
         assert "no track yet" in _text(build_rows(snap))
+
+
+class TestOverlayHelpers:
+    def test_candidate_box_and_label(self):
+        frame = _frame()
+        overlay.draw_ball_candidate(frame, [10, 20, 30, 40], [20.0, 30.0], 0.42)
+        # the hollow box is drawn on the frame (hollow => the centre stays out)
+        assert frame[20, 20, 0] == _frame()[20, 20, 0]
+        assert (frame[18, 20, :] != _frame()[18, 20, :]).any()
+
+    def test_candidate_without_bbox_uses_center(self):
+        frame = _frame()
+        overlay.draw_ball_candidate(frame, None, [50.0, 50.0], None)
+        # hollow box around the centre point: the edge is drawn, the middle is not
+        assert (frame[50, 50 - overlay.CANDIDATE_HALF - 2, :] != _frame()[50, 50, :]).any()
+        np.testing.assert_array_equal(frame[50, 50, :], _frame()[50, 50, :])
+
+    def test_unplaceable_candidate_is_skipped(self):
+        frame = _frame()
+        overlay.draw_ball_candidate(frame, None, None, 0.9)
+        np.testing.assert_array_equal(frame, _frame())
+
+
+class TestBallCandidates:
+    def _det(self):
+        play = {"bbox": [10, 10, 20, 20], "center": [15.0, 15.0], "confidence": 0.9}
+        suspect = {"bbox": [30, 30, 38, 38], "center": [34.0, 34.0],
+                   "confidence": 0.44, "stationary_suspect": True}
+        removed = {"bbox": [50, 50, 58, 58], "center": [54.0, 54.0],
+                   "confidence": 0.22}
+        det = types.SimpleNamespace(raw_detections=[play, suspect, removed])
+        proc = _processor()
+        proc.frame_processor.ball_detector = det
+        return proc, play, suspect, removed
+
+    def test_flags_reflect_detector_stage(self):
+        proc, play, suspect, removed = self._det()
+        cands = proc._ball_candidates(
+            {"ball_detections": [play, suspect]})
+        assert [c["flag"] for c in cands] == ["", "sus", "rm"]
+        assert cands[0]["conf"] == 0.9
+        assert cands[0]["bbox"] == [10, 10, 20, 20]
+
+    def test_missing_detector_degrades_to_empty(self):
+        proc = _processor()
+        proc.frame_processor.ball_detector = None
+        assert proc._ball_candidates({}) == []
+
+    def test_snapshot_carries_candidates_only_when_enabled(self):
+        proc, play, suspect, removed = self._det()
+        res = _frame_result()
+        res["ball_detections"] = [play, suspect]
+        proc._candidates_enabled = False
+        assert proc._signals(res, 241)["candidates"] == []
+        proc._candidates_enabled = True
+        assert len(proc._signals(res, 241)["candidates"]) == 3
 
 
 class TestHeldBallReadout:

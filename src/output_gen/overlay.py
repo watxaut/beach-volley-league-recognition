@@ -38,6 +38,19 @@ ACTION_COLORS["spike touch"] = (0, 0, 255)
 LABEL_PERSIST = 30
 
 # Ball trail after a spike: red, fading as each point ages, gone past max age.
+# --- ball-candidate markers (live debug only, toggle 'b') ---------------
+# Every ball the DETECTOR saw this frame, not just the tracked one: a hollow
+# box per candidate with its confidence beside it. The colours are chosen
+# outside the action palette (green/blue/yellow/cyan/red) and the boxes are
+# hollow (the tracked ball is a FILLED circle), so a candidate can never be
+# read as the ball in play or as a player action tint.
+CANDIDATE_COLOR = (255, 0, 255)       # magenta: plain candidate
+CANDIDATE_SUSPECT_COLOR = (0, 165, 255)   # BGR orange: detector flagged it stationary
+CANDIDATE_REMOVED_COLOR = (170, 170, 170)  # grey: static suppression dropped it
+CANDIDATE_FLAG_TEXT = {"sus": "sus", "rm": "rm"}
+# Half-size of the fallback box used when a detection carries no bbox.
+CANDIDATE_HALF = 7
+
 TRAIL_COLOR = (0, 0, 255)
 TRAIL_MAX_AGE = 45
 TRAIL_MAX_GAP_FRAMES = 8  # no connecting line across sighting gaps larger than this
@@ -87,6 +100,54 @@ def draw_ball(frame, x: float, y: float, predicted: bool = False) -> None:
     """Draw the tracked ball as a single filled circle (in place)."""
     color = BALL_PREDICTED_COLOR if predicted else BALL_COLOR
     cv2.circle(frame, (int(x), int(y)), 8, color, -1)
+
+
+def draw_ball_candidate(
+    frame,
+    bbox: Optional[Sequence[float]] = None,
+    center: Optional[Sequence[float]] = None,
+    confidence: Optional[float] = None,
+    flag: str = "",
+) -> None:
+    """Draw ONE un-tracked ball candidate: a hollow box + its confidence.
+
+    Display-only annotation (the live-debug ``b`` overlay); it says nothing the
+    pipeline does not already know -- ``flag`` carries the detector's own verdict
+    (``"sus"`` = stationary suspect, ``"rm"`` = removed by static suppression, so
+    the tracker never saw it) rather than re-deriving a threshold here.
+
+    Args:
+        frame: BGR frame, drawn in place.
+        bbox: ``(x1, y1, x2, y2)`` detection box, when it has one.
+        center: ``(x, y)`` used to place the box when ``bbox`` is missing/short.
+        confidence: Detector confidence; ``None`` renders as "-".
+        flag: ``""`` / ``"sus"`` / ``"rm"`` -- tints the box and suffixes the label.
+    """
+    color = (CANDIDATE_SUSPECT_COLOR if flag == "sus"
+             else CANDIDATE_REMOVED_COLOR if flag == "rm"
+             else CANDIDATE_COLOR)
+    h, w = frame.shape[:2]
+    if bbox is not None and len(bbox) == 4:
+        x1, y1, x2, y2 = (int(round(float(v))) for v in bbox)
+    elif center is not None and len(center) >= 2:
+        cx, cy = int(round(float(center[0]))), int(round(float(center[1])))
+        x1, y1, x2, y2 = cx - CANDIDATE_HALF, cy - CANDIDATE_HALF, cx + CANDIDATE_HALF, cy + CANDIDATE_HALF
+    else:
+        return                       # nothing placeable: skip rather than draw at 0,0
+    if x2 < x1:
+        x1, x2 = x2, x1
+    if y2 < y1:
+        y1, y2 = y2, y1
+    x1, y1 = max(0, x1 - 2), max(0, y1 - 2)
+    x2, y2 = min(w - 1, x2 + 2), min(h - 1, y2 + 2)
+    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 1)
+
+    conf_txt = "-" if confidence is None else f"{float(confidence):.2f}"
+    suffix = CANDIDATE_FLAG_TEXT.get(flag, "")
+    label = f"{conf_txt} {suffix}".strip()
+    org = (x1, max(12, y1 - 4))
+    cv2.putText(frame, label, org, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 3)
+    cv2.putText(frame, label, org, cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
 
 def draw_ball_trail(
