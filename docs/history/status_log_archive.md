@@ -3653,3 +3653,60 @@ SET of recovered/lost serves, not the aggregate: 8/16 → 8/16 hides the whole
 finding.
 
 **Nothing in `src/` changed.** Suite not run (no `scripts/` or `tests/` touched).
+
+### 2026-10-02 (sixty-ninth session) — THE TOUCH-COUNT LEVER (#68): the label bucket is Layer 2's possession count, not Layer 1's gesture — and the far serve is the SMALLEST lever on the goal metric
+
+**Asked:** continue the coordinator loop toward G3 (the user's standing "Continue", m00266,
+with gemini/sonnet banned, opus only for `/architect`, briefs passed as files).
+
+**Step 0 (read).** Re-read STATUS *Active next* + *Open points* + the re-ranked cards,
+AGENTS.md, `.pi/prompts/coordinator-prompt.md`. All 7 existing cards were DONE — no READY
+card remained — so the first job was to decide what the next card should be, not to run one.
+
+**Step 1 (the hypothesis I wanted to test, and refuted).** After PG2 passed and #48's
+"41 of 44 missed contacts have a nearby action 7-69 f away" plus 8 far serves 26-34 f late,
+the natural story was that emissions are systematically LATE. Measured the signed delta to
+the nearest emission by GT class on committed artifacts: dig median **-2 f**, set **-2 f**,
+spike **-2 f**, overpass **-2 f**, serve **+23 f**. **A global timing fix pays nothing.**
+The recorded class accuracy reproduces exactly (83/141 = 0.589).
+
+**Step 2 (the find).** Dumped the match `--diag-dump` (`output/g3r1/match_bw03_diag.jsonl`,
+185 `accepted` candidates) and found **Layer 1 is degenerate**: the whole match emits only
+three `VisualGesture` values, with `bump_set` at **157 of 185 (85 %)**. `bump_set` becomes
+dig 73 / set 40 / spike 24 / serve 16 / overpass 4. So the entire `dig`/`set`/`overpass`/
+`serve` decision is **Layer 2's `ActionContextResolver._decide`**, keyed on `_poss_touch`.
+That reclassifies the "label bucket" from a perception problem to a Layer 2 rule problem.
+
+**Step 3 (the lever, verified by replay).** Replayed the **unmodified** `_decide` over the
+accepted contacts, substituting one input at a time. Feeding the **real GT `touch_number`**
+lifts label accuracy **79/139 = 0.568 -> 110/139 = 0.791 (+0.223)**, while `touch_number`
+itself is only **96/139 = 0.691**. That is bigger than every other lever measured on this GT
+(12 far serves +0.032 class / +0.066 total-correct; 13 overpass labels +0.071; the 14
+`set<->dig` swaps +0.077). Residual confusions after a perfect count: `overpass->spike` 10,
+`serve->dig` 9, `serve->spike` 3, `overpass->dig` 3, `spike->block` 2, `spike->set` 1,
+`set->overpass` 1 — the count is necessary, not sufficient.
+
+**Mechanism, first cut.** Touch errors concentrate where the pipeline emitted FEWER contacts
+than the owner listed: 11 GT points with `accepted >= GT` -> 11/37 touch errors; 14 points
+with `accepted < GT` -> **32/102**. Worst: P19 18/13 (7), P25 18/12 (6), P26 11/8 (6),
+P30 18/15 (5), P23 7/6 (4), P29 6/7 (4), P33 4/5 (3). P18 (16 GT / 15 accepted) and
+P24 (7/6) are CLEAN, so it is the placement of the missing contact, not the count itself.
+
+**Trap.** The GT `touch_number` lives in `points[].events[].touch_number`, **not** in
+`points[].contacts[]`. Reading `contacts` (which has `action`, `gesture`, `team`, ... but no
+touch key) silently returns 0/139 while the code runs fine — it produced a wrong answer
+mid-session before it was caught. Anyone re-running this must read `events`.
+
+**What did NOT happen.** No `src/` change, no decode, no seek, no GT edit, no pipeline run,
+held-out session `20260928_entreno_vall_dhebron` never read. No rule proposed and nothing
+shipped (STOP list / AGENTS.md §5 discipline: this is in-sample on the same 139 contacts).
+
+**Step 5.** Wrote `docs/g3_touch_count_lever.md` (the full argument, plus the two limits:
+the GT touch number encodes the OWNER's segmentation, and the +0.223 is an upper bound on a
+rule fix, not a result), `logs/touch_lever_stdout.txt` (the reproducible transcript), **CARD
+TC1** (READY, first card) and the re-ranked *Active next*.
+
+**Owner decision needed (recorded, not acted on):** the far-serve track (open point 30 /
+22) is now measurably the SMALLEST lever on the goal metric, so the label work goes first.
+That does not cancel the owner's serve priority — it re-orders it — so it is written up here
+rather than assumed.
