@@ -1,0 +1,28 @@
+scripts/probe_insert_path.py
+  s_0d530c1e5ad472::t_14b00531c5cec1 403-783
+  s_0d530c1e5ad472::t_1e552aae671d1a 1-402,784-1025
+STATUS.md
+  s_0d530c1e5ad472::t_4a3f9c4f275af5 20,303-304,1924,2130-2163
+  s_0d530c1e5ad472::t_c41c8d123b698f 2164
+docs/g3_touch_count_lever.md
+  s_0d530c1e5ad472::t_9ce37478d5031f 114-123
+tests/test_insert_path.py
+  s_0d530c1e5ad472::t_14b00531c5cec1 1-502,528-539
+  s_0d530c1e5ad472::t_c31bf3aa8c13a8 503-527
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "f0eb6fe5eaf16f71a09fa2dc59d39972f610742e",
+  "prompts": {},
+  "sessions": {
+    "s_0d530c1e5ad472": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1039a-94c7-70ec-8f23-5186d117f513",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
