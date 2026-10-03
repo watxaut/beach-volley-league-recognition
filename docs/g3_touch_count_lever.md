@@ -111,6 +111,16 @@ to what the far serves the production stream can *convert today* contribute
 "≈4.5 far serves convert", not "12/12". The near/far split and the +0.177 total
 are confirmed exact.
 
+**CORRECTION 2 (2026-10-03, #74c, from `logs/insert_path_report.md` §4).** The
+#74b goal math "full fix 103/139 = 0.741" is numerator-only: the 13 far-side
+contacts were NOT-FOUND, so a consistent INSERT arm counts them in the
+denominator too (103/152 ≈ 0.678). The measured INSERT path (PG2-style
+window-start placement over the existing evidence artifacts) tops out at
+**96/150 = 0.640** IN-SAMPLE — 11/17 far hits (every at_seam serve, none of
+the 6 in_gap ones; the ceiling is the point map's, not the evidence's), at
+placement precision 0.6111 with 0 near misclaims and 0 owner-negative FP.
+Even the numerator-only variant reads 96/139 = 0.691, still under 0.70.
+
 Residual confusions after the substitution (all 139): `overpass→spike` 10,
 `serve→dig` 9, `serve→spike` 3, `overpass→dig` 3, `spike→block` 2, `spike→set` 1,
 `set→overpass` 1. So a perfect touch count is necessary but not sufficient:
