@@ -1,0 +1,22 @@
+{"type":"goal_created","goalId":"murbs4tw-fwhb63","objective":"Act as the coordinator, read .pi/prompts/coordinator-prompt.md. The goal is G3: be able to reliably track actions across different videos. Follow the tasks open, delegate to agents when needed. Stop when you get good results >70% actions correct with GT in 20260920_match_ari_joan_lost without video_entreno_* falling from 90% accuracy.","sisyphus":false,"autoContinue":true,"at":"2026-10-02T18:57:35.348Z"}
+{"type":"goal_paused","goalId":"murbs4tw-fwhb63","reason":"user","status":"paused","at":"2026-10-02T19:41:34.510Z"}
+{"type":"goal_paused","goalId":"murbs4tw-fwhb63","reason":"Scheduling paused","source":"agent","at":"2026-10-02T19:43:01.073Z"}
+{"type":"goal_paused","goalId":"murbs4tw-fwhb63","reason":"Scheduling paused","source":"agent","at":"2026-10-02T21:16:17.765Z"}
+{"type":"goal_paused","goalId":"murbs4tw-fwhb63","reason":"Scheduling paused","source":"agent","at":"2026-10-02T21:16:26.401Z"}
+{"type":"goal_paused","goalId":"murbs4tw-fwhb63","reason":"Scheduling paused","source":"agent","at":"2026-10-02T21:29:08.733Z"}
+{"type":"goal_resumed","goalId":"murbs4tw-fwhb63","reason":"user","at":"2026-10-02T21:30:14.616Z"}
+{"type":"goal_paused","goalId":"murbs4tw-fwhb63","reason":"user","status":"paused","at":"2026-10-02T21:33:58.945Z"}
+{"type":"goal_resumed","goalId":"murbs4tw-fwhb63","reason":"user","at":"2026-10-02T21:34:56.529Z"}
+{"type":"goal_focused","goalId":"murbs4tw-fwhb63","reason":"selected","at":"2026-10-03T21:12:43.658Z"}
+{"type":"goal_created","goalId":"musw7o9u-r5dm88","objective":"Make Goal 3 make actions reliable. I am willing to accept >70% actions tracked correctly in 20260920_match_ari_joan_lost and >90% in video_entreno, minimizing false positives.","sisyphus":false,"autoContinue":true,"at":"2026-10-03T21:17:18.882Z"}
+{"type":"goal_paused","goalId":"musw7o9u-r5dm88","reason":"user","status":"paused","at":"2026-10-03T21:17:23.301Z"}
+{"type":"goal_paused","goalId":"musw7o9u-r5dm88","reason":"Scheduling paused","source":"agent","at":"2026-10-03T21:20:00.949Z"}
+{"type":"goal_resumed","goalId":"musw7o9u-r5dm88","reason":"user","at":"2026-10-03T21:20:31.892Z"}
+{"type":"goal_focused","goalId":"musw7o9u-r5dm88","reason":"selected","at":"2026-10-04T05:07:05.725Z"}
+{"type":"goal_resumed","goalId":"musw7o9u-r5dm88","reason":"user","at":"2026-10-04T05:07:05.739Z"}
+{"type":"goal_paused","goalId":"musw7o9u-r5dm88","reason":"user","status":"paused","at":"2026-10-04T05:07:12.134Z"}
+{"type":"goal_focused","goalId":"musw7o9u-r5dm88","reason":"selected","at":"2026-10-04T07:21:48.449Z"}
+{"type":"goal_resumed","goalId":"musw7o9u-r5dm88","reason":"user","at":"2026-10-04T07:21:48.459Z"}
+{"type":"goal_paused","goalId":"musw7o9u-r5dm88","reason":"user","status":"paused","at":"2026-10-04T07:21:53.637Z"}
+{"type":"goal_focused","goalId":"musw7o9u-r5dm88","reason":"selected","at":"2026-10-04T07:41:16.599Z"}
+{"type":"goal_created","goalId":"mutijiky-y2byse","objective":"Continue from session #75 (committed, tree clean) toward G3: maximize action-label accuracy. Match bar 0.70 (shipped 0.612 dump-action / 0.589 pipeline_output.json) and entreno bar 0.90 (e1 0.706, e2 0.571, e7 0.750 failing). All measured single levers are closed except the OVERPASS rule (item 0a: +0.092 remaining single label lever) and the new entreno mechanisms from #74d (`gesture_miss` x2, `emitted_vocabulary`: `freeball` not in VolleyballAction). Diagnose-first, GT-validated, no unvalidated src/ change.","sisyphus":false,"autoContinue":true,"at":"2026-10-04T07:42:22.930Z"}
