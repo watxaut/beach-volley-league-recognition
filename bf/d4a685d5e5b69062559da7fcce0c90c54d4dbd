@@ -1,0 +1,43 @@
+tests/test_reach_scale.py
+  s_0d530c1e5ad472::t_b0170817b4a2e3 1-187
+scripts/probe_reach_scale.py
+  s_0d530c1e5ad472::t_147237d4390939 238-341,346-367
+  s_0d530c1e5ad472::t_5705ea3e5092e3 95,123,138,159,169,343,598-673
+  s_0d530c1e5ad472::t_cb849f6c298c16 92-94
+  s_0d530c1e5ad472::t_f549b518e88546 96-98,120-122
+  s_0d530c1e5ad472::t_54ea46bf7363df 124-126,135-137
+  s_0d530c1e5ad472::t_5a70ebd94e34a7 139-141,156-158
+  s_0d530c1e5ad472::t_adeba7432a094a 160-162,166-168
+  s_0d530c1e5ad472::t_80cb1f3b6af06f 170-172,235-237
+  s_0d530c1e5ad472::t_43f3153b8adf8d 342
+  s_0d530c1e5ad472::t_d8b2f793496407 344-345
+  s_0d530c1e5ad472::t_6ee5f72202686c 368-370,595-597
+  s_0d530c1e5ad472::t_2988c1ba13ebed 674-676
+  s_9ed08fada71d0a::t_af0322c044c9f5 1-91,99-119,127-134,142-155,163-165,173-234,371-594,677-762
+STATUS.md
+  s_9ed08fada71d0a::t_fd24c00a6ee8a0 20,1254-1268,1514-1515,1941,2056-2122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "bfd4a685d5e5b69062559da7fcce0c90c54d4dbd",
+  "prompts": {},
+  "sessions": {
+    "s_0d530c1e5ad472": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1039a-94c7-70ec-8f23-5186d117f513",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    },
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
