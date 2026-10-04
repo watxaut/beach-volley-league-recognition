@@ -24,23 +24,39 @@ Design constraints (AGENTS.md §2/§5/§6):
 
       d_net = D * w_near * w_far / (4 * (w_near + w_far))
 
-  MEASURED REGIMES (session #78, owner-flagged windows on the match and the
-  full practice video, `scripts/probe_possession_feedback.py`): a FLYING
-  near-half ball measures 1.55-1.6x d_net; a ball AT the net plane (tape
-  dribble, mesh, resting/rolled) and a motion-blurred FAR flight BOTH
-  measure 1.0-1.35x d_net -- width cannot split those two; a crisp FAR
-  ground bounce measures 0.5-0.8x d_net. The original factors (1.15/1.55,
-  fit on flying balls) put the far threshold INSIDE the net-plane regime,
-  so occlusion dips on the near side committed FAR -- the owner-reported
-  bias. Recalibrated: FAR_FACTOR 0.85 (only genuine far-ground/low-far
-  evidence commits far), NEAR_FACTOR 1.55 unchanged; the overlap regime
-  reads as CROSSING (band) and HOLDS the last committed side.
+  MEASURED REGIMES (sessions #78/#79, owner-flagged windows on the match,
+  the full practice video and entreno_3, `scripts/probe_possession_feedback.py`
+  + GT cross-check): a FLYING near-half ball measures 1.49-1.6x d_net
+  (e3 sustains 39-40 px = 1.45-1.49x around its GT near touches; the match
+  1.55-1.6x); a ball AT the net plane (tape dribble, mesh, resting/rolled)
+  and a motion-blurred FAR flight BOTH measure 1.0-1.35x d_net -- width
+  cannot split those two; a crisp FAR ground bounce measures 0.5-0.8x
+  d_net. The original factors (1.15/1.55, fit on match flying balls) put
+  the far threshold INSIDE the net-plane regime, so occlusion dips on the
+  near side committed FAR -- the owner-reported bias. Recalibrated:
+  FAR_FACTOR 0.85 (only genuine far-ground/low-far evidence commits far),
+  NEAR_FACTOR 1.45 (e3's GT near touches sustain only 1.49x; 1.55 left
+  them holding the far label -- the #79 mirror bias on e3). The overlap
+  regime reads as CROSSING (band) and HOLDS the last committed side.
 * Owner instruction (#78, "do the greatest of the sides"): all band
   decisions use the MAXIMUM width seen in the last EVIDENCE_WINDOW_FRAMES
   measured frames, so an occluded near-side ball (tape/mesh/player clipping
   the bbox) cannot out-vote a recent larger measurement. Evidence ages out
   by frame index (predicted stretches freeze it, so a long dropout still
   holds).
+* Owner instruction (#79, "too biased towards near"): the rolling max is
+  the WRONG statistic for the far side -- a far dig/set rally oscillates
+  0.66-1.14x d_net (match f1415-1500: clear frames 21-26 px, occluded
+  frames 15-19 px), so the max keeps rescuing it into the band and the
+  side holds NEAR through the whole far rally. The two complaints are
+  ASYMMETRIC phenomena: near occlusion is momentary smallness behind a
+  big ball (max survives it; sub-far frames: 0 per window), far rallies
+  are PERSISTENT smallness with flickering clear frames (4-7 sub-far
+  frames per 12f window). So the FAR commit also fires when >=
+  FAR_COMMIT_MIN_COUNT of the last EVIDENCE_WINDOW_FRAMES measured
+  frames are <= far_px (evidence max still < near_px). The near commit
+  stays max-only: a near ball never produces 4 sub-far frames per window
+  (tape-window dips measure 23-30 px).
 
 CAVEAT (recorded, #77): display-only v1 -- nothing acts on this signal and
 no Config key exists. The far-flight/net-rest overlap means far commits land
@@ -54,20 +70,28 @@ from typing import Any, Dict, List, Optional, Tuple
 # Beach volleyball ball: circumference 66-68 cm -> diameter ~0.67/pi m.
 _BALL_DIAMETER_M = 0.67 / math.pi
 
-# Measured width regimes (session #78; see module docstring).
+# Measured width regimes (sessions #78/#79; see module docstring).
 FAR_FACTOR = 0.85
-NEAR_FACTOR = 1.55
+NEAR_FACTOR = 1.45
 
 # Owner instruction (#78): band decisions use the max width over this many
 # measured frames, so occlusion dips cannot out-vote a recent larger
 # measurement.
 EVIDENCE_WINDOW_FRAMES = 12
 
+# Owner instruction (#79): the FAR side commits not only on an all-small
+# window but on PERSISTENT smallness -- at least this many of the last
+# EVIDENCE_WINDOW_FRAMES measured frames at <= far_px. Pre-registered on the
+# match: fires in the far dig/set rally f1415-1500 (count hits 4 at f1428,
+# before the f1429 dig), never fires in the near tape window f300-400
+# (dips 23-30 px, count 0).
+FAR_COMMIT_MIN_COUNT = 4
+
 # Uncalibrated fallback = the factors applied to a nominal d_net of ~22.6 px
 # (the match value). Venue-coupled by definition; bands are recomputed from
 # the calibration the moment one is set.
 FALLBACK_FAR_PX = 19.0
-FALLBACK_NEAR_PX = 35.0
+FALLBACK_NEAR_PX = 33.0
 
 SIDE_NEAR = "near"
 SIDE_FAR = "far"
@@ -103,10 +127,15 @@ class BallSidePossessionObserver:
 
     All band decisions read the ROLLING MAX of the measured widths
     ("greatest of the sides", owner #78), so near-side occlusion dips
-    cannot commit far behind a recent larger measurement. Committed sides
-    persist (last-known); a crossing is announced once a previously
-    committed side is seen INSIDE the net band; a genuine crossing counts
-    in ``crossings`` when the OPPOSITE side commits -- which the rolling
+    cannot commit far behind a recent larger measurement. The FAR side
+    additionally commits on PERSISTENT smallness (#79): >=
+    FAR_COMMIT_MIN_COUNT of the last EVIDENCE_WINDOW_FRAMES measured
+    frames at <= far_px -- the max-only statistic reads a far dig/set
+    rally (oscillating 0.66-1.14x d_net) as band and holds NEAR through
+    it, the owner-reported mirror bias. Committed sides persist
+    (last-known); a crossing is announced once a previously committed
+    side is seen INSIDE the net band; a genuine crossing counts in
+    ``crossings`` when the OPPOSITE side commits -- which the rolling
     max DELAYS by up to EVIDENCE_WINDOW_FRAMES (the label shows CROSSING
     while the evidence decays; flap-backs to the same side never count).
     """
@@ -167,13 +196,16 @@ class BallSidePossessionObserver:
             # a predicted stretch freezes the evidence (holds) and stale
             # widths drop once real measurements resume.
             self._evidence.append((int(frame_index), width))
-            cutoff = int(frame_index) - EVIDENCE_WINDOW_FRAMES
+            # Keep exactly EVIDENCE_WINDOW_FRAMES entries (f-11 .. f).
+            cutoff = int(frame_index) - EVIDENCE_WINDOW_FRAMES + 1
             while self._evidence and self._evidence[0][0] < cutoff:
                 self._evidence.pop(0)
             evidence = max(w for _, w in self._evidence)
+            far_small = sum(1 for _, w in self._evidence
+                            if w <= self.far_px)
             if evidence >= self.near_px:
                 self._commit(SIDE_NEAR)
-            elif evidence <= self.far_px:
+            elif evidence <= self.far_px or far_small >= FAR_COMMIT_MIN_COUNT:
                 self._commit(SIDE_FAR)
             elif self._side is not None:
                 # Inside the net band with a prior committed side.
@@ -190,6 +222,9 @@ class BallSidePossessionObserver:
             "width_frame": self._last_width_frame,
             "evidence_width_px": (max(w for _, w in self._evidence)
                                   if self._evidence else None),
+            "far_small_count": (sum(1 for _, w in self._evidence
+                                   if w <= self.far_px)
+                                if self._evidence else 0),
             "net_width_px": self.net_width_px,
             "far_px": self.far_px,
             "near_px": self.near_px,

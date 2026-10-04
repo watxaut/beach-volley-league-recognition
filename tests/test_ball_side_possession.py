@@ -102,7 +102,7 @@ def test_bands_scale_with_calibration():
 def test_fallback_bands_uncalibrated():
     obs = BallSidePossessionObserver()
     assert obs.far_px == FALLBACK_FAR_PX == 19.0
-    assert obs.near_px == FALLBACK_NEAR_PX == 35.0
+    assert obs.near_px == FALLBACK_NEAR_PX == 33.0
     assert obs.net_width_px is None
     # A calibration the formula rejects must leave the fallback in place.
     obs.set_calibration(_Calib(None))
@@ -119,7 +119,7 @@ def test_bands_outside_measured_regimes():
     obs.reset()
     r_rest = obs.observe(0, tb(26))      # net-plane rest/tape (1.0-1.35x)
     assert r_rest["side"] is None        # band: no commit, NOT far
-    r_near = obs.observe(1, tb(37))      # near flight (1.55-1.6x d_net)
+    r_near = obs.observe(1, tb(37))      # near flight (1.49-1.6x d_net)
     assert r_near["side"] == SIDE_NEAR
 
 
@@ -145,20 +145,16 @@ def test_band_before_any_side_is_not_crossing():
 
 
 def test_flap_back_does_not_count():
-    # The rolling max keeps the band widths as evidence, so a flap-back far
-    # -> band -> far re-commits far only after the band widths age out
-    # (<= EVIDENCE_WINDOW_FRAMES); CROSSING lingers meanwhile and the
-    # flap-back never increments the count.
-    from src.analysis.ball_side_possession import EVIDENCE_WINDOW_FRAMES
+    # A flap-back far -> band -> far re-commits far; CROSSING lingers only
+    # while the count rule has not yet re-confirmed far (#79: 4 sub-far
+    # frames within the window), and the flap-back never increments the
+    # count.
     obs = BallSidePossessionObserver()
     obs.observe(0, tb(15))   # far
     obs.observe(1, tb(25))   # crossing (from far)
-    r_mid = None
-    for f in range(2, 2 + EVIDENCE_WINDOW_FRAMES - 1):
-        r_mid = obs.observe(f, tb(15))  # back to far widths: evidence decays
-        assert r_mid["side"] == SIDE_FAR
-        assert r_mid["crossing"]        # still decaying, label stays crossing
-    r = obs.observe(2 + EVIDENCE_WINDOW_FRAMES - 1 + 1, tb(15))
+    assert obs.observe(2, tb(15))["crossing"]
+    assert obs.observe(3, tb(15))["crossing"]
+    r = obs.observe(4, tb(15))  # 4 sub-far frames -> far re-commits
     assert r["side"] == SIDE_FAR and not r["crossing"]
     assert obs.crossings == 0
 
@@ -216,8 +212,9 @@ def test_observe_never_mutates_tracked_ball():
 
 def test_occluded_near_hold_greatest_of_sides():
     # Owner's match window: near committed, then a ball occluded at the
-    # tape/mesh measures 23-30 px (inside the band, below the OLD far edge
-    # of 26.3) -> must NEVER commit far while the rolling max is higher.
+    # tape/mesh measures 23-30 px (inside the band, below the far edge of
+    # 19.4 AND below the near edge of 33.1) -> must NEVER commit far while
+    # the rolling max is higher, and must not need re-committing near.
     obs = BallSidePossessionObserver()
     obs.set_calibration(_Calib(MATCH_CORNERS))
     assert obs.observe(0, tb(37))["side"] == SIDE_NEAR
@@ -250,6 +247,55 @@ def test_evidence_width_in_row():
     r = obs.observe(1, tb(20))   # dip: instant 20, evidence still 40
     assert r["width_px"] == 20.0
     assert r["evidence_width_px"] == 40.0
+
+
+# --------------------------------------------------------------------- #
+# persistent-smallness far commit (owner #79: "too biased towards near")
+# --------------------------------------------------------------------- #
+
+def test_far_rally_oscillation_commits_far():
+    # Owner's match far dig/set rally (f1415-1500): widths oscillate 15-26,
+    # the rolling max alone rescues them into the band and holds NEAR.
+    # >= 4 sub-far frames within the window must commit far (here at the
+    # 4th sub-far frame), counting the announced near->far crossing.
+    obs = BallSidePossessionObserver()
+    obs.set_calibration(_Calib(MATCH_CORNERS))
+    assert obs.observe(0, tb(37))["side"] == SIDE_NEAR
+    for f in range(1, 14):                       # age the near evidence out
+        r = obs.observe(f, tb(25))
+    assert r["crossing"]                         # band, announced from near
+    seq = [17, 21, 19, 22, 17, 19]               # sub-far: f14,f16,f18,f19
+    side = None
+    for i, w in enumerate(seq):
+        side = obs.observe(14 + i, tb(w))["side"]
+        if side == SIDE_FAR:
+            break
+    assert side == SIDE_FAR
+    assert obs.crossings == 1                    # near -> far, announced
+
+
+def test_three_subfar_frames_do_not_commit_far():
+    # Pre-registered negative: 3 sub-far frames per window is flicker, not
+    # persistent smallness; the near hold survives (count rule needs 4).
+    obs = BallSidePossessionObserver()
+    obs.set_calibration(_Calib(MATCH_CORNERS))
+    assert obs.observe(0, tb(37))["side"] == SIDE_NEAR
+    # Period-12 pattern with 3 sub-far positions spaced apart: every
+    # 12-entry window holds exactly 3 sub-far frames (the count rule needs
+    # 4), so the near hold survives flicker at this rate.
+    pattern = [15, 25, 25, 25, 25, 15, 25, 25, 25, 15, 25, 25]
+    for i in range(60):
+        r = obs.observe(1 + i, tb(pattern[i % len(pattern)]))
+        assert r["side"] == SIDE_NEAR, f"frame {1 + i}: count rule leaked"
+        assert r["far_small_count"] <= 3
+
+
+def test_far_small_count_in_row():
+    obs = BallSidePossessionObserver()
+    obs.observe(0, tb(15))
+    r = obs.observe(1, tb(25))
+    assert r["far_small_count"] == 1
+    assert obs.observe(2, tb(15))["far_small_count"] == 2
 
 
 # --------------------------------------------------------------------- #

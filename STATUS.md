@@ -17,7 +17,7 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-04 (seventy-eighth session — **#78: the #77 possession labels RECALIBRATED on owner feedback** — occluded near-side balls were committing FAR and sticking there; fix = ALL band decisions read the ROLLING MAX width over the last 12 measured frames (owner: "do the greatest of the sides") + FAR_FACTOR 1.15→0.85 (the net-plane rest regime and blurred far flight OVERLAP at 1.0-1.35×d_net, so that regime now reads CROSSING/band and holds the last side; far commits only on far-ground/low-far evidence); probe-verified on the owner's exact windows: match f250-345 far 100→4 frames, f378+ 0; vall f1059-1280 0 (f1185 = near+crossing); e3 one far commit at the point-ending landing. Suite **1493**. Prior session: **#77** owner RATIFIED the post-hoc direction (open point 9): overpass = a POST-HOC read of WHERE the action lands, plus possession-first ambiguous-touch attribution — and the first instrumentation step SHIPPED: per-frame ball-side possession + net-crossing labels (always-on pure observer `src/analysis/ball_side_possession.py` inside `process_frame`; live-debug `possession: NEAR|FAR` + `CROSSING`; diag `ball_possession` schema v2; NO new `pipeline_output.json` key). Sequencing in open point 9: C1 fitted ball-fate measurement (pre-registered at m ≤ 2k−12) → C2 possession timeline → C3 overpass relabel → C4 ambiguous-touch attribution. Prior chain collapsed — detail lives in the Session index / open points: **#76b** overpass lever UNREACHABLE from the current stream (4 families killed; open point 9 = instrumentation requirement); **#76a** label-ceiling arithmetic corrected (`overpass` alone +0.0949 crosses 0.70); **#75** reach asymmetry NOT scale-explained.)
+**Last updated:** 2026-10-04 (seventy-ninth session — **#79: the possession labels RE-BALANCED on owner feedback** — "now it's too biased towards near": a FAR dig/set rally oscillates 0.66-1.14×d_net (match f1415-1500: clear frames 21-26 px, occluded 15-19 px) and the #78 rolling MAX kept rescuing it into the band, holding NEAR through the whole far rally. Fix = ASYMMETRIC evidence: NEAR commit stays max-only (occlusion is momentary smallness behind a big ball; tape-window sub-far count 0), FAR commit additionally fires on PERSISTENT smallness — ≥FAR_COMMIT_MIN_COUNT=4 of the last 12 measured frames ≤0.85×d_net. MEASURED #79: near flight is 1.49-1.6×d_net (e3 sustains only 1.49× ≈ 39-40 px around its GT near touches), so NEAR_FACTOR 1.55→1.45 — 1.55 left e3's GT near touches holding far. Verified: match f1428/f1488 now FAR (count fires at the f1429 dig), tape f300-400 still 0 far, f254 near intact; vall f1185 near✕, f1059-1280 0 far, 5/5 genuine bounces far; e3 12/14 GT touches read the right side (2 misses = flight latency; all 6 transitions 14/74/202/375/445/560 precede the NEXT GT touch). Suite **1496**. Also fixed a latent #78 off-by-one: the evidence window kept 13 entries, now exactly 12. Prior: **#78** occlusion-dip far bias (rolling max + FAR 0.85); **#77** owner RATIFIED the post-hoc direction (open point 9): overpass = a POST-HOC read of WHERE the action lands, plus possession-first ambiguous-touch attribution — first instrumentation SHIPPED: per-frame ball-side possession + net-crossing labels (always-on pure observer `src/analysis/ball_side_possession.py` inside `process_frame`; live-debug `possession: NEAR|FAR` + `CROSSING`; diag `ball_possession` schema v2; NO new `pipeline_output.json` key). Sequencing in open point 9: C1 fitted ball-fate measurement (pre-registered at m ≤ 2k−12) → C2 possession timeline → C3 overpass relabel → C4 ambiguous-touch attribution. Prior chain collapsed — detail lives in the Session index / open points: **#76b** overpass lever UNREACHABLE from the current stream (4 families killed; open point 9 = instrumentation requirement); **#76a** label-ceiling arithmetic corrected (`overpass` alone +0.0949 crosses 0.70); **#75** reach asymmetry NOT scale-explained.)
 Prior sessions this file: #73's overlay paragraph below; #72's reach-cascade refutation below that (also in `docs/g3_reach_cascade.md`).
 An offline replay of the unmodified `ActionContextResolver` over the 185 accepted rows PLUS every `reason="reach"` rejection within a scalar factor K (the gate re-scores offline) scores, against the 182 in-region GT events at ±15 f: BASE 78/139 = 0.561 label, 90/139 touch; **K=1.1 +4 found → +1 label; K=1.2 +14 found (all 14 within ±15 f of a GT contact, the precision-clean gate) → −4 LABELS; K=1.3 +21 → −5; K=1.5 +28 → −1; K=2.0 +48 → +1 at rate 0.513 vs 0.561.** Admitting ALL 71 reach rows repairs only **9 of 49** wrong touch numbers (40 still wrong), because the count is driven by the resolver's own resets, not by recall — so the recall → count → label chain is real about the ERROR POPULATION but **earning the recall does not earn the count**. The architect's own "~0.00 class accuracy" caveat is CONFIRMED and slightly optimistic: the honest expectation is negative. **The 44 missed contacts stay a RECALL story (contact P/R, per-point completeness), NOT the path to 0.70 class accuracy — do not spend a GPU A/B on them while the goal is the class metric.** The label bucket's two count routes are now BOTH measured and closed (re-derive: TC1 +0.050; earn-by-recall: #72 negative), leaving **39 of 55 wrong labels with a wrong count and 16 with a CORRECT count** (the residual Layer-1/2 rule errors open point 9 already names).
 **Seventy-third session (2026-10-03): a display-only live-debug overlay LANDED** — every ball the DETECTOR saw this frame drawn as a hollow box with its confidence and the detector's own verdict (`sus` stationary-suspect / `rm` dropped by static suppression), toggle `b`, default ON; reads only the sanctioned `BallDetector.raw_detections` side channel, no new Config key, processing path untouched; tests +9, suite **1336**. Its session's own commit claim (`8040f04`) was FALSE — the commit never existed (reflog clean after `ad1dc03`); committed after coordinator verification. With the toggle ON the saved `--debug-live` video now carries the candidate boxes too (still unpanelled).
@@ -229,13 +229,15 @@ dump as `ball_possession`, schema v2). Next in the ratified sequencing:
 **C1** fitted ball-fate measurement (pre-registered PASS/FAIL at the
 m ≤ 2k−12 budget) → **C2** possession timeline reliability → **C3** overpass
 relabel scored once on the held-out → **C4** ambiguous-touch reattribution.
-RECALIBRATED #78 on owner feedback: measured width regimes (probe
-`scripts/probe_possession_feedback.py`) are near flight ≥1.55×d_net,
+RECALIBRATED #78+#79 on owner feedback: measured width regimes (probe
+`scripts/probe_possession_feedback.py`) are near flight 1.49-1.6×d_net,
 net-plane rest/tape AND blurred far flight BOTH 1.0-1.35×d_net
-(indistinguishable), far ground 0.5-0.8×d_net — the #77 factors sat inside
-the overlap regime and occlusion dips committed far; shipped fix =
-rolling-max(12 measured frames) evidence for all band decisions +
-FAR_FACTOR 0.85 (verified on the owner's windows, Log #78). The serves track
+(indistinguishable), far ground 0.5-0.8×d_net — shipped evidence is
+ASYMMETRIC: NEAR commits on the rolling max(12 measured frames) ≥1.45×d_net
+(occlusion is momentary smallness), FAR on max ≤0.85×d_net OR ≥4 of the
+last 12 measured frames ≤0.85×d_net (far rallies FLICKER 0.66-1.14×d_net;
+persistent smallness is the far signature). Verified on the owner's windows
++ the e3 GT touches (Logs #78/#79). The serves track
 below remains the standing record.
 
 **Serves are the active track and they are NOT reliable (#56 SR0 measured them;
@@ -313,7 +315,7 @@ the reception as the serve. No look at vall_dhebron outputs (held-out lock).
 - **`--serve-events` observers:** default OFF. Inertness is measured
   (byte-identical).
 - **Entreno gate record** (`evaluate --ignore-player` F1): e1 0.706, e2 0.571,
-  e3 1.0, e4 0.933, e5 0.923, e6 0.933, e7 0.75. Suite **1493**.
+  e3 1.0, e4 0.933, e5 0.923, e6 0.933, e7 0.75. Suite **1496**.
 
 **Refuted and parked** (do not reopen without new data): T5 tracker admission, R1
 departure gate, S1 looming, scale-aware geometry, M1 far-end crop, possession
@@ -1436,10 +1438,12 @@ point number in `docs/history/`.
     possession + crossing labels — `src/analysis/ball_side_possession.py`,
     an always-on pure observer in `process_frame`; bands per-video from the
     calibration via the owner's pinhole
-    `d_net = D·w_near·w_far/(4(w_near+w_far))`; RECALIBRATED #78 on owner
-    feedback: factors **0.85/1.55** (match 19.4/35.4 px; fallback 19/35) and
-    ALL band decisions on the ROLLING MAX width of the last 12 measured
-    frames — the #77 factors (1.15/1.55, fit on flying balls) put far_px
+    `d_net = D·w_near·w_far/(4(w_near+w_far))`; RECALIBRATED #78+#79 on
+    owner feedback: factors **0.85/1.45** (match 19.4/33.1 px; fallback
+    19/33), NEAR on the ROLLING MAX width of the last 12 measured frames,
+    FAR additionally on PERSISTENT smallness (≥4 of the last 12 measured
+    frames ≤ far_px; window fixed to exactly 12 entries) — the #77 factors
+    (1.15/1.55, fit on flying balls) put far_px
     INSIDE the net-plane rest regime, so occlusion dips committed far
     (match f302, vall f1059) and stuck for 100-220 frames; live-debug label +
     diag `ball_possession` (schema v2). Sequencing for the label lever:
@@ -1457,6 +1461,11 @@ point number in `docs/history/`.
     fixed with rolling-max evidence + FAR_FACTOR 0.85, probe-verified on
     match/vall/e3 (Log #78). C1-C4 unchanged. vall_dhebron was unlocked for
     THIS display-band diagnosis only.]
+    [#79 UPDATE: the MIRROR bias — far dig/set rallies held NEAR because
+    the rolling max rescued their 0.66-1.14×d_net flicker into the band;
+    fixed with the persistent-smallness far rule + NEAR_FACTOR 1.45
+    (e3 GT cross-check: 12/14 touches correct, both misses flight latency,
+    every flip precedes the next GT touch). C1-C4 unchanged.]
 
     **[UPDATED #76: the crossing signal is not merely "missing" — it is NOT
     PRESENT in this stream, and four independent families are now measured
@@ -1606,7 +1615,7 @@ point number in `docs/history/`.
 
 ## Learnings (standing)
 
-- **THE NET-PLANE BALL SCALE IS COMPUTABLE FROM THE CALIBRATION ALONE (owner-derived #77): `d_net = D·w_near·w_far/(4(w_near+w_far))`** with D = 0.67/π m and w_near/w_far the projected baseline widths (near pair = the 2 largest-y corners; sanity: near projects wider than far). Match 20260920: d_net = 22.8 px. **MEASURED width regimes (#78, both venues): near flight ≥1.55-1.6×d_net; net-plane rest/tape/mesh AND motion-blurred far flight BOTH 1.0-1.35×d_net — width cannot split those two; far ground bounce 0.5-0.8×d_net.** Shipped bands (recalibrated #78): FAR 0.85× / NEAR 1.55× d_net with ALL decisions on the rolling max of the last 12 measured frames (owner: "do the greatest of the sides") — far commits only on far-ground/low-far evidence, occlusion dips hold the last side, the overlap regime reads CROSSING. Per-video bands replace venue-coupled px constants (entreno_3: d_net 26.9 → 22.8/41.6). Carried caveats: ±0.5 m of depth shifts the ball diameter by <0.5 px and jitter/motion-blur are ±1-2 px, so width alone is weak PER-FRAME — rolling max + hysteresis + last-known hold is the design answer.
+- **THE NET-PLANE BALL SCALE IS COMPUTABLE FROM THE CALIBRATION ALONE (owner-derived #77): `d_net = D·w_near·w_far/(4(w_near+w_far))`** with D = 0.67/π m and w_near/w_far the projected baseline widths (near pair = the 2 largest-y corners; sanity: near projects wider than far). Match 20260920: d_net = 22.8 px. **MEASURED width regimes (#78/#79, three videos + e3 GT): near flight 1.49-1.6×d_net; net-plane rest/tape/mesh AND motion-blurred far flight BOTH 1.0-1.35×d_net — width cannot split those two; far ground bounce 0.5-0.8×d_net; a far rally FLICKERS 0.66-1.14×d_net (max-only reads it as band).** Shipped bands (recalibrated #79): FAR 0.85× / NEAR 1.45× d_net; NEAR commits on the rolling max of the last 12 measured frames (owner: "do the greatest of the sides"), FAR on max ≤ far_px OR ≥4 of the last 12 measured frames ≤ far_px (persistent smallness — occlusion dips never produce 4 sub-far frames, flickering far rallies do) — occlusion dips hold the last side, the overlap regime reads CROSSING. Per-video bands replace venue-coupled px constants (match 19.4/33.1; entreno_3: d_net 26.9 → 22.8/39.0). Carried caveats: ±0.5 m of depth shifts the ball diameter by <0.5 px and jitter/motion-blur are ±1-2 px, so width alone is weak PER-FRAME — asymmetric rolling evidence + hysteresis + last-known hold is the design answer.
 
 - **A GT CLASS WHOSE WORDING NEVER APPEARS IN ANY OTHER GT EVENT IS A LABEL, NOT A MOTION PATTERN — read the `owner_raw` lines before designing the rule (measured #76b).** The 21 match-GT overpass events read "bump pass"/"bump passes" (12), "overpass" (10) and "passes the ball" (3), and across all 189 non-overpass events those words NEVER appear (the only "over"-lines are five `overhand dig` dig events and one bystander). So the owner's `overpass` means *a bump sent over* — including f24948, "bump passes ball f24948 into the net and loses point", still `overpass`. **That immediately tells you the feature is the ball's FATE after the contact, not the contact's kinematics — and it is why the "every bump_set is an overpass" ceiling rule recovers 1 of 16: a dig and an overpass are the same motion here.** Corollary: when a class cannot be recovered from a contact's own features, check whether the GT's own wording makes it a post-hoc/outcome class before hunting another threshold; that reclassifies an open point from a rule-design task into an instrumentation requirement.
 - **THE PRECISION BUDGET IS THE FIRST THING TO COMPUTE FOR ANY RELABEL LEVER, AND IT IS CHEAP (measured #76b).** `base + k - (m - k) >= labels_needed` because the matcher is class-agnostic and a relabelled matched contact scores iff the label equals the GT's — so `m <= 2k - labels_needed`, and `m >= k` always. On G3's bar arm (137 matched, 84 correct, bar 0.70) that is 12 labels needed, k=13 -> at most 14 fires (93% precision), k=16 -> at most 20 (80%), and **any k below 6 is infeasible at ANY precision**. Write it down FIRST: it turns a lever hunt into a target ("does any family hit 93% precision?") and it catches a family instantly. It also caught a first-draft algebra error (`bar*n_matched` = 95.9 instead of the 12 labels needed) that would have "proved" every rule impossible for the wrong reason — pinned by `tests/test_overpass_levers.py::test_budget_would_have_been_satisfied_by_the_mistaken_formula`.
@@ -2040,6 +2049,7 @@ survive across sessions; provenance in the archives.
 - **A player box with no detector behind it can read "behind the line" and do no harm, and a backward-looking fix for it costs as much as it gains** (#60). Fifteen match contacts had `behind_baseline` read off a carried-forward or absent track; the owner confirmed only 2 are serves and the other 13 were vetoed by the serve label's second condition (they did not open a rally). The 2 real serves DEPEND on that read — their player has no real detection at or before the hit (it returns 1-7 f LATER) — so a rule that looks backwards for a cleaner position trades +P11/+P12 for −P17/−P19; P9/P10 read false at K = 5, 10 and 15 (stance feet y = 750/747 vs the 761 px line). Corollary for any reproduction gate: a diag dump's per-frame player list is NOT the classifier's snapshot (a contact is confirmed 7 f late and the last REAL position is used), so a probe cannot reproduce the shipped read on the ~6% of contacts whose toucher is coasting.
 
 ## Session index (one line each)
+- #79 **Possession labels RE-BALANCED on owner feedback (mirror bias: far rallies held NEAR)** — the #78 rolling-max statistic is wrong for the far side: a far dig/set rally flickers 0.66-1.14×d_net (match f1415-1500) and the max rescued it into the band; fix = ASYMMETRIC evidence in `src/analysis/ball_side_possession.py`: NEAR stays max-only, FAR also fires on ≥FAR_COMMIT_MIN_COUNT=4 of the last 12 measured frames ≤0.85×d_net; NEAR_FACTOR 1.55→1.45 (e3's GT near touches sustain only 1.49×; e3 GT cross-check 12/14 correct, both misses flight latency, all 6 transitions precede the next GT touch); latent #78 off-by-one fixed (window was 13 entries). Probe A/B: match f1428/f1488 far (count fires at the dig), tape 0 far, f254 intact; vall f1185 near✕, 5/5 bounces far; suite **1496**.
 - #78 **Possession labels recalibrated on owner feedback (occlusion-dip far bias)** — probe `scripts/probe_possession_feedback.py` measured the width regimes on match+vall (near flight ≥1.55×d_net; net-plane rest AND blurred far flight OVERLAP at 1.0-1.35×d_net; far ground 0.5-0.8×d_net); fix in `src/analysis/ball_side_possession.py` = ALL band decisions on the ROLLING MAX width of the last 12 measured frames (owner: "do the greatest of the sides") + FAR_FACTOR 1.15→0.85 (overlap regime reads CROSSING, holds last side; fallback 26→19); probe A/B: match f250-345 far 100→4, f378+ 0, vall f1059-1280 0 (f1185 near+crossing), e3 one far commit at the point-ending landing. vall unlocked for THIS display-band diagnosis only. Suite **1493**.
 - #77 **Post-hoc layer RATIFIED + first instrumentation SHIPPED: per-frame ball-side POSSESSION + net-CROSSING live-debug labels (display-only pure observer)** — owner ratified overpass-as-where-it-lands + possession-first attribution (open point 9 [OWNER-RATIFIED #77]); new `src/analysis/ball_side_possession.py` (always-on, inside `process_frame` step 3c): reads tracked-ball bbox width ONLY on non-predicted frames, hysteresis bands per-video from the owner's pinhole `d_net` formula (1.15×/1.55× of d_net; match 26.3/35.4 px ≈ measured 26/35; fallback 26/35 uncalibrated), last-known side on lost/predicted frames, crossings counted on completed far↔near transitions; live-debug `possession: NEAR|FAR` + `CROSSING` label via `_overlay_data` 4-tuple → queue 7-tuple → `overlay.draw_possession`; diag `ball_possession` (SCHEMA_VERSION 2); NO `pipeline_output.json` key, actions byte-identical. Sequencing C1→C4 recorded (C1 = fitted ball-fate read, pre-registered at the m ≤ 2k−12 budget). Suite **1489**; e3 script-path F1 **1.000** reproduced post-ship (14/14, team 1.0).
 - #76b **The OVERPASS lever is `UNREACHABLE FROM THE CURRENT STREAM` — the +0.0949 prize and the modest 88-100% precision budget are both real, but no emitted signal separates the class; 4 independent families measured and killed, nothing ships** — `logs/overpass_unreachable_report.md`, `scripts/probe_overpass_separator.py` (16 kinematic features + all 120 two-feature AND-rules, Cliff's delta + Fisher, no scipy), `scripts/probe_overpass_budget.py` (the budget + 7 possession-refaming rules replayed through the IMPORTED `ActionContextResolver` over `candidate_passed_gates`), `scripts/probe_overpass_netcross.py` (post-contact net-plane crossing in y on the PRODUCTION calibration), `tests/test_overpass_levers.py` (+22; suite **1470**). Budget `m <= 2k - 12`: 12 labels needed on the 137/84 bar arm, k=13 -> <=14 fires (93%), k=16 -> <=20 (80%), k<6 infeasible at any precision; the 13-contact oracle satisfies it exactly. Family (i) NO LARGE separator (best single -0.413, best pair +0.333 at 8/16 vs 14/92; 7/120 significant = the chance rate). Family (ii) all 7 rules net-negative, best R5 5 fires/0 hits/-0.0073, 2 hits total across 205 fires, edit distance grows in every arm. Family (iii) the vocabulary ceiling R1 "every bump_set is an overpass" fires 117 and recovers **1** — a dig and an overpass are kinematically the same contact here. Family (iv) net-plane crossing precision 0.124 / 0.129; the ball IS tracked 91/91 frames in the window so the evidence exists and was never read; the `spike`-crosses-more row is the instrument's sanity check. **⇒ OPEN POINT 9 RECLASSIFIED as an INSTRUMENTATION requirement: the pipeline emits a contact and discards the ball's fate. Two §6-shaped default-OFF observers are specified (per-contact FITTED net crossing; rally-terminal flag, because "sent over" must not exclude "did not clear" — f24948) and NOT built: adding per-contact outcome evidence to the emission is a production change and needs OWNER RATIFICATION FIRST.**
@@ -2159,6 +2169,41 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+### 2026-10-04 (seventy-ninth session) — #79: possession labels RE-BALANCED on owner feedback ("too biased towards near"); FAR commits on PERSISTENT smallness, NEAR drops to 1.45×; e3 GT cross-check 12/14
+
+**Owner (m00499):** "now it's too biased towards near, on the match, f1428 and
+f1488 are both dig and set from the far side and still show near crossing".
+
+**Diagnosis (probe + data):** the far dig/set rally f1415-1500 oscillates
+15-26 px (0.66-1.14×d_net): clear frames 21-26, occluded 15-19 — the #78
+rolling MAX kept rescuing it into the band (evidence stuck at the f1415-18
+25-26 px), so the side held NEAR with crossing through the whole far rally.
+The two owner complaints are ASYMMETRIC phenomena: near occlusion = momentary
+smallness behind a big ball (sub-far frames per 12f window in the tape
+window: 0), far rallies = persistent smallness with flickering clear frames
+(4-7 sub-far frames per window).
+
+**Fix (`src/analysis/ball_side_possession.py`):** FAR commits on max ≤ far_px
+OR ≥ FAR_COMMIT_MIN_COUNT=4 of the last 12 measured frames ≤ far_px; NEAR
+stays max-only ≥ NEAR_FACTOR. NEAR_FACTOR 1.55→1.45: e3's GT near touches
+sustain only 1.49× (39-40 px) — 1.55 left them holding far (the same mirror
+bias on e3). Latent #78 off-by-one fixed: the evidence window kept 13
+entries, now exactly 12. Row gains `far_small_count`.
+
+**Verified:** suite 1493→**1496** (+3: far-rally oscillation, 3-sub-far
+flicker negative, count row; flap-back test updated — the count rule
+re-confirms far in 4 frames, crossings still 0). Probe A/B: match f1428 +
+f1488 = FAR (count fires exactly at the f1429 dig), tape f300-400 still 0
+far, f254 near intact, far rally 132 far frames; vall f1185 near+crossing,
+f1059-1280 0 far, 5/5 genuine far bounces commit; e3 vs GT touches: **12/14
+read the correct side** (f69 dig +5f flight latency; f332 dig flips at f375,
+before the f379 set) and ALL 6 side transitions (14/74/202/375/445/560)
+precede the next GT touch on the announced side.
+
+**STATUS:** lead, open point 9, factors, [#79 UPDATE], Learning, session
+index updated; #74 Log entry moved verbatim to
+`docs/history/status_log_archive.md`.
+
 ### 2026-10-04 (seventy-eighth session) — #78: possession labels RECALIBRATED on owner feedback ("do the greatest of the sides" + "more calibrated towards near/crossing"); occlusion-dip far bias fixed and probe-verified on all three videos
 
 **Asked (owner, with frame windows):** on 20260920_match_ari_joan_lost f250-f345 and f378+ the ball stays NEAR (near player spikes into the net, ball dribbles at/near the net on the near side) but the labels said far/crossing; same on the full practice video at f1185 (near spike into net, ball stays near) — "Should be more calibrated towards near/crossing"; entreno "works better but still potentially a bit biased towards the same side"; and an occluded near-side ball measures less — "Do the greatest of the sides to get the ball side." vall_dhebron UNLOCKED for THIS display-band diagnosis only (the C1 held-out discipline is untouched).
@@ -2251,131 +2296,3 @@ untouched; IN-SAMPLE 3 drills. Suite `venv/bin/python -m pytest tests/ -o addopt
 **1437 passed** (+17 in `tests/test_reach_scale.py`, which pins the px->metre helper on
 synthetic points through the imported loader and the verdict table structure — never a
 pipeline output).
-
-### 2026-10-03 (seventy-fourth session) — coordinator: ritual completed and committed; the SET↔DIG swap lever AND the SERVE bucket are CLOSED (NO SEPARATOR — swaps are count errors in costume; the serve line is mostly MISSING far-side contacts); lever table corrected twice
-
-**Asked:** standing "Continue" on G3; owner prompt (m00005): finish what the prior
-sessions left, then continue toward the goal, as TIER-1 COORDINATOR (decide →
-brief → verify; never write deliverables; never rubber-stamp).
-
-**Finished (verified, then committed):** (1) the #73 live-debug ball-candidate
-overlay — display-only, `b` toggle, reads only `BallDetector.raw_detections`; its
-session's own "committed as `8040f04`" claim was FALSE (`git cat-file` fails,
-reflog clean after `ad1dc03`) → committed as `da0c962` after checklist
-verification (suite 1336, no processing-path change). (2) #72's half-finished
-STATUS ritual + `docs/g3_reach_cascade.md` (reach-gate cascade REFUTED as a
-label lever: K=1.2 precision-clean +14 found → −4 LABELS) → committed as
-`c336753` with index/log/archive entries.
-
-**Delegated + verified (the goal step):** the set↔dig swap diagnosis, run by a
-worker on the #68-machinery G1 gate. **Verdict: NO SEPARATOR — the lever is
-closed.** G1 reproduced exactly (185 accepted / 139 found / touch 96/139 =
-0.691 / R0 79/139 = 0.568) before any swap was read; 13 swaps on the dump
-population (9 GT-set→dig, 4 GT-dig→set), reconciled EXACTLY with #68's 15 (the
-2 extras are production-only, P11 f7162/f7207, where the dump labels are
-correct). All 12 dump-carried signals overlap between GT-set and GT-dig swaps
-(best `ball_above_net_px` δ=−0.722, ~19 px overlap at n=9/4; the soft trends
-point the way the possession mechanism already predicts). **Mechanism
-(coordinator-checked in source):** `_decide` keys set/dig on the touch count
-(`src/recognition/action_context.py:198-210`: touch 1 → DIG, touch 2+follow →
-SET), so a swap REQUIRES a ±1 count error — 0/13 swaps carry a correct count;
-all 13 are a subset of #70's 43 wrong-touch contacts; 8/13 also mis-attribute
-team. **Consequence: #68's +0.106 swap line is NOT a separate lever — it
-re-absorbs into the touch-count lever, whose two repair routes are already
-measured closed (TC1 +0.050; #72 recall negative). The +0.244 GT-touch
-substitution number already includes these swaps.** Remaining measured label
-levers: 25 region serves +0.177, 13 overpass +0.092 (needs a rule idea, open
-point 9), 12 far serves +0.032.
-
-**Discipline:** worker had no `src/` change, no decode/seek, no GT edit,
-held-out session untouched; coordinator independently reproduced the suite
-(1345 passed = 1336 + 9 new pins incl. no-cv2/no-seek + determinism), checked
-the resolver mapping in source, and accepted on the gates — not on the
-worker's word. Artifacts: `scripts/probe_set_dig_swaps.py`,
-`tests/test_set_dig_swaps.py`, `logs/swaps_report.md`, `output/swaps/report.json`
-(logs/ + output/ git-ignored per convention).
-
-**Open for the owner:** the entreno 0.90 metric definition (per-drill F1 vs
-per-action accuracy); the overpass rule idea (open point 9) needs owner/tier-2.
-
-**Then (same session, owner reroute): the SERVE bucket (+0.177, the last big
-label lever) is CLOSED as a label lever.** Owner instructed mid-run to switch
-delegation to the free OpenRouter route (`MODEL=stealth/space-bunny-alpha
-scripts/run_task_openrouter.sh`); the in-flight GLM subagent was stopped at
-~3 min (read-only, tree verified untouched) and the same brief relaunched
-headless (`.pi/task_briefs/serve_bucket.md`). **Verdict: NO SEPARATOR.** G1
-exact before any serve read (185 accepted / 139 found / dump base 85/139 =
-0.612 / dump serves 7/12 / touch 96/139 / R0 control 79/139). Bucket split
-**7 found-correct / 5 found-mislabeled / 13 NOT-FOUND (all 12 far serves +
-P24)** — reconciled with #68's +0.177 (25/141 ✓) and near/far 13/12 ✓, while
-the far **+0.032 line does NOT reproduce** (12/141 = 0.085; reported, not
-reinterpreted; lever doc corrected: read far as "≈4.5 of 12 convert today").
-The 5 mislabels = spike×3 (P9/P10/P12) + dig×2 (P11/P33), exactly #68's
-serve→spike 3 / serve→dig 2 found-set residual. **Two named mechanisms, no
-rule designed:** 4/5 read `behind_baseline=False` because the contact frame
-catches the LANDING (feet 14.6–15.4 m at the frame; +5…+7 f later they read
-inside at 16.6–17.0 m — a cousin of #60's closed M-a, which was about the
-takeoff stance); P33 fails `rally_start` (a contact accepted 16 f earlier).
-**Premise refuted: the dump DOES carry `behind_baseline` — in its
-`candidate_passed_gates` stage, 185/185 rows (`src/recognition/
-action_classifier.py:443-457`; the `accepted` writer drops it); a reduced
-`_decide` replay reproduces the shipped serve labels 12/12**, so #70's
-"replay scores 0/12 on serves" is a stage-selection issue, not a hard dump
-limit. **Goal math: label-only fix = 90/139 = 0.647 (UNDER the bar); full fix
-= 103/139 = 0.741 (OVER) but needs the 13 far-side contacts to be emitted at
-all — the recall story (open points 2/5) is now load-bearing: without
-far-side recall, 0.70 is unreachable on this match by labelling alone.** The
-docs' +23 f serve latency is CONFIRMED a completeness artefact (nearest-ANY
-over all 25; the found set's median is +1 f). Coordinator verification:
-suite **1365** (1345 + 20) run independently; the source claim checked at
-the cited lines; the JSON artifact checked (G1, split, branch 12/12, 24
-signals, zero separators); vfr guard green; no `src/` change, no decode,
-no GT edit, held-out untouched. Artifacts: `scripts/probe_serve_bucket.py`,
-`tests/test_serve_bucket.py`, `logs/serve_bucket_report.md`,
-`output/g3r1/serve_bucket.json`. Committed with STATUS + the lever-doc
-correction.
-
-**Open for the owner (updated):** (1) the entreno 0.90 metric definition;
-(2) the overpass rule idea (open point 9) — now the ONLY surviving label
-lever (+0.092); (3) whether to open the far-side RECALL story (the detector
-sees the far ball at GT far serves per AGENTS.md §9, but no candidate
-survives admission within ±15 f — the death is in candidate gating, upstream
-of the resolver); (4) ratification gate for the two serve mislabel
-mechanisms (default-OFF observer + non-serve controls per §6 before anything
-acts on them).
-
-**Then (#74c, same route): the INSERT path — the sanctioned way to give far
-serves a record (SR4's promotion shape: INSERT, never relabel) — is MEASURED
-and DOES NOT CARRY THE BAR.** The first worker degenerated after writing
-`scripts/probe_insert_path.py` (stream error, EXIT 0, never ran it); the
-coordinator ran the probe once (G1 green; far_hits 11/17 = PG2's exact point
-list and seam split), then relaunched the remainder as a continuation brief
-(`.pi/task_briefs/insert_path_continuation.md`). Placement rule keyed on
-window starts over the EXISTING artifacts (no decode, no `src/` change):
-**11/17 far hits — every at_seam serve, none of the 6 in_gap ones — at
-precision 0.6111** (3 rally-contact misclaims + 1 dead-time + 3 late
-near-side serve claims; 0 near misclaims; 0 owner-negative FP, a lower bound
-since 4 of 9 owner negatives are mid-window). The 6 misses are structural:
-in-gap far serves have no window start within 20–778 f to hang a claim on —
-the ceiling is the POINT MAP's (PM1's uniform lateness), not the evidence
-layer's. **Goal translation under the consistent convention (a)
-(insert-into-denominator, verified against the dump: no accepted emission
-within ±15 f of any hit serve, nearest 23–84 f late): all-17 IN-SAMPLE
-96/150 = 0.6400, held-out arm 94/148 = 0.6351, label-only ceiling 90/139 =
-0.6475 — all UNDER the 0.70 bar; under #74b's numerator-only convention the
-same arm reads 96/139 = 0.6906, still under. #74b's "103/139 = 0.741" is
-CORRECTED: it added the 13 not-found serves to the numerator without the
-denominator (consistent: 103/152 ≈ 0.678; lever doc corrected).** The worker
-also fixed two inherited probe bugs (the 0.0 precision print =
-`classify_false_positives` applied to matched rows; a pool silently wider
-than PG2's 28 px cut), both regression-pinned. Coordinator verification:
-suite **1393** (1365 + 28) run independently; PG2 anchors reproduced
-exactly. Artifacts: `scripts/probe_insert_path.py`,
-`tests/test_insert_path.py`, `logs/insert_path_report.md`,
-`output/insert_path/probe.json`. **Open for the owner (adds item 5): the
-0.70 bar on this match is now a COMPOUND-LEVER question — the measured
-compound (INSERT + overpass) reads ≈109/150 = 0.727 only in-sample-best,
-with the overpass rule unsolved and 7 imprecise placements to clean; decide
-whether to widen scope (point-map/seam repair for the 6 in-gap serves is the
-prerequisite serve-recall lever) or re-examine the bar/metric definition.**
-

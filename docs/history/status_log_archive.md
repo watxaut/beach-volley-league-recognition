@@ -3940,3 +3940,131 @@ untracked on purpose. **Next (coordinator's ranking, item 0a):** diagnose the
 15 `set↔dig` swap bucket (+0.106, the largest surviving measured label lever) —
 no `src/` change; overpass (+0.092) stays parked on a rule idea (open point 9).
 
+
+### 2026-10-03 (seventy-fourth session) — coordinator: ritual completed and committed; the SET↔DIG swap lever AND the SERVE bucket are CLOSED (NO SEPARATOR — swaps are count errors in costume; the serve line is mostly MISSING far-side contacts); lever table corrected twice
+
+**Asked:** standing "Continue" on G3; owner prompt (m00005): finish what the prior
+sessions left, then continue toward the goal, as TIER-1 COORDINATOR (decide →
+brief → verify; never write deliverables; never rubber-stamp).
+
+**Finished (verified, then committed):** (1) the #73 live-debug ball-candidate
+overlay — display-only, `b` toggle, reads only `BallDetector.raw_detections`; its
+session's own "committed as `8040f04`" claim was FALSE (`git cat-file` fails,
+reflog clean after `ad1dc03`) → committed as `da0c962` after checklist
+verification (suite 1336, no processing-path change). (2) #72's half-finished
+STATUS ritual + `docs/g3_reach_cascade.md` (reach-gate cascade REFUTED as a
+label lever: K=1.2 precision-clean +14 found → −4 LABELS) → committed as
+`c336753` with index/log/archive entries.
+
+**Delegated + verified (the goal step):** the set↔dig swap diagnosis, run by a
+worker on the #68-machinery G1 gate. **Verdict: NO SEPARATOR — the lever is
+closed.** G1 reproduced exactly (185 accepted / 139 found / touch 96/139 =
+0.691 / R0 79/139 = 0.568) before any swap was read; 13 swaps on the dump
+population (9 GT-set→dig, 4 GT-dig→set), reconciled EXACTLY with #68's 15 (the
+2 extras are production-only, P11 f7162/f7207, where the dump labels are
+correct). All 12 dump-carried signals overlap between GT-set and GT-dig swaps
+(best `ball_above_net_px` δ=−0.722, ~19 px overlap at n=9/4; the soft trends
+point the way the possession mechanism already predicts). **Mechanism
+(coordinator-checked in source):** `_decide` keys set/dig on the touch count
+(`src/recognition/action_context.py:198-210`: touch 1 → DIG, touch 2+follow →
+SET), so a swap REQUIRES a ±1 count error — 0/13 swaps carry a correct count;
+all 13 are a subset of #70's 43 wrong-touch contacts; 8/13 also mis-attribute
+team. **Consequence: #68's +0.106 swap line is NOT a separate lever — it
+re-absorbs into the touch-count lever, whose two repair routes are already
+measured closed (TC1 +0.050; #72 recall negative). The +0.244 GT-touch
+substitution number already includes these swaps.** Remaining measured label
+levers: 25 region serves +0.177, 13 overpass +0.092 (needs a rule idea, open
+point 9), 12 far serves +0.032.
+
+**Discipline:** worker had no `src/` change, no decode/seek, no GT edit,
+held-out session untouched; coordinator independently reproduced the suite
+(1345 passed = 1336 + 9 new pins incl. no-cv2/no-seek + determinism), checked
+the resolver mapping in source, and accepted on the gates — not on the
+worker's word. Artifacts: `scripts/probe_set_dig_swaps.py`,
+`tests/test_set_dig_swaps.py`, `logs/swaps_report.md`, `output/swaps/report.json`
+(logs/ + output/ git-ignored per convention).
+
+**Open for the owner:** the entreno 0.90 metric definition (per-drill F1 vs
+per-action accuracy); the overpass rule idea (open point 9) needs owner/tier-2.
+
+**Then (same session, owner reroute): the SERVE bucket (+0.177, the last big
+label lever) is CLOSED as a label lever.** Owner instructed mid-run to switch
+delegation to the free OpenRouter route (`MODEL=stealth/space-bunny-alpha
+scripts/run_task_openrouter.sh`); the in-flight GLM subagent was stopped at
+~3 min (read-only, tree verified untouched) and the same brief relaunched
+headless (`.pi/task_briefs/serve_bucket.md`). **Verdict: NO SEPARATOR.** G1
+exact before any serve read (185 accepted / 139 found / dump base 85/139 =
+0.612 / dump serves 7/12 / touch 96/139 / R0 control 79/139). Bucket split
+**7 found-correct / 5 found-mislabeled / 13 NOT-FOUND (all 12 far serves +
+P24)** — reconciled with #68's +0.177 (25/141 ✓) and near/far 13/12 ✓, while
+the far **+0.032 line does NOT reproduce** (12/141 = 0.085; reported, not
+reinterpreted; lever doc corrected: read far as "≈4.5 of 12 convert today").
+The 5 mislabels = spike×3 (P9/P10/P12) + dig×2 (P11/P33), exactly #68's
+serve→spike 3 / serve→dig 2 found-set residual. **Two named mechanisms, no
+rule designed:** 4/5 read `behind_baseline=False` because the contact frame
+catches the LANDING (feet 14.6–15.4 m at the frame; +5…+7 f later they read
+inside at 16.6–17.0 m — a cousin of #60's closed M-a, which was about the
+takeoff stance); P33 fails `rally_start` (a contact accepted 16 f earlier).
+**Premise refuted: the dump DOES carry `behind_baseline` — in its
+`candidate_passed_gates` stage, 185/185 rows (`src/recognition/
+action_classifier.py:443-457`; the `accepted` writer drops it); a reduced
+`_decide` replay reproduces the shipped serve labels 12/12**, so #70's
+"replay scores 0/12 on serves" is a stage-selection issue, not a hard dump
+limit. **Goal math: label-only fix = 90/139 = 0.647 (UNDER the bar); full fix
+= 103/139 = 0.741 (OVER) but needs the 13 far-side contacts to be emitted at
+all — the recall story (open points 2/5) is now load-bearing: without
+far-side recall, 0.70 is unreachable on this match by labelling alone.** The
+docs' +23 f serve latency is CONFIRMED a completeness artefact (nearest-ANY
+over all 25; the found set's median is +1 f). Coordinator verification:
+suite **1365** (1345 + 20) run independently; the source claim checked at
+the cited lines; the JSON artifact checked (G1, split, branch 12/12, 24
+signals, zero separators); vfr guard green; no `src/` change, no decode,
+no GT edit, held-out untouched. Artifacts: `scripts/probe_serve_bucket.py`,
+`tests/test_serve_bucket.py`, `logs/serve_bucket_report.md`,
+`output/g3r1/serve_bucket.json`. Committed with STATUS + the lever-doc
+correction.
+
+**Open for the owner (updated):** (1) the entreno 0.90 metric definition;
+(2) the overpass rule idea (open point 9) — now the ONLY surviving label
+lever (+0.092); (3) whether to open the far-side RECALL story (the detector
+sees the far ball at GT far serves per AGENTS.md §9, but no candidate
+survives admission within ±15 f — the death is in candidate gating, upstream
+of the resolver); (4) ratification gate for the two serve mislabel
+mechanisms (default-OFF observer + non-serve controls per §6 before anything
+acts on them).
+
+**Then (#74c, same route): the INSERT path — the sanctioned way to give far
+serves a record (SR4's promotion shape: INSERT, never relabel) — is MEASURED
+and DOES NOT CARRY THE BAR.** The first worker degenerated after writing
+`scripts/probe_insert_path.py` (stream error, EXIT 0, never ran it); the
+coordinator ran the probe once (G1 green; far_hits 11/17 = PG2's exact point
+list and seam split), then relaunched the remainder as a continuation brief
+(`.pi/task_briefs/insert_path_continuation.md`). Placement rule keyed on
+window starts over the EXISTING artifacts (no decode, no `src/` change):
+**11/17 far hits — every at_seam serve, none of the 6 in_gap ones — at
+precision 0.6111** (3 rally-contact misclaims + 1 dead-time + 3 late
+near-side serve claims; 0 near misclaims; 0 owner-negative FP, a lower bound
+since 4 of 9 owner negatives are mid-window). The 6 misses are structural:
+in-gap far serves have no window start within 20–778 f to hang a claim on —
+the ceiling is the POINT MAP's (PM1's uniform lateness), not the evidence
+layer's. **Goal translation under the consistent convention (a)
+(insert-into-denominator, verified against the dump: no accepted emission
+within ±15 f of any hit serve, nearest 23–84 f late): all-17 IN-SAMPLE
+96/150 = 0.6400, held-out arm 94/148 = 0.6351, label-only ceiling 90/139 =
+0.6475 — all UNDER the 0.70 bar; under #74b's numerator-only convention the
+same arm reads 96/139 = 0.6906, still under. #74b's "103/139 = 0.741" is
+CORRECTED: it added the 13 not-found serves to the numerator without the
+denominator (consistent: 103/152 ≈ 0.678; lever doc corrected).** The worker
+also fixed two inherited probe bugs (the 0.0 precision print =
+`classify_false_positives` applied to matched rows; a pool silently wider
+than PG2's 28 px cut), both regression-pinned. Coordinator verification:
+suite **1393** (1365 + 28) run independently; PG2 anchors reproduced
+exactly. Artifacts: `scripts/probe_insert_path.py`,
+`tests/test_insert_path.py`, `logs/insert_path_report.md`,
+`output/insert_path/probe.json`. **Open for the owner (adds item 5): the
+0.70 bar on this match is now a COMPOUND-LEVER question — the measured
+compound (INSERT + overpass) reads ≈109/150 = 0.727 only in-sample-best,
+with the overpass rule unsolved and 7 imprecise placements to clean; decide
+whether to widen scope (point-map/seam repair for the 6 in-gap serves is the
+prerequisite serve-recall lever) or re-examine the bar/metric definition.**
+
