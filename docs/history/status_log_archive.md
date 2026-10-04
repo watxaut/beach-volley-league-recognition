@@ -3904,3 +3904,39 @@ session untouched. Suite **1286 passed**.
 stream is measured, and a diag dump that omits one `_decide` input makes that fidelity
 unachievable for a whole class of contacts. Quote the shipped stream's own score, and state
 every gate as a delta over the arm the tooling can actually produce.
+
+### 2026-10-03 (seventy-third session) — live-debug ball-candidate overlay LANDED (`b` toggle); the prior session's FALSE commit claim caught and repaired; #72's ritual completed
+
+**Asked (owner):** continue what the previous sessions left unfinished, then continue
+the coordinator loop toward G3.
+
+**Found in the tree (verified, not trusted).** Two threads, neither committed:
+(a) #72's STATUS ritual was half-done — Last updated + open point 0z rewritten,
+sixty-ninth Log entry archived verbatim, but NO session-index line, NO Log entry,
+and NO commit; `docs/g3_reach_cascade.md` sat untracked.
+(b) A complete display-only live-debug feature (73rd-session work, session
+`2026-10-03T06-59-26`): every ball the detector saw this frame as a hollow box with
+its confidence and the detector's own verdict — `sus` = stationary suspect (kept,
+distrusted), `rm` = dropped by static suppression (tracker never saw it) — toggle
+`b`, default ON, cached on the producer thread like every other panel signal. Its
+final message claimed "committed as `8040f04`" — **FALSE**: `git cat-file` fails,
+reflog shows no commit after `ad1dc03`.
+
+**Verification (coordinator-run, all checked in the diff):** suite **1336 passed**
+(1327 + 9 new); scope is ONE display mechanism (`src/analysis/live_debug_processor.py`
++81, `src/output_gen/overlay.py` +61, `tests/test_debug_panel.py` +61,
+`tests/test_live_debug_decoupling.py` +108); reads ONLY
+`BallDetector.raw_detections` (the AGENTS.md §6 side channel) plus the tracker's
+survivor list, flag looked up never re-derived; no new Config key (class attribute);
+no `FrameProcessor`/tracker/classifier change; saved video stays unpanelled (writer
+gets the pre-panel frame — but with the toggle ON it now carries candidate boxes;
+display behaviour, not pipeline). Cross-check: #72's K-curve in its session
+transcript (K=1.3 −5, K=1.5 −1, K=2.0 +1; 49→40 wrong touches after all 71) matches
+its STATUS/doc writeup exactly.
+
+**Committed:** (1) the overlay feature (src + tests); (2) this ritual +
+`docs/g3_reach_cascade.md` + the archive. `.pi/goals/` goal-runner state left
+untracked on purpose. **Next (coordinator's ranking, item 0a):** diagnose the
+15 `set↔dig` swap bucket (+0.106, the largest surviving measured label lever) —
+no `src/` change; overpass (+0.092) stays parked on a rule idea (open point 9).
+
