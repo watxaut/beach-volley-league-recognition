@@ -35,6 +35,11 @@ Record schema (one JSONL line per frame, plus a first ``meta`` line)::
 ``actions`` and ``candidates`` are keyed by their CONTACT frame (the value the
 classifier reports as ``frame_number``), not by the frame the contact was
 confirmed on, so a consumer can look a contact up in one place.
+
+``ball_possession`` (#77) is the per-frame ball-side row (state, side,
+net_crossing, ...). ``ball_ground`` (#80) is the per-frame ground-contact
+row (state air|ground|out, ratio, world, bounce, ...). Both are pure-observer
+output, display/diag only.
 """
 
 from __future__ import annotations
@@ -44,7 +49,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 #: Bumped when the record shape changes; recorded in the file header.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def _new_frame_record(frame: int) -> Dict[str, Any]:
@@ -56,6 +61,7 @@ def _new_frame_record(frame: int) -> Dict[str, Any]:
         "actions": [],
         "candidates": [],
         "ball_possession": None,
+        "ball_ground": None,
     }
 
 
@@ -82,7 +88,7 @@ class DiagRecorder:
         emitted actions) into the buffer."""
         rec = self._frames.setdefault(int(frame_index), _new_frame_record(frame_index))
         for key in ("ball_dets", "ball_track", "players", "actions", "candidates",
-                    "ball_possession"):
+                    "ball_possession", "ball_ground"):
             if key in data:
                 rec[key] = data[key]
 

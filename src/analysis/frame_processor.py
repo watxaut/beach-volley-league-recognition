@@ -21,6 +21,7 @@ from ..recognition.action_classifier import ActionClassifier
 from .game_state_manager import GameStateManager
 from .spike_analyzer import SpikeAnalyzer
 from .serve_events import ServeEventEmitter
+from .ball_ground_contact import BallGroundContactObserver
 from .ball_side_possession import BallSidePossessionObserver
 from ..utils.diagnostics import DiagRecorder
 
@@ -230,6 +231,18 @@ class FrameProcessor:
             # always-on, display/diag only. Reads the tracked ball's bbox
             # width and the calibration's net-plane scale; never feeds back.
             self.ball_possession = BallSidePossessionObserver()
+            # #80: ground-contact observer (GROUND/AIR/OUT + bounce), always
+            # on, display/diag only -- nothing reads it in the exporters.
+            self.ball_ground = BallGroundContactObserver()
+            # Both observers must see the INIT-TIME calibration: the batch
+            # path builds FrameProcessor(config) and never calls
+            # set_court_calibration, so without this the possession observer
+            # silently ran on its fallback px bands and the ground observer
+            # had no homography at all (found by the #80 entreno_3 probe,
+            # 2026-10-04: net_width_px was null in the batch diag dump).
+            if self.court_calibration is not None:
+                self.ball_possession.set_calibration(self.court_calibration)
+                self.ball_ground.set_calibration(self.court_calibration)
 
             # Game state detection
             self.game_state_manager = GameStateManager(self.config)
@@ -249,6 +262,7 @@ class FrameProcessor:
         self.action_classifier.set_court_calibration(calibration)
         self.spike_analyzer.court = calibration
         self.ball_possession.set_calibration(calibration)
+        self.ball_ground.set_calibration(calibration)
         if self.config.get("serve_events_enabled"):
             # The runway geometry IS the calibration: rebuild on new corners.
             self.serve_events = None
@@ -364,6 +378,14 @@ class FrameProcessor:
                 frame_index, tracked_ball
             )
 
+            # 3d. Ball ground contact (pure observer, always on, #80): is the
+            # ball at play resting on the sand (GROUND), airborne (AIR), or
+            # grounded outside the court (OUT)? Plus bounce events (image-vy
+            # sign reversal near the ground). Display/diag only.
+            frame_result["ball_ground"] = self.ball_ground.observe(
+                frame_index, tracked_ball
+            )
+
             # 3b. Serve-evidence events (pure observer, OFF by default). Reads
             # the UNFILTERED person detections (the play-area filter would hide
             # a server standing behind the far baseline) and the pre-static-
@@ -413,6 +435,7 @@ class FrameProcessor:
                 frame_index, ball_detections, tracked_ball, tracked_players,
                 frame_result.get("actions") or [],
                 ball_possession=frame_result.get("ball_possession"),
+                ball_ground=frame_result.get("ball_ground"),
             )
 
         frame_result["processing_time"] = time.time() - start_time
@@ -426,6 +449,7 @@ class FrameProcessor:
         tracked_players: List[Dict[str, Any]],
         actions: List[Dict[str, Any]],
         ball_possession: Optional[Dict[str, Any]] = None,
+        ball_ground: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Mirror this frame's already-computed state into the diag dump.
 
@@ -453,6 +477,7 @@ class FrameProcessor:
             "actions": [dict(a, frame=a.get("frame_number", frame_index))
                         for a in actions],
             "ball_possession": ball_possession,
+            "ball_ground": ball_ground,
         })
         # No player tracks at all: the classifier was never asked, which is a
         # distinct (and reportable) loss stage.
@@ -519,6 +544,7 @@ class FrameProcessor:
         self.action_classifier.reset()
         self.spike_analyzer.reset()
         self.ball_possession.reset()
+        self.ball_ground.reset()
 
         self.game_state_manager = GameStateManager(self.config)
         self.logger.debug("Trackers and game state reset")

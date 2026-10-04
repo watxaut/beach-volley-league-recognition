@@ -165,6 +165,21 @@ def build_rows(snapshot: Dict[str, Any],
         add((f"width-side read: {side_txt}", tone, 1))
         add((f"speed {_fmt(ball.get('speed'))} px/f   "
              f"conf {_fmt(ball.get('conf'), 2)}", tone, 1))
+        # Ball ground contact (#80): GROUND / OUT / AIR + groundedness ratio
+        # + mapped court position (metres). Held rows keep the last state.
+        g = ball.get("ground") or {}
+        g_state = g.get("state")
+        if g_state:
+            g_ratio = g.get("ratio")
+            g_txt = g_state.upper()
+            if g_ratio is not None:
+                g_txt += f" r{float(g_ratio):.2f}"
+            wpt = g.get("world")
+            if wpt:
+                g_txt += f" @({float(wpt[0]):.1f},{float(wpt[1]):.1f})m"
+            if g.get("bounce"):
+                g_txt += " BOUNCE"
+            add((f"ground: {g_txt}", tone, 1))
         pred = bool(ball.get("predicted"))
         stale = ball.get("stale")
         if held:

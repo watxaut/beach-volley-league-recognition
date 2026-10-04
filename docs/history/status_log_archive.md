@@ -4068,3 +4068,70 @@ with the overpass rule unsolved and 7 imprecise placements to clean; decide
 whether to widen scope (point-map/seam repair for the 6 in-gap serves is the
 prerequisite serve-recall lever) or re-examine the bar/metric definition.**
 
+
+### 2026-10-04 (seventy-fifth session, first half) — the reach-gate FAR-SIDE ASYMMETRY quantified: `NOT SCALE-EXPLAINED`; side-blindness is real but worth only ~0.34 m
+
+**Asked (card, m00001):** diagnose-only — "once each side's pixel scale is accounted for
+(court calibration), are the 7 far-side reach rejections the SAME physical reach as
+near-side accepted contacts (scale-explained), or do they demand genuinely more physical
+reach?" Verdict exactly one of `SCALE-EXPLAINED` / `NOT SCALE-EXPLAINED` /
+`NOT ANSWERABLE`. Hard constraint: a ground-metre reach is OWNER-GATED (the px->m move
+was GT-refuted for `near_net`, F1 0.929->0.857), so measure only, design nothing.
+
+**Gates.** G1b PASS (all three calibrations load through the IMPORTED `CourtCalibration`;
+they are byte-identical). **G1a PARTIAL FAIL, reported not worked around:** only **2 of 7**
+rejection rows survive in `output/entreno_buckets/buckets.json` (e2 f79 179.4, e7 f163
+182.3, both team B) — `scripts/probe_entreno_buckets.py:120-162` (`window_census`) only
+censuses reach rows inside a GT event's ±15 f window, and e1 f161/f399, e2 f390/f402/f403
+fall outside every window; e1 has no reach rows at all. No field the task needs is missing,
+so this is not the card's STOP condition; the 5 rows were read from the committed dumps
+`output/sr1/entreno_{1,2,7}_diag.jsonl` and **nothing was re-run**.
+
+**The measurement problem first (this is most of the session).** The shipped
+`CourtCalibration.world_scale_at` is the MEAN of the homography's two scale components and
+inherits the broken one: it reads a 4.8 m near-side body, 5.9-6.2 m far, has poles at
+y=192-193 and y=302-303 (577 m/px), and gives far/near m-per-px 4.169 — the wrong
+direction. An in-session first attempt published a `far/near 0.49x` ratio, which is
+physically impossible (a far object must have FEWER px per metre) and was discarded
+rather than reported; the "far appears bigger" anomaly that produced it was the same
+artefact. An earlier hypothesis that the corner order is rotated was also refuted:
+`CORNER_WORLD = ((0,0),(8,0),(8,16),(0,16))` reproduces `compute_ground_homography` to
+`max |diff| = 0.0` and both sidelines hold x = 0/8 to 3 decimals. **No refit was applied.**
+The ACROSS component validated cleanly: multiplied into median player bbox widths per 80 px
+`foot_y` band it reads 0.58-0.74 m at every depth in all 3 drills (a shoulder span), while
+the ALONG component reads 1.88-4.76 m. So the conversion is `px * across_m_per_px(foot)`,
+the foot coming from `CourtCalibration.foot_point(bbox)` — the tracker's own ground plane.
+Also established: the 6-point DLT over 4 corners + 2 net-tops is DEGENERATE (every net
+height 1.8-3.4 m fits to 0.64 px), so the focal length is unrecoverable and vertical px
+spans have no ground-metre reading at all; and ball bbox width is not a usable scale
+reference (non-monotonic in y).
+
+**The result.** Pixel scale is real: far 0.00971 m/px vs near 0.00724 = **1.341x** (per
+clip e1 1.203 / e2 1.343 / e7 2.109), so the side-blind 140 px constant means 1.359 m far
+and 1.014 m near. But the 7 rejections convert to **1.382 / 1.521 / 1.549 / 1.661 / 2.283 /
+3.080 / 4.540 m**, against a near-accepted range of 0.000-0.736 m and a near-side
+**GT-contact** maximum of 0.576 m. Cliff's delta is **+1.000** in metres (both directions,
+and +0.978 in px). The least extreme rejection, e2 f403 at 140.8 px — 0.8 px over the gate —
+is **2.40x** the largest reach any true near-side contact demands and still misses by 49 px
+after the full 1.341x scale correction. **Verdict: `NOT SCALE-EXPLAINED`.**
+
+**Two findings that a threshold change would not fix.** (i) *Kind, not only magnitude*:
+5 of 7 rejections are pure lateral (dy = 0.0) while 8 of 21 accepted contacts are
+image-vertical (ball above the player) — different measurements, so scale correction alone
+cannot reconcile them. (ii) The accepted arm is **censored** (a contact the pipeline emits
+has the ball inside the bbox, so 8 of 21 rows read 0.0 px); the probe therefore also scores
+every GT contact frame (stage `gt_contact`, 22 usable rows) as a censoring-free yardstick,
+and it agrees with the verdict. Sensitivity (counts only, no rule proposed): the
+scale-corrected 187.7 px admits 4/7 while putting 254 of the 589 near-side rows already
+dropped downstream inside the band; reaching all 7 costs 472.7 px and 580/589.
+
+**Left open for the owner, deliberately:** whether any of the 7 is a real far-side contact.
+3.08 m (e2 f390) and 4.54 m (e1 f399) are the frame where the ball sits 472 px to the side
+of a player on the far baseline — not a reach anyone made. The far side does demand 1.83 m at
+a real GT contact (e7 f160), so a metre-scale reach is not absurd per se, but these dumps
+cannot say which rejections are genuine. **GT annotation on owner-ratified contact sheets
+would settle it.** Nothing ships; no `src/` change; no new Config key; held-out session
+untouched; IN-SAMPLE 3 drills. Suite `venv/bin/python -m pytest tests/ -o addopts=""` ->
+**1437 passed** (+17 in `tests/test_reach_scale.py`, which pins the px->metre helper on
+synthetic points through the imported loader and the verdict table structure — never a
+pipeline output).

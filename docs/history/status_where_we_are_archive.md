@@ -2498,3 +2498,31 @@ match. The plan replaces it with a per-point **serve record** covering both side
 two signals never used before: the **audio track** (real AAC in every video, never
 read) and the **beach serving rules** (decoded jointly across the match). It also
 asks the owner for cheap serve-only GT on one new session.
+
+
+### Archived 2026-10-04 (superseded by #80 rewrite)
+
+**The post-hoc interpretation layer is RATIFIED and its first
+instrumentation step is SHIPPED (#77, owner 2026-10-04; open point 9).** The
+owner ratified overpass as a POST-HOC read of WHERE an action lands (a dig
+and an overpass are the same contact kinematically; spike-on-2 vs overpass is
+the hard case to separate) and possession-first attribution for ambiguous
+touches (who touched first decides the side; both proposals stand on ONE
+substrate — a per-rally ball-fate timeline). Shipped this session,
+display-only: per-frame ball-side possession (near/far/last-known) +
+net-crossing flag as a live-debug label (`possession: NEAR|FAR` + `CROSSING`)
+via a new always-on pure observer in `process_frame`
+(`src/analysis/ball_side_possession.py`, bands per video from the
+calibration via the owner's pinhole `d_net` formula; recorded in the diag
+dump as `ball_possession`, schema v2). Next in the ratified sequencing:
+**C1** fitted ball-fate measurement (pre-registered PASS/FAIL at the
+m ≤ 2k−12 budget) → **C2** possession timeline reliability → **C3** overpass
+relabel scored once on the held-out → **C4** ambiguous-touch reattribution.
+RECALIBRATED #78+#79 on owner feedback: measured width regimes (probe
+`scripts/probe_possession_feedback.py`) are near flight 1.49-1.6×d_net,
+net-plane rest/tape AND blurred far flight BOTH 1.0-1.35×d_net
+(indistinguishable), far ground 0.5-0.8×d_net — shipped evidence is
+ASYMMETRIC: NEAR commits on the rolling max(12 measured frames) ≥1.45×d_net
+(occlusion is momentary smallness), FAR on max ≤0.85×d_net OR ≥4 of the
+last 12 measured frames ≤0.85×d_net (far rallies FLICKER 0.66-1.14×d_net;
+persistent smallness is the far signature). Verified on the owner's windows

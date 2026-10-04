@@ -36,6 +36,14 @@ POSSESSION_FAR_COLOR = (0, 140, 255)     # orange
 POSSESSION_CROSSING_COLOR = (0, 230, 230)  # yellow while crossing
 POSSESSION_UNKNOWN_COLOR = (200, 200, 200)
 
+# Ball ground-contact label (#80): GROUND / OUT / AIR next to the tracked
+# ball, plus the per-candidate groundedness tag in the live-debug ``b``
+# overlay. BGR like everything else.
+GROUND_STATE_COLOR = (0, 165, 255)     # orange: resting on the sand
+GROUND_OUT_COLOR = (0, 0, 255)         # red: grounded outside the court
+GROUND_AIR_COLOR = (255, 255, 255)     # white: in flight
+GROUND_HELD_COLOR = (160, 160, 160)    # gray: held state (no fresh read)
+
 # Typed spike labels reuse the spike colour (cv2 text is ASCII-only, hence
 # "spike hard"/"spike touch" rather than a middle dot).
 ACTION_COLORS["spike hard"] = (0, 0, 255)
@@ -115,6 +123,7 @@ def draw_ball_candidate(
     center: Optional[Sequence[float]] = None,
     confidence: Optional[float] = None,
     flag: str = "",
+    ground: Optional[str] = None,
 ) -> None:
     """Draw ONE un-tracked ball candidate: a hollow box + its confidence.
 
@@ -129,6 +138,9 @@ def draw_ball_candidate(
         center: ``(x, y)`` used to place the box when ``bbox`` is missing/short.
         confidence: Detector confidence; ``None`` renders as "-".
         flag: ``""`` / ``"sus"`` / ``"rm"`` -- tints the box and suffixes the label.
+        ground: per-box groundedness verdict (#80) -- ``"ground"`` / ``"air"`` /
+            ``None`` (band or unmeasurable); rendered as ``GND`` / ``AIR`` after
+            the flag, so parked balls can be told from the ball in play by eye.
     """
     color = (CANDIDATE_SUSPECT_COLOR if flag == "sus"
              else CANDIDATE_REMOVED_COLOR if flag == "rm"
@@ -151,6 +163,10 @@ def draw_ball_candidate(
 
     conf_txt = "-" if confidence is None else f"{float(confidence):.2f}"
     suffix = CANDIDATE_FLAG_TEXT.get(flag, "")
+    if ground == "ground":
+        suffix = f"{suffix} GND".strip()
+    elif ground == "air":
+        suffix = f"{suffix} AIR".strip()
     label = f"{conf_txt} {suffix}".strip()
     org = (x1, max(12, y1 - 4))
     cv2.putText(frame, label, org, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 3)
@@ -323,3 +339,39 @@ def draw_possession(frame, possession: Optional[Dict[str, object]]) -> None:
                     scale, (0, 0, 0), 4)
         cv2.putText(frame, "CROSSING", (x + tw + 18, y), cv2.FONT_HERSHEY_SIMPLEX,
                     scale, POSSESSION_CROSSING_COLOR, 1)
+
+
+def draw_ball_ground(frame, x: float, y: float,
+                     ground: Optional[Dict[str, object]]) -> None:
+    """Draw the tracked ball's ground-contact label (in place, #80).
+
+    ``ground`` is the per-frame ``BallGroundContactObserver.observe`` row
+    cached by live debug. ``GROUND`` (resting on the sand, inside the
+    court), ``OUT`` (grounded outside the court rect + margin), or
+    ``AIR n.nn`` (airborne; the number is the groundedness ratio -- how
+    many ball-diameters wider than a resting ball it measures, growing
+    with height). A held row (no fresh read: ball lost/predicted) renders
+    the short state in gray, so a stale label is never mistaken for a live
+    one. Pure render: never reads observer state.
+    """
+    if not ground:
+        return
+    state = ground.get("state")
+    if state not in ("ground", "out", "air"):
+        return
+    ratio = ground.get("ratio")
+    held = bool(ground.get("held"))
+    if held:
+        label = {"ground": "GND", "out": "OUT", "air": "AIR"}[state]
+        color = GROUND_HELD_COLOR
+    elif state == "ground":
+        label, color = "GROUND", GROUND_STATE_COLOR
+    elif state == "out":
+        label, color = "OUT", GROUND_OUT_COLOR
+    else:
+        label = f"AIR {ratio:.2f}" if ratio else "AIR"
+        color = GROUND_AIR_COLOR
+    scale = 0.5
+    org = (int(x) + 12, int(y) - 10)
+    cv2.putText(frame, label, org, cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 0, 0), 3)
+    cv2.putText(frame, label, org, cv2.FONT_HERSHEY_SIMPLEX, scale, color, 1)
