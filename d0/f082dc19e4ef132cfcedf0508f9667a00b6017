@@ -1,0 +1,39 @@
+STATUS.md
+  s_738897f6bd67b0::t_a4bd617f9fd9f0 2148-2160
+  s_738897f6bd67b0::t_a9412a78de6a6b 310,1594-1595,2028
+  s_738897f6bd67b0::t_d94ecdcb2f1a58 20,216-234,1420-1445,2146-2147,2161
+src/analysis/ball_side_possession.py
+  s_738897f6bd67b0::t_a7adb4b598544c 1-166
+src/utils/diagnostics.py
+  s_738897f6bd67b0::t_f2094b950d1236 47,58,84-85
+tests/test_ball_side_possession.py
+  s_738897f6bd67b0::t_311375e01cfab5 33
+  s_738897f6bd67b0::t_263085aeb43638 1-32,34-257
+src/output_gen/overlay.py
+  s_738897f6bd67b0::t_77a9800a21777a 32-38,289-325
+src/analysis/frame_processor.py
+  s_738897f6bd67b0::t_50add532df5edc 415
+  s_738897f6bd67b0::t_036743b2e23bf3 24,229-233,251,359-365,428,455,521
+  s_738897f6bd67b0::t_6be024c6088213 366
+docs/history/status_log_archive.md
+  s_738897f6bd67b0::t_d94ecdcb2f1a58 12-50
+src/analysis/live_debug_processor.py
+  s_738897f6bd67b0::t_45f15c8a2a8602 655
+  s_738897f6bd67b0::t_a4d3c465f3b284 530-532,546-547,553-554,567,573-574,622-624,680,685-686,740,744,844,847-848
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "d0f082dc19e4ef132cfcedf0508f9667a00b6017",
+  "prompts": {},
+  "sessions": {
+    "s_738897f6bd67b0": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1061a-4716-770b-b2d5-a591abca1fcb",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
