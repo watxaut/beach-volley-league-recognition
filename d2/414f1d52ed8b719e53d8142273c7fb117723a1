@@ -1,0 +1,49 @@
+src/analysis/ball_ground_contact.py
+  s_a61f25581b81d1::t_1b5f153fa8276d 1-203,222-236,239-347
+  s_a61f25581b81d1::t_f501d434048a2a 204-214,221,237-238
+  s_a61f25581b81d1::t_065b865e6038a7 215-220
+src/output_gen/overlay.py
+  s_a61f25581b81d1::t_648c5e64475618 39-46,126,141-143,166-169,342-377
+src/analysis/debug_panel.py
+  s_a61f25581b81d1::t_d7d980cf6386c1 168-182
+src/utils/diagnostics.py
+  s_a61f25581b81d1::t_2848c12a2c3f07 39-42
+  s_a61f25581b81d1::t_12004821baaf87 52,64,91
+  s_a61f25581b81d1::t_022897201adafa 38
+tests/test_ball_ground_contact.py
+  s_a61f25581b81d1::t_d9078a36632553 1-40,42-384,389-458
+  s_a61f25581b81d1::t_df10f3d8373c6e 41
+  s_a61f25581b81d1::t_ac1152e5226593 385-388
+tests/test_ball_side_possession.py
+  s_a61f25581b81d1::t_45f9d6ea4a2282 306,326,330
+docs/history/status_where_we_are_archive.md
+  s_a61f25581b81d1::t_e734df5faf9868 2501-2528
+src/analysis/live_debug_processor.py
+  s_a61f25581b81d1::t_cedb4d68dead16 34
+  s_a61f25581b81d1::t_ff38d81d2a91ce 353,430-435,454-455
+  s_a61f25581b81d1::t_0c6f3ddb047e35 540,542-543,558-559,566-567,580-581,588-589,605-606,611-613,674,699,705,759,763,863,867
+STATUS.md
+  s_a61f25581b81d1::t_fd130bb7b6c84f 2090-2091
+  s_a61f25581b81d1::t_02c4df73d76a2e 20-35,231-261,1420-1438,2093-2107,2228-2281
+src/analysis/frame_processor.py
+  s_a61f25581b81d1::t_8bd6ff0f59795e 24,234-236,265,381-388,438,452,480,547
+  s_a61f25581b81d1::t_fdfd57137db8bb 237-245
+docs/history/status_log_archive.md
+  s_a61f25581b81d1::t_e734df5faf9868 4071-4137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "d2414f1d52ed8b719e53d8142273c7fb117723a1",
+  "prompts": {},
+  "sessions": {
+    "s_a61f25581b81d1": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1084e-5446-770b-b2d5-a59330d375d5",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
