@@ -29,6 +29,13 @@ PLAYER_COLOR = (0, 255, 0)          # green box when no action is active
 BALL_COLOR = (0, 255, 0)            # green when the ball is detected
 BALL_PREDICTED_COLOR = (0, 0, 255)  # red when the position is predicted
 
+# Ball-side possession label (#77): which half the ball is in (near/far)
+# and whether it is inside the net-crossing band. BGR like everything else.
+POSSESSION_NEAR_COLOR = (0, 220, 0)      # green
+POSSESSION_FAR_COLOR = (0, 140, 255)     # orange
+POSSESSION_CROSSING_COLOR = (0, 230, 230)  # yellow while crossing
+POSSESSION_UNKNOWN_COLOR = (200, 200, 200)
+
 # Typed spike labels reuse the spike colour (cv2 text is ASCII-only, hence
 # "spike hard"/"spike touch" rather than a middle dot).
 ACTION_COLORS["spike hard"] = (0, 0, 255)
@@ -279,3 +286,40 @@ def draw_game_state(frame, state: str, points: int = 0, provisional: bool = Fals
     cv2.rectangle(frame, (x - 8, y - th - 8), (x + tw + 8, y + 8), (0, 0, 0), -1)
     cv2.putText(frame, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 4)
     cv2.putText(frame, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 1)
+
+
+def draw_possession(frame, possession: Optional[Dict[str, object]]) -> None:
+    """Draw the ball-side possession label + CROSSING tag (in place, #77).
+
+    ``possession`` is the per-frame ``BallSidePossessionObserver.observe``
+    row cached by live debug (side/crossing). The side shown is the LAST
+    COMMITTED side (the observer holds it while the ball is lost or
+    predicted); ``CROSSING`` is appended in yellow while the ball is inside
+    the net band between committed sides. Sits top-left BELOW the game
+    badge on its own black plate. Pure render: never reads observer state.
+    """
+    if not possession:
+        return
+    side = possession.get("side")
+    crossing = bool(possession.get("crossing"))
+    label = f"possession: {str(side).upper()}" if side else "possession: --"
+    color = (POSSESSION_NEAR_COLOR if side == "near"
+             else POSSESSION_FAR_COLOR if side == "far"
+             else POSSESSION_UNKNOWN_COLOR)
+    scale = 0.55
+    (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
+    x, y = 12, 94  # text baseline; one line below the game badge (y=62)
+    pad = 8
+    extra = 0
+    if crossing:
+        (cw, _), _ = cv2.getTextSize("CROSSING", cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
+        extra = cw + 18
+    cv2.rectangle(frame, (x - pad, y - th - pad),
+                  (x + tw + extra + pad, y + pad), (0, 0, 0), -1)
+    cv2.putText(frame, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 0, 0), 4)
+    cv2.putText(frame, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, scale, color, 1)
+    if crossing:
+        cv2.putText(frame, "CROSSING", (x + tw + 18, y), cv2.FONT_HERSHEY_SIMPLEX,
+                    scale, (0, 0, 0), 4)
+        cv2.putText(frame, "CROSSING", (x + tw + 18, y), cv2.FONT_HERSHEY_SIMPLEX,
+                    scale, POSSESSION_CROSSING_COLOR, 1)

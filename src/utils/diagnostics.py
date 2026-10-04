@@ -44,7 +44,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 #: Bumped when the record shape changes; recorded in the file header.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def _new_frame_record(frame: int) -> Dict[str, Any]:
@@ -55,6 +55,7 @@ def _new_frame_record(frame: int) -> Dict[str, Any]:
         "players": [],
         "actions": [],
         "candidates": [],
+        "ball_possession": None,
     }
 
 
@@ -80,7 +81,8 @@ class DiagRecorder:
         """Merge one frame's directly observed state (dets, tracker, players,
         emitted actions) into the buffer."""
         rec = self._frames.setdefault(int(frame_index), _new_frame_record(frame_index))
-        for key in ("ball_dets", "ball_track", "players", "actions", "candidates"):
+        for key in ("ball_dets", "ball_track", "players", "actions", "candidates",
+                    "ball_possession"):
             if key in data:
                 rec[key] = data[key]
 

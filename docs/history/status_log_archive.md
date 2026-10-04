@@ -9,6 +9,45 @@
 > `status_where_we_are_archive.md` (same directory); the one-line-per-session
 > index is in STATUS.md. Nothing was edited or deleted.
 
+### 2026-10-02 (seventy-second session) — #72: the REACH-GATE CASCADE is REFUTED offline — admitting the reach-blocked contacts DAMAGES the labels; the recall→count→label chain holds about the error POPULATION but earning the recall does not earn the count
+
+**Asked:** continue the coordinator loop toward G3 (standing "Continue"). Session
+died mid-STATUS-ritual (no commit, no index/log entries — completed by #73); its
+measurements and doc were verified and committed as found.
+
+**The measurement (`docs/g3_reach_cascade.md`).** Offline replay of the UNMODIFIED
+`ActionContextResolver` (imported, never copied) over `output/g3r1/match_bw03_diag.jsonl`:
+base arm = the 185 `accepted` rows; arm K = base plus every `reason="reach"`
+rejection whose overage `distance / reach <= K` (the gate's own recorded numbers
+re-scored offline), replayed in frame order; scored against the 182 in-region GT
+events (f5240–f26147) at ±15 f, nearest-emission matching, exactly as #68/#71.
+`behind_baseline` fixed False everywhere (the #70 replay artifact), so the base is
+a REPLAY control and every arm is a delta over THAT.
+
+**The result: BASE 78/139 = 0.561 label, 90/139 touch. K=1.1 +4 found → +1 label;
+K=1.2 +14 found (all 14 within ±15 f of a GT contact — the precision-clean gate
+#71 recommended) → −4 LABELS; K=1.3 +21 → −5; K=1.5 +28 → −1; K=2.0 +48 → +1 at
+rate 0.513 vs 0.561.** Admitting ALL 71 reach rows repairs only **9 of 49** wrong
+touch numbers (40 still wrong): the count is driven by the resolver's own resets,
+not by recall. The architect's "~0.00 class accuracy" caveat is CONFIRMED and
+slightly optimistic — the honest expectation is NEGATIVE.
+
+**Verdict.** The recall → count → label chain is real about WHERE the errors live
+(the 44 missed contacts) but relaxing the gate does not convert them into correct
+labels — the newly admitted rows mostly renumber touches wrongly. **CARD RG1 is
+NOT written; the pose-anchored reach inherits the same failure** (same 20 contacts
+through the same resolver; its only distinct argument was scale-freedom, not a
+label argument). **The 44 missed contacts are a RECALL story (contact P/R,
+per-point completeness — open points 2/5), NOT the path to 0.70 class accuracy;
+do not spend a GPU A/B on them while the goal is the class metric.** The label
+bucket's two count routes are both measured and closed (re-derive: TC1 +0.050;
+earn-by-recall: #72 negative), leaving 39 of 55 wrong labels with a wrong count
+and 16 with a CORRECT count (the Layer-1/2 rule errors open point 9 names).
+
+**Discipline:** no `src/` change, no decode, no seek, no GT edit, held-out session
+untouched. Trap recorded in the doc: gestures must be passed as the `VisualGesture`
+enum — a plain string silently skips the ATTACK/BLOCK branches (#71 harness bug).
+
 ### 2026-10-01 (fifty-second session) — possession signal built, REFUTED, parked default-OFF (`src/` untouched)
 
 **Asked:** create a possession signal (open point 9's enabler for overpass and

@@ -527,8 +527,9 @@ class LiveDebugProcessor:
                     self._spike_log_state[i] = sig
 
     @staticmethod
-    def _overlay_data(frame_result: Dict[str, Any]) -> Tuple[BallOverlay, PlayerOverlay, Optional[Dict[str, Any]]]:
-        """Extract the lightweight ball + player boxes + game state snapshot."""
+    def _overlay_data(frame_result: Dict[str, Any]) -> Tuple[BallOverlay, PlayerOverlay, Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        """Extract the lightweight ball + player boxes + game state +
+        ball-possession snapshot (cached per frame; render-only reads)."""
         ball: BallOverlay = None
         tb = frame_result.get("tracked_ball")
         if tb:
@@ -542,13 +543,15 @@ class LiveDebugProcessor:
             if len(bbox) == 4:
                 players.append((p.get("track_id", -1), [int(v) for v in bbox]))
         game_state = frame_result.get("game_state") or None
-        return ball, players, game_state
+        possession = frame_result.get("ball_possession") or None
+        return ball, players, game_state, possession
 
     def _render_frame(self, frame: np.ndarray, frame_idx: int, ball: BallOverlay,
                       players: PlayerOverlay, plan: overlay.LabelPlan,
                       total_frames: Optional[int] = None,
                       game_state: Optional[Dict[str, Any]] = None,
-                      candidates: Optional[List[Dict[str, Any]]] = None
+                      candidates: Optional[List[Dict[str, Any]]] = None,
+                      possession: Optional[Dict[str, Any]] = None
                       ) -> np.ndarray:
         """Draw court + ball + player boxes (labels anchored on contact frames)."""
         out = frame
@@ -561,13 +564,14 @@ class LiveDebugProcessor:
                         (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
         return self._draw_overlay(out, frame_idx, ball, players, plan,
                                   total_frames=total_frames, game_state=game_state,
-                                  candidates=candidates)
+                                  candidates=candidates, possession=possession)
 
     def _draw_overlay(self, frame: np.ndarray, frame_idx: int, ball: BallOverlay,
                       players: PlayerOverlay, plan: overlay.LabelPlan,
                       total_frames: Optional[int] = None,
                       game_state: Optional[Dict[str, Any]] = None,
-                      candidates: Optional[List[Dict[str, Any]]] = None
+                      candidates: Optional[List[Dict[str, Any]]] = None,
+                      possession: Optional[Dict[str, Any]] = None
                       ) -> np.ndarray:
         """Draw everything EXCEPT the court lines, in ``_render_frame`` order.
 
@@ -615,6 +619,9 @@ class LiveDebugProcessor:
                     len(game_state.get("points", [])),
                     provisional=bool(game_state.get("provisional", False)),
                 )
+            # Ball-side possession + crossing flag (#77): render-only read of
+            # the per-frame observer row cached from process_frame.
+            overlay.draw_possession(out, possession)
         except Exception as e:
             self.logger.error(f"Error rendering frame {frame_idx}: {e}")
             cv2.putText(out, f"Render Error: {str(e)[:50]}",
@@ -645,7 +652,7 @@ class LiveDebugProcessor:
         self.frame_processor.setup_video_dimensions(width, height)
 
         plan = overlay.LabelPlan()
-        cache: List[Tuple[BallOverlay, PlayerOverlay]] = []
+        cache: List[Tuple[BallOverlay, PlayerOverlay, Optional[Dict[str, Any]], Optional[Dict[str, Any]]]] = []
 
         # ---- Pass 1: process every frame, cache overlay data, build the plan.
         frame_idx = 0
@@ -670,12 +677,13 @@ class LiveDebugProcessor:
         # ---- Pass 2: re-read frames and draw contact-anchored labels.
         cap, *_ = self._open(video_path)
         writer = cv2.VideoWriter(save_video, cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
-        for frame_idx, (ball, players, gs) in enumerate(cache):
+        for frame_idx, (ball, players, gs, poss) in enumerate(cache):
             ret, frame = cap.read()
             if not ret:
                 break
             writer.write(self._render_frame(frame, frame_idx, ball, players, plan,
-                                            total_frames=total, game_state=gs))
+                                            total_frames=total, game_state=gs,
+                                            possession=poss))
         cap.release()
         writer.release()
         self.logger.info(f"Annotated video written: {save_video}")
@@ -729,11 +737,11 @@ class LiveDebugProcessor:
                 result = self.frame_processor.process_frame(frame, frame_idx, enable_court_redetection=True)
                 self._ingest_actions(result.get("actions", []), plan)
                 self._log_resolved_spikes()
-                ball, players, gs = self._overlay_data(result)
+                ball, players, gs, poss = self._overlay_data(result)
                 signals = self._signals(result, frame_idx)
                 if self.court_detector is not None:
                     frame = self.court_detector.draw_court_overlay(frame)
-                out_queue.put((frame, frame_idx, ball, players, gs, signals))
+                out_queue.put((frame, frame_idx, ball, players, gs, signals, poss))
                 frame_idx += 1
         except Exception:
             self.logger.exception("Producer thread failed at frame %s", frame_idx)
@@ -833,10 +841,11 @@ class LiveDebugProcessor:
                 if item is _PRODUCER_DONE:
                     drained = True
                 elif item is not None:
-                    frame, idx, ball, players, gs, signals = item
+                    frame, idx, ball, players, gs, signals, poss = item
                     shown = self._draw_overlay(frame, idx, ball, players, plan,
                                                total_frames=total, game_state=gs,
-                                               candidates=(signals or {}).get("candidates"))
+                                               candidates=(signals or {}).get("candidates"),
+                                               possession=poss)
                     if writer is not None:
                         writer.write(shown)   # the saved video stays unpanelled
                     display = self._compose_panel(shown, signals, total)

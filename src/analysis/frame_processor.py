@@ -21,6 +21,7 @@ from ..recognition.action_classifier import ActionClassifier
 from .game_state_manager import GameStateManager
 from .spike_analyzer import SpikeAnalyzer
 from .serve_events import ServeEventEmitter
+from .ball_side_possession import BallSidePossessionObserver
 from ..utils.diagnostics import DiagRecorder
 
 
@@ -225,6 +226,11 @@ class FrameProcessor:
             # Spike outcome/zone analyzer (pure observer of the stream above)
             self.spike_analyzer = SpikeAnalyzer(self.court_calibration)
 
+            # Ball-side possession + net-crossing observer (#77): pure,
+            # always-on, display/diag only. Reads the tracked ball's bbox
+            # width and the calibration's net-plane scale; never feeds back.
+            self.ball_possession = BallSidePossessionObserver()
+
             # Game state detection
             self.game_state_manager = GameStateManager(self.config)
 
@@ -242,6 +248,7 @@ class FrameProcessor:
         self.player_tracker.set_court_calibration(calibration)
         self.action_classifier.set_court_calibration(calibration)
         self.spike_analyzer.court = calibration
+        self.ball_possession.set_calibration(calibration)
         if self.config.get("serve_events_enabled"):
             # The runway geometry IS the calibration: rebuild on new corners.
             self.serve_events = None
@@ -349,6 +356,14 @@ class FrameProcessor:
             frame_result["tracked_players"] = tracked_players
             frame_result["tracked_ball"] = tracked_ball
 
+            # 3c. Ball-side possession (pure observer, always on, #77): which
+            # half the ball is in + a net-crossing flag, from the tracked
+            # ball's bbox width and the calibration's net-plane scale.
+            # Display/diag only -- adds nothing the exporters read.
+            frame_result["ball_possession"] = self.ball_possession.observe(
+                frame_index, tracked_ball
+            )
+
             # 3b. Serve-evidence events (pure observer, OFF by default). Reads
             # the UNFILTERED person detections (the play-area filter would hide
             # a server standing behind the far baseline) and the pre-static-
@@ -397,6 +412,7 @@ class FrameProcessor:
             self._record_diagnostics(
                 frame_index, ball_detections, tracked_ball, tracked_players,
                 frame_result.get("actions") or [],
+                ball_possession=frame_result.get("ball_possession"),
             )
 
         frame_result["processing_time"] = time.time() - start_time
@@ -409,6 +425,7 @@ class FrameProcessor:
         tracked_ball: Optional[Dict[str, Any]],
         tracked_players: List[Dict[str, Any]],
         actions: List[Dict[str, Any]],
+        ball_possession: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Mirror this frame's already-computed state into the diag dump.
 
@@ -435,6 +452,7 @@ class FrameProcessor:
             # frame they were confirmed on.
             "actions": [dict(a, frame=a.get("frame_number", frame_index))
                         for a in actions],
+            "ball_possession": ball_possession,
         })
         # No player tracks at all: the classifier was never asked, which is a
         # distinct (and reportable) loss stage.
@@ -500,6 +518,7 @@ class FrameProcessor:
         self.ball_detector.reset()
         self.action_classifier.reset()
         self.spike_analyzer.reset()
+        self.ball_possession.reset()
 
         self.game_state_manager = GameStateManager(self.config)
         self.logger.debug("Trackers and game state reset")
