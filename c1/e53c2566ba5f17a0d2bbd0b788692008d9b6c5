@@ -1,0 +1,27 @@
+.pi/task_briefs/insert_path_continuation.md
+  s_0d530c1e5ad472::t_ad5fdfd3add3a6 1-50
+.pi/task_briefs/entreno_buckets.md
+  s_0d530c1e5ad472::t_41589efb7b3e44 1-99
+.pi/task_briefs/serve_bucket.md
+  s_0d530c1e5ad472::t_0a92c0bc352577 1-18
+.pi/task_briefs/reach_scale.md
+  s_0d530c1e5ad472::t_0aefd4330b19f8 1-85
+.pi/task_briefs/insert_path.md
+  s_0d530c1e5ad472::t_ba8cd148b988a1 1-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "c1e53c2566ba5f17a0d2bbd0b788692008d9b6c5",
+  "prompts": {},
+  "sessions": {
+    "s_0d530c1e5ad472": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1039a-94c7-70ec-8f23-5186d117f513",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
