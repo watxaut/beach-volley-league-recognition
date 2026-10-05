@@ -1,0 +1,19 @@
+.gitignore
+  s_639daa06a44809::t_9986f2edd680a3 196
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "24d027dcf96526669c0bdc043e2d75fa7d1a2d43",
+  "prompts": {},
+  "sessions": {
+    "s_639daa06a44809": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a10c68-d8c0-72f4-a75a-dbeca9e28274",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
