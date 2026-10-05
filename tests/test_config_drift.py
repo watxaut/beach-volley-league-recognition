@@ -135,6 +135,10 @@ CTOR_PARITY = [
     ("player_label_new_track_min_similarity", PlayerTracker, "label_new_track_min_similarity"),
     ("player_identity_resolver", PlayerTracker, "identity_resolver"),
     ("player_identity_court_slack_px", PlayerTracker, "identity_court_slack_px"),
+    ("player_identity_mode", PlayerTracker, "identity_mode"),
+    ("player_identity_switch_threshold", PlayerTracker, "identity_switch_threshold"),
+    ("player_identity_switch_temper", PlayerTracker, "identity_switch_temper"),
+    ("player_identity_min_switch_interval_frames", PlayerTracker, "identity_min_switch_interval_frames"),
     # PlayerEnrollment (E1 pre-pass; references are display-only)
     ("player_enrollment_frames", PlayerEnrollment, "max_frames"),
     ("player_enrollment_stride", PlayerEnrollment, "stride"),

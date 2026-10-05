@@ -46,12 +46,19 @@ from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
+from src.tracking.identity_resolver import compute_descriptor, lateral_height_m
+
 logger = logging.getLogger(__name__)
 
 # Chain-merge appearance floor: mean-torso-histogram correlation above which
 # two chains whose endpoints are close may be joined (same player across an
 # occlusion). Same-player values measured well above this; partners differ.
 _MERGE_MIN_CORREL = 0.45
+# Team identity resolver inputs per reference: at most this many per-sample
+# descriptors (evenly spaced over the chain), heights smoothed by a running
+# median over this many consecutive samples (one sample = one stride).
+_IDENTITY_MAX_SAMPLES = 40
+_IDENTITY_HEIGHT_WINDOW = 5
 
 
 @dataclass
@@ -288,6 +295,10 @@ class PlayerEnrollment:
                     "head_histogram": sig.get("head_histogram"),
                     "world_height": self._first_or_none(sig.get("world_height_samples")),
                     "world_width": self._first_or_none(sig.get("world_width_samples")),
+                    # Team identity resolver inputs (display/attribution
+                    # only; no chaining decision reads them).
+                    "identity": compute_descriptor(frame, bbox),
+                    "identity_height": lateral_height_m(self.court_calibration, bbox),
                 }
             )
         return obs
@@ -479,6 +490,7 @@ class PlayerEnrollment:
             o["world_height"] for o in chain.observations if o.get("world_height")
         ]
         widths = [o["world_width"] for o in chain.observations if o.get("world_width")]
+        id_samples, id_heights = self._identity_samples(chain)
         return {
             # Team letter (A = near/squad 1, B = far/squad 2) + player number
             # within the team: P1A, P2A are team A; P1B, P2B are team B.
@@ -489,8 +501,32 @@ class PlayerEnrollment:
             "head_histogram": chain.mean_head(),
             "world_height_samples": heights,
             "world_width_samples": widths,
+            # Per-sample descriptors for the team identity resolver (the
+            # squad's enrollment view: near for squad 1, far for squad 2).
+            "identity_samples": id_samples,
+            "identity_heights": id_heights,
             "n_observations": len(chain.observations),
             "first_frame": chain.observations[0]["frame"],
             "last_frame": chain.last["frame"],
             "last_foot": list(chain.last["foot"]),
         }
+
+    @staticmethod
+    def _identity_samples(chain: _Chain) -> Tuple[List[Any], List[Optional[float]]]:
+        """Evenly spaced per-observation identity descriptors + running-median
+        heights (pose noise -- crouch, jump -- is per frame; stature is not)."""
+        obs = [o for o in chain.observations if o.get("identity") is not None]
+        if not obs:
+            return [], []
+        raw = [o.get("identity_height") for o in obs]
+        heights: List[Optional[float]] = []
+        for k in range(len(obs)):
+            window = [
+                h for h in raw[max(0, k - _IDENTITY_HEIGHT_WINDOW // 2):
+                               k + _IDENTITY_HEIGHT_WINDOW // 2 + 1]
+                if h is not None
+            ]
+            heights.append(float(np.median(window)) if window else None)
+        n = min(_IDENTITY_MAX_SAMPLES, len(obs))
+        pick = sorted({int(round(k)) for k in np.linspace(0, len(obs) - 1, n)})
+        return [obs[k]["identity"] for k in pick], [heights[k] for k in pick]

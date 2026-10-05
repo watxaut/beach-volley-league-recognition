@@ -13,6 +13,8 @@ from scipy.optimize import linear_sum_assignment
 from collections import defaultdict, deque, Counter
 import logging
 
+from src.tracking.identity_resolver import TeamIdentityResolver
+
 
 class PlayerTracker:
     """Tracks exactly 4 beach volleyball players with stable IDs.
@@ -75,6 +77,10 @@ class PlayerTracker:
         label_new_track_min_similarity: float = 0.55,
         identity_resolver: bool = True,
         identity_court_slack_px: float = 16.0,
+        identity_mode: str = "team",
+        identity_switch_threshold: float = 8.0,
+        identity_switch_temper: float = 0.2,
+        identity_min_switch_interval_frames: int = 300,
     ):
         """Initialize the player tracker.
 
@@ -180,6 +186,18 @@ class PlayerTracker:
                 so upward coasting decays fast (cosmetic for ghost boxes and
                 keeps re-acquisition gating honest after jumps). Downward
                 velocity is court-axis running and coasts normally.
+            identity_mode: Source of the OUTPUT labels (player_label/squad/
+                slot on tracked players and actions). ``"team"`` = the
+                side-switch-aware TeamIdentityResolver (src/tracking/
+                identity_resolver.py); ``"legacy"`` = the #82 per-frame
+                resolver. Either way the legacy label map keeps driving the
+                tracker's own enrollment guards, so tracking decisions are
+                identical in both modes.
+            identity_switch_threshold / identity_switch_temper /
+            identity_min_switch_interval_frames: the team resolver's side-
+                switch test (threshold on the accumulated log-likelihood,
+                per-frame tempering of that evidence, minimum frames between
+                two switches).
         """
         self.max_disappeared = max_disappeared
         self.max_distance = max_distance
@@ -260,6 +278,16 @@ class PlayerTracker:
         self._identity_ema: Dict[int, np.ndarray] = {}
         self._identity_center: Dict[int, Tuple[float, float]] = {}
         self._label_pos: Dict[str, Tuple[int, Tuple[float, float]]] = {}
+        # Team identity resolver (side-switch-aware OUTPUT labels). Pure
+        # observer: it owns its own label map and never writes
+        # _track_labels, which stays the legacy map the tracker's
+        # enrollment guards read -- so tracking is identical with it on/off.
+        self.identity_mode = identity_mode
+        self.identity_switch_threshold = identity_switch_threshold
+        self.identity_switch_temper = identity_switch_temper
+        self.identity_min_switch_interval_frames = identity_min_switch_interval_frames
+        self._team_identity: Optional[TeamIdentityResolver] = None
+        self._frame_index = 0
 
         # Enrollment references (E1): stable appearance anchors + labels
         # (P1A/P1B/P2A/P2B) built by the PlayerEnrollment pre-pass. Labels are
@@ -440,6 +468,7 @@ class PlayerTracker:
         ball_active: bool = False,
         n_court_det: Optional[int] = None,
         ball_position: Optional[List[float]] = None,
+        frame_index: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """Update tracker with new detections.
 
@@ -459,12 +488,17 @@ class PlayerTracker:
                 any. Anchors serve-zone admission to the likely server (see
                 serve_zone_ball_anchor_px); None keeps the previous
                 confidence-order behaviour.
+            frame_index: The caller's frame index (the clock actions use in
+                ``frame_number``), keying the identity label history so
+                ``label_for(tid, frame)`` answers for a contact's own frame.
+                Defaults to the tracker's internal update count.
 
         Returns:
             List of tracked players with stable 'track_id' and 'team' fields.
         """
         self._current_frame = frame
         self.frame_count += 1
+        self._frame_index = frame_index if frame_index is not None else self.frame_count
         self._last_n_court_det = n_court_det
         self._last_ball_position = list(ball_position) if ball_position else None
         if self._last_ball_position:
@@ -1763,6 +1797,8 @@ class PlayerTracker:
     def set_court_calibration(self, calibration) -> None:
         """Set or update court calibration for team assignment."""
         self.court_calibration = calibration
+        if self._team_identity is not None:
+            self._team_identity.set_court_calibration(calibration)
 
     # --- Enrollment labels (E1) ---
 
@@ -1778,14 +1814,38 @@ class PlayerTracker:
         self._identity_ema = {}
         self._identity_center = {}
         self._label_pos = {}
+        self._team_identity = self._build_team_identity()
         if self._enrollment_refs:
             self.logger.info(
                 "Enrollment active: %s", [r.get("label") for r in self._enrollment_refs]
             )
 
+    def _build_team_identity(self) -> Optional[TeamIdentityResolver]:
+        """Team resolver from the enrollment refs (None in legacy mode, or
+        when the refs carry no identity samples -- older/hand-built refs)."""
+        if self.identity_mode != "team" or not self._enrollment_refs:
+            return None
+        return TeamIdentityResolver.from_references(
+            self._enrollment_refs,
+            self.court_calibration,
+            court_slack_px=self.identity_court_slack_px,
+            switch_threshold=self.identity_switch_threshold,
+            switch_temper=self.identity_switch_temper,
+            min_switch_interval_frames=self.identity_min_switch_interval_frames,
+        )
+
     @property
     def enrollment_active(self) -> bool:
         return bool(self._enrollment_refs)
+
+    @property
+    def team_identity(self) -> Optional[TeamIdentityResolver]:
+        """The side-switch-aware resolver, when it drives the labels."""
+        return self._team_identity
+
+    def identity_state(self) -> Optional[Dict[str, Any]]:
+        """Team resolver diagnostics (near squad, CUSUM, flips), or None."""
+        return self._team_identity.state() if self._team_identity else None
 
     def _best_enrollment_sim(self, subject: Dict[str, Any]) -> float:
         """Max ensemble similarity between ``subject`` (a detection or a track
@@ -1826,13 +1886,23 @@ class PlayerTracker:
                 )
         return False
 
-    def label_for(self, track_id: int) -> Optional[str]:
+    def label_for(self, track_id: int, frame: Optional[int] = None) -> Optional[str]:
         """Enrolled label (e.g. ``P1A``) for a track id, else None.
 
-        Labels are sticky per tid for the life of the tracker, so this is
-        safe to call for any emitted action keyed by track_id.
+        With the team resolver, ``frame`` (the caller's frame index, e.g. an
+        action's ``frame_number``) returns the label the id carried AT that
+        frame -- actions are emitted a few frames after their contact, and
+        the end-of-video flush much later -- falling back to the current
+        label when the id was unlabeled then (claim delay, orientation
+        doubt). Legacy mode ignores ``frame``.
         """
-        entry = self._track_labels.get(track_id)
+        if self._team_identity is not None:
+            entry = (
+                self._team_identity.label_at(track_id, frame)
+                or self._team_identity.label_at(track_id)
+            )
+        else:
+            entry = self._track_labels.get(track_id)
         return entry[0] if entry else None
 
     def compute_enrollment_signature(
@@ -1920,6 +1990,10 @@ class PlayerTracker:
         is the single place identity display metadata is attached. Tracks
         without a label (pre-lock temps, fallback videos, low-similarity
         creations) get None -- the overlay then shows today's green P<id>.
+
+        The legacy resolver always runs: its ``_track_labels`` feed the
+        tracker's enrollment guards. In team mode the OUTPUT labels come from
+        the TeamIdentityResolver instead (side-switch aware).
         """
         if (
             self.identity_resolver
@@ -1927,9 +2001,14 @@ class PlayerTracker:
             and self._current_frame is not None
         ):
             self._resolve_identities(players)
+        labels = self._track_labels
+        if self._team_identity is not None and self._current_frame is not None:
+            labels = self._team_identity.update(
+                self._frame_index, self._current_frame, players
+            )
         for p in players:
             tid = p.get("track_id")
-            label_info = self._track_labels.get(tid) if tid is not None else None
+            label_info = labels.get(tid) if tid is not None else None
             if label_info:
                 p["player_label"], p["squad"], p["slot"] = label_info
             else:
@@ -2118,6 +2197,10 @@ class PlayerTracker:
         self._identity_ema = {}
         self._identity_center = {}
         self._label_pos = {}
+        # Fresh resolver from the enrollment refs: learned views and the
+        # side-switch state belong to the previous run.
+        self._team_identity = self._build_team_identity()
+        self._frame_index = 0
         self._squatter_cooldown.clear()
         self.frame_count = 0
         self._initialized = False
