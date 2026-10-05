@@ -1,0 +1,33 @@
+docs/history/status_log_archive.md
+  s_639daa06a44809::t_a104cdf52104e1 4155-6234
+AGENTS.md
+  s_639daa06a44809::t_5050d5bdc6d39c 16-21,23-30
+STATUS.md
+  s_639daa06a44809::t_3c235e3070beba 303-355,360,364-365,387
+  s_639daa06a44809::t_78d72df7644fe4 1-26,30-43,47-126,130-131,137-214,218-238,242-296,299-302
+docs/history/status_where_we_are_archive.md
+  s_639daa06a44809::t_a104cdf52104e1 2529-2739
+scripts/probe_touch_rules.py
+  s_639daa06a44809::t_ecb021ab289269 103
+tests/test_status_leanness.py
+  s_639daa06a44809::t_7ccc314d7b923b 1-69,77-120,138-139
+  s_639daa06a44809::t_58d2b7e83ad5f1 70-76,121-137
+scripts/build_dev_clip_gt.py
+  s_639daa06a44809::t_ecb021ab289269 523
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "4598bd89a76bf51a5f37813c2b526bcbcebc8dac",
+  "prompts": {},
+  "sessions": {
+    "s_639daa06a44809": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a10c68-d8c0-72f4-a75a-dbeca9e28274",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
