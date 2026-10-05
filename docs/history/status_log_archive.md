@@ -4135,3 +4135,20 @@ untouched; IN-SAMPLE 3 drills. Suite `venv/bin/python -m pytest tests/ -o addopt
 **1437 passed** (+17 in `tests/test_reach_scale.py`, which pins the px->metre helper on
 synthetic points through the imported loader and the verdict table structure — never a
 pipeline output).
+
+### 2026-10-04 (seventy-seventh session) — #77: post-hoc layer RATIFIED; first instrumentation shipped: per-frame ball-side possession + net-crossing labels (display-only)
+
+**Asked (owner, two messages):** (1) detect OVERPASSES as POST-PROCESSING (fine that it will not show in live debug) — overpass is not an action but WHERE the action lands; needs good team understanding; distinguish overpass vs spike-on-2; other ambiguous cases (bump-attack on 2, pass-attack on 1) may be labeled overpass for now. (2) The same post-process settles ambiguous touches (ball near two players: who touched first decides the team — “if the third touch is from PA1 the mid touch was PA2's set; if PB2 touched it, the first dig was an overpass”) and “will also increase the performance of the pipeline”. Then ordered: modify STATUS, then implement far/near possession for live debug with a `possession` label, a `crossing` label when the ball crosses the net, and last-known location when the ball is unknown — plus the pinhole derivation behind `d_net`.
+
+**Analysis before building:** both proposals stand on ONE substrate — a per-rally ball-fate timeline. The overpass separator is still unsolved (budget m ≤ 2k−12: k=13 → ≤14 fires at ≥93% precision; four families dead in #76b); the unmeasured piece is the FITTED trajectory read. Sequencing recorded in open point 9 [OWNER-RATIFIED #77]: **C1** fitted ball-fate measurement (pre-registered PASS/FAIL; e4 f347 must NOT fire; f24948 into-net MUST fire) → **C2** possession timeline (squad mapping + ratified side-switch schedule, never raw foot-side) → **C3** overpass relabel via the label-ceilings harness → **C4** ambiguous-touch reattribution (open point 26). “Increase performance” means delivered labels in the pass-2 layer; `pipeline_output.json` stays untouched (§6).
+
+**Shipped (display-only):**
+- `src/analysis/ball_side_possession.py` — `net_plane_width_px()` (owner's pinhole formula; near pair = 2 largest-y corners) + `BallSidePossessionObserver`, an always-on PURE observer wired at `process_frame` step 3c: width evidence ONLY from non-predicted bboxes; hysteresis commit (w ≤ far_px → far, w ≥ near_px → near); CROSSING announced once a committed side is seen inside the net band; `crossings` counts only completed far↔near transitions (flap-backs free); lost/predicted frames HOLD last-known (owner instruction).
+- Bands per-video: 1.15×/1.55× of d_net (match: 22.84 → 26.3/35.4 px ≈ the measured 26/35 classifier abstain band); fallback 26/35 uncalibrated. CAVEAT recorded: the practice-venue far regime tops ~28 px while 1.15×d_net ≈ 30.9 there — drills may read CROSSING while still deep far-side; validate before anything acts on the signal.
+- Live debug: `possession: NEAR|FAR/--` + `CROSSING` label (top-left, below the game badge) — `_overlay_data` 4-tuple → producer queue 7-tuple → `overlay.draw_possession`; both the live panel and the two-pass save draw it.
+- Diag dump: `ball_possession` per frame (SCHEMA_VERSION 1→2); `set_court_calibration` feeds the observer; `reset_trackers` resets it.
+
+**Proof of inertness:** suite **1489** (1470 + 19 new in `tests/test_ball_side_possession.py`: formula, bands, hysteresis/last-known/flap-back, diag persistence, `_overlay_data` arity, exporter-contract source check, overlay smoke). Action parity: `scripts/test_action_recognition.py` on entreno_3, scored with `evaluate.py --ignore-player --component actions` → **F1 1.000** (14/14, team 1.0, spike_type 1.0) — reproduces the recorded e3 gate exactly; the observer adds NO key any exporter reads (pinned by test).
+
+**Discipline:** one mechanism; no GT edit; no seek (§9); held-out untouched; no Config key added (no config-drift surface); STATUS updated per the lean convention (72nd Log entry moved verbatim to `docs/history/status_log_archive.md`).
+

@@ -200,6 +200,7 @@ class FrameProcessor:
                 serve_zone_trial_frames=self.config.get("player_serve_zone_trial_frames", 90),
                 serve_zone_ball_votes=self.config.get("player_serve_zone_ball_votes", 2),
                 coast_vertical_damping=self.config.get("coast_vertical_damping", 0.5),
+                label_min_similarity=self.config.get("player_label_min_similarity", 0.35),
             )
 
             # Pose estimation (video mode for temporal smoothing)
@@ -269,6 +270,47 @@ class FrameProcessor:
             self._enable_serve_events()
         if calibration.is_calibrated and calibration.court_bounds:
             self.ball_tracker.set_court_bounds(calibration.court_bounds)
+
+    def enroll_from_video(self, video_path: str) -> Optional[List[Dict[str, Any]]]:
+        """Run the player-enrollment pre-pass (E1) for a video.
+
+        Sequential decode of the video's opening (no seeks, AGENTS.md §9):
+        detector-only sampling of foot-in-court players, chained into the 4
+        persistent enrollment references (labels P1A/P1B/P2A/P2B + squads).
+        The references are handed to the tracker as DISPLAY-ONLY anchors --
+        they never change a tracking decision. Call BEFORE the per-frame
+        loop (batch VideoProcessor.process_video and both LiveDebug paths).
+        Returns the reference list, or None when disabled/fallback.
+        """
+        if not self.config.get("player_enrollment_enabled", True):
+            return None
+        if self.court_calibration is None or not getattr(
+            self.court_calibration, "is_calibrated", False
+        ):
+            self.logger.warning(
+                "Player enrollment skipped: court not calibrated"
+            )
+            return None
+        # Late import: the enrollment module imports nothing from this
+        # package, but keeping it lazy keeps the tracker import graph flat.
+        from src.tracking.player_enrollment import PlayerEnrollment
+
+        enroller = PlayerEnrollment(
+            court_calibration=self.court_calibration,
+            player_detector=self.player_detector,
+            tracker=self.player_tracker,
+            max_frames=self.config.get("player_enrollment_frames", 600),
+            stride=self.config.get("player_enrollment_stride", 5),
+            min_observations=self.config.get("player_enrollment_min_obs", 8),
+            chain_gate_px=self.config.get("player_enrollment_chain_gate_px", 120.0),
+            chain_gap_samples=self.config.get(
+                "player_enrollment_chain_gap_samples", 6
+            ),
+            merge_gap_frames=self.config.get("player_enrollment_merge_gap_frames", 60),
+        )
+        references = enroller.enroll(video_path)
+        self.player_tracker.set_enrollment(references)
+        return references
 
     def setup_video_fps(self, fps: float) -> None:
         """Setup components with video FPS information."""
@@ -416,6 +458,14 @@ class FrameProcessor:
                     if a.get("action", "unknown") != "unknown"
                     and a.get("confidence", 0.0) > 0.1
                 ]
+                if self.player_tracker.enrollment_active:
+                    # E1: ride the enrolled label along so every action is
+                    # directly attributable to a named player (display/DB;
+                    # never consulted by the classifier itself).
+                    actions = [
+                        dict(a, player_label=self.player_tracker.label_for(a.get("track_id")))
+                        for a in actions
+                    ]
 
             frame_result["actions"] = actions
 
@@ -533,6 +583,12 @@ class FrameProcessor:
             self.diag.add_section("candidates", self.action_classifier.pop_diag())
             self.diag.add_section("actions", [dict(a, frame=a.get("frame_number"))
                                               for a in actions if isinstance(a, dict)])
+        if self.player_tracker.enrollment_active:
+            actions = [
+                dict(a, player_label=self.player_tracker.label_for(a.get("track_id")))
+                if isinstance(a, dict) else a
+                for a in actions
+            ]
         return actions
 
     def reset_trackers(self) -> None:

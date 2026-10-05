@@ -71,6 +71,7 @@ class PlayerTracker:
         serve_zone_ball_votes: int = 2,
         coast_vertical_damping: float = 0.5,
         debug_assignments: bool = False,
+        label_min_similarity: float = 0.35,
     ):
         """Initialize the player tracker.
 
@@ -241,6 +242,17 @@ class PlayerTracker:
         self.serve_zone_side_margin_m = serve_zone_side_margin_m
         self.serve_zone_trial_frames = serve_zone_trial_frames
         self.serve_zone_ball_votes = serve_zone_ball_votes
+        self.label_min_similarity = label_min_similarity
+
+        # Enrollment references (E1): stable appearance anchors + labels
+        # (P1A/P1B/P2A/P2B) built by the PlayerEnrollment pre-pass. Labels are
+        # DISPLAY-ONLY: they never influence association, admission or
+        # retirement, so tracking is byte-identical with or without them.
+        self._enrollment_refs: List[Dict[str, Any]] = []
+        # tid -> (label, squad, slot); survives retire-to-gallery + restore
+        # (same player, same id), cleared when an id is hard-removed or
+        # reclaimed so a recycled id never inherits the old player's label.
+        self._track_labels: Dict[int, Tuple[str, int, str]] = {}
 
         # Trial-expiry cooldown: last bboxes of hard-removed serve-zone
         # squatters, so the same stationary person is not re-admitted from the
@@ -434,12 +446,14 @@ class PlayerTracker:
         )
 
         if not self._initialized:
-            return self._bootstrap_phase(detections, self._last_strict_detections, ball_active)
+            return self._stamp_identities(
+                self._bootstrap_phase(detections, self._last_strict_detections, ball_active)
+            )
 
         if not detections:
-            return self._handle_no_detections()
+            return self._stamp_identities(self._handle_no_detections())
 
-        return self._associate_detections(detections)
+        return self._stamp_identities(self._associate_detections(detections))
 
     # --- Initialization ---
 
@@ -1107,6 +1121,7 @@ class PlayerTracker:
         }
         self.disappeared[tid] = 0
         self.logger.debug(f"Created track {tid}")
+        self._maybe_assign_label(tid, detection)
         return tid
 
     def _expire_serve_zone_trials(self) -> None:
@@ -1131,6 +1146,7 @@ class PlayerTracker:
         for tid in expired:
             track = self.tracks.pop(tid)
             self.disappeared.pop(tid, None)
+            self._track_labels.pop(tid, None)
             self._serve_zone_cooldown.append(list(track.get("bbox", [0, 0, 0, 0])))
             self.logger.info(
                 f"Serve-zone trial expired for track {tid}: never entered the "
@@ -1193,6 +1209,7 @@ class PlayerTracker:
         if track is None:
             return
         self.disappeared.pop(tid, None)
+        self._track_labels.pop(tid, None)
         samples = track.get("foot_world_samples") or []
         self._squatter_cooldown.extend(samples)
         self._retire_track_from(track, tid, squatter=True)
@@ -1205,6 +1222,12 @@ class PlayerTracker:
 
     def _update_track(self, tid: int, detection: Dict[str, Any]) -> None:
         """Update an existing track with a new detection."""
+        # Label retry (E1): a track created before its enrollment reference
+        # freed up (e.g. admission before a wrong-player track retired) gets
+        # another chance on every real feeding while unlabeled. Sticky once
+        # assigned -- an assigned label is never reconsidered.
+        if self._enrollment_refs and tid not in self._track_labels:
+            self._maybe_assign_label(tid, detection)
         track = self.tracks[tid]
         old_center = track["center"]
         new_center = detection["center"]
@@ -1396,6 +1419,7 @@ class PlayerTracker:
         )
         gid = pool[0][0]
         self.gallery.pop(gid, None)
+        self._track_labels.pop(gid, None)
         self.logger.debug(
             f"Evicted stale dormant id {gid} to free a slot for a new detection"
         )
@@ -1682,6 +1706,118 @@ class PlayerTracker:
         """Set or update court calibration for team assignment."""
         self.court_calibration = calibration
 
+    # --- Enrollment labels (E1) ---
+
+    def set_enrollment(self, references: Optional[List[Dict[str, Any]]]) -> None:
+        """Store enrollment references for label assignment.
+
+        The references (from PlayerEnrollment) carry the ensemble signature
+        keys used by _signature_similarity, so each one can be scored against
+        a live detection exactly like a track or gallery entry.
+        """
+        self._enrollment_refs = list(references or [])
+        self._track_labels = {}
+        if self._enrollment_refs:
+            self.logger.info(
+                "Enrollment active: %s", [r.get("label") for r in self._enrollment_refs]
+            )
+
+    @property
+    def enrollment_active(self) -> bool:
+        return bool(self._enrollment_refs)
+
+    def label_for(self, track_id: int) -> Optional[str]:
+        """Enrolled label (e.g. ``P1A``) for a track id, else None.
+
+        Labels are sticky per tid for the life of the tracker, so this is
+        safe to call for any emitted action keyed by track_id.
+        """
+        entry = self._track_labels.get(track_id)
+        return entry[0] if entry else None
+
+    def compute_enrollment_signature(
+        self, frame: np.ndarray, bbox: List[float]
+    ) -> Dict[str, Any]:
+        """Public appearance signature for enrollment references.
+
+        Same channels as the ensemble (torso/head histograms + ground-plane
+        world sizes); used by PlayerEnrollment so the pre-pass and the
+        in-stream signature can never drift apart.
+        """
+        saved = self._current_frame
+        self._current_frame = frame
+        try:
+            hist = self._compute_histogram(bbox)
+            head_hist = self._compute_head_histogram(bbox)
+        finally:
+            self._current_frame = saved
+        world_height_samples: List[float] = []
+        world_width_samples: List[float] = []
+        if self.court_calibration is not None:
+            size = self.court_calibration.world_body_size(bbox)
+            if size:
+                world_height_samples.append(size["world_height"])
+                world_width_samples.append(size["world_width"])
+        return {
+            "histogram": hist,
+            "head_histogram": head_hist,
+            "world_height_samples": world_height_samples,
+            "world_width_samples": world_width_samples,
+        }
+
+    def _maybe_assign_label(self, tid: int, detection: Dict[str, Any]) -> None:
+        """Attach an enrollment label to an unlabeled track, if one fits.
+
+        Greedy best-of-unclaimed: the reference with the highest ensemble
+        similarity to the creating/feeding detection wins, provided it beats
+        label_min_similarity and is not already claimed by an ACTIVE track.
+        Sticky: a labeled track keeps its label for life (restores keep the
+        tid, so the label follows the gallery id).
+        """
+        if not self._enrollment_refs or tid in self._track_labels:
+            return
+        claimed = {
+            self._track_labels[t][0]
+            for t in self.tracks
+            if t in self._track_labels
+        }
+        best_ref, best_sim = None, self.label_min_similarity
+        for ref in self._enrollment_refs:
+            if ref.get("label") in claimed:
+                continue
+            sim = self._signature_similarity(ref, detection)
+            if sim > best_sim:
+                best_sim, best_ref = sim, ref
+        if best_ref is not None:
+            self._track_labels[tid] = (
+                best_ref["label"], best_ref["squad"], best_ref["slot"],
+            )
+            self.logger.info(
+                "Assigned enrollment label %s to track %d (sim %.3f)",
+                best_ref["label"], tid, best_sim,
+            )
+
+    def _stamp_identities(
+        self, players: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Add player_label/squad/slot to tracked-player dicts (in place).
+
+        Every output path funnels through update()'s three returns, so this
+        is the single place identity display metadata is attached. Tracks
+        without a label (pre-lock temps, fallback videos, low-similarity
+        creations) get None -- the overlay then shows today's green P<id>.
+        """
+        for p in players:
+            tid = p.get("track_id")
+            label_info = self._track_labels.get(tid) if tid is not None else None
+            if label_info:
+                p["player_label"], p["squad"], p["slot"] = label_info
+            else:
+                p["player_label"] = None
+                p["squad"] = None
+                p["slot"] = None
+        return players
+
     # --- Public API ---
 
     def get_track_history(self, track_id: int) -> List[List[float]]:
@@ -1703,6 +1839,7 @@ class PlayerTracker:
         self.tracks = {}
         self.disappeared = {}
         self.gallery = {}
+        self._track_labels = {}
         self._squatter_cooldown.clear()
         self.frame_count = 0
         self._initialized = False

@@ -114,6 +114,27 @@ class Config:
         "player_signature_proportions_weight": 0.15,  # body height/width ratio
         "player_signature_height_smoothing": 30,  # rolling-median window (frames) for the world body-size estimate
 
+        # Player enrollment pre-pass (E1): stable P1A/P1B/P2A/P2B identity
+        # anchors. A pre-pipeline pass decodes the opening of the video
+        # SEQUENTIALLY (no seeks, AGENTS.md §9), runs the player detector on
+        # every stride-th frame, keeps foot-strictly-in-court detections and
+        # chains them into identities; the 4 most persistent chains become
+        # enrollment references (multi-crop ensemble signatures + labels:
+        # squad 1 = the near-side pair at video start, squad 2 = far; slot
+        # A/B = left-to-right). References attach DISPLAY-ONLY labels to the
+        # in-stream tracks by signature matching -- bootstrap/admission
+        # machinery is untouched, so tracking is byte-identical with
+        # enrollment off or on. Fallback (<4 persistent chains, no 2+2 side
+        # split): no enrollment, today's green P<id> display.
+        "player_enrollment_enabled": True,     # run the enrollment pre-pass (labels + squad colors)
+        "player_enrollment_frames": 600,       # opening window to sample (frames, ~23 s at 26 fps)
+        "player_enrollment_stride": 5,         # run the detector every Nth frame of the window (~0.2 s between samples)
+        "player_enrollment_min_obs": 8,        # observations a chain needs to count as a player
+        "player_enrollment_chain_gate_px": 120.0,  # foot-distance gate between consecutive samples of one chain (VENUE-COUPLED px: beach court is 206 px deep vs 464-479 at the practice venue)
+        "player_enrollment_chain_gap_samples": 6,  # consecutive missed samples before a chain dies (occlusion fragments re-join in the merge pass)
+        "player_enrollment_merge_gap_frames": 60,  # max time gap for merging a chain fragment back into its predecessor (~2.3 s)
+        "player_label_min_similarity": 0.35,   # ensemble-similarity floor to attach an enrollment label to a track (greedy best-of-unclaimed; sticky once assigned)
+
         # Enhanced trajectory-based tracking settings
         "low_confidence_threshold": 0.4,  # Min confidence for the tracker to accept a detection
         "trajectory_confidence_boost": 0.3,  # Boost confidence for trajectory-consistent detections

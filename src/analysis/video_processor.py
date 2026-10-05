@@ -72,6 +72,11 @@ class VideoProcessor:
         self.frame_processor.setup_video_fps(fps)
         self.frame_processor.setup_video_dimensions(width, height)
 
+        # Player-enrollment pre-pass (E1): stable P1A/P1B/P2A/P2B labels for
+        # the tracker, from a sequential decode of the video's opening.
+        # Display-only -- tracking decisions are byte-identical without it.
+        self.frame_processor.enroll_from_video(video_path)
+
         # Initialize results storage
         results = {
             "video_info": {

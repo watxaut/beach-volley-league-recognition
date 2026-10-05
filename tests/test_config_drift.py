@@ -40,6 +40,7 @@ from src.recognition.action_classifier import ActionClassifier
 from src.recognition.pose_estimator import PoseEstimator
 from src.tracking.ball_tracker import BallTracker
 from src.tracking.player_tracker import PlayerTracker
+from src.tracking.player_enrollment import PlayerEnrollment
 from src.utils.config import Config
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -130,6 +131,14 @@ CTOR_PARITY = [
     ("player_serve_zone_side_margin_m", PlayerTracker, "serve_zone_side_margin_m"),
     ("player_serve_zone_trial_frames", PlayerTracker, "serve_zone_trial_frames"),
     ("player_serve_zone_ball_votes", PlayerTracker, "serve_zone_ball_votes"),
+    ("player_label_min_similarity", PlayerTracker, "label_min_similarity"),
+    # PlayerEnrollment (E1 pre-pass; references are display-only)
+    ("player_enrollment_frames", PlayerEnrollment, "max_frames"),
+    ("player_enrollment_stride", PlayerEnrollment, "stride"),
+    ("player_enrollment_min_obs", PlayerEnrollment, "min_observations"),
+    ("player_enrollment_chain_gate_px", PlayerEnrollment, "chain_gate_px"),
+    ("player_enrollment_chain_gap_samples", PlayerEnrollment, "chain_gap_samples"),
+    ("player_enrollment_merge_gap_frames", PlayerEnrollment, "merge_gap_frames"),
 ]
 
 

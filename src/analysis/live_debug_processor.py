@@ -39,7 +39,9 @@ from src.output_gen import overlay
 
 # Overlay data cached per frame for the deferred render.
 BallOverlay = Optional[Tuple[int, int, bool]]           # (x, y, is_predicted)
-PlayerOverlay = List[Tuple[int, List[int]]]             # [(track_id, [x1,y1,x2,y2]), ...]
+# (track_id, [x1,y1,x2,y2], box_color, id_label) -- color/label come from the
+# enrollment identity (E3); None/None falls back to green P<id>.
+PlayerOverlay = List[Tuple[int, List[int], Optional[tuple], Optional[str]]]
 
 # Sentinel the producer thread queues after its final flush; tells the
 # consumer the source is exhausted and the label plan is final.
@@ -386,6 +388,8 @@ class LiveDebugProcessor:
             snapshot["players"].append({
                 "tid": p.get("track_id"),
                 "team": p.get("team"),
+                "label": p.get("player_label"),
+                "squad": p.get("squad"),
                 "near_net": near_net,
                 "predicted": bool(p.get("predicted", False)),
                 "dist": dist,
@@ -552,7 +556,10 @@ class LiveDebugProcessor:
         for p in frame_result.get("tracked_players", []):
             bbox = p.get("bbox", [])
             if len(bbox) == 4:
-                players.append((p.get("track_id", -1), [int(v) for v in bbox]))
+                color, label = overlay.player_box_style(p)
+                players.append(
+                    (p.get("track_id", -1), [int(v) for v in bbox], color, label)
+                )
         game_state = frame_result.get("game_state") or None
         possession = frame_result.get("ball_possession") or None
         ground = frame_result.get("ball_ground") or None
@@ -622,12 +629,14 @@ class LiveDebugProcessor:
             if kill is not None:
                 overlay.draw_kill_marker(out, kill[0], kill[1], kill[2])
 
-            for track_id, bbox in players:
+            for track_id, bbox, squad_color, id_label in players:
                 lab = plan.active(track_id, frame_idx)
                 overlay.draw_player(
                     out, track_id, bbox,
                     action=lab[0] if lab else None,
                     confidence=lab[1] if lab else None,
+                    color=squad_color,
+                    label=id_label,
                 )
 
             overlay.draw_frame_counter(out, frame_idx, total_frames)
@@ -669,6 +678,10 @@ class LiveDebugProcessor:
         self.logger.info(f"Video: {total} frames, {fps} FPS, {width}x{height}")
         self.frame_processor.setup_video_fps(fps)
         self.frame_processor.setup_video_dimensions(width, height)
+
+        # Player-enrollment pre-pass (E1) before the first processed frame
+        # -- same code path as batch (live-debug parity, AGENTS.md §2).
+        self.frame_processor.enroll_from_video(video_path)
 
         plan = overlay.LabelPlan()
         cache: List[Tuple[BallOverlay, PlayerOverlay, Optional[Dict[str, Any]], Optional[Dict[str, Any]], Optional[Dict[str, Any]]]] = []
@@ -804,6 +817,10 @@ class LiveDebugProcessor:
         self.logger.info(f"Video: {total} frames, {fps} FPS, {width}x{height}")
         self.frame_processor.setup_video_fps(fps)
         self.frame_processor.setup_video_dimensions(width, height)
+
+        # Player-enrollment pre-pass (E1) before the producer starts, so the
+        # very first overlay frame can already carry squad colors.
+        self.frame_processor.enroll_from_video(video_path)
 
         writer = None
         if save_video:

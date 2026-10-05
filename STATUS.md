@@ -17,22 +17,27 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-04 (eightieth session — **#80: ball GROUND-CONTACT/OUT
-observer SHIPPED (display+diag) + latent batch-calibration wiring bug FIXED.** New
-always-on pure observer `src/analysis/ball_ground_contact.py` in `process_frame` step
-3d, mirroring #77's pattern: sign-normalized ground homography, groundedness ratio =
-bbox width / projected ground diameter at the mapped bbox-bottom point, hysteresis
-AIR≥1.45 → GROUND≤1.25 (in-court rect +0.25 m) / OUT, gated image-vy-flip BOUNCE;
-live-debug GROUND/OUT/AIR ball label + per-candidate GND/AIR tags + panel line; diag
-`ball_ground`, SCHEMA_VERSION 3; NO Config/exporter key. Validated: game_state 13 GT
-points — IN-window 95.5% AIR vs BETWEEN 39.3% GROUND/OUT, live GROUND/OUT ≤2 s after
-11/13 point stops, 10 bounces (5 in-rally/5 dead-ball); e3 dig touch f453-455 + bounce
-f454. Point-end REST is structurally invisible to the tracked-only contract (static
-suppression drops the resting ball; tracker lost the final descent at e3 f616 while
-the rolling ball stayed visible in `ball_dets`) → open point 31 proposes the v1.5
-raw-candidate read, OWNER GATE. Probe exposed that batch NEVER called
-`set_court_calibration` — possession ran on fallback px bands since #77; both
-observers wired in `__init__` now. Suite **1525**.)
+**Last updated:** 2026-10-05 (eighty-first session — **#81: player ENROLLMENT
+pre-pass (E1) + squad colours (E3) SHIPPED — stable P1A/P1B/P2A/P2B labels and
+team-blue/team-red boxes, display-only, tracking byte-identical.** New
+`src/tracking/player_enrollment.py`: sequential decode of the first 600 frames
+(detector every 5th, foot-strictly-in-court only — §9, no seeks), greedy ONE-TO-ONE
+chains (120 px gate + torso-HSV correl tie-break), fragment merge (gap ≤60 f, correl
+≥0.45), 4 most persistent chains (≥8 obs) → majority-side squads (near = squad 1),
+left→right slots A/B, averaged-signature references. `PlayerTracker.set_enrollment`
+attaches labels in-stream (greedy best-unclaimed ensemble similarity > 0.35, sticky
+per tid, survives gallery retire+restore, cleared on track death); every tracked player
+dict + every ACTION now carries `player_label`/`squad`/`slot`. Overlay: 4 squad colours
+(blue clear/dark, red clear/dark) follow the SQUAD not the side — stable through side
+switches; fallback = legacy green `P<tid>`. Wired into batch + BOTH live paths via
+`FrameProcessor.enroll_from_video` before the loops; 7 new `player_enrollment_*` Config
+keys, drift-guard extended. **Gate PASS:** fresh A/B on all 7 entrenos — action F1
+Δ = 0.000 on 7/7, tracker snapshot streams byte-identical, 56/56 actions labelled
+(e1: 4 refs from 294 samples/8 chains, labels by frame ~8 at sim 0.51–0.93). Suite
+**1549** (+24). e2's recorded 0.571 reads 0.400 on BOTH fresh arms — pre-existing
+fresh-run variance in the base, rule 'compare A/B, never vs recorded' extended to e2.
+Next: E2 identity-drift + side-switch observers (display/diag only, OWNER GATE);
+owner visual pass on live debug pending.)
 Prior sessions this file: #73's overlay paragraph below; #72's reach-cascade refutation below that (also in `docs/g3_reach_cascade.md`).
 An offline replay of the unmodified `ActionContextResolver` over the 185 accepted rows PLUS every `reason="reach"` rejection within a scalar factor K (the gate re-scores offline) scores, against the 182 in-region GT events at ±15 f: BASE 78/139 = 0.561 label, 90/139 touch; **K=1.1 +4 found → +1 label; K=1.2 +14 found (all 14 within ±15 f of a GT contact, the precision-clean gate) → −4 LABELS; K=1.3 +21 → −5; K=1.5 +28 → −1; K=2.0 +48 → +1 at rate 0.513 vs 0.561.** Admitting ALL 71 reach rows repairs only **9 of 49** wrong touch numbers (40 still wrong), because the count is driven by the resolver's own resets, not by recall — so the recall → count → label chain is real about the ERROR POPULATION but **earning the recall does not earn the count**. The architect's own "~0.00 class accuracy" caveat is CONFIRMED and slightly optimistic: the honest expectation is negative. **The 44 missed contacts stay a RECALL story (contact P/R, per-point completeness), NOT the path to 0.70 class accuracy — do not spend a GPU A/B on them while the goal is the class metric.** The label bucket's two count routes are now BOTH measured and closed (re-derive: TC1 +0.050; earn-by-recall: #72 negative), leaving **39 of 55 wrong labels with a wrong count and 16 with a CORRECT count** (the residual Layer-1/2 rule errors open point 9 already names).
 **Seventy-third session (2026-10-03): a display-only live-debug overlay LANDED** — every ball the DETECTOR saw this frame drawn as a hollow box with its confidence and the detector's own verdict (`sus` stationary-suspect / `rm` dropped by static suppression), toggle `b`, default ON; reads only the sanctioned `BallDetector.raw_detections` side channel, no new Config key, processing path untouched; tests +9, suite **1336**. Its session's own commit claim (`8040f04`) was FALSE — the commit never existed (reflog clean after `ad1dc03`); committed after coordinator verification. With the toggle ON the saved `--debug-live` video now carries the candidate boxes too (still unpanelled).
@@ -228,6 +233,32 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
+**#81 SHIPPED: player-enrollment pre-pass (E1) + squad colours (E3) — the first
+half of the owner's player-identity request (m00001, plan m00055/m00056).** Stable
+labels **P1A/P1B (near/squad 1) and P2A/P2B (far/squad 2)**, slots left→right at the
+earliest simultaneously-observed frame; **colours follow the SQUAD, not the current
+side** (blue clear/dark + red clear/dark), so a side switch cannot recolour a player.
+Mechanism (display-only by design — the GT-validated bootstrap/admission machinery is
+untouched, enrollment only supplies reference signatures + a tid→label map): sequential
+decode of the first 600 frames, player DETECTOR only every 5th frame, foot-strictly-
+in-court detections, greedy ONE-TO-ONE nearest-neighbour chaining (120 px gate +
+torso-HSV correl tie-break; each chain takes ≤1 obs per sampled frame so two players
+projecting close cannot feed one chain), occlusion-fragment merge (gap ≤60 f, endpoint
+≤120 px, cross-corr ≥0.45), the 4 most persistent chains (≥8 obs) become averaged-
+signature references; <4 chains or no 2+2 near/far split → no enrollment, legacy green
+`P<tid>` fallback. In-stream: labels attach greedily (best unclaimed ref, ensemble
+similarity > `player_label_min_similarity` = 0.35), sticky per tid, survive
+retire-to-gallery + restore (same tid → same label → same colour, the owner's core
+ask). Every tracked-player dict and every ACTION carries `player_label`/`squad`/
+`slot`; `pipeline_output.json` actions gained `player_label` (additive; snapshots
+unchanged). **Validation:** fresh A/B both arms, all 7 entrenos — action F1 Δ=0.000
+on 7/7, tracker snapshot streams (tid→frame/bbox) byte-identical, 56/56 actions
+labelled; suite **1549** (+17 enrollment, +7 squad-colour tests). **E2 is next
+session, owner-approved:** identity-drift observer (sustained signature mismatch vs
+the enrolled reference) + side-switch observer (sustained foot-side ≠ squad side),
+display/diag only, owner gate before anything acts. Owner visual pass on live debug
+(squad colours + labels) pending. The serves track below remains the standing record.
+
 **#80 SHIPPED: ball GROUND-CONTACT / OUT-of-court observer, display+diag, beside
 possession (#77-#79).** New always-on pure observer
 `src/analysis/ball_ground_contact.py` in `process_frame` (step 3d): maps the TRACKED
@@ -335,7 +366,9 @@ the reception as the serve. No look at vall_dhebron outputs (held-out lock).
 - **`--serve-events` observers:** default OFF. Inertness is measured
   (byte-identical).
 - **Entreno gate record** (`evaluate --ignore-player` F1): e1 0.706, e2 0.571,
-  e3 1.0, e4 0.933, e5 0.923, e6 0.933, e7 0.75. Suite **1496**.
+  e3 1.0, e4 0.933, e5 0.923, e6 0.933, e7 0.75 — CAVEAT #81: e2's 0.571 reads
+  0.400 on BOTH fresh MPS arms (pre-existing fresh-run variance in the base; same-
+  session A/B is the valid comparison). Suite **1549**.
 
 **Refuted and parked** (do not reopen without new data): T5 tracker admission, R1
 departure gate, S1 looming, scale-aware geometry, M1 far-end crop, possession
@@ -1270,8 +1303,14 @@ point number in `docs/history/`.
     metres + abstain band; "hard to call" must read LOW. Parity rule
     applies to all layers.
 
-2.  **Side-change survival (player identity) — BLOCKED on the GT pass.**
-    The roster machinery SURVIVED the full match: ids 1-4 only, 0 ghost/
+2.  **Side-change survival (player identity) — [UPDATE #81: E1 enrollment + E3
+    squad colours SHIPPED (labels P1A/P1B/P2A/P2B, squad-stable colours, actions
+    carry player_label; tracking byte-identical, gate ΔF1 0.000 on 7/7 entrenos).
+    E2 NEXT SESSION, owner-approved scope: identity-drift observer (sustained
+    signature mismatch vs enrolled reference) + side-switch observer (sustained
+    foot-side ≠ squad side) — display/diag only, OWNER GATE before acting. The
+    GT-pass blocker below still stands for VALIDATING drift/side switches on real
+    match footage.]** The roster machinery SURVIVED the full match: ids 1-4 only, 0 ghost/
     recycled ids, swap-rate 0.00, team acc 97.9%, coverage 3.28/4,
     dead-time persistence 3.05/4. BUT 46 resurrections and a visually
     confirmed mid-rally identity hop (id2 woman→man, both in-court —
@@ -1653,6 +1692,10 @@ point number in `docs/history/`.
     a bug; a reading convention (see Learnings).
 
 ## Learnings (standing)
+
+- **`json_exporter.collect_actions` projects actions through an EXPLICIT key list — a new action field must be added there or it silently vanishes from `pipeline_output.json` (measured #81: `player_label` was stamped in `FrameProcessor` yet exported None; the flushed last contact also bypasses `process_frame`, so stamp at `flush_actions`'s return).**
+- **Enrollment chaining must be ONE-TO-ONE per sampled frame (#81):** without the exclusion, two same-frame detections within the gate both feed ONE chain (4 players → 2 chains, squad split fails) — greedy best-(correl, −dist)-first with per-frame used-sets is the fix.
+- **e2's recorded entreno F1 0.571 does not reproduce on fresh runs (base reads 0.400 on both arms, #81)** — fresh-run device variance exists in the BASE itself; the same-session A/B is the only valid comparison (extends the open-point-1 rule from tracking to the action gate).
 
 - **THE NET-PLANE BALL SCALE IS COMPUTABLE FROM THE CALIBRATION ALONE (owner-derived #77): `d_net = D·w_near·w_far/(4(w_near+w_far))`** with D = 0.67/π m and w_near/w_far the projected baseline widths (near pair = the 2 largest-y corners; sanity: near projects wider than far). Match 20260920: d_net = 22.8 px. **MEASURED width regimes (#78/#79, three videos + e3 GT): near flight 1.49-1.6×d_net; net-plane rest/tape/mesh AND motion-blurred far flight BOTH 1.0-1.35×d_net — width cannot split those two; far ground bounce 0.5-0.8×d_net; a far rally FLICKERS 0.66-1.14×d_net (max-only reads it as band).** Shipped bands (recalibrated #79): FAR 0.85× / NEAR 1.45× d_net; NEAR commits on the rolling max of the last 12 measured frames (owner: "do the greatest of the sides"), FAR on max ≤ far_px OR ≥4 of the last 12 measured frames ≤ far_px (persistent smallness — occlusion dips never produce 4 sub-far frames, flickering far rallies do) — occlusion dips hold the last side, the overlap regime reads CROSSING. Per-video bands replace venue-coupled px constants (match 19.4/33.1; entreno_3: d_net 26.9 → 22.8/39.0). Carried caveats: ±0.5 m of depth shifts the ball diameter by <0.5 px and jitter/motion-blur are ±1-2 px, so width alone is weak PER-FRAME — asymmetric rolling evidence + hysteresis + last-known hold is the design answer.
 
@@ -2090,6 +2133,18 @@ survive across sessions; provenance in the archives.
 - **A calibration consumer wired ONLY in `set_court_calibration` never receives the batch calibration — `FrameProcessor.__init__` loads `self.court_calibration` itself and the batch path never calls the setter (measured #80).** Both the #77 possession and the #80 ground-contact observers silently ran on their FALLBACK px bands in every batch run (e3: fallback 19/33 px vs real 22.8/39.0, diag `net_width_px: null`) until the #80 probe showed 672/672 `state: None`. Fix = wire every calibration consumer in `__init__` right after construction and PIN it with a wiring grep test (possession + ground both). Live-debug was unaffected (it calls the setter); only batch was degraded — suspect this bug class whenever a batch diag shows fallback constants while live looks right.
 
 ## Session index (one line each)
+- #81 **Player ENROLLMENT pre-pass (E1) + squad colours (E3) SHIPPED (display-only)**
+  — `src/tracking/player_enrollment.py` builds 4 averaged-signature references from a
+  sequential decode of the first 600 frames (detector every 5th, foot-in-court, greedy
+  one-to-one chains + fragment merge); `PlayerTracker.set_enrollment` attaches sticky
+  per-tid labels (P1A/P1B/P2A/P2B, squad = majority side, slots left→right, ensemble
+  similarity > 0.35); tracked players + actions carry `player_label`/`squad`/`slot`;
+  overlay `PLAYER_SQUAD_COLORS` (blue clear/dark, red clear/dark, squad-stable) used by
+  batch + live debug; 7 new `player_enrollment_*` Config keys + drift-guard rows;
+  tests `tests/test_player_enrollment.py` (10) + `tests/test_overlay_squad_colors.py`
+  (7); gate PASS — fresh A/B 7 entrenos, action F1 Δ=0.000, snapshots byte-identical,
+  56/56 actions labelled; suite 1549. E2 (drift + side-switch observers, display/diag,
+  owner gate) is next session.
 - #80 **Ball GROUND-CONTACT/OUT observer SHIPPED (display+diag, always-on pure
   observer) + latent batch-calibration wiring bug FIXED** — `src/analysis/ball_ground_contact.py`
   maps the tracked ball's bbox bottom-center through the SIGN-normalized ground homography;
@@ -2226,6 +2281,77 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 
 ## Log (newest first)
 
+### 2026-10-05 (eighty-first session) — #81: player enrollment (E1) + squad colours (E3) shipped: sticky P1A/P1B/P2A/P2B labels, squad-stable colours on boxes and actions, tracking byte-identical (gate ΔF1 0.000 ×7)
+
+**Asked (owner, m00001):** make player tracking bulletproof — a pre-pipeline step
+sampling the opening frames to extract features so the same player always gets the
+same number; live debug colours one team 2 blues (clear/dark) and the other 2 reds
+(clear/dark); a re-appearing player must regain number AND colour; open to proposals;
+worried about tracking a wrong person and voiding the video; side switches should
+unblock automatically. **Plan approved m00055/m00056:** names P1A/P1B/P2A/P2B
+(left→right), colours follow the TEAM not the side, enrollment window = first ~600
+frames stride 5, E1+E3 this session / E2 (identity-drift + side-switch observers,
+display/diag only, owner gate) next session, batch overlay gets the same colours,
+`20290928_entreno_vall_dhebron` stays held-out (players substituted — never run).
+
+**Design pivot (deliberate, safer):** enrollment does NOT seed tracker positions and
+does NOT skip the in-stream k-means bootstrap — all GT-validated bootstrap/admission
+machinery untouched; enrollment only supplies reference signatures + a tid→label map
+attached greedily in-stream. Avoids the position-mismatch-at-frame-0 problem and
+keeps one shared path (§2 live-debug parity).
+
+**Shipped:**
+- `src/tracking/player_enrollment.py` — `_Chain` dataclass (running hist means),
+  `PlayerEnrollment.enroll(video_path)` → Optional[List[ref dicts]] guarded on
+  `enabled`/`is_calibrated`; sequential decode ≤600 frames (§9), detector every 5th
+  frame, strict foot-in-court filter, per-obs ensemble signature via
+  `tracker.compute_enrollment_signature`; `_build_chains` greedy ONE-TO-ONE per
+  sampled frame (best (correl, −dist) pair first; ≤1 obs per chain per frame —
+  without this two players within the 120 px gate both fed ONE chain, 4 players → 2
+  chains, caught by the no-2+2 test); `_merge_chains` (gap ∈ (0,60] f, endpoint
+  ≤120 px, cross-corr ≥0.45); ≥8 obs chains, squads by majority side (near = 1),
+  slots left→right at the earliest shared frame; refs = averaged histograms + world
+  size samples (compatible with `_signature_similarity`).
+- `src/tracking/player_tracker.py` — `label_min_similarity` ctor param,
+  `_enrollment_refs`/`_track_labels` state, `set_enrollment()` (clears labels),
+  `enrollment_active`, `label_for(tid)`, `compute_enrollment_signature(frame, bbox)`,
+  `_maybe_assign_label` on create/update (greedy best-unclaimed, sticky),
+  `_stamp_identities` on all three `update()` returns; labels cleared on
+  expiry/eviction, KEPT through retire-to-gallery (restore = same tid = same label).
+- `src/output_gen/overlay.py` — `PLAYER_SQUAD_COLORS` (1,A) clear blue / (1,B) dark
+  blue / (2,A) clear red / (2,B) dark red; `player_box_style(player)`;
+  `draw_player(..., color=, label=)` explicit-colour precedence over action tint.
+- Wiring: `FrameProcessor.enroll_from_video(video_path)` (config-gated); called in
+  `VideoProcessor.process_video` + live `_process_two_pass` AND
+  `_process_buffered_live` before the loops; live `PlayerOverlay` 4-tuples + panel
+  rows carry label/squad; `json_exporter.collect_actions` projects `player_label`
+  onto exported actions (explicit key list — a new action field must be added there
+  or it silently vanishes; cost one debug loop this session).
+- Config: `player_enrollment_enabled` True / `_frames` 600 / `_stride` 5 / `_min_obs`
+  8 / `_chain_gate_px` 120.0 (venue-coupled) / `_chain_gap_samples` 6 /
+  `_merge_gap_frames` 60 / `player_label_min_similarity` 0.35 — drift-guard rows
+  added (85 pass).
+
+**Validation (pre-registered gate):** unit parity — byte-identical tracker outputs
+enrollment on/off (scripted gather/drift/swap/occlude, `cv2.setRNGSeed(0)` per arm);
+end-to-end — fresh A/B both arms (git worktree @ HEAD d2414f1 vs working tree), all
+7 entrenos: action F1 e1-e7 Δ = **0.000** on 7/7, tracker snapshot streams
+(tid→frame/bbox) byte-identical on 7/7, **56/56 actions carry a player_label**; e1
+engagement: 4 refs from 294 samples / 8 chains, labels assigned by frame ~8 at
+similarities 0.51-0.93. Suite **1549** (+10 enrollment incl. occlusion-merge 10+10
+→20 obs, label stickiness across position swap, gallery retire+restore,
+<4-chains/no-2+2 fallbacks; +7 squad-colour overlay tests). Enrollment adds no
+measurable wall time (441-frame clip: 46 s base vs 36 s enrolled — run noise).
+
+**e2 caveat recorded:** the recorded e2 baseline 0.571 reads **0.400 on BOTH fresh
+arms** — pre-existing fresh-run/MPS variance in the BASE itself, both arms equal;
+open point 1's rule ('compare A/B, never vs recorded') now covers e2 explicitly.
+
+**Discipline:** one mechanism (E1+E3 as one approved unit, no E2); no GT edit; no
+seek (§9 — sequential decode); held-out untouched; GT-validated tracker machinery
+untouched by design; STATUS updated per the lean convention (#77 log entry moved
+verbatim to `docs/history/status_log_archive.md`).
+
 ### 2026-10-04 (eightieth session) — #80: ball GROUND-CONTACT/OUT observer shipped (display+diag); batch-calibration wiring bug found+fixed; point-end rest invisible to the tracked-only contract (open point 31)
 
 **Asked (owner, m00001):** "a signal to know when the ball at play is on the ground or
@@ -2323,20 +2449,4 @@ index updated; #74 Log entry moved verbatim to
 **Fix (one recalibration of `src/analysis/ball_side_possession.py`, owner directive):** (a) ALL band decisions read the ROLLING MAX width over the last 12 measured frames (`EVIDENCE_WINDOW_FRAMES`; evidence ages out by frame index, so predicted stretches freeze it); (b) `FAR_FACTOR` 1.15→0.85 — only genuine far-ground/low-far evidence commits far, the overlap regime reads CROSSING/band and holds the last committed side; `NEAR_FACTOR` 1.55 unchanged; fallback 26→19 px. Documented trade (owner chose it): far commits land at deep-far/bounce moments and the opposite commit is delayed ≤12 f (the label shows CROSSING meanwhile).
 
 **Verified:** suite 1489→**1493** (+4: regime pins, occluded-near hold over the owner's match numbers, far-ground commit after evidence expiry, evidence row key). Probe A/B: match f250-345 far frames 100→**4** (only the pre-commit 250-253) and f378+ **0**; vall f1059-1280 **0** far (f1185 now near+crossing, crop confirmed); genuine far bounces still commit (vall 12/13/17/20 px); entreno_3 near-dominant with ONE far commit at f643 (the point-ending far landing).
-
-### 2026-10-04 (seventy-seventh session) — #77: post-hoc layer RATIFIED; first instrumentation shipped: per-frame ball-side possession + net-crossing labels (display-only)
-
-**Asked (owner, two messages):** (1) detect OVERPASSES as POST-PROCESSING (fine that it will not show in live debug) — overpass is not an action but WHERE the action lands; needs good team understanding; distinguish overpass vs spike-on-2; other ambiguous cases (bump-attack on 2, pass-attack on 1) may be labeled overpass for now. (2) The same post-process settles ambiguous touches (ball near two players: who touched first decides the team — “if the third touch is from PA1 the mid touch was PA2's set; if PB2 touched it, the first dig was an overpass”) and “will also increase the performance of the pipeline”. Then ordered: modify STATUS, then implement far/near possession for live debug with a `possession` label, a `crossing` label when the ball crosses the net, and last-known location when the ball is unknown — plus the pinhole derivation behind `d_net`.
-
-**Analysis before building:** both proposals stand on ONE substrate — a per-rally ball-fate timeline. The overpass separator is still unsolved (budget m ≤ 2k−12: k=13 → ≤14 fires at ≥93% precision; four families dead in #76b); the unmeasured piece is the FITTED trajectory read. Sequencing recorded in open point 9 [OWNER-RATIFIED #77]: **C1** fitted ball-fate measurement (pre-registered PASS/FAIL; e4 f347 must NOT fire; f24948 into-net MUST fire) → **C2** possession timeline (squad mapping + ratified side-switch schedule, never raw foot-side) → **C3** overpass relabel via the label-ceilings harness → **C4** ambiguous-touch reattribution (open point 26). “Increase performance” means delivered labels in the pass-2 layer; `pipeline_output.json` stays untouched (§6).
-
-**Shipped (display-only):**
-- `src/analysis/ball_side_possession.py` — `net_plane_width_px()` (owner's pinhole formula; near pair = 2 largest-y corners) + `BallSidePossessionObserver`, an always-on PURE observer wired at `process_frame` step 3c: width evidence ONLY from non-predicted bboxes; hysteresis commit (w ≤ far_px → far, w ≥ near_px → near); CROSSING announced once a committed side is seen inside the net band; `crossings` counts only completed far↔near transitions (flap-backs free); lost/predicted frames HOLD last-known (owner instruction).
-- Bands per-video: 1.15×/1.55× of d_net (match: 22.84 → 26.3/35.4 px ≈ the measured 26/35 classifier abstain band); fallback 26/35 uncalibrated. CAVEAT recorded: the practice-venue far regime tops ~28 px while 1.15×d_net ≈ 30.9 there — drills may read CROSSING while still deep far-side; validate before anything acts on the signal.
-- Live debug: `possession: NEAR|FAR/--` + `CROSSING` label (top-left, below the game badge) — `_overlay_data` 4-tuple → producer queue 7-tuple → `overlay.draw_possession`; both the live panel and the two-pass save draw it.
-- Diag dump: `ball_possession` per frame (SCHEMA_VERSION 1→2); `set_court_calibration` feeds the observer; `reset_trackers` resets it.
-
-**Proof of inertness:** suite **1489** (1470 + 19 new in `tests/test_ball_side_possession.py`: formula, bands, hysteresis/last-known/flap-back, diag persistence, `_overlay_data` arity, exporter-contract source check, overlay smoke). Action parity: `scripts/test_action_recognition.py` on entreno_3, scored with `evaluate.py --ignore-player --component actions` → **F1 1.000** (14/14, team 1.0, spike_type 1.0) — reproduces the recorded e3 gate exactly; the observer adds NO key any exporter reads (pinned by test).
-
-**Discipline:** one mechanism; no GT edit; no seek (§9); held-out untouched; no Config key added (no config-drift surface); STATUS updated per the lean convention (72nd Log entry moved verbatim to `docs/history/status_log_archive.md`).
 

@@ -215,7 +215,8 @@ def build_rows(snapshot: Dict[str, Any],
         if held:
             dist_col = DIM
         team = p.get("team") or "?"
-        add((f"P{p.get('tid')} {team} {(' '.join(flags)):<8} {dist_txt:>6}",
+        name = p.get("label") or f"P{p.get('tid')}"
+        add((f"{name} {team} {(' '.join(flags)):<8} {dist_txt:>6}",
              dist_col, 1))
     if len(players) > MAX_PLAYER_ROWS:
         add((f"... +{len(players) - MAX_PLAYER_ROWS} more", DIM, 1))

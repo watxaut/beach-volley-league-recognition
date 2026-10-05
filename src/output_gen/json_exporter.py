@@ -144,6 +144,7 @@ class JSONExporter:
                 actions.append({
                     "track_id": action.get("track_id"),
                     "player_id": action.get("player_id"),
+                    "player_label": action.get("player_label"),
                     "action": action.get("action"),
                     "gesture": action.get("gesture"),
                     "confidence": action.get("confidence"),

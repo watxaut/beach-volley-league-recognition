@@ -225,33 +225,75 @@ def draw_kill_marker(frame, x: float, y: float, text: str) -> None:
     cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.7, TRAIL_COLOR, 2)
 
 
+# Squad display palette (E3): color follows the TEAM (enrollment-time squad,
+# owner convention), NOT the current side -- a side switch shows the blue pair
+# moving to the far side. Within a squad, slot A = clear/light, B = dark.
+# BGR values: light blue #64C8FF, dark blue #143CB4, light red #FF968C,
+# dark red #C82828.
+PLAYER_SQUAD_COLORS = {
+    (1, "A"): (255, 200, 100),   # P1A clear blue
+    (1, "B"): (180, 60, 20),     # P1B dark blue
+    (2, "A"): (140, 150, 255),   # P2A clear red
+    (2, "B"): (40, 40, 200),     # P2B dark red
+}
+
+
+def player_box_style(player: Optional[dict]):
+    """(box_color, label) for a tracked-player dict, or (None, None).
+
+    Uses the enrollment identity when present (P1A..P2B + squad color);
+    otherwise returns (None, None) and the caller falls back to today's
+    green ``P<id>`` display (fallback videos, pre-lock temps, unlabeled
+    tracks).
+    """
+    if not isinstance(player, dict):
+        return None, None
+    squad, slot = player.get("squad"), player.get("slot")
+    label = player.get("player_label")
+    if not label or squad is None:
+        return None, None
+    return PLAYER_SQUAD_COLORS.get((squad, slot)), label
+
+
 def draw_player(
     frame,
     track_id: int,
     bbox: Sequence[float],
     action: Optional[str] = None,
     confidence: Optional[float] = None,
+    color: Optional[tuple] = None,
+    label: Optional[str] = None,
 ) -> None:
     """Draw a player box + id, tinted to the action colour when acting.
 
     Args:
         frame: BGR frame, drawn in place.
-        track_id: Stable player id (shown as ``P<id>``).
+        track_id: Stable player id (shown as ``P<id>`` unless ``label``).
         bbox: ``(x1, y1, x2, y2)`` box in pixels.
         action: Action name if one is currently on screen for this player;
             ``None`` leaves the box green with no action label.
         confidence: Action confidence, appended to the label when provided.
+        color: Explicit box/text colour (enrollment squad colour). When given,
+            it takes precedence over the action tint -- identity colour is
+            stable, the action is carried by the text label instead.
+        label: Explicit id text (``P1A``..); defaults to ``P<track_id>``.
     """
     x1, y1, x2, y2 = (int(v) for v in bbox)
-    box_color = ACTION_COLORS.get(action, PLAYER_COLOR) if action else PLAYER_COLOR
+    if color is not None:
+        box_color = id_color = color
+    else:
+        box_color = ACTION_COLORS.get(action, PLAYER_COLOR) if action else PLAYER_COLOR
+        id_color = PLAYER_COLOR
+    id_text = label or f"P{track_id}"
 
     cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
     if action:
         conf_str = f" ({confidence:.2f})" if confidence is not None else ""
+        action_color = box_color if color is not None else ACTION_COLORS.get(action, PLAYER_COLOR)
         cv2.putText(frame, f"{action}{conf_str}", (x1, y1 - 25),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, box_color, 2)
-    cv2.putText(frame, f"P{track_id}", (x1, y1 - 8),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, PLAYER_COLOR, 1)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, action_color, 2)
+    cv2.putText(frame, id_text, (x1, y1 - 8),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, id_color, 1)
 
 
 def draw_frame_counter(frame, frame_idx: int, total: Optional[int] = None) -> None:

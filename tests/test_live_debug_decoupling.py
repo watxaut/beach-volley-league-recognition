@@ -106,6 +106,10 @@ class StubFrameProcessor:
     def setup_video_dimensions(self, w, h):
         self.setup_dim_calls.append((w, h))
 
+    def enroll_from_video(self, video_path):
+        self.enroll_calls = getattr(self, "enroll_calls", []) + [video_path]
+        return None
+
 
 class StubCourtDetector:
     def __init__(self):
