@@ -19,7 +19,7 @@ Usage::
     venv/bin/python scripts/replay_identity.py \\
         output/identity_probe/20260920_match_ari_joan_lost/identity_features.npz \\
         --contacts-gt ground_truth/20260920_match_contacts.json \\
-        --set switch_threshold=30 --set LEVEL_ALPHA=0.001
+        --set switch_threshold=12 --set LEVEL_ALPHA=0.001
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import probe_identity_switches as probe  # noqa: E402
 from src.tracking.identity_resolver import TeamIdentityResolver  # noqa: E402
 
-_CTOR_KWARGS = ("switch_threshold", "switch_drift", "min_switch_interval_frames",
+_CTOR_KWARGS = ("switch_threshold", "switch_temper", "min_switch_interval_frames",
                 "court_slack_px", "serve_zone_eligible")
 
 
@@ -96,7 +96,6 @@ def replay(features_path, record: Optional[Dict[str, Any]] = None,
                            *[int(round(v)) for v in o.bbox]])
         out["frames"].append({
             "frame": frame, "near_squad": st["near_squad"], "cusum": st["cusum"],
-            "cusum_near": st["cusum_near"], "cusum_far": st["cusum_far"],
             "x_near": st["x_near"], "x_far": st["x_far"], "doubt": st["doubt"],
             "bodies": bodies,
         })
@@ -110,6 +109,7 @@ def replay(features_path, record: Optional[Dict[str, Any]] = None,
         out["actions"].append(dict(a, label=lab))
     out["flips"] = list(res.flips)
     out["learned"] = res.state()["learned"]
+    out["separability"] = res.state()["separability"]
     return out, res
 
 

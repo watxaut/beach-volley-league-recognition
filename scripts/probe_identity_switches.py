@@ -304,7 +304,9 @@ def load_features(path) -> Tuple[Dict[str, Any], List[Dict[str, Any]], Dict[int,
 
     from src.tracking.identity_resolver import BodyObs, Descriptor  # noqa: E402
 
-    z = np.load(path, allow_pickle=False)
+    with np.load(path, allow_pickle=False) as npz:
+        # Read every array ONCE: each NpzFile key access decompresses it anew.
+        z = {k: npz[k] for k in npz.files}
     meta = json.loads(str(z["meta_json"]))
     parts = z["desc_parts"].astype("float64")
     mask = z["desc_mask"].astype(bool)
@@ -313,20 +315,21 @@ def load_features(path) -> Tuple[Dict[str, Any], List[Dict[str, Any]], Dict[int,
         return None if row < 0 else Descriptor(parts=parts[row], mask=mask[row])
 
     refs = [dict(r, identity_samples=[], identity_heights=[]) for r in meta["refs"]]
-    for player, h, row in zip(z["ref_player"], z["ref_height"], z["ref_desc_row"]):
-        refs[int(player)]["identity_samples"].append(desc(int(row)))
-        refs[int(player)]["identity_heights"].append(None if np.isnan(h) else float(h))
+    for player, h, row in zip(z["ref_player"].tolist(), z["ref_height"].tolist(),
+                              z["ref_desc_row"].tolist()):
+        refs[player]["identity_samples"].append(desc(row))
+        refs[player]["identity_heights"].append(None if h != h else float(h))
     sides = {v: k for k, v in _SIDES.items()}
     frames: Dict[int, list] = {}
-    for i in range(len(z["obs_frame"])):
-        flags = int(z["obs_flags"][i])
-        h = float(z["obs_height"][i])
-        frames.setdefault(int(z["obs_frame"][i]), []).append(BodyObs(
-            tid=int(z["obs_tid"][i]), bbox=[float(v) for v in z["obs_bbox"][i]],
-            side=sides[int(z["obs_side"][i])],
+    columns = zip(z["obs_frame"].tolist(), z["obs_tid"].tolist(), z["obs_bbox"].tolist(),
+                  z["obs_side"].tolist(), z["obs_flags"].tolist(), z["obs_height"].tolist(),
+                  z["obs_desc_row"].tolist())
+    for frame, tid, bbox, side, flags, h, row in columns:
+        frames.setdefault(frame, []).append(BodyObs(
+            tid=tid, bbox=bbox, side=sides[side],
             predicted=bool(flags & _FLAG_PREDICTED), eligible=bool(flags & _FLAG_ELIGIBLE),
-            in_court=bool(flags & _FLAG_IN_COURT), desc=desc(int(z["obs_desc_row"][i])),
-            height=None if np.isnan(h) else h,
+            in_court=bool(flags & _FLAG_IN_COURT), desc=desc(row),
+            height=None if h != h else float(h),
         ))
     return meta, refs, frames
 
@@ -393,8 +396,6 @@ def sequential_pass(video: str, config: Dict[str, Any], max_frames: Optional[int
                 "frame": frame_idx,
                 "near_squad": state.get("near_squad"),
                 "cusum": state.get("cusum"),
-                "cusum_near": state.get("cusum_near"),
-                "cusum_far": state.get("cusum_far"),
                 "x_near": state.get("x_near"),
                 "x_far": state.get("x_far"),
                 "doubt": state.get("doubt"),
@@ -427,6 +428,7 @@ def sequential_pass(video: str, config: Dict[str, Any], max_frames: Optional[int
     final = tracker.identity_state() or {}
     record["flips"] = final.get("flips", [])
     record["learned"] = final.get("learned")
+    record["separability"] = final.get("separability")
     return record, sheets
 
 
@@ -509,6 +511,9 @@ def print_report(record: Dict[str, Any], gt: Optional[Dict[str, Any]]) -> Dict[s
     print(f"label teleports (label jumps to another id >200 px away): {report['labels']['teleports']}")
     if record.get("learned"):
         print(f"learned prototypes per view: {record['learned']}")
+    if record.get("separability"):
+        print(f"team separability d' per side (~1 or less: switches unreadable): "
+              f"{record['separability']}")
     if gt is None:
         return report
     orient = score_orientation(record, gt)

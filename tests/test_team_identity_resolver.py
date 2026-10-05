@@ -267,7 +267,8 @@ def _resolver(**kw) -> TeamIdentityResolver:
     params = dict(min_switch_interval_frames=150)
     params.update(kw)
     res = TeamIdentityResolver(enrollment_refs(), FakeCourt(), **params)
-    res.LEARN_INTERVAL = 30   # learn the new view in fewer synthetic frames
+    res.LEARN_INTERVAL = 30          # learn the new view in fewer synthetic frames
+    res.ORIENT_WARMUP_FRAMES = 100   # synthetic openings are short
     return res
 
 
@@ -423,8 +424,8 @@ def test_silent_teammate_swap_is_corrected():
             wrong_frames.append(k)
         t += 1
     # While the boxes merge the labels are withheld; after they separate the
-    # occluded crop is ignored, so the swap shows for at most a few frames.
-    assert len(wrong_frames) <= 6 and all(30 <= k <= 40 for k in wrong_frames)
+    # occluded crop is ignored and the slow evidence turns within ~0.5 s.
+    assert len(wrong_frames) <= 15 and all(30 <= k <= 50 for k in wrong_frames)
     assert truth_labels(players, labels) == (4, 0, 0)
     assert res.flips == []
 
@@ -526,6 +527,8 @@ def _run_tracker(mode: str, n_before=150, n_after=100):
         max_distance=250.0, identity_mode=mode, identity_min_switch_interval_frames=100,
     )
     tracker.set_enrollment(_tracker_refs(tracker))
+    if tracker.team_identity is not None:
+        tracker.team_identity.ORIENT_WARMUP_FRAMES = 100   # short synthetic opening
     tracker._initialized = True
     pl = positions(1, 0, rng)
     tracker._current_frame = scene(pl, rng)

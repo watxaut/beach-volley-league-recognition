@@ -4321,3 +4321,13 @@ open point 1's rule ('compare A/B, never vs recorded') now covers e2 explicitly.
 seek (§9 — sequential decode); held-out untouched; GT-validated tracker machinery
 untouched by design; STATUS updated per the lean convention (#77 log entry moved
 verbatim to `docs/history/status_log_archive.md`).
+
+### 2026-10-05 (eighty-second session) — #82: labels renamed to team letters, readable colours, per-frame identity resolver, f151 teammate id-swap fixed
+
+**Asked (owner):** (1) first/second player of a team = P1A/P2A (team B = P1B/P2B); (2) the dark navy is unreadable on black; (3) players must stop swapping ids -- a pre-video pass over colours/features so a label sticks from start to end (only in-court bodies; full matches, not entreno; side switches every 7 points). Follow-up contract: a momentary loss/swap/steal is fine as long as the same id returns to the same person after some frames.
+
+**Found:** labels were never reassigned (`_track_labels` only changes on removal); the f189 flip was a TRACKER id swap at f151 -- `_may_feed_track` stopped feeding P2A's track (off-court hold 90 f expired, her detection sits just off the sideline) and Hungarian paired it with her teammate's box.
+
+**Changed (display + one guard):** enrolled tracks keep feeding off-court while the detection matches their reference (`tid` param on `_may_feed_track`/`_compute_assignment_cost`); label text = number + team letter (`_build_reference`); `PLAYER_SQUAD_COLORS` vivid blue/red (contrast >= 4.5 on black, tested); `PlayerTracker._resolve_identities` per-frame resolver (config `player_identity_resolver`, `player_identity_court_slack_px`); slow reference drift for lighting/side switches (not validated on a real switch).
+
+**Measured (20260920 match, f1-2500):** f74/f189 correct; label teleports 10 -> 6 (all one id hopping between two people at f1305-1363, tracker-side), label changes 4 -> 25 (more None flicker, fewer wrong-person labels). Suite 1569 passed. Full 26k-frame run NOT done; no identity GT exists.

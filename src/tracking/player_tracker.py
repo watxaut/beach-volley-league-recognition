@@ -78,9 +78,9 @@ class PlayerTracker:
         identity_resolver: bool = True,
         identity_court_slack_px: float = 16.0,
         identity_mode: str = "team",
-        identity_switch_threshold: float = 25.0,
-        identity_switch_drift: float = 0.5,
-        identity_min_switch_interval_frames: int = 1500,
+        identity_switch_threshold: float = 8.0,
+        identity_switch_temper: float = 0.2,
+        identity_min_switch_interval_frames: int = 300,
     ):
         """Initialize the player tracker.
 
@@ -193,10 +193,11 @@ class PlayerTracker:
                 resolver. Either way the legacy label map keeps driving the
                 tracker's own enrollment guards, so tracking decisions are
                 identical in both modes.
-            identity_switch_threshold / identity_switch_drift /
+            identity_switch_threshold / identity_switch_temper /
             identity_min_switch_interval_frames: the team resolver's side-
-                switch change-point test (CUSUM threshold, per-frame drift
-                allowance, minimum frames between two switches).
+                switch test (threshold on the accumulated log-likelihood,
+                per-frame tempering of that evidence, minimum frames between
+                two switches).
         """
         self.max_disappeared = max_disappeared
         self.max_distance = max_distance
@@ -283,7 +284,7 @@ class PlayerTracker:
         # enrollment guards read -- so tracking is identical with it on/off.
         self.identity_mode = identity_mode
         self.identity_switch_threshold = identity_switch_threshold
-        self.identity_switch_drift = identity_switch_drift
+        self.identity_switch_temper = identity_switch_temper
         self.identity_min_switch_interval_frames = identity_min_switch_interval_frames
         self._team_identity: Optional[TeamIdentityResolver] = None
         self._frame_index = 0
@@ -1829,7 +1830,7 @@ class PlayerTracker:
             self.court_calibration,
             court_slack_px=self.identity_court_slack_px,
             switch_threshold=self.identity_switch_threshold,
-            switch_drift=self.identity_switch_drift,
+            switch_temper=self.identity_switch_temper,
             min_switch_interval_frames=self.identity_min_switch_interval_frames,
         )
 

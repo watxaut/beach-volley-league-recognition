@@ -228,11 +228,14 @@ The cross-session plan for consistent 4-player IDs:
   serve-zone admission + seed-dedup (08-16), server vote + trial expiry +
   contested swap (08-18), off-court hold horizon =90f (08-29).
 - Status: side switches handled by the team identity resolver (#83, output
-  labels only); its first real run (18 flips for 4 switches) led to the #84
-  orientation redesign (baseline-relative, both sides, fixed anchors). The
-  real-footage gate is `scripts/probe_identity_switches.py` on the 20260920
-  match (4 switches, every GT contact carries its squad); its feature dump
-  lets `scripts/replay_identity.py` re-tune the decision layer offline.
+  labels only). Its orientation is a two-state likelihood test on fixed
+  enrollment anchors (#85): on the 20260920 match (4 switches, every GT
+  contact carries its squad) it finds 4/4 switches, 0 stray, 211/211 GT
+  contacts, measured by replaying the probe's feature dump
+  (`scripts/probe_identity_switches.py` -> `identity_features.npz` ->
+  `scripts/replay_identity.py`, 17 s): tune the decision layer OFFLINE, never
+  by asking the owner for another full run. Per-player (within-side)
+  correctness is still only checked on contact sheets.
   Phase 2 (global stitch / post-hoc relabel) is the owner-approved fallback
   if online is not enough.
 
