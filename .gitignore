@@ -242,3 +242,6 @@ data/
 
 # mined retraining frames (large, regenerable via scripts/mine_ball_frames.py)
 resources/frames/
+
+.pi/goals
+.pi/.goals-pool-snapshot.json
