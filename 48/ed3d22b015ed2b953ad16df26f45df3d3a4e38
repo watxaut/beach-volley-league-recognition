@@ -1,0 +1,69 @@
+src/analysis/frame_processor.py
+  s_570eaa9c456bdd::t_e43d84da9393df 461-468
+  s_570eaa9c456bdd::t_040f871097a452 586-591
+  s_570eaa9c456bdd::t_cd31dad76ed45f 203,274-313
+  s_570eaa9c456bdd::t_2b0d9101e9721a 314
+src/tracking/player_tracker.py
+  s_570eaa9c456bdd::t_64f0315379ea79 1795
+  s_570eaa9c456bdd::t_b5661fc7a5ac72 1729-1737
+  s_570eaa9c456bdd::t_b2ac68f9d3aabd 74,245-255,449-451,454,456,1124,1149,1212,1225-1230,1422,1709-1728,1738-1794,1796-1820,1842
+tests/test_config_drift.py
+  s_570eaa9c456bdd::t_f21f408bf92145 43,134-141
+src/utils/config.py
+  s_570eaa9c456bdd::t_135ba976ec0f92 117-137
+src/analysis/live_debug_processor.py
+  s_570eaa9c456bdd::t_e9283f6fb292a7 391-392
+  s_570eaa9c456bdd::t_b5dfe93a996436 682-685,821-823
+  s_570eaa9c456bdd::t_09223b1a012c07 42-44,559-562,632,638-639
+  s_570eaa9c456bdd::t_e034b2a26a06ae 824
+tests/test_live_debug_decoupling.py
+  s_570eaa9c456bdd::t_2ff53f70812300 109-112
+src/tracking/player_enrollment.py
+  s_570eaa9c456bdd::t_40d0ad69db1dbb 314,316
+  s_570eaa9c456bdd::t_d71aec98174b33 1-271,277-284,288-295,312,315,317-448
+  s_570eaa9c456bdd::t_7272129511364b 272-276,285-287,296-311,313
+src/output_gen/json_exporter.py
+  s_570eaa9c456bdd::t_ab83609c44615e 147
+src/output_gen/overlay.py
+  s_570eaa9c456bdd::t_47dd4d1e5c9003 228-257,264-265,271,276-279,282-287,292,294-296
+tests/test_player_enrollment.py
+  s_570eaa9c456bdd::t_f3c420816ddf62 72-85
+  s_570eaa9c456bdd::t_ed22ef99cadac1 294-305,309,352,365,386,392-398,422,446
+  s_570eaa9c456bdd::t_9ac80a0fbad7d5 225-230
+  s_570eaa9c456bdd::t_c7cad14aaf4097 332-336
+  s_570eaa9c456bdd::t_cfadf2b7c3e087 441-442
+  s_570eaa9c456bdd::t_77ba008a2dcdbc 1-71,86-224,231-293,306-308,310-331,337-351,353-364,366-385,387-391,399-421,423-440,443-445,447-448
+docs/history/status_log_archive.md
+  s_570eaa9c456bdd::t_e6d4470212f0bd 4138-4154
+tests/test_overlay_squad_colors.py
+  s_570eaa9c456bdd::t_652f908639a56f 55
+  s_570eaa9c456bdd::t_beead882e6a7fc 1-54,56-62
+STATUS.md
+  s_570eaa9c456bdd::t_c8de0e63b00449 236-261
+  s_570eaa9c456bdd::t_61ee88c300c798 369-371
+  s_570eaa9c456bdd::t_706949004e32fc 1306-1313
+  s_570eaa9c456bdd::t_45eba8608b7b31 2284-2354
+  s_570eaa9c456bdd::t_d85fff19c33746 20-40
+  s_570eaa9c456bdd::t_861b9c04363bf5 1696-1699
+  s_570eaa9c456bdd::t_8b94d83dff8cbc 2136-2147
+src/analysis/video_processor.py
+  s_570eaa9c456bdd::t_4a4822abd92fa1 75-79
+src/analysis/debug_panel.py
+  s_570eaa9c456bdd::t_34a710c0481d99 218-219
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "48ed3d22b015ed2b953ad16df26f45df3d3a4e38",
+  "prompts": {},
+  "sessions": {
+    "s_570eaa9c456bdd": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a108b2-99f2-72e9-b5b4-5f8fdbd98ef5",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
