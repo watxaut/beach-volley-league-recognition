@@ -1,0 +1,27 @@
+tests/test_status_leanness.py
+  s_639daa06a44809::t_0004b52b0075ba 1
+STATUS.md
+  s_639daa06a44809::t_02997731c9f28c 322-324
+  s_639daa06a44809::t_4b97ff66a8a72a 419,421,423
+  s_639daa06a44809::t_1829675e4184b3 418,420,422
+  s_639daa06a44809::t_b1220098b8d1b5 21-28,32-45,49-140,144-145,151-232,236-256,260-318,321
+docs/history/status_log_archive.md
+  s_639daa06a44809::t_4b97ff66a8a72a 4167
+  s_639daa06a44809::t_1829675e4184b3 6376-6528
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "aef0019efdf27e6e456fb083da54abb207fff5eb",
+  "prompts": {},
+  "sessions": {
+    "s_639daa06a44809": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a10c68-d8c0-72f4-a75a-dbeca9e28274",
+        "model": "glm-5.3"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
