@@ -1,0 +1,67 @@
+AGENTS.md
+  s_9ed08fada71d0a::t_48e23478f745fd 42-43,59-63,82-84,342-374
+Makefile
+  s_9ed08fada71d0a::t_00f7046e6f53d5 25,51-67,95-96
+STATUS.md
+  s_9ed08fada71d0a::t_d4dc5b4da4c4f5 21-27,39-46,50-91,94-95,97-100,109-110,114-128,139-154,199-202,204-206,211-224,233-242,290-301,318,416-429
+docs/history/status_log_archive.md
+  s_9ed08fada71d0a::t_301acb642691c3 6529-6629
+docs/history/status_where_we_are_archive.md
+  s_9ed08fada71d0a::t_7c5d8a5dd98817 2927-3016
+docs/postrun_reconstruction.md
+  s_9ed08fada71d0a::t_a7355192f5f311 1-127
+scripts/score_postrun.py
+  s_9ed08fada71d0a::t_61a66085b41bc5 1-279
+scripts/score_postrun_entreno.py
+  s_9ed08fada71d0a::t_ad4261140b1f19 1-111
+scripts/sweep_postrun.py
+  s_9ed08fada71d0a::t_59707ab28b0629 1-110
+src/analysis/frame_processor.py
+  s_9ed08fada71d0a::t_fa680cb3402cd7 545-547
+src/postrun/__init__.py
+  s_9ed08fada71d0a::t_464cbec52b0737 1-7
+src/postrun/__main__.py
+  s_9ed08fada71d0a::t_95544f2adafdc9 1-5
+src/postrun/ball_flights.py
+  s_9ed08fada71d0a::t_f3b6acc7db573a 1-430
+src/postrun/geometry.py
+  s_9ed08fada71d0a::t_5b04c16f3f69fd 1-176
+src/postrun/match.py
+  s_9ed08fada71d0a::t_ba794feaa5a6b0 1-391
+src/postrun/rallies.py
+  s_9ed08fada71d0a::t_2371f30e62c292 1-533
+src/postrun/reconstruct.py
+  s_9ed08fada71d0a::t_c9aebc5206de1d 1-297
+src/postrun/stream.py
+  s_9ed08fada71d0a::t_a605ab13583083 1-227
+src/postrun/touches.py
+  s_9ed08fada71d0a::t_3f7f9f581d816a 1-534
+src/tracking/ball_tracker.py
+  s_9ed08fada71d0a::t_d7263024472a8b 195-196
+src/utils/diagnostics.py
+  s_9ed08fada71d0a::t_70da0cc2d3f6cc 26-27,29-30,45-49,59
+tests/postrun_sim.py
+  s_9ed08fada71d0a::t_83d569f1fbad41 1-222
+tests/test_ball_ground_contact.py
+  s_9ed08fada71d0a::t_e63673a1cff3e8 351
+tests/test_ball_side_possession.py
+  s_9ed08fada71d0a::t_4fce299898e972 306
+tests/test_postrun.py
+  s_9ed08fada71d0a::t_99c26eba4ac44f 1-544
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "a748fe85beb3bb648dc2140f8986af1016322bc5",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
