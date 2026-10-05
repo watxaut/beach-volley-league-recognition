@@ -208,6 +208,16 @@ class FrameProcessor:
                 identity_court_slack_px=self.config.get(
                     "player_identity_court_slack_px", 16.0
                 ),
+                identity_mode=self.config.get("player_identity_mode", "team"),
+                identity_switch_threshold=self.config.get(
+                    "player_identity_switch_threshold", 40.0
+                ),
+                identity_switch_drift=self.config.get(
+                    "player_identity_switch_drift", 0.5
+                ),
+                identity_min_switch_interval_frames=self.config.get(
+                    "player_identity_min_switch_interval_frames", 900
+                ),
             )
 
             # Pose estimation (video mode for temporal smoothing)
@@ -415,6 +425,7 @@ class FrameProcessor:
                 ball_active=bool(ball_detections),
                 n_court_det=len(strict_players),
                 ball_position=ball_position,
+                frame_index=frame_index,
             )
             tracked_ball = self.ball_tracker.update(ball_detections)
 
@@ -471,8 +482,11 @@ class FrameProcessor:
                     # E1: ride the enrolled label along so every action is
                     # directly attributable to a named player (display/DB;
                     # never consulted by the classifier itself).
+                    # The label the toucher carried AT the contact frame (the
+                    # classifier emits a few frames after the contact).
                     actions = [
-                        dict(a, player_label=self.player_tracker.label_for(a.get("track_id")))
+                        dict(a, player_label=self.player_tracker.label_for(
+                            a.get("track_id"), frame=a.get("frame_number")))
                         for a in actions
                     ]
 
@@ -594,7 +608,8 @@ class FrameProcessor:
                                               for a in actions if isinstance(a, dict)])
         if self.player_tracker.enrollment_active:
             actions = [
-                dict(a, player_label=self.player_tracker.label_for(a.get("track_id")))
+                dict(a, player_label=self.player_tracker.label_for(
+                    a.get("track_id"), frame=a.get("frame_number")))
                 if isinstance(a, dict) else a
                 for a in actions
             ]

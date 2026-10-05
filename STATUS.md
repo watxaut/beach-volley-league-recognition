@@ -17,27 +17,24 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-05 (eighty-first session — **#81: player ENROLLMENT
-pre-pass (E1) + squad colours (E3) SHIPPED — stable P1A/P1B/P2A/P2B labels and
-team-blue/team-red boxes, display-only, tracking byte-identical.** New
-`src/tracking/player_enrollment.py`: sequential decode of the first 600 frames
-(detector every 5th, foot-strictly-in-court only — §9, no seeks), greedy ONE-TO-ONE
-chains (120 px gate + torso-HSV correl tie-break), fragment merge (gap ≤60 f, correl
-≥0.45), 4 most persistent chains (≥8 obs) → majority-side squads (near = squad 1),
-left→right slots A/B, averaged-signature references. `PlayerTracker.set_enrollment`
-attaches labels in-stream (greedy best-unclaimed ensemble similarity > 0.35, sticky
-per tid, survives gallery retire+restore, cleared on track death); every tracked player
-dict + every ACTION now carries `player_label`/`squad`/`slot`. Overlay: 4 squad colours
-(blue clear/dark, red clear/dark) follow the SQUAD not the side — stable through side
-switches; fallback = legacy green `P<tid>`. Wired into batch + BOTH live paths via
-`FrameProcessor.enroll_from_video` before the loops; 7 new `player_enrollment_*` Config
-keys, drift-guard extended. **Gate PASS:** fresh A/B on all 7 entrenos — action F1
-Δ = 0.000 on 7/7, tracker snapshot streams byte-identical, 56/56 actions labelled
-(e1: 4 refs from 294 samples/8 chains, labels by frame ~8 at sim 0.51–0.93). Suite
-**1549** (+24). e2's recorded 0.571 reads 0.400 on BOTH fresh arms — pre-existing
-fresh-run variance in the base, rule 'compare A/B, never vs recorded' extended to e2.
-Next: E2 identity-drift + side-switch observers (display/diag only, OWNER GATE);
-owner visual pass on live debug pending.)
+**Last updated:** 2026-10-05 (eighty-third session — **#83: side-switch-aware
+TEAM IDENTITY RESOLVER shipped (output labels only; tracking byte-identical by
+construction).** New `src/tracking/identity_resolver.py` (`TeamIdentityResolver`)
+re-derives P1A/P2A/P1B/P2B every frame from the structural fact that teammates
+share a side: (1) ORIENTATION (which squad is near) by a one-sided CUSUM over
+per-body evidence with a 900 f minimum dwell, labels withheld while in doubt;
+(2) within-side slots by per-tracklet evidence EMA + hysteresis + elimination.
+Evidence = impostor-normalised DISCRIMINATION + same-view FIT, both calibrated on
+the video's own enrollment samples (no venue/kit constant); background-weighted,
+resolution-normalised part histograms (H x S + achromatic V) + lateral-scale
+height; each player LEARNS the view it was not enrolled in after a confident flip
+(anchors never replaced). The #82 resolver keeps running only to feed the
+tracker's enrollment guards. Synthetic validation (drawn near/back vs far/front
+players, scrambled ids): switches flip in ~10 frames with ZERO wrong labels, 3
+consecutive switches, no flip through occlusion, silent teammate swap fixed in
+≤4 f. NOT yet run on real footage (no video in the cloud session) — owner runs
+`scripts/probe_identity_switches.py` on the 20260920 match next. Suite **1475**
+(+30). Config `player_identity_mode` ("team"/"legacy") + 3 CUSUM keys.)
 Prior sessions this file: #73's overlay paragraph below; #72's reach-cascade refutation below that (also in `docs/g3_reach_cascade.md`).
 An offline replay of the unmodified `ActionContextResolver` over the 185 accepted rows PLUS every `reason="reach"` rejection within a scalar factor K (the gate re-scores offline) scores, against the 182 in-region GT events at ±15 f: BASE 78/139 = 0.561 label, 90/139 touch; **K=1.1 +4 found → +1 label; K=1.2 +14 found (all 14 within ±15 f of a GT contact, the precision-clean gate) → −4 LABELS; K=1.3 +21 → −5; K=1.5 +28 → −1; K=2.0 +48 → +1 at rate 0.513 vs 0.561.** Admitting ALL 71 reach rows repairs only **9 of 49** wrong touch numbers (40 still wrong), because the count is driven by the resolver's own resets, not by recall — so the recall → count → label chain is real about the ERROR POPULATION but **earning the recall does not earn the count**. The architect's own "~0.00 class accuracy" caveat is CONFIRMED and slightly optimistic: the honest expectation is negative. **The 44 missed contacts stay a RECALL story (contact P/R, per-point completeness), NOT the path to 0.70 class accuracy — do not spend a GPU A/B on them while the goal is the class metric.** The label bucket's two count routes are now BOTH measured and closed (re-derive: TC1 +0.050; earn-by-recall: #72 negative), leaving **39 of 55 wrong labels with a wrong count and 16 with a CORRECT count** (the residual Layer-1/2 rule errors open point 9 already names).
 **Seventy-third session (2026-10-03): a display-only live-debug overlay LANDED** — every ball the DETECTOR saw this frame drawn as a hollow box with its confidence and the detector's own verdict (`sus` stationary-suspect / `rm` dropped by static suppression), toggle `b`, default ON; reads only the sanctioned `BallDetector.raw_detections` side channel, no new Config key, processing path untouched; tests +9, suite **1336**. Its session's own commit claim (`8040f04`) was FALSE — the commit never existed (reflog clean after `ad1dc03`); committed after coordinator verification. With the toggle ON the saved `--debug-live` video now carries the candidate boxes too (still unpanelled).
@@ -233,31 +230,34 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
-**#81 SHIPPED: player-enrollment pre-pass (E1) + squad colours (E3) — the first
-half of the owner's player-identity request (m00001, plan m00055/m00056).** Stable
-labels **P1A/P1B (near/squad 1) and P2A/P2B (far/squad 2)**, slots left→right at the
-earliest simultaneously-observed frame; **colours follow the SQUAD, not the current
-side** (blue clear/dark + red clear/dark), so a side switch cannot recolour a player.
-Mechanism (display-only by design — the GT-validated bootstrap/admission machinery is
-untouched, enrollment only supplies reference signatures + a tid→label map): sequential
-decode of the first 600 frames, player DETECTOR only every 5th frame, foot-strictly-
-in-court detections, greedy ONE-TO-ONE nearest-neighbour chaining (120 px gate +
-torso-HSV correl tie-break; each chain takes ≤1 obs per sampled frame so two players
-projecting close cannot feed one chain), occlusion-fragment merge (gap ≤60 f, endpoint
-≤120 px, cross-corr ≥0.45), the 4 most persistent chains (≥8 obs) become averaged-
-signature references; <4 chains or no 2+2 near/far split → no enrollment, legacy green
-`P<tid>` fallback. In-stream: labels attach greedily (best unclaimed ref, ensemble
-similarity > `player_label_min_similarity` = 0.35), sticky per tid, survive
-retire-to-gallery + restore (same tid → same label → same colour, the owner's core
-ask). Every tracked-player dict and every ACTION carries `player_label`/`squad`/
-`slot`; `pipeline_output.json` actions gained `player_label` (additive; snapshots
-unchanged). **Validation:** fresh A/B both arms, all 7 entrenos — action F1 Δ=0.000
-on 7/7, tracker snapshot streams (tid→frame/bbox) byte-identical, 56/56 actions
-labelled; suite **1549** (+17 enrollment, +7 squad-colour tests). **E2 is next
-session, owner-approved:** identity-drift observer (sustained signature mismatch vs
-the enrolled reference) + side-switch observer (sustained foot-side ≠ squad side),
-display/diag only, owner gate before anything acts. Owner visual pass on live debug
-(squad colours + labels) pending. The serves track below remains the standing record.
+**#83 SHIPPED: TEAM IDENTITY RESOLVER — the owner's side-switch request (labels
+must find the same person again after a switch; a few wrong/blank frames are
+acceptable, actions are ~10% of frames).** Identity stack today, all output-only
+(no tracking decision reads it): E1 enrollment pre-pass (#81) → 4 references,
+now also carrying per-sample identity descriptors + heights → `TeamIdentityResolver`
+(#83, `player_identity_mode: "team"`, default) stamps `player_label`/`squad`/`slot`
+on tracked players and actions; actions take the label at their CONTACT frame
+(`label_for(tid, frame)`, 900 f history), falling back to the emission-time label.
+The #82 per-frame resolver still runs and still writes `_track_labels`, which ONLY
+the tracker's enrollment guards read — so tracking is identical in "team" and
+"legacy" modes (unit-pinned). Mechanism: orientation CUSUM (threshold 40, drift
+0.5, min dwell 900 f; doubt at 25% of the threshold or one frame with mean swap
+advantage ≥3 over ≥2 bodies → labels blank, never wrong); within-side slots by
+EMA evidence (+1 hold bonus, −1 hold floor, quick-EMA hold break for overlap
+swaps, 5-frame claim delay, elimination only with a decided partner); evidence
+`e = z + f` (z = vs all other players' samples in both views, f = vs the player's
+own same-view samples, capped +1); learning only when settled, isolated
+(IoU < 0.05), in court, pair margin ≥2. Eligible bodies = in court (+16 px
+slack) or in a serve zone (the server). **Validation status:** synthetic only —
+the real-footage gate is the owner's run of `scripts/probe_identity_switches.py`
+(one sequential production pass, team vs legacy labels side by side, contact
+sheets rows = P1A..P2B, and with `--contacts-gt
+ground_truth/20260920_match_contacts.json`: orientation at all 184 GT contacts,
+one flip per GT switch window after P7/P14/P21/P28, action-label squad accuracy
+team vs legacy). Entreno A/B for action F1 is unchanged by construction (labels
+never reach the classifier) but a fresh run is still owed per §1. Open risks,
+unmeasured: cross-view similarity on real far players (weak sims 0.3-0.6 in #82),
+lighting drift over a long match, same-gender teams with similar kit.
 
 **#80 SHIPPED: ball GROUND-CONTACT / OUT-of-court observer, display+diag, beside
 possession (#77-#79).** New always-on pure observer
@@ -1303,23 +1303,22 @@ point number in `docs/history/`.
     metres + abstain band; "hard to call" must read LOW. Parity rule
     applies to all layers.
 
-2.  **Side-change survival (player identity) — [UPDATE #81: E1 enrollment + E3
-    squad colours SHIPPED (labels P1A/P1B/P2A/P2B, squad-stable colours, actions
-    carry player_label; tracking byte-identical, gate ΔF1 0.000 on 7/7 entrenos).
-    E2 NEXT SESSION, owner-approved scope: identity-drift observer (sustained
-    signature mismatch vs enrolled reference) + side-switch observer (sustained
-    foot-side ≠ squad side) — display/diag only, OWNER GATE before acting. The
-    GT-pass blocker below still stands for VALIDATING drift/side switches on real
-    match footage.]** The roster machinery SURVIVED the full match: ids 1-4 only, 0 ghost/
-    recycled ids, swap-rate 0.00, team acc 97.9%, coverage 3.28/4,
-    dead-time persistence 3.05/4. BUT 46 resurrections and a visually
-    confirmed mid-rally identity hop (id2 woman→man, both in-court —
-    `output/match20260920/sheet_id3_cross_f1250-1350.png`; the in-court
-    preference cannot separate them) and 12 per-episode all-4 side-mapping
-    changes vs ~5 official switches. **Next:** GT pass on a few points
-    around an official switch to measure hop rate → then judge the
-    dead-time gallery horizon (18a lever) vs a stronger appearance
-    tie-breaker. Not blocked by 22 (tracks dump is ball-independent).
+2.  **Side-change survival (player identity) — status: BUILT, awaiting the
+    real-footage gate (#83).** Problem: labels mixed after side switches (#82's
+    resolver had no team constraint, position continuity locked swaps in, and
+    enrollment only ever saw squad 1 near / squad 2 far). #83 ships
+    `TeamIdentityResolver` (orientation CUSUM + within-side slots + per-video
+    calibrated evidence + learned second view), output labels only. Prior
+    roster facts stand (full match: ids 1-4 only, swap-rate 0.00, 46
+    resurrections, a mid-rally id hop f1250-1350 — the resolver is designed to
+    absorb hops, not prevent them). **Next:** owner runs
+    `scripts/probe_identity_switches.py <20260920 match> --contacts-gt
+    ground_truth/20260920_match_contacts.json`; pre-registered reading: PASS =
+    4/4 switch windows ok, 0 stray flips, orientation wrong at 0 GT contacts
+    outside the first ~5 s after a switch, team-resolver action squad errors <
+    legacy's, contact-sheet rows one person each. Then entreno A/B (§1) and
+    vall_dhebron only after its held-out lock is lifted. History:
+    `docs/history/status_where_we_are_archive.md` (#83 section).
 
 1.  **e1/e3 tracking baselines stale vs recorded numbers** (diagnosed
     08-18; pre-existing, NOT the serve-zone fix). Old-code dumps: e1 id
@@ -2134,7 +2133,11 @@ survive across sessions; provenance in the archives.
 
 - **Identity labels must converge, not be perfect (owner contract, #82).** P1A/P2A/P1B/P2B only have to land on the same person again within a few frames; a lost box, a momentary id swap or a stolen box is fine. The tracker swapped the two far teammates at f151 of the 20260920 match because `_may_feed_track`'s 90 f off-court hold expired for the on-sideline player (detection sim 0.956 to her own track) and Hungarian paired her id with the teammate's box; fixed for enrolled tracks, and a per-frame display-only resolver (`_resolve_identities`: smoothed appearance + last-seen-position continuity + sticky bonus, history wiped on a box jump) now makes labels follow the body. Far-player appearance is weak (sims ~0.3-0.6, near ~0.9) and an occluded far player gets ~0.5 on every reference, so expect brief None/flicker, not swaps.
 
+- **A side switch is invisible to positions — identity there is an appearance question, and the FIRST one is cross-view (#83).** 2 near + 2 far before and after, so only appearance can tell; enrollment sees squad 1 only from behind/large and squad 2 only from the front/small, so raw similarities are biased toward "nothing changed". Decompose identity into orientation (piecewise constant → change-point test over all four bodies) + one slot bit per side, and standardise every similarity on the video's OWN enrollment samples.
+- **Teammate-only impostor normalisation is fooled by mixed teams (#83, found while designing on the owner's stills).** If a man's only impostor is his female teammate, any other man scores a high z — including the other team's man after a switch. Normalise against ALL other players (both views) and add a same-view genuine FIT term (how typical for that player in that view), which collapses for the whole replaced pair at a switch with no view bias.
+
 ## Session index (one line each)
+- #83 **Side-switch-aware TEAM IDENTITY RESOLVER (output labels only; tracking identical)** — `src/tracking/identity_resolver.py` (orientation CUSUM + within-side slots + per-video calibrated z/fit evidence + learned second view); enrollment refs carry identity samples; `label_for(tid, frame)` labels actions at their contact frame; `player_identity_mode` + 3 CUSUM Config keys; `scripts/probe_identity_switches.py` (owner-run real-footage gate, scored against the match contact GT); tests +30 (synthetic switches), suite 1475; NOT yet run on real footage.
 - #82 **Identity labels follow the body (per-frame resolver), team-letter labels P1A/P2A/P1B/P2B, readable colours**
 - #81 **Player ENROLLMENT pre-pass (E1) + squad colours (E3) SHIPPED (display-only)**
   — `src/tracking/player_enrollment.py` builds 4 averaged-signature references from a
@@ -2284,6 +2287,18 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 
 ## Log (newest first)
 
+### 2026-10-05 (eighty-third session) — #83: TEAM IDENTITY RESOLVER — labels survive side switches by structure (orientation change-point + within-side slots), not by appearance alone
+
+**Asked (owner):** player tracking works until a side switch, then players mix and swap boxes; build a system that reliably re-attaches the same player id to the same player across switches (not every frame -- actions are ~10% of frames, a few wrong/blank frames are fine); generalise, do not overfit the one video; 5 stills shared (not committed). Plan approved (AskUserQuestion): the online team resolver first; a post-hoc pass only if online is not enough.
+
+**Diagnosed (code-reading; no footage in the cloud container):** the #82 resolver has (1) no team constraint (P1A near + P1B far possible), (2) self-reinforcing position continuity (`_label_pos` follows whichever body holds the label, +0.4 bonus vs weak far sims -> a swap never corrects), (3) enrollment only sees each squad from one view, so post-switch comparisons are cross-view and biased toward "no change", (4) `_adapt_reference` drifts references toward whoever holds the label (corruption after a wrong lock-in). Labels also feed the tracker's enrollment guards (`_enrollment_holds`), so changing them changes tracking.
+
+**Built:** `TeamIdentityResolver` (see Where we are) as a pure observer with its own label map; the #82 resolver keeps writing `_track_labels` for the guards -> tracking identical in both modes (pinned). Enrollment refs gained `identity_samples`/`identity_heights`. `PlayerTracker.update(..., frame_index=)`, `label_for(tid, frame=)` (contact-frame history, emission fallback), `identity_state()`. FrameProcessor passes frame_index and labels actions at `frame_number` (also fixes the end-of-video flush labelling actions with the FINAL tid->label map). Config: `player_identity_mode` "team", `_switch_threshold` 40, `_switch_drift` 0.5, `_min_switch_interval_frames` 900 (+ drift-guard rows). Design corrections found during the build: teammate-only impostors are fooled by mixed teams -> all-player impostors + same-view fit (Learnings); a held label survived a silent cross-net swap for 2-5 frames -> 30 f gap reset, quick-EMA hold break, 5 f claim delay, elimination only with a decided partner, instant doubt.
+
+**Measured (synthetic only):** stable rally 0 wrong; 3 consecutive switches with scrambled ids: flip 10-11 f after reappearance, 0 wrong labels (blank instead), all views learned; occlusion 0 flips; silent teammate swap 2 wrong frames then corrected; ~3 ms/frame at 640x360 with 4 bodies. Suite 1475 passed (+19 resolver, +7 probe, +4 drift rows); the 4 failed + 42 errors are the pre-existing missing-`output/` artifacts (identical set before/after).
+
+**Not done / owed:** real-footage run (owner: `scripts/probe_identity_switches.py`, pre-registered reading in open point 2); fresh entreno A/B (§1; action F1 unchanged by construction). E2 drift observers are subsumed by the resolver's doubt/flip diagnostics.
+
 ### 2026-10-05 (eighty-second session) — #82: labels renamed to team letters, readable colours, per-frame identity resolver, f151 teammate id-swap fixed
 
 **Asked (owner):** (1) first/second player of a team = P1A/P2A (team B = P1B/P2B); (2) the dark navy is unreadable on black; (3) players must stop swapping ids -- a pre-video pass over colours/features so a label sticks from start to end (only in-court bodies; full matches, not entreno; side switches every 7 points). Follow-up contract: a momentary loss/swap/steal is fine as long as the same id returns to the same person after some frames.
@@ -2364,102 +2379,3 @@ open point 1's rule ('compare A/B, never vs recorded') now covers e2 explicitly.
 seek (§9 — sequential decode); held-out untouched; GT-validated tracker machinery
 untouched by design; STATUS updated per the lean convention (#77 log entry moved
 verbatim to `docs/history/status_log_archive.md`).
-
-### 2026-10-04 (eightieth session) — #80: ball GROUND-CONTACT/OUT observer shipped (display+diag); batch-calibration wiring bug found+fixed; point-end rest invisible to the tracked-only contract (open point 31)
-
-**Asked (owner, m00001):** "a signal to know when the ball at play is on the ground or
-bounces out of the ground... we will need to pick the correct ball at play for this...
-add a label to the ball/s in livedebug". Owner derivation: ground homography
-H = K[r1 r2 t]; a resting ball's silhouette bottom lands on its contact point (0.2 px
-synthetic check); an airborne bbox-bottom maps BEYOND the true ground point (biased
-toward the horizon: 0.5 m up → 2.4 m, 1 m → 14.06 m vs true 6 m, 2 m → 183 m), so
-mapped-point-outside-court alone cannot mean OUT. Plan approved (m00045: "execute
-plan, both defaults look good"): pure observer reading the TRACKED ball only
-(predicted/lost frames HOLD state), always-on, no Config key, v1 display/diag only.
-
-**Shipped:** `src/analysis/ball_ground_contact.py` — `measure_box` maps the bbox
-bottom-center through the sign-normalized ground homography (H from
-`CourtCalibration.compute_ground_homography()`; SIGN-NORMALIZED because
-`cv2.findHomography` normalization is arbitrary and the owner's camera convention
-yields w<0 at valid on-court points — `_sign_normalized` evaluates w at the
-court-corner centroid and flips H when negative); groundedness ratio = bbox width /
-projected ground diameter (D = 0.67/π) at the mapped point; hysteresis AIR (ratio
-≥1.45 or degenerate) → GROUND (≤1.25 AND inside the court rect + OUT_MARGIN_M 0.25) /
-OUT (grounded outside; the band re-locates in/out — rolling ball); BOUNCE =
-image-vy sign flip (≥+2 → ≤−2 px/f, gap 1) gated ratio ≤1.35, armed by the fall, one
-shot per arming. Occlusion/blur inflate the ratio only → cannot fake GROUND. Wiring:
-`frame_result["ball_ground"]` in `process_frame` step 3d (after possession),
-`_record_diagnostics` + SCHEMA_VERSION 2→3, live-debug 8-tuple queue with a
-GROUND/OUT/AIR label at the ball (`overlay.draw_ball_ground`), per-candidate GND/AIR
-tags in the `b` overlay, panel `ground:` line, `_snapshot` carries it on held frames.
-NO Config key, NO `pipeline_output.json` key. Tests `tests/test_ball_ground_contact.py`
-(+55 with the `test_ball_side_possession.py` updates: schema pin 3, `_overlay_data`
-5-tuple) on a synthetic pinhole camera with sphere-silhouette bboxes: grounded ratio
-≈1 with ±0.15 m world recovery; a 1 m-up ball maps 16.5-60 m deep → AIR not OUT;
-OUT margin ±0.05/0.15 m straddles 16.25; hysteresis/bounce/hold/purity; wiring greps
-pin the INIT-time calibration wiring. Suite **1525**.
-
-**Probe found+fixed a latent wiring bug:** `FrameProcessor.__init__` loads
-`self.court_calibration` itself (`src/analysis/frame_processor.py:51`) and the batch
-path NEVER calls `set_court_calibration` — the possession observer's #77 hook never
-fired in batch, so possession ran on FALLBACK px bands (19/33) in every batch run
-since #77 (e3 probe v1: 672/672 `state: None`, diag `net_width_px: null`). Fix: both
-observers wired in `__init__` when the calibration exists; tests pin it. Probe v2
-(e3): possession near 348/far 303 (real crossings); dig ground-touch f453-455 with
-bounce f454; serve flight AIR.
-
-**GT validation (game_state video, 13 GT point windows, 8196 f):** IN-window 95.5%
-AIR (66.8 live / 28.7 held); BETWEEN-points 39.3% GROUND/OUT (29.6 ground + 9.7 out)
-with the AIR remainder = carried/held ball (honest) + mid-fall tracker losses; live
-GROUND/OUT within ≤2 s of 11/13 "point stops" (7 at ≤+13 f, P1/P4/P5/P10 at
-+41..+59 f, P3/P13 none — ball carried at once); 10 bounces: 5 in-rally (digs), 5
-dead-ball. e3 point-end: the tracker loses the final descent at f616 (vy +17.5
-falling) and the label holds AIR to the end while diag `ball_dets` shows the rolling
-ball (686,478)→(558,492) — the static-ball suppression removes resting balls BY
-DESIGN, so point-end rest is structurally invisible to the tracked-only contract →
-open point 31 (v1.5 raw-candidate extension, OWNER GATE).
-### 2026-10-04 (seventy-ninth session) — #79: possession labels RE-BALANCED on owner feedback ("too biased towards near"); FAR commits on PERSISTENT smallness, NEAR drops to 1.45×; e3 GT cross-check 12/14
-
-**Owner (m00499):** "now it's too biased towards near, on the match, f1428 and
-f1488 are both dig and set from the far side and still show near crossing".
-
-**Diagnosis (probe + data):** the far dig/set rally f1415-1500 oscillates
-15-26 px (0.66-1.14×d_net): clear frames 21-26, occluded 15-19 — the #78
-rolling MAX kept rescuing it into the band (evidence stuck at the f1415-18
-25-26 px), so the side held NEAR with crossing through the whole far rally.
-The two owner complaints are ASYMMETRIC phenomena: near occlusion = momentary
-smallness behind a big ball (sub-far frames per 12f window in the tape
-window: 0), far rallies = persistent smallness with flickering clear frames
-(4-7 sub-far frames per window).
-
-**Fix (`src/analysis/ball_side_possession.py`):** FAR commits on max ≤ far_px
-OR ≥ FAR_COMMIT_MIN_COUNT=4 of the last 12 measured frames ≤ far_px; NEAR
-stays max-only ≥ NEAR_FACTOR. NEAR_FACTOR 1.55→1.45: e3's GT near touches
-sustain only 1.49× (39-40 px) — 1.55 left them holding far (the same mirror
-bias on e3). Latent #78 off-by-one fixed: the evidence window kept 13
-entries, now exactly 12. Row gains `far_small_count`.
-
-**Verified:** suite 1493→**1496** (+3: far-rally oscillation, 3-sub-far
-flicker negative, count row; flap-back test updated — the count rule
-re-confirms far in 4 frames, crossings still 0). Probe A/B: match f1428 +
-f1488 = FAR (count fires exactly at the f1429 dig), tape f300-400 still 0
-far, f254 near intact, far rally 132 far frames; vall f1185 near+crossing,
-f1059-1280 0 far, 5/5 genuine far bounces commit; e3 vs GT touches: **12/14
-read the correct side** (f69 dig +5f flight latency; f332 dig flips at f375,
-before the f379 set) and ALL 6 side transitions (14/74/202/375/445/560)
-precede the next GT touch on the announced side.
-
-**STATUS:** lead, open point 9, factors, [#79 UPDATE], Learning, session
-index updated; #74 Log entry moved verbatim to
-`docs/history/status_log_archive.md`.
-
-### 2026-10-04 (seventy-eighth session) — #78: possession labels RECALIBRATED on owner feedback ("do the greatest of the sides" + "more calibrated towards near/crossing"); occlusion-dip far bias fixed and probe-verified on all three videos
-
-**Asked (owner, with frame windows):** on 20260920_match_ari_joan_lost f250-f345 and f378+ the ball stays NEAR (near player spikes into the net, ball dribbles at/near the net on the near side) but the labels said far/crossing; same on the full practice video at f1185 (near spike into net, ball stays near) — "Should be more calibrated towards near/crossing"; entreno "works better but still potentially a bit biased towards the same side"; and an occluded near-side ball measures less — "Do the greatest of the sides to get the ball side." vall_dhebron UNLOCKED for THIS display-band diagnosis only (the C1 held-out discipline is untouched).
-
-**Measured (new `scripts/probe_possession_feedback.py`: sequential decode, NO seeks; zoomed crops of the flagged frames):** width regimes are venue-consistent — near flight ≥1.55-1.6×d_net; net-plane rest/tape/mesh AND motion-blurred far flight BOTH ≈1.0-1.35×d_net (indistinguishable by width); far ground bounce 0.5-0.8×d_net. The #77 far_px = 1.15×d_net sat INSIDE the net-plane regime, so any occlusion dip committed far and stuck: match near commit f254 (w=37) → wrong far f302 (w=26), stuck to f400; vall near f1042-47 (w=41) → wrong far f1059 (w=29), stuck f1059-1280. Crops confirmed the ball clipped by tape/mesh (match f302/f355, vall f1159) or resting just past the net (f1185).
-
-**Fix (one recalibration of `src/analysis/ball_side_possession.py`, owner directive):** (a) ALL band decisions read the ROLLING MAX width over the last 12 measured frames (`EVIDENCE_WINDOW_FRAMES`; evidence ages out by frame index, so predicted stretches freeze it); (b) `FAR_FACTOR` 1.15→0.85 — only genuine far-ground/low-far evidence commits far, the overlap regime reads CROSSING/band and holds the last committed side; `NEAR_FACTOR` 1.55 unchanged; fallback 26→19 px. Documented trade (owner chose it): far commits land at deep-far/bounce moments and the opposite commit is delayed ≤12 f (the label shows CROSSING meanwhile).
-
-**Verified:** suite 1489→**1493** (+4: regime pins, occluded-near hold over the owner's match numbers, far-ground commit after evidence expiry, evidence row key). Probe A/B: match f250-345 far frames 100→**4** (only the pre-commit 250-253) and f378+ **0**; vall f1059-1280 **0** far (f1185 now near+crossing, crop confirmed); genuine far bounces still commit (vall 12/13/17/20 px); entreno_3 near-dominant with ONE far commit at f643 (the point-ending far landing).
-

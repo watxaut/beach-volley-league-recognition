@@ -139,6 +139,10 @@ class Config:
         "player_label_new_track_min_similarity": 0.55,  # stricter floor for labels claimed AFTER the bootstrap lock (a recycled track must clearly match its reference)
         "player_identity_resolver": True,       # per-frame display-only identity resolver: labels follow the body (appearance + continuity), not the tracker id, so an id swap never moves a label
         "player_identity_court_slack_px": 16.0, # a body only competes for a label when its foot is in court or within this many px of the line
+        "player_identity_mode": "team",          # OUTPUT label source: "team" = side-switch-aware TeamIdentityResolver (src/tracking/identity_resolver.py), "legacy" = the #82 per-frame resolver; tracking is identical either way
+        "player_identity_switch_threshold": 40.0,  # team resolver: CUSUM threshold (per-body standardised evidence x frames) to accept a side switch; ~1-3 s of clear evidence
+        "player_identity_switch_drift": 0.5,       # team resolver: per-frame evidence allowance subtracted before accumulating (guards against slow noise building up)
+        "player_identity_min_switch_interval_frames": 900,  # team resolver: min frames between two accepted side switches (~30 s; real switches are minutes apart)
 
         # Enhanced trajectory-based tracking settings
         "low_confidence_threshold": 0.4,  # Min confidence for the tracker to accept a detection

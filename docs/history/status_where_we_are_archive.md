@@ -2526,3 +2526,73 @@ ASYMMETRIC: NEAR commits on the rolling max(12 measured frames) ≥1.45×d_net
 (occlusion is momentary smallness), FAR on max ≤0.85×d_net OR ≥4 of the
 last 12 measured frames ≤0.85×d_net (far rallies FLICKER 0.66-1.14×d_net;
 persistent smallness is the far signature). Verified on the owner's windows
+
+## Archived 2026-10-05 (#83): header paragraph #81 + the #81 identity block of "Where we are", verbatim
+
+**Last updated:** 2026-10-05 (eighty-first session — **#81: player ENROLLMENT
+pre-pass (E1) + squad colours (E3) SHIPPED — stable P1A/P1B/P2A/P2B labels and
+team-blue/team-red boxes, display-only, tracking byte-identical.** New
+`src/tracking/player_enrollment.py`: sequential decode of the first 600 frames
+(detector every 5th, foot-strictly-in-court only — §9, no seeks), greedy ONE-TO-ONE
+chains (120 px gate + torso-HSV correl tie-break), fragment merge (gap ≤60 f, correl
+≥0.45), 4 most persistent chains (≥8 obs) → majority-side squads (near = squad 1),
+left→right slots A/B, averaged-signature references. `PlayerTracker.set_enrollment`
+attaches labels in-stream (greedy best-unclaimed ensemble similarity > 0.35, sticky
+per tid, survives gallery retire+restore, cleared on track death); every tracked player
+dict + every ACTION now carries `player_label`/`squad`/`slot`. Overlay: 4 squad colours
+(blue clear/dark, red clear/dark) follow the SQUAD not the side — stable through side
+switches; fallback = legacy green `P<tid>`. Wired into batch + BOTH live paths via
+`FrameProcessor.enroll_from_video` before the loops; 7 new `player_enrollment_*` Config
+keys, drift-guard extended. **Gate PASS:** fresh A/B on all 7 entrenos — action F1
+Δ = 0.000 on 7/7, tracker snapshot streams byte-identical, 56/56 actions labelled
+(e1: 4 refs from 294 samples/8 chains, labels by frame ~8 at sim 0.51–0.93). Suite
+**1549** (+24). e2's recorded 0.571 reads 0.400 on BOTH fresh arms — pre-existing
+fresh-run variance in the base, rule 'compare A/B, never vs recorded' extended to e2.
+Next: E2 identity-drift + side-switch observers (display/diag only, OWNER GATE);
+owner visual pass on live debug pending.)
+
+**#81 SHIPPED: player-enrollment pre-pass (E1) + squad colours (E3) — the first
+half of the owner's player-identity request (m00001, plan m00055/m00056).** Stable
+labels **P1A/P1B (near/squad 1) and P2A/P2B (far/squad 2)**, slots left→right at the
+earliest simultaneously-observed frame; **colours follow the SQUAD, not the current
+side** (blue clear/dark + red clear/dark), so a side switch cannot recolour a player.
+Mechanism (display-only by design — the GT-validated bootstrap/admission machinery is
+untouched, enrollment only supplies reference signatures + a tid→label map): sequential
+decode of the first 600 frames, player DETECTOR only every 5th frame, foot-strictly-
+in-court detections, greedy ONE-TO-ONE nearest-neighbour chaining (120 px gate +
+torso-HSV correl tie-break; each chain takes ≤1 obs per sampled frame so two players
+projecting close cannot feed one chain), occlusion-fragment merge (gap ≤60 f, endpoint
+≤120 px, cross-corr ≥0.45), the 4 most persistent chains (≥8 obs) become averaged-
+signature references; <4 chains or no 2+2 near/far split → no enrollment, legacy green
+`P<tid>` fallback. In-stream: labels attach greedily (best unclaimed ref, ensemble
+similarity > `player_label_min_similarity` = 0.35), sticky per tid, survive
+retire-to-gallery + restore (same tid → same label → same colour, the owner's core
+ask). Every tracked-player dict and every ACTION carries `player_label`/`squad`/
+`slot`; `pipeline_output.json` actions gained `player_label` (additive; snapshots
+unchanged). **Validation:** fresh A/B both arms, all 7 entrenos — action F1 Δ=0.000
+on 7/7, tracker snapshot streams (tid→frame/bbox) byte-identical, 56/56 actions
+labelled; suite **1549** (+17 enrollment, +7 squad-colour tests). **E2 is next
+session, owner-approved:** identity-drift observer (sustained signature mismatch vs
+the enrolled reference) + side-switch observer (sustained foot-side ≠ squad side),
+display/diag only, owner gate before anything acts. Owner visual pass on live debug
+(squad colours + labels) pending. The serves track below remains the standing record.
+
+Open point 2 as it stood before the #83 rewrite, verbatim:
+
+2.  **Side-change survival (player identity) — [UPDATE #81: E1 enrollment + E3
+    squad colours SHIPPED (labels P1A/P1B/P2A/P2B, squad-stable colours, actions
+    carry player_label; tracking byte-identical, gate ΔF1 0.000 on 7/7 entrenos).
+    E2 NEXT SESSION, owner-approved scope: identity-drift observer (sustained
+    signature mismatch vs enrolled reference) + side-switch observer (sustained
+    foot-side ≠ squad side) — display/diag only, OWNER GATE before acting. The
+    GT-pass blocker below still stands for VALIDATING drift/side switches on real
+    match footage.]** The roster machinery SURVIVED the full match: ids 1-4 only, 0 ghost/
+    recycled ids, swap-rate 0.00, team acc 97.9%, coverage 3.28/4,
+    dead-time persistence 3.05/4. BUT 46 resurrections and a visually
+    confirmed mid-rally identity hop (id2 woman→man, both in-court —
+    `output/match20260920/sheet_id3_cross_f1250-1350.png`; the in-court
+    preference cannot separate them) and 12 per-episode all-4 side-mapping
+    changes vs ~5 official switches. **Next:** GT pass on a few points
+    around an official switch to measure hop rate → then judge the
+    dead-time gallery horizon (18a lever) vs a stronger appearance
+    tie-breaker. Not blocked by 22 (tracks dump is ball-independent).

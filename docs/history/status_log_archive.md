@@ -4152,3 +4152,101 @@ pipeline output).
 
 **Discipline:** one mechanism; no GT edit; no seek (§9); held-out untouched; no Config key added (no config-drift surface); STATUS updated per the lean convention (72nd Log entry moved verbatim to `docs/history/status_log_archive.md`).
 
+### 2026-10-04 (seventy-eighth session) — #78: possession labels RECALIBRATED on owner feedback ("do the greatest of the sides" + "more calibrated towards near/crossing"); occlusion-dip far bias fixed and probe-verified on all three videos
+
+**Asked (owner, with frame windows):** on 20260920_match_ari_joan_lost f250-f345 and f378+ the ball stays NEAR (near player spikes into the net, ball dribbles at/near the net on the near side) but the labels said far/crossing; same on the full practice video at f1185 (near spike into net, ball stays near) — "Should be more calibrated towards near/crossing"; entreno "works better but still potentially a bit biased towards the same side"; and an occluded near-side ball measures less — "Do the greatest of the sides to get the ball side." vall_dhebron UNLOCKED for THIS display-band diagnosis only (the C1 held-out discipline is untouched).
+
+**Measured (new `scripts/probe_possession_feedback.py`: sequential decode, NO seeks; zoomed crops of the flagged frames):** width regimes are venue-consistent — near flight ≥1.55-1.6×d_net; net-plane rest/tape/mesh AND motion-blurred far flight BOTH ≈1.0-1.35×d_net (indistinguishable by width); far ground bounce 0.5-0.8×d_net. The #77 far_px = 1.15×d_net sat INSIDE the net-plane regime, so any occlusion dip committed far and stuck: match near commit f254 (w=37) → wrong far f302 (w=26), stuck to f400; vall near f1042-47 (w=41) → wrong far f1059 (w=29), stuck f1059-1280. Crops confirmed the ball clipped by tape/mesh (match f302/f355, vall f1159) or resting just past the net (f1185).
+
+**Fix (one recalibration of `src/analysis/ball_side_possession.py`, owner directive):** (a) ALL band decisions read the ROLLING MAX width over the last 12 measured frames (`EVIDENCE_WINDOW_FRAMES`; evidence ages out by frame index, so predicted stretches freeze it); (b) `FAR_FACTOR` 1.15→0.85 — only genuine far-ground/low-far evidence commits far, the overlap regime reads CROSSING/band and holds the last committed side; `NEAR_FACTOR` 1.55 unchanged; fallback 26→19 px. Documented trade (owner chose it): far commits land at deep-far/bounce moments and the opposite commit is delayed ≤12 f (the label shows CROSSING meanwhile).
+
+**Verified:** suite 1489→**1493** (+4: regime pins, occluded-near hold over the owner's match numbers, far-ground commit after evidence expiry, evidence row key). Probe A/B: match f250-345 far frames 100→**4** (only the pre-commit 250-253) and f378+ **0**; vall f1059-1280 **0** far (f1185 now near+crossing, crop confirmed); genuine far bounces still commit (vall 12/13/17/20 px); entreno_3 near-dominant with ONE far commit at f643 (the point-ending far landing).
+
+### 2026-10-04 (seventy-ninth session) — #79: possession labels RE-BALANCED on owner feedback ("too biased towards near"); FAR commits on PERSISTENT smallness, NEAR drops to 1.45×; e3 GT cross-check 12/14
+
+**Owner (m00499):** "now it's too biased towards near, on the match, f1428 and
+f1488 are both dig and set from the far side and still show near crossing".
+
+**Diagnosis (probe + data):** the far dig/set rally f1415-1500 oscillates
+15-26 px (0.66-1.14×d_net): clear frames 21-26, occluded 15-19 — the #78
+rolling MAX kept rescuing it into the band (evidence stuck at the f1415-18
+25-26 px), so the side held NEAR with crossing through the whole far rally.
+The two owner complaints are ASYMMETRIC phenomena: near occlusion = momentary
+smallness behind a big ball (sub-far frames per 12f window in the tape
+window: 0), far rallies = persistent smallness with flickering clear frames
+(4-7 sub-far frames per window).
+
+**Fix (`src/analysis/ball_side_possession.py`):** FAR commits on max ≤ far_px
+OR ≥ FAR_COMMIT_MIN_COUNT=4 of the last 12 measured frames ≤ far_px; NEAR
+stays max-only ≥ NEAR_FACTOR. NEAR_FACTOR 1.55→1.45: e3's GT near touches
+sustain only 1.49× (39-40 px) — 1.55 left them holding far (the same mirror
+bias on e3). Latent #78 off-by-one fixed: the evidence window kept 13
+entries, now exactly 12. Row gains `far_small_count`.
+
+**Verified:** suite 1493→**1496** (+3: far-rally oscillation, 3-sub-far
+flicker negative, count row; flap-back test updated — the count rule
+re-confirms far in 4 frames, crossings still 0). Probe A/B: match f1428 +
+f1488 = FAR (count fires exactly at the f1429 dig), tape f300-400 still 0
+far, f254 near intact, far rally 132 far frames; vall f1185 near+crossing,
+f1059-1280 0 far, 5/5 genuine far bounces commit; e3 vs GT touches: **12/14
+read the correct side** (f69 dig +5f flight latency; f332 dig flips at f375,
+before the f379 set) and ALL 6 side transitions (14/74/202/375/445/560)
+precede the next GT touch on the announced side.
+
+**STATUS:** lead, open point 9, factors, [#79 UPDATE], Learning, session
+index updated; #74 Log entry moved verbatim to
+`docs/history/status_log_archive.md`.
+
+### 2026-10-04 (eightieth session) — #80: ball GROUND-CONTACT/OUT observer shipped (display+diag); batch-calibration wiring bug found+fixed; point-end rest invisible to the tracked-only contract (open point 31)
+
+**Asked (owner, m00001):** "a signal to know when the ball at play is on the ground or
+bounces out of the ground... we will need to pick the correct ball at play for this...
+add a label to the ball/s in livedebug". Owner derivation: ground homography
+H = K[r1 r2 t]; a resting ball's silhouette bottom lands on its contact point (0.2 px
+synthetic check); an airborne bbox-bottom maps BEYOND the true ground point (biased
+toward the horizon: 0.5 m up → 2.4 m, 1 m → 14.06 m vs true 6 m, 2 m → 183 m), so
+mapped-point-outside-court alone cannot mean OUT. Plan approved (m00045: "execute
+plan, both defaults look good"): pure observer reading the TRACKED ball only
+(predicted/lost frames HOLD state), always-on, no Config key, v1 display/diag only.
+
+**Shipped:** `src/analysis/ball_ground_contact.py` — `measure_box` maps the bbox
+bottom-center through the sign-normalized ground homography (H from
+`CourtCalibration.compute_ground_homography()`; SIGN-NORMALIZED because
+`cv2.findHomography` normalization is arbitrary and the owner's camera convention
+yields w<0 at valid on-court points — `_sign_normalized` evaluates w at the
+court-corner centroid and flips H when negative); groundedness ratio = bbox width /
+projected ground diameter (D = 0.67/π) at the mapped point; hysteresis AIR (ratio
+≥1.45 or degenerate) → GROUND (≤1.25 AND inside the court rect + OUT_MARGIN_M 0.25) /
+OUT (grounded outside; the band re-locates in/out — rolling ball); BOUNCE =
+image-vy sign flip (≥+2 → ≤−2 px/f, gap 1) gated ratio ≤1.35, armed by the fall, one
+shot per arming. Occlusion/blur inflate the ratio only → cannot fake GROUND. Wiring:
+`frame_result["ball_ground"]` in `process_frame` step 3d (after possession),
+`_record_diagnostics` + SCHEMA_VERSION 2→3, live-debug 8-tuple queue with a
+GROUND/OUT/AIR label at the ball (`overlay.draw_ball_ground`), per-candidate GND/AIR
+tags in the `b` overlay, panel `ground:` line, `_snapshot` carries it on held frames.
+NO Config key, NO `pipeline_output.json` key. Tests `tests/test_ball_ground_contact.py`
+(+55 with the `test_ball_side_possession.py` updates: schema pin 3, `_overlay_data`
+5-tuple) on a synthetic pinhole camera with sphere-silhouette bboxes: grounded ratio
+≈1 with ±0.15 m world recovery; a 1 m-up ball maps 16.5-60 m deep → AIR not OUT;
+OUT margin ±0.05/0.15 m straddles 16.25; hysteresis/bounce/hold/purity; wiring greps
+pin the INIT-time calibration wiring. Suite **1525**.
+
+**Probe found+fixed a latent wiring bug:** `FrameProcessor.__init__` loads
+`self.court_calibration` itself (`src/analysis/frame_processor.py:51`) and the batch
+path NEVER calls `set_court_calibration` — the possession observer's #77 hook never
+fired in batch, so possession ran on FALLBACK px bands (19/33) in every batch run
+since #77 (e3 probe v1: 672/672 `state: None`, diag `net_width_px: null`). Fix: both
+observers wired in `__init__` when the calibration exists; tests pin it. Probe v2
+(e3): possession near 348/far 303 (real crossings); dig ground-touch f453-455 with
+bounce f454; serve flight AIR.
+
+**GT validation (game_state video, 13 GT point windows, 8196 f):** IN-window 95.5%
+AIR (66.8 live / 28.7 held); BETWEEN-points 39.3% GROUND/OUT (29.6 ground + 9.7 out)
+with the AIR remainder = carried/held ball (honest) + mid-fall tracker losses; live
+GROUND/OUT within ≤2 s of 11/13 "point stops" (7 at ≤+13 f, P1/P4/P5/P10 at
++41..+59 f, P3/P13 none — ball carried at once); 10 bounces: 5 in-rally (digs), 5
+dead-ball. e3 point-end: the tracker loses the final descent at f616 (vy +17.5
+falling) and the label holds AIR to the end while diag `ball_dets` shows the rolling
+ball (686,478)→(558,492) — the static-ball suppression removes resting balls BY
+DESIGN, so point-end rest is structurally invisible to the tracked-only contract →
+open point 31 (v1.5 raw-candidate extension, OWNER GATE).

@@ -158,10 +158,12 @@ realities, not tuning opportunities:
   person within a few frames. A momentary lost box, a brief tracker-id swap or a
   stolen box is acceptable; what matters is that actions end up attributed to the
   same people most of the time. Do NOT harden tracker association to prevent every
-  swap -- the display-only identity resolver
-  (`PlayerTracker._resolve_identities`, `player_identity_resolver`) re-derives the
-  label per frame from enrollment appearance + continuity, so labels follow the
-  body, not the track id. Label text = player number + TEAM letter (squad 1 = A,
+  swap -- the output-only `TeamIdentityResolver` (`src/tracking/identity_resolver.py`,
+  `player_identity_mode: "team"`, #83) re-derives the label per frame from the
+  team structure (which squad is near = a change-point test; who is who within a
+  side) and per-video calibrated appearance, so labels follow the body and survive
+  side switches. It must stay a pure observer: the tracker's enrollment guards
+  read the #82 resolver's `_track_labels`, never the team resolver's labels. Label text = player number + TEAM letter (squad 1 = A,
   squad 2 = B); colours are keyed on (squad, slot) and must stay readable on the
   black label plate (contrast test).
 
@@ -225,9 +227,11 @@ The cross-session plan for consistent 4-player IDs:
   signature), plus the later GT-validated mechanisms — bystander guard +
   serve-zone admission + seed-dedup (08-16), server vote + trial expiry +
   contested swap (08-18), off-court hold horizon =90f (08-29).
-- Status: side-change validation still BLOCKED — no set-to-21 footage;
-  Phase 2 (global stitch) sketched, unbuilt; `annotate_player_gt.py` ready
-  for when footage arrives.
+- Status: side switches handled by the team identity resolver (#83, output
+  labels only), validated on synthetic switches; the real-footage gate is
+  `scripts/probe_identity_switches.py` on the 20260920 match (4 switches,
+  every GT contact carries its squad). Phase 2 (global stitch / post-hoc
+  relabel) is the owner-approved fallback if online is not enough.
 
 ### 5. Attribution signals — long-axis camera
 
