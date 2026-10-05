@@ -1,0 +1,60 @@
+src/analysis/frame_processor.py
+  s_570eaa9c456bdd::t_42703159172ce7 204-210,317-318
+tests/test_overlay_squad_colors.py
+  s_570eaa9c456bdd::t_5b6b71a2c3277a 78-98
+  s_9ed08fada71d0a::t_d85f5499e7a7f0 42,46-61
+tests/test_player_enrollment.py
+  s_570eaa9c456bdd::t_2d5c543cf3d6d1 184-189,230-233,235-236
+  s_570eaa9c456bdd::t_0331bf3e2eb910 177,455-508,512-515,517-525,527-535,537-622,628,630-659
+  s_570eaa9c456bdd::t_26e33970007a56 509-511,516,526,536
+  s_570eaa9c456bdd::t_994209d8893b2c 623-627,629
+  s_570eaa9c456bdd::t_76bd6801f33343 143,146
+  s_570eaa9c456bdd::t_6983e77737874c 174-176
+  s_570eaa9c456bdd::t_cd114c8ec25d69 660-662
+  s_9ed08fada71d0a::t_0c070302057031 181-182,663-774
+src/tracking/player_tracker.py
+  s_570eaa9c456bdd::t_a40e740baa8455 75-77,249-262,378-381,413-425,604,649,695,737,909-916,940-941,955-956,967,1065-1066,1166,1188-1195,1252-1257,1682-1683,1692-1693,1778-1780,1790-1828,1868-1870,1875-1884
+  s_9ed08fada71d0a::t_a78a0e89c5fa6a 1893-1898,1924-1929,1941-2095,2118-2120
+src/detection/court_calibration.py
+  s_570eaa9c456bdd::t_fe0a6744f99a05 701-716
+tests/test_config_drift.py
+  s_570eaa9c456bdd::t_35f5a6e4383a75 135-137,145-146
+src/utils/config.py
+  s_570eaa9c456bdd::t_0acfe26167355a 136-137,139
+  s_570eaa9c456bdd::t_fac36b60d5e9e8 140-141
+src/tracking/player_enrollment.py
+  s_570eaa9c456bdd::t_73508bf3eee79d 122-123,135-143,179-187,249-254,258-270,272
+  s_570eaa9c456bdd::t_9de9b6cd7285c4 445-454
+  s_9ed08fada71d0a::t_86cafc28148a54 483-485
+src/output_gen/overlay.py
+  s_570eaa9c456bdd::t_51f5245df2742e 291-299,304-305
+  s_9ed08fada71d0a::t_e5780921983e87 230-234,236-239
+AGENTS.md
+  s_9ed08fada71d0a::t_f481eaf41a8589 156-167
+STATUS.md
+  s_9ed08fada71d0a::t_34c782e3a91c3f 2135-2136,2138,2287-2296
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "063d920301f4c86000756f4753204a23defd812e",
+  "prompts": {},
+  "sessions": {
+    "s_570eaa9c456bdd": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a108b2-99f2-72e9-b5b4-5f8fdbd98ef5",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    },
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
