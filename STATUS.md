@@ -17,24 +17,27 @@
 >   technical facts go into **Learnings** (one line each, provenance in the
 >   archives).
 
-**Last updated:** 2026-10-05 (eighty-third session — **#83: side-switch-aware
-TEAM IDENTITY RESOLVER shipped (output labels only; tracking byte-identical by
-construction).** New `src/tracking/identity_resolver.py` (`TeamIdentityResolver`)
-re-derives P1A/P2A/P1B/P2B every frame from the structural fact that teammates
-share a side: (1) ORIENTATION (which squad is near) by a one-sided CUSUM over
-per-body evidence with a 900 f minimum dwell, labels withheld while in doubt;
-(2) within-side slots by per-tracklet evidence EMA + hysteresis + elimination.
-Evidence = impostor-normalised DISCRIMINATION + same-view FIT, both calibrated on
-the video's own enrollment samples (no venue/kit constant); background-weighted,
-resolution-normalised part histograms (H x S + achromatic V) + lateral-scale
-height; each player LEARNS the view it was not enrolled in after a confident flip
-(anchors never replaced). The #82 resolver keeps running only to feed the
-tracker's enrollment guards. Synthetic validation (drawn near/back vs far/front
-players, scrambled ids): switches flip in ~10 frames with ZERO wrong labels, 3
-consecutive switches, no flip through occlusion, silent teammate swap fixed in
-≤4 f. NOT yet run on real footage (no video in the cloud session) — owner runs
-`scripts/probe_identity_switches.py` on the 20260920 match next. Suite **1475**
-(+30). Config `player_identity_mode` ("team"/"legacy") + 3 CUSUM keys.)
+**Last updated:** 2026-10-05 (eighty-fourth session — **#84: the team identity
+resolver's FIRST REAL RUN (owner, 20260920 match) measured, diagnosed and the
+orientation layer REDESIGNED.** Measured (`scripts/probe_identity_switches.py`,
+26 061 f): **18 flips for 4 real switches** (3/4 windows right, P7 masked by a
+stray flip just before it, 15 stray flips, dwell-limited every ~900-1500 f);
+orientation at GT contacts 127/211 ok, 21 wrong, 63 withheld; action squad
+team 71 ok / 28 wrong / 60 unlabeled vs legacy 83 / 71 / 5 (159 matched).
+Owner's contact sheets: within-side labels right whenever the orientation was
+right — every error sits in a wrong-orientation stretch, swapped whole-team.
+Causes: the FIT term was 0 for views without native stats but negative for
+the current hypothesis (a standing bias toward flipping), learned prototypes
+fed back into the orientation (corrupted by wrong-orientation learning), and
+the dwell clamp fired the moment the dwell expired. Redesign: orientation =
+per-side, baseline-relative, directional CUSUM on FIXED anchors, both sides
+required; within-side = always label (hysteresis + quick swap override scaled
+by the video's teammate-margin spread, occluded/merged crops ignored);
+learning feeds the within-side models only. New: feature dump
+(`identity_features.npz`) + `scripts/replay_identity.py` so the decision layer
+is re-tuned OFFLINE from one owner run. Synthetic: 3 switches, 0 wrong labels
+outside teammate crossings. Suite **1477**. Next: owner re-runs the probe and
+shares the dump.)
 Prior sessions this file: #73's overlay paragraph below; #72's reach-cascade refutation below that (also in `docs/g3_reach_cascade.md`).
 An offline replay of the unmodified `ActionContextResolver` over the 185 accepted rows PLUS every `reason="reach"` rejection within a scalar factor K (the gate re-scores offline) scores, against the 182 in-region GT events at ±15 f: BASE 78/139 = 0.561 label, 90/139 touch; **K=1.1 +4 found → +1 label; K=1.2 +14 found (all 14 within ±15 f of a GT contact, the precision-clean gate) → −4 LABELS; K=1.3 +21 → −5; K=1.5 +28 → −1; K=2.0 +48 → +1 at rate 0.513 vs 0.561.** Admitting ALL 71 reach rows repairs only **9 of 49** wrong touch numbers (40 still wrong), because the count is driven by the resolver's own resets, not by recall — so the recall → count → label chain is real about the ERROR POPULATION but **earning the recall does not earn the count**. The architect's own "~0.00 class accuracy" caveat is CONFIRMED and slightly optimistic: the honest expectation is negative. **The 44 missed contacts stay a RECALL story (contact P/R, per-point completeness), NOT the path to 0.70 class accuracy — do not spend a GPU A/B on them while the goal is the class metric.** The label bucket's two count routes are now BOTH measured and closed (re-derive: TC1 +0.050; earn-by-recall: #72 negative), leaving **39 of 55 wrong labels with a wrong count and 16 with a CORRECT count** (the residual Layer-1/2 rule errors open point 9 already names).
 **Seventy-third session (2026-10-03): a display-only live-debug overlay LANDED** — every ball the DETECTOR saw this frame drawn as a hollow box with its confidence and the detector's own verdict (`sus` stationary-suspect / `rm` dropped by static suppression), toggle `b`, default ON; reads only the sanctioned `BallDetector.raw_detections` side channel, no new Config key, processing path untouched; tests +9, suite **1336**. Its session's own commit claim (`8040f04`) was FALSE — the commit never existed (reflog clean after `ad1dc03`); committed after coordinator verification. With the toggle ON the saved `--debug-live` video now carries the candidate boxes too (still unpanelled).
@@ -230,34 +233,46 @@ placement, per-video splits); remaining adds = serve/assist/error stats
 
 ## Where we are
 
-**#83 SHIPPED: TEAM IDENTITY RESOLVER — the owner's side-switch request (labels
-must find the same person again after a switch; a few wrong/blank frames are
-acceptable, actions are ~10% of frames).** Identity stack today, all output-only
-(no tracking decision reads it): E1 enrollment pre-pass (#81) → 4 references,
-now also carrying per-sample identity descriptors + heights → `TeamIdentityResolver`
-(#83, `player_identity_mode: "team"`, default) stamps `player_label`/`squad`/`slot`
-on tracked players and actions; actions take the label at their CONTACT frame
-(`label_for(tid, frame)`, 900 f history), falling back to the emission-time label.
-The #82 per-frame resolver still runs and still writes `_track_labels`, which ONLY
-the tracker's enrollment guards read — so tracking is identical in "team" and
-"legacy" modes (unit-pinned). Mechanism: orientation CUSUM (threshold 40, drift
-0.5, min dwell 900 f; doubt at 25% of the threshold or one frame with mean swap
-advantage ≥3 over ≥2 bodies → labels blank, never wrong); within-side slots by
-EMA evidence (+1 hold bonus, −1 hold floor, quick-EMA hold break for overlap
-swaps, 5-frame claim delay, elimination only with a decided partner); evidence
-`e = z + f` (z = vs all other players' samples in both views, f = vs the player's
-own same-view samples, capped +1); learning only when settled, isolated
-(IoU < 0.05), in court, pair margin ≥2. Eligible bodies = in court (+16 px
-slack) or in a serve zone (the server). **Validation status:** synthetic only —
-the real-footage gate is the owner's run of `scripts/probe_identity_switches.py`
-(one sequential production pass, team vs legacy labels side by side, contact
-sheets rows = P1A..P2B, and with `--contacts-gt
-ground_truth/20260920_match_contacts.json`: orientation at all 184 GT contacts,
-one flip per GT switch window after P7/P14/P21/P28, action-label squad accuracy
-team vs legacy). Entreno A/B for action F1 is unchanged by construction (labels
-never reach the classifier) but a fresh run is still owed per §1. Open risks,
-unmeasured: cross-view similarity on real far players (weak sims 0.3-0.6 in #82),
-lighting drift over a long match, same-gender teams with similar kit.
+**#84: TEAM IDENTITY RESOLVER, round 2 — first real run measured, orientation
+redesigned (the owner's side-switch request: labels must find the same person
+after a switch; a few wrong/blank frames are fine, actions are ~10% of frames).**
+Identity stack, all output-only (no tracking decision reads it): E1 enrollment
+(#81, refs carry per-sample identity descriptors + heights) →
+`TeamIdentityResolver` (`player_identity_mode: "team"`, default) stamps
+`player_label`/`squad`/`slot` on tracked players and actions (actions at their
+CONTACT frame via `label_for(tid, frame)`, emission-time fallback). The #82
+resolver still writes `_track_labels`, read ONLY by the tracker's enrollment
+guards → tracking identical in "team"/"legacy" (unit-pinned).
+
+**First real run (#83 design, 20260920 match, owner):** 18 flips for 4 switches
+(P14/P21/P28 windows right; P7 masked by a stray flip at f3743; 15 stray flips
+in both orientations, spaced by the 900 f dwell); orientation at GT contacts
+127/211 ok, 21 wrong, 63 withheld; action squad 71/28/60 (ok/wrong/unlabeled)
+vs legacy 83/71/5. Contact sheets: every error is a whole-team swap inside a
+wrong-orientation stretch; within-side labels right otherwise. Diagnosed:
+(1) FIT term 0 for views without native stats vs negative for the current
+hypothesis → standing bias to flip; (2) prototypes learned under a wrong
+orientation fed back into the orientation statistic; (3) the dwell clamp held
+the CUSUM at threshold and fired on dwell expiry.
+
+**#84 design:** orientation statistic per side `x = best squad-1 − best squad-2
+similarity` on FIXED anchors only; per-orientation per-side levels learned
+online (warm-up 100 obs, EMA α 0.002 while in the noise band); directional
+standardised CUSUM per side (drift 0.5, threshold 25, both sides required,
+min dwell 1500 f); a new orientation's baseline is reused if seen before, else
+seeded from the post-change run (u ≥ 1); doubt (labels withheld) at half the
+threshold on both sides or one frame at the clip on both. Within side: slow +
+quick EMAs of similarity to each player (anchors + view-learned prototypes +
+height), better permutation with hysteresis 0.5 and quick override 1.0 per
+clean body, both in units of the video's RMS teammate margin; occluded/merged
+crops ignored, merged same-side pairs withheld; stranger = best similarity 4
+spreads below usual. Learning only while settled; never read by orientation.
+**Validation status:** synthetic only for #84; the real-footage gate is the
+owner re-running `scripts/probe_identity_switches.py ... --contacts-gt
+ground_truth/20260920_match_contacts.json` (now also writes
+`identity_features.npz`), after which `scripts/replay_identity.py` re-scores /
+re-tunes OFFLINE. Entreno A/B owed per §1 (action F1 unchanged by
+construction).
 
 **#80 SHIPPED: ball GROUND-CONTACT / OUT-of-court observer, display+diag, beside
 possession (#77-#79).** New always-on pure observer
@@ -1303,22 +1318,20 @@ point number in `docs/history/`.
     metres + abstain band; "hard to call" must read LOW. Parity rule
     applies to all layers.
 
-2.  **Side-change survival (player identity) — status: BUILT, awaiting the
-    real-footage gate (#83).** Problem: labels mixed after side switches (#82's
-    resolver had no team constraint, position continuity locked swaps in, and
-    enrollment only ever saw squad 1 near / squad 2 far). #83 ships
-    `TeamIdentityResolver` (orientation CUSUM + within-side slots + per-video
-    calibrated evidence + learned second view), output labels only. Prior
-    roster facts stand (full match: ids 1-4 only, swap-rate 0.00, 46
-    resurrections, a mid-rally id hop f1250-1350 — the resolver is designed to
-    absorb hops, not prevent them). **Next:** owner runs
-    `scripts/probe_identity_switches.py <20260920 match> --contacts-gt
-    ground_truth/20260920_match_contacts.json`; pre-registered reading: PASS =
-    4/4 switch windows ok, 0 stray flips, orientation wrong at 0 GT contacts
-    outside the first ~5 s after a switch, team-resolver action squad errors <
-    legacy's, contact-sheet rows one person each. Then entreno A/B (§1) and
-    vall_dhebron only after its held-out lock is lifted. History:
-    `docs/history/status_where_we_are_archive.md` (#83 section).
+2.  **Side-change survival (player identity) — status: round 2 BUILT (#84),
+    awaiting the owner's re-run.** #83's first real run: 18 flips for 4
+    switches, orientation wrong/withheld at 84 of 211 GT contacts, action
+    squad 71 ok / 28 wrong / 60 unlabeled (legacy 83 / 71 / 5); within-side
+    labels right whenever the orientation was. #84 redesigns the orientation
+    (baseline-relative per-side CUSUM on fixed anchors, both sides) and the
+    within-side step (always label). **Next:** owner re-runs the probe (same
+    command; it now writes `identity_features.npz`) and shares the dump +
+    `identity_probe.json`; tuning then happens offline with
+    `scripts/replay_identity.py`. PASS reading unchanged: 4/4 switch windows, 0
+    stray flips, orientation wrong at 0 GT contacts outside ~5 s after a
+    switch, team-resolver squad errors < legacy's, contact-sheet rows one
+    person each. History: `docs/history/status_where_we_are_archive.md` (#83,
+    #84 sections).
 
 1.  **e1/e3 tracking baselines stale vs recorded numbers** (diagnosed
     08-18; pre-existing, NOT the serve-zone fix). Old-code dumps: e1 id
@@ -2135,8 +2148,10 @@ survive across sessions; provenance in the archives.
 
 - **A side switch is invisible to positions — identity there is an appearance question, and the FIRST one is cross-view (#83).** 2 near + 2 far before and after, so only appearance can tell; enrollment sees squad 1 only from behind/large and squad 2 only from the front/small, so raw similarities are biased toward "nothing changed". Decompose identity into orientation (piecewise constant → change-point test over all four bodies) + one slot bit per side, and standardise every similarity on the video's OWN enrollment samples.
 - **Teammate-only impostor normalisation is fooled by mixed teams (#83, found while designing on the owner's stills).** If a man's only impostor is his female teammate, any other man scores a high z — including the other team's man after a switch. Normalise against ALL other players (both views) and add a same-view genuine FIT term (how typical for that player in that view), which collapses for the whole replaced pair at a switch with no view bias.
+- **Never decide the side-switch orientation by comparing hypotheses in absolute terms (#84, measured on the 20260920 match).** Any term that is informative for one hypothesis and neutral for the other (#83's FIT: 0 without native view stats, negative for the current one) is a standing bias; the first real run flipped 18 times for 4 switches, in both orientations. Test for a SHIFT of a fixed-model statistic relative to each side's own learned baseline, require both sides, and keep learned prototypes out of that statistic.
 
 ## Session index (one line each)
+- #84 **Identity round 2: first real run measured (18 flips / 4 switches, squad errors 28 vs legacy 71 but 60 unlabeled) → orientation redesigned (baseline-relative per-side CUSUM on fixed anchors, both sides), within-side always labels; feature dump + `scripts/replay_identity.py` for offline tuning; suite 1477**
 - #83 **Side-switch-aware TEAM IDENTITY RESOLVER (output labels only; tracking identical)** — `src/tracking/identity_resolver.py` (orientation CUSUM + within-side slots + per-video calibrated z/fit evidence + learned second view); enrollment refs carry identity samples; `label_for(tid, frame)` labels actions at their contact frame; `player_identity_mode` + 3 CUSUM Config keys; `scripts/probe_identity_switches.py` (owner-run real-footage gate, scored against the match contact GT); tests +30 (synthetic switches), suite 1475; NOT yet run on real footage.
 - #82 **Identity labels follow the body (per-frame resolver), team-letter labels P1A/P2A/P1B/P2B, readable colours**
 - #81 **Player ENROLLMENT pre-pass (E1) + squad colours (E3) SHIPPED (display-only)**
@@ -2287,6 +2302,18 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 
 ## Log (newest first)
 
+### 2026-10-05 (eighty-fourth session) — #84: identity resolver round 2 — the first real run diagnosed (18 flips for 4 switches) and the orientation layer redesigned
+
+**Asked (owner):** ran `scripts/probe_identity_switches.py` on the 20260920 match and shared the log, the report and 3 contact sheets: sheet 02 all right; sheet 00 right except 0:59B/1:19B (P1A also missing some); sheet 01 swaps around 11:19/12:19/13:19.
+
+**Measured (owner run, #83 design):** flips at f1163, 2292, 3743, 5855, 7052, 9488, 11000, 12001, 12901, 13801, 15544, 17054, 18214, 19938, 20840, 21740, 22820, 23720 (GT switch windows: after P7 [4040,4770] missed -- the state was already flipped by the stray f3743; P14 9488, P21 15544, P28 21740 on time); orientation at GT contacts 127 ok / 21 wrong / 63 withheld of 211; label coverage 0.40-0.48; action squad (159 matched) team 71/28/60 vs legacy 83/71/5. Every sheet error is a whole-team swap inside a wrong-orientation stretch.
+
+**Diagnosed (code + numbers; no footage in the container):** (1) the orientation evidence `e = z + f` had f = 0 for (player, view) pairs without native stats -- every cross-view comparison -- while the current hypothesis's f was often strongly negative on real poses (enrollment genuine spread is tight), so the swapped hypothesis was favoured at rest; (2) learning ran after wrong flips and fed the corrupted prototypes back into the orientation statistic (12 learned far prototypes for P1A by the end); (3) the dwell clamp held the CUSUM at threshold, so a flip fired as soon as the 900 f dwell expired (flips spaced 900-1100 f: 12001/12901/13801, 22820/23720).
+
+**Changed:** `src/tracking/identity_resolver.py` decision layer rewritten (see Where we are): `measure()` / `update_observed()` split (`BodyObs`); orientation = per-side baseline-relative directional CUSUM on FIXED anchors, both sides, baseline seeding from the post-change run, defaults threshold 25 / drift 0.5 / dwell 1500 (Config + tracker + drift guard); within-side = always label with margin-scaled hysteresis, per-clean-body quick swap override, occluded/merged crops ignored, lenient stranger test; learning only for within-side models. Probe: records x/CUSUM per side and writes `identity_features.npz`; new `scripts/replay_identity.py` (re-run + re-score offline, `--set NAME=VALUE` overrides). Tests: resolver suite adapted (warm-up-realistic timings, steady-state CUSUM bound instead of exactly 0), +2 dump/replay round-trip tests; suite 1477 passed (same pre-existing missing-`output/` failures).
+
+**Not done / owed:** the real-footage check of #84 (owner re-run + dump); entreno A/B (§1).
+
 ### 2026-10-05 (eighty-third session) — #83: TEAM IDENTITY RESOLVER — labels survive side switches by structure (orientation change-point + within-side slots), not by appearance alone
 
 **Asked (owner):** player tracking works until a side switch, then players mix and swap boxes; build a system that reliably re-attaches the same player id to the same player across switches (not every frame -- actions are ~10% of frames, a few wrong/blank frames are fine); generalise, do not overfit the one video; 5 stills shared (not committed). Plan approved (AskUserQuestion): the online team resolver first; a post-hoc pass only if online is not enough.
@@ -2308,74 +2335,3 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 **Changed (display + one guard):** enrolled tracks keep feeding off-court while the detection matches their reference (`tid` param on `_may_feed_track`/`_compute_assignment_cost`); label text = number + team letter (`_build_reference`); `PLAYER_SQUAD_COLORS` vivid blue/red (contrast >= 4.5 on black, tested); `PlayerTracker._resolve_identities` per-frame resolver (config `player_identity_resolver`, `player_identity_court_slack_px`); slow reference drift for lighting/side switches (not validated on a real switch).
 
 **Measured (20260920 match, f1-2500):** f74/f189 correct; label teleports 10 -> 6 (all one id hopping between two people at f1305-1363, tracker-side), label changes 4 -> 25 (more None flicker, fewer wrong-person labels). Suite 1569 passed. Full 26k-frame run NOT done; no identity GT exists.
-
-### 2026-10-05 (eighty-first session) — #81: player enrollment (E1) + squad colours (E3) shipped: sticky P1A/P1B/P2A/P2B labels, squad-stable colours on boxes and actions, tracking byte-identical (gate ΔF1 0.000 ×7)
-
-**Asked (owner, m00001):** make player tracking bulletproof — a pre-pipeline step
-sampling the opening frames to extract features so the same player always gets the
-same number; live debug colours one team 2 blues (clear/dark) and the other 2 reds
-(clear/dark); a re-appearing player must regain number AND colour; open to proposals;
-worried about tracking a wrong person and voiding the video; side switches should
-unblock automatically. **Plan approved m00055/m00056:** names P1A/P1B/P2A/P2B
-(left→right), colours follow the TEAM not the side, enrollment window = first ~600
-frames stride 5, E1+E3 this session / E2 (identity-drift + side-switch observers,
-display/diag only, owner gate) next session, batch overlay gets the same colours,
-`20290928_entreno_vall_dhebron` stays held-out (players substituted — never run).
-
-**Design pivot (deliberate, safer):** enrollment does NOT seed tracker positions and
-does NOT skip the in-stream k-means bootstrap — all GT-validated bootstrap/admission
-machinery untouched; enrollment only supplies reference signatures + a tid→label map
-attached greedily in-stream. Avoids the position-mismatch-at-frame-0 problem and
-keeps one shared path (§2 live-debug parity).
-
-**Shipped:**
-- `src/tracking/player_enrollment.py` — `_Chain` dataclass (running hist means),
-  `PlayerEnrollment.enroll(video_path)` → Optional[List[ref dicts]] guarded on
-  `enabled`/`is_calibrated`; sequential decode ≤600 frames (§9), detector every 5th
-  frame, strict foot-in-court filter, per-obs ensemble signature via
-  `tracker.compute_enrollment_signature`; `_build_chains` greedy ONE-TO-ONE per
-  sampled frame (best (correl, −dist) pair first; ≤1 obs per chain per frame —
-  without this two players within the 120 px gate both fed ONE chain, 4 players → 2
-  chains, caught by the no-2+2 test); `_merge_chains` (gap ∈ (0,60] f, endpoint
-  ≤120 px, cross-corr ≥0.45); ≥8 obs chains, squads by majority side (near = 1),
-  slots left→right at the earliest shared frame; refs = averaged histograms + world
-  size samples (compatible with `_signature_similarity`).
-- `src/tracking/player_tracker.py` — `label_min_similarity` ctor param,
-  `_enrollment_refs`/`_track_labels` state, `set_enrollment()` (clears labels),
-  `enrollment_active`, `label_for(tid)`, `compute_enrollment_signature(frame, bbox)`,
-  `_maybe_assign_label` on create/update (greedy best-unclaimed, sticky),
-  `_stamp_identities` on all three `update()` returns; labels cleared on
-  expiry/eviction, KEPT through retire-to-gallery (restore = same tid = same label).
-- `src/output_gen/overlay.py` — `PLAYER_SQUAD_COLORS` (1,A) clear blue / (1,B) dark
-  blue / (2,A) clear red / (2,B) dark red; `player_box_style(player)`;
-  `draw_player(..., color=, label=)` explicit-colour precedence over action tint.
-- Wiring: `FrameProcessor.enroll_from_video(video_path)` (config-gated); called in
-  `VideoProcessor.process_video` + live `_process_two_pass` AND
-  `_process_buffered_live` before the loops; live `PlayerOverlay` 4-tuples + panel
-  rows carry label/squad; `json_exporter.collect_actions` projects `player_label`
-  onto exported actions (explicit key list — a new action field must be added there
-  or it silently vanishes; cost one debug loop this session).
-- Config: `player_enrollment_enabled` True / `_frames` 600 / `_stride` 5 / `_min_obs`
-  8 / `_chain_gate_px` 120.0 (venue-coupled) / `_chain_gap_samples` 6 /
-  `_merge_gap_frames` 60 / `player_label_min_similarity` 0.35 — drift-guard rows
-  added (85 pass).
-
-**Validation (pre-registered gate):** unit parity — byte-identical tracker outputs
-enrollment on/off (scripted gather/drift/swap/occlude, `cv2.setRNGSeed(0)` per arm);
-end-to-end — fresh A/B both arms (git worktree @ HEAD d2414f1 vs working tree), all
-7 entrenos: action F1 e1-e7 Δ = **0.000** on 7/7, tracker snapshot streams
-(tid→frame/bbox) byte-identical on 7/7, **56/56 actions carry a player_label**; e1
-engagement: 4 refs from 294 samples / 8 chains, labels assigned by frame ~8 at
-similarities 0.51-0.93. Suite **1549** (+10 enrollment incl. occlusion-merge 10+10
-→20 obs, label stickiness across position swap, gallery retire+restore,
-<4-chains/no-2+2 fallbacks; +7 squad-colour overlay tests). Enrollment adds no
-measurable wall time (441-frame clip: 46 s base vs 36 s enrolled — run noise).
-
-**e2 caveat recorded:** the recorded e2 baseline 0.571 reads **0.400 on BOTH fresh
-arms** — pre-existing fresh-run/MPS variance in the BASE itself, both arms equal;
-open point 1's rule ('compare A/B, never vs recorded') now covers e2 explicitly.
-
-**Discipline:** one mechanism (E1+E3 as one approved unit, no E2); no GT edit; no
-seek (§9 — sequential decode); held-out untouched; GT-validated tracker machinery
-untouched by design; STATUS updated per the lean convention (#77 log entry moved
-verbatim to `docs/history/status_log_archive.md`).

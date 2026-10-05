@@ -349,7 +349,8 @@ def test_stable_rally_labels_everyone_and_never_flips():
     assert wrong == 0
     # Only the fresh-tracklet claim delay leaves anyone unlabeled.
     assert none <= 4 * res.CLAIM_MIN_FRAMES
-    assert res.flips == [] and res.cusum == 0.0
+    assert res.flips == [] and not res.doubt
+    assert res.cusum < 0.25 * res.switch_threshold
     assert all(s == (4, 0, 0) for s in stats[10:])
 
 
@@ -381,24 +382,24 @@ def test_second_switch_back_is_detected():
     t = _blank(res, t + 320, 40, rng)
     stats = run(res, 120, 1, {"P1A": 2, "P2A": 4, "P1B": 1, "P2B": 3}, t, rng)
     learned = res.state()["learned"]
-    assert all(v[view] >= res.MIN_NATIVE_PROTOS - 1 for v in learned.values() for view in v)
+    assert all(v[view] >= 2 for v in learned.values() for view in v)
     assert [f["near_squad"] for f in res.flips] == [2, 1]
     assert _totals(stats)[1] == 0
     assert all(s == (4, 0, 0) for s in stats[40:])
 
 
 def test_too_early_switch_waits_in_doubt_without_wrong_labels():
-    res = _resolver(min_switch_interval_frames=300)
+    res = _resolver(min_switch_interval_frames=400)
     rng = np.random.default_rng(3)
-    run(res, 60, 1, TIDS, 0, rng)
-    t = _blank(res, 60, 20, rng)
-    stats = run(res, 300, 2, {"P1A": 3, "P2A": 1, "P1B": 4, "P2B": 2}, t, rng)
+    run(res, 150, 1, TIDS, 0, rng)   # past the baseline warm-up
+    t = _blank(res, 150, 20, rng)
+    stats = run(res, 400, 2, {"P1A": 3, "P2A": 1, "P1B": 4, "P2B": 2}, t, rng)
     assert _totals(stats)[1] == 0
     flip = res.flips[0]
-    assert flip["frame"] >= 300                       # not before the dwell
-    blocked = stats[: 300 - t - 1]
+    assert flip["frame"] >= 400                       # not before the dwell
+    blocked = stats[: 400 - t - 1]
     assert all(s[0] == 0 for s in blocked)            # doubt: blank, not wrong
-    assert all(s == (4, 0, 0) for s in stats[300 - t + 40:])
+    assert all(s == (4, 0, 0) for s in stats[400 - t + 40:])
 
 
 def test_silent_teammate_swap_is_corrected():
@@ -421,7 +422,9 @@ def test_silent_teammate_swap_is_corrected():
         if truth_labels(players, labels)[1]:
             wrong_frames.append(k)
         t += 1
-    assert all(30 <= k <= 33 for k in wrong_frames)   # at most a few frames
+    # While the boxes merge the labels are withheld; after they separate the
+    # occluded crop is ignored, so the swap shows for at most a few frames.
+    assert len(wrong_frames) <= 6 and all(30 <= k <= 40 for k in wrong_frames)
     assert truth_labels(players, labels) == (4, 0, 0)
     assert res.flips == []
 
@@ -435,7 +438,8 @@ def test_far_player_occluded_by_a_near_body_does_not_flip():
         if 120 <= t < 180:   # P2B's box slides over the far-left player's column
             pl = [(l, (pl[2][1] + 6 if l == "P2B" else cx), fy) for l, cx, fy in pl]
         res.update(t, scene(pl, rng), tracked(pl, TIDS))
-    assert res.flips == [] and res.cusum == 0.0
+    assert res.flips == [] and not res.doubt
+    assert res.cusum < 0.25 * res.switch_threshold
 
 
 def test_stranger_in_court_stays_unlabeled():
@@ -514,7 +518,7 @@ def _det(bbox):
             "confidence": 0.9}
 
 
-def _run_tracker(mode: str, n_before=80, n_after=100):
+def _run_tracker(mode: str, n_before=150, n_after=100):
     cv2.setRNGSeed(0)  # AGENTS.md §3: per-instance RNG for A/B harnesses
     rng = np.random.default_rng(11)
     tracker = PlayerTracker(

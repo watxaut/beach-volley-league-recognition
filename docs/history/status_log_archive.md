@@ -4250,3 +4250,74 @@ falling) and the label holds AIR to the end while diag `ball_dets` shows the rol
 ball (686,478)→(558,492) — the static-ball suppression removes resting balls BY
 DESIGN, so point-end rest is structurally invisible to the tracked-only contract →
 open point 31 (v1.5 raw-candidate extension, OWNER GATE).
+
+### 2026-10-05 (eighty-first session) — #81: player enrollment (E1) + squad colours (E3) shipped: sticky P1A/P1B/P2A/P2B labels, squad-stable colours on boxes and actions, tracking byte-identical (gate ΔF1 0.000 ×7)
+
+**Asked (owner, m00001):** make player tracking bulletproof — a pre-pipeline step
+sampling the opening frames to extract features so the same player always gets the
+same number; live debug colours one team 2 blues (clear/dark) and the other 2 reds
+(clear/dark); a re-appearing player must regain number AND colour; open to proposals;
+worried about tracking a wrong person and voiding the video; side switches should
+unblock automatically. **Plan approved m00055/m00056:** names P1A/P1B/P2A/P2B
+(left→right), colours follow the TEAM not the side, enrollment window = first ~600
+frames stride 5, E1+E3 this session / E2 (identity-drift + side-switch observers,
+display/diag only, owner gate) next session, batch overlay gets the same colours,
+`20290928_entreno_vall_dhebron` stays held-out (players substituted — never run).
+
+**Design pivot (deliberate, safer):** enrollment does NOT seed tracker positions and
+does NOT skip the in-stream k-means bootstrap — all GT-validated bootstrap/admission
+machinery untouched; enrollment only supplies reference signatures + a tid→label map
+attached greedily in-stream. Avoids the position-mismatch-at-frame-0 problem and
+keeps one shared path (§2 live-debug parity).
+
+**Shipped:**
+- `src/tracking/player_enrollment.py` — `_Chain` dataclass (running hist means),
+  `PlayerEnrollment.enroll(video_path)` → Optional[List[ref dicts]] guarded on
+  `enabled`/`is_calibrated`; sequential decode ≤600 frames (§9), detector every 5th
+  frame, strict foot-in-court filter, per-obs ensemble signature via
+  `tracker.compute_enrollment_signature`; `_build_chains` greedy ONE-TO-ONE per
+  sampled frame (best (correl, −dist) pair first; ≤1 obs per chain per frame —
+  without this two players within the 120 px gate both fed ONE chain, 4 players → 2
+  chains, caught by the no-2+2 test); `_merge_chains` (gap ∈ (0,60] f, endpoint
+  ≤120 px, cross-corr ≥0.45); ≥8 obs chains, squads by majority side (near = 1),
+  slots left→right at the earliest shared frame; refs = averaged histograms + world
+  size samples (compatible with `_signature_similarity`).
+- `src/tracking/player_tracker.py` — `label_min_similarity` ctor param,
+  `_enrollment_refs`/`_track_labels` state, `set_enrollment()` (clears labels),
+  `enrollment_active`, `label_for(tid)`, `compute_enrollment_signature(frame, bbox)`,
+  `_maybe_assign_label` on create/update (greedy best-unclaimed, sticky),
+  `_stamp_identities` on all three `update()` returns; labels cleared on
+  expiry/eviction, KEPT through retire-to-gallery (restore = same tid = same label).
+- `src/output_gen/overlay.py` — `PLAYER_SQUAD_COLORS` (1,A) clear blue / (1,B) dark
+  blue / (2,A) clear red / (2,B) dark red; `player_box_style(player)`;
+  `draw_player(..., color=, label=)` explicit-colour precedence over action tint.
+- Wiring: `FrameProcessor.enroll_from_video(video_path)` (config-gated); called in
+  `VideoProcessor.process_video` + live `_process_two_pass` AND
+  `_process_buffered_live` before the loops; live `PlayerOverlay` 4-tuples + panel
+  rows carry label/squad; `json_exporter.collect_actions` projects `player_label`
+  onto exported actions (explicit key list — a new action field must be added there
+  or it silently vanishes; cost one debug loop this session).
+- Config: `player_enrollment_enabled` True / `_frames` 600 / `_stride` 5 / `_min_obs`
+  8 / `_chain_gate_px` 120.0 (venue-coupled) / `_chain_gap_samples` 6 /
+  `_merge_gap_frames` 60 / `player_label_min_similarity` 0.35 — drift-guard rows
+  added (85 pass).
+
+**Validation (pre-registered gate):** unit parity — byte-identical tracker outputs
+enrollment on/off (scripted gather/drift/swap/occlude, `cv2.setRNGSeed(0)` per arm);
+end-to-end — fresh A/B both arms (git worktree @ HEAD d2414f1 vs working tree), all
+7 entrenos: action F1 e1-e7 Δ = **0.000** on 7/7, tracker snapshot streams
+(tid→frame/bbox) byte-identical on 7/7, **56/56 actions carry a player_label**; e1
+engagement: 4 refs from 294 samples / 8 chains, labels assigned by frame ~8 at
+similarities 0.51-0.93. Suite **1549** (+10 enrollment incl. occlusion-merge 10+10
+→20 obs, label stickiness across position swap, gallery retire+restore,
+<4-chains/no-2+2 fallbacks; +7 squad-colour overlay tests). Enrollment adds no
+measurable wall time (441-frame clip: 46 s base vs 36 s enrolled — run noise).
+
+**e2 caveat recorded:** the recorded e2 baseline 0.571 reads **0.400 on BOTH fresh
+arms** — pre-existing fresh-run/MPS variance in the BASE itself, both arms equal;
+open point 1's rule ('compare A/B, never vs recorded') now covers e2 explicitly.
+
+**Discipline:** one mechanism (E1+E3 as one approved unit, no E2); no GT edit; no
+seek (§9 — sequential decode); held-out untouched; GT-validated tracker machinery
+untouched by design; STATUS updated per the lean convention (#77 log entry moved
+verbatim to `docs/history/status_log_archive.md`).

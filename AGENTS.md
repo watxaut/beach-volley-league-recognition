@@ -228,10 +228,13 @@ The cross-session plan for consistent 4-player IDs:
   serve-zone admission + seed-dedup (08-16), server vote + trial expiry +
   contested swap (08-18), off-court hold horizon =90f (08-29).
 - Status: side switches handled by the team identity resolver (#83, output
-  labels only), validated on synthetic switches; the real-footage gate is
-  `scripts/probe_identity_switches.py` on the 20260920 match (4 switches,
-  every GT contact carries its squad). Phase 2 (global stitch / post-hoc
-  relabel) is the owner-approved fallback if online is not enough.
+  labels only); its first real run (18 flips for 4 switches) led to the #84
+  orientation redesign (baseline-relative, both sides, fixed anchors). The
+  real-footage gate is `scripts/probe_identity_switches.py` on the 20260920
+  match (4 switches, every GT contact carries its squad); its feature dump
+  lets `scripts/replay_identity.py` re-tune the decision layer offline.
+  Phase 2 (global stitch / post-hoc relabel) is the owner-approved fallback
+  if online is not enough.
 
 ### 5. Attribution signals — long-axis camera
 

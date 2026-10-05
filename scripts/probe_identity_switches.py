@@ -11,6 +11,11 @@ own guards) -- so a single run is an A/B of the two.
 Outputs (``--out``, default ``output/identity_probe/<stem>/``, git-ignored):
 
 * ``identity_probe.json`` -- the raw record (re-score it with ``--reuse``);
+* ``identity_features.npz`` -- every MEASURED body per frame (descriptor,
+  side, eligibility, height) + the enrollment samples: what the identity
+  decision reads, so ``scripts/replay_identity.py`` can re-run and re-tune
+  the decision layer offline, without the video or the weights
+  (``--no-features`` skips it);
 * ``identity_sheet_NN.png`` -- CONTACT SHEETS, rows = P1A / P2A / P1B / P2B,
   one column every ``--sheet-every`` seconds. Each row must show ONE person
   from left to right, on both sides of every switch: the eyeball check for
@@ -215,11 +220,124 @@ def label_stats(record: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
+# Feature dump (the identity decision's inputs, for offline replay)
+# --------------------------------------------------------------------------- #
+
+FEATURES_VERSION = 1
+_FLAG_PREDICTED, _FLAG_ELIGIBLE, _FLAG_IN_COURT = 1, 2, 4
+_SIDES = {None: -1, "near": 0, "far": 1}
+
+
+class FeatureRecorder:
+    """Accumulates ``BodyObs`` per frame + the enrollment identity samples
+    into compact arrays (descriptors as float16 sqrt-histograms)."""
+
+    def __init__(self):
+        self.rows: Dict[str, list] = {k: [] for k in (
+            "frame", "tid", "bbox", "side", "flags", "height", "desc_row")}
+        self.desc_parts: list = []
+        self.desc_mask: list = []
+        self.refs_meta: List[Dict[str, Any]] = []
+        self.ref_rows: Dict[str, list] = {"player": [], "height": [], "desc_row": []}
+
+    def _add_desc(self, desc) -> int:
+        if desc is None:
+            return -1
+        self.desc_parts.append(desc.parts.astype("float16"))
+        self.desc_mask.append(desc.mask.astype("uint8"))
+        return len(self.desc_parts) - 1
+
+    def add_refs(self, refs: Sequence[Dict[str, Any]]) -> None:
+        for i, ref in enumerate(refs or []):
+            self.refs_meta.append({k: ref.get(k) for k in ("label", "squad", "slot")})
+            samples = ref.get("identity_samples") or []
+            heights = list(ref.get("identity_heights") or [])
+            if len(heights) != len(samples):
+                heights = [None] * len(samples)
+            for desc, h in zip(samples, heights):
+                self.ref_rows["player"].append(i)
+                self.ref_rows["height"].append(float("nan") if h is None else float(h))
+                self.ref_rows["desc_row"].append(self._add_desc(desc))
+
+    def add_frame(self, frame_idx: int, observations) -> None:
+        for o in observations or []:
+            flags = ((_FLAG_PREDICTED if o.predicted else 0)
+                     | (_FLAG_ELIGIBLE if o.eligible else 0)
+                     | (_FLAG_IN_COURT if o.in_court else 0))
+            self.rows["frame"].append(frame_idx)
+            self.rows["tid"].append(int(o.tid))
+            self.rows["bbox"].append([float(v) for v in o.bbox])
+            self.rows["side"].append(_SIDES.get(o.side, -1))
+            self.rows["flags"].append(flags)
+            self.rows["height"].append(float("nan") if o.height is None else float(o.height))
+            self.rows["desc_row"].append(self._add_desc(o.desc))
+
+    def save(self, path: Path, fps: float, n_frames: int) -> None:
+        import numpy as np  # noqa: E402
+
+        meta = {"version": FEATURES_VERSION, "fps": fps, "n_frames": n_frames,
+                "refs": self.refs_meta}
+        parts = (np.stack(self.desc_parts) if self.desc_parts
+                 else np.zeros((0, 3, 40), "float16"))
+        mask = (np.stack(self.desc_mask) if self.desc_mask
+                else np.zeros((0, 3), "uint8"))
+        np.savez_compressed(
+            path,
+            meta_json=np.array(json.dumps(meta)),
+            obs_frame=np.array(self.rows["frame"], "int32"),
+            obs_tid=np.array(self.rows["tid"], "int32"),
+            obs_bbox=np.array(self.rows["bbox"], "float32").reshape(-1, 4),
+            obs_side=np.array(self.rows["side"], "int8"),
+            obs_flags=np.array(self.rows["flags"], "uint8"),
+            obs_height=np.array(self.rows["height"], "float32"),
+            obs_desc_row=np.array(self.rows["desc_row"], "int32"),
+            ref_player=np.array(self.ref_rows["player"], "int8"),
+            ref_height=np.array(self.ref_rows["height"], "float32"),
+            ref_desc_row=np.array(self.ref_rows["desc_row"], "int32"),
+            desc_parts=parts, desc_mask=mask,
+        )
+
+
+def load_features(path) -> Tuple[Dict[str, Any], List[Dict[str, Any]], Dict[int, list]]:
+    """(meta, enrollment refs, frame -> [BodyObs]) from a feature dump."""
+    import numpy as np  # noqa: E402
+
+    from src.tracking.identity_resolver import BodyObs, Descriptor  # noqa: E402
+
+    z = np.load(path, allow_pickle=False)
+    meta = json.loads(str(z["meta_json"]))
+    parts = z["desc_parts"].astype("float64")
+    mask = z["desc_mask"].astype(bool)
+
+    def desc(row: int):
+        return None if row < 0 else Descriptor(parts=parts[row], mask=mask[row])
+
+    refs = [dict(r, identity_samples=[], identity_heights=[]) for r in meta["refs"]]
+    for player, h, row in zip(z["ref_player"], z["ref_height"], z["ref_desc_row"]):
+        refs[int(player)]["identity_samples"].append(desc(int(row)))
+        refs[int(player)]["identity_heights"].append(None if np.isnan(h) else float(h))
+    sides = {v: k for k, v in _SIDES.items()}
+    frames: Dict[int, list] = {}
+    for i in range(len(z["obs_frame"])):
+        flags = int(z["obs_flags"][i])
+        h = float(z["obs_height"][i])
+        frames.setdefault(int(z["obs_frame"][i]), []).append(BodyObs(
+            tid=int(z["obs_tid"][i]), bbox=[float(v) for v in z["obs_bbox"][i]],
+            side=sides[int(z["obs_side"][i])],
+            predicted=bool(flags & _FLAG_PREDICTED), eligible=bool(flags & _FLAG_ELIGIBLE),
+            in_court=bool(flags & _FLAG_IN_COURT), desc=desc(int(z["obs_desc_row"][i])),
+            height=None if np.isnan(h) else h,
+        ))
+    return meta, refs, frames
+
+
+# --------------------------------------------------------------------------- #
 # The production pass
 # --------------------------------------------------------------------------- #
 
 def sequential_pass(video: str, config: Dict[str, Any], max_frames: Optional[int],
-                    sheet_every_s: float) -> Tuple[Dict[str, Any], Dict[str, list]]:
+                    sheet_every_s: float, features: Optional[FeatureRecorder] = None,
+                    ) -> Tuple[Dict[str, Any], Dict[str, list]]:
     import cv2  # noqa: E402
 
     from src.analysis.frame_processor import FrameProcessor  # noqa: E402
@@ -244,6 +362,8 @@ def sequential_pass(video: str, config: Dict[str, Any], max_frames: Optional[int
 
     record: Dict[str, Any] = {"video": video, "fps": fps, "frames": [], "actions": [],
                               "flips": [], "enrolled": [r["label"] for r in refs or []]}
+    if features is not None:
+        features.add_refs(refs or [])
     sheets: Dict[str, list] = {lab: [] for lab in LABELS}
     sheet_every = max(1, int(round(sheet_every_s * fps)))
 
@@ -257,6 +377,8 @@ def sequential_pass(video: str, config: Dict[str, Any], max_frames: Optional[int
                 break
             result = processor.process_frame(image, frame_idx)
             state = tracker.identity_state() or {}
+            if features is not None and tracker.team_identity is not None:
+                features.add_frame(frame_idx, tracker.team_identity.last_observations)
             bodies = []
             for p in result.get("tracked_players") or []:
                 if p.get("predicted") or not p.get("bbox"):
@@ -271,7 +393,10 @@ def sequential_pass(video: str, config: Dict[str, Any], max_frames: Optional[int
                 "frame": frame_idx,
                 "near_squad": state.get("near_squad"),
                 "cusum": state.get("cusum"),
-                "evidence": state.get("evidence"),
+                "cusum_near": state.get("cusum_near"),
+                "cusum_far": state.get("cusum_far"),
+                "x_near": state.get("x_near"),
+                "x_far": state.get("x_far"),
                 "doubt": state.get("doubt"),
                 "bodies": bodies,
             })
@@ -415,6 +540,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--contacts-gt", default=None, help="match-contacts-v1 GT JSON")
     ap.add_argument("--out", default=None, help="output dir (default output/identity_probe/<stem>)")
     ap.add_argument("--reuse", default=None, help="re-score an identity_probe.json, no decode")
+    ap.add_argument("--no-features", action="store_true",
+                    help="skip identity_features.npz (the offline-replay dump)")
     args = ap.parse_args(argv)
 
     gt = json.loads(Path(args.contacts_gt).read_text()) if args.contacts_gt else None
@@ -430,8 +557,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         out_dir = Path(args.out) if args.out else ROOT / "output" / "identity_probe" / stem
         out_dir.mkdir(parents=True, exist_ok=True)
         video, config = _config(args)
-        record, sheets = sequential_pass(video, config, args.max_frames, args.sheet_every)
+        features = None if args.no_features else FeatureRecorder()
+        record, sheets = sequential_pass(video, config, args.max_frames, args.sheet_every,
+                                         features)
         (out_dir / "identity_probe.json").write_text(json.dumps(record))
+        if features is not None:
+            features.save(out_dir / "identity_features.npz", record["fps"],
+                          len(record["frames"]))
+            print(f"feature dump: {out_dir / 'identity_features.npz'}")
         for path in write_sheets(sheets, record["fps"], out_dir):
             print(f"contact sheet: {path}")
     report = print_report(record, gt)

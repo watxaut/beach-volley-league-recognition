@@ -5,39 +5,36 @@ Display/attribution-only pure observer over the tracker's per-frame output
 enrolled player each tracked body is, and is built around the one structural
 fact that survives every venue, camera height and kit: **during play the two
 players of a team are on the same side of the net, opposite the other team.**
-That splits identity into three small decisions instead of one 4-way guess:
+That splits identity into small decisions instead of one 4-way guess:
 
 1. **Orientation** -- which squad is on the NEAR side. Piecewise constant: it
-   only changes at a side switch (minutes apart). Decided by a one-sided CUSUM
-   change-point test over the whole frame's evidence (both players of both
-   sides, every frame), with a minimum dwell between flips. A single bad frame
-   or an occluded player cannot flip it; a real switch flips it within ~1-3 s
-   of the players settling on their new sides.
-2. **Near slot / far slot** -- which of the side's two bodies is which
-   teammate, by per-tracklet appearance evidence (EMA, reset when the tracker
-   id jumps to another body) with a hysteresis bonus for the current holder
-   and "by elimination" when the partner is clear.
+   only changes at a side switch (minutes apart). Per side, a statistic
+   ``x = best squad-1 similarity - best squad-2 similarity`` (FIXED
+   enrollment anchors only) has a level in each orientation, learned online;
+   a switch shifts both sides' levels in opposite, known directions. One
+   CUSUM per side on the standardised directional deviation from the side's
+   own baseline; a flip needs BOTH sides plus a minimum dwell. Being relative
+   to the side's own baseline, the test is blind to constant biases -- the
+   near/far view gap above all: enrollment sees squad 1 only from behind and
+   squad 2 only from the front, so ABSOLUTE comparisons favour "nothing
+   changed" or, worse, one hypothesis permanently (#83's first real run: 18
+   flips for 4 switches).
+2. **Who is who within a side** -- per-tracklet EMAs of the similarity to each
+   player (anchors + prototypes learned in that view + height), the better
+   permutation with hysteresis scaled by this video's own teammate-margin
+   spread, a quick override for silent id swaps, crops behind or merged with
+   another body ignored. Every in-court body gets a label unless the
+   orientation is in doubt (labels are withheld then -- a blank costs an
+   unattributed action, a wrong label corrupts a player's stats).
 
-**View bias, and why scores are standardised.** The camera sees the near
-pair large and from behind, the far pair small and from the front. Enrollment
-watches squad 1 only near and squad 2 only far, so at the FIRST switch the
-comparisons that matter are cross-view, and raw similarities are biased toward
-"nothing changed". Every similarity is therefore turned into two standardised
-scores, both calibrated on this video's own enrollment samples (no constant
-here is tuned on one clip, venue or kit):
+Measurement (``measure``: side, eligibility, descriptor, height per tracked
+player) is separate from the decision (``update_observed``), so a run can be
+dumped once and the decision replayed offline (``scripts/replay_identity.py``).
 
-* DISCRIMINATION ``z``: against the impostor distribution -- every OTHER
-  player's samples (both views) scored against this player's model, as in
-  speaker-verification Z-norm. Cross-view impostors exist from frame 0.
-* FIT ``f``: against this player's OWN samples in the same view. Same-view, so
-  free of view bias: at a side switch the near pair's fit collapses on both
-  sides of the net at once, which is what makes the first switch detectable
-  even when cross-view similarity is weak.
-
-**Second view.** After a confident orientation (no doubt, settled since the
-last flip), bodies that are clearly assigned and isolated add prototypes to
-their player's model for the view they are seen in. The enrollment anchors are
-never replaced, so the model cannot drift away from the person it started as.
+**Second view.** While the orientation is settled, clearly assigned, isolated
+in-court bodies add prototypes to their player's model for the view they are
+seen in. They serve the within-side decision only; the orientation statistic
+never reads them, so a wrong label cannot feed back into the orientation.
 
 Descriptor: per body part (head / upper / lower), a 40-bin HSV histogram --
 12 hue x 3 saturation bins for chromatic pixels plus 4 value bins for
@@ -255,31 +252,54 @@ def mean_descriptor(descs: Sequence[Descriptor]) -> Optional[Descriptor]:
 
 
 @dataclass
+class BodyObs:
+    """One tracked player in one frame, as MEASURED (no identity decision).
+
+    ``measure`` produces these from a frame; ``update_observed`` decides from
+    them alone -- so a run can be dumped once and the decision layer replayed
+    offline (``scripts/replay_identity.py``) without the video or weights.
+    """
+
+    tid: int
+    bbox: List[float]
+    side: Optional[str]          # NEAR / FAR by the foot, None if unknown
+    predicted: bool = False      # coasting box (no detection behind it)
+    eligible: bool = False       # foot in court (+slack) or in a serve zone
+    in_court: bool = False       # foot in court (+slack): learnable
+    desc: Optional[Descriptor] = None   # only for real, eligible bodies
+    height: Optional[float] = None
+
+
+@dataclass
 class _PlayerModel:
     label: str
     squad: int
     slot: str
     anchor_view: str
-    protos: Dict[str, List[Descriptor]] = field(default_factory=lambda: {NEAR: [], FAR: []})
-    n_anchor: Dict[str, int] = field(default_factory=lambda: {NEAR: 0, FAR: 0})
-    heights: Dict[str, Deque[float]] = field(
-        default_factory=lambda: {NEAR: deque(maxlen=200), FAR: deque(maxlen=200)}
-    )
+    anchors: List[Descriptor] = field(default_factory=list)   # fixed, enrolled view
+    learned: Dict[str, List[Descriptor]] = field(default_factory=lambda: {NEAR: [], FAR: []})
+    heights: List[float] = field(default_factory=list)
     last_learn: Dict[str, int] = field(default_factory=lambda: {NEAR: -10**9, FAR: -10**9})
 
 
 @dataclass
-class _PoolEntry:
-    desc: Descriptor
-    height: Optional[float]
+class _Level:
+    """Running mean / spread of one side's orientation statistic in one
+    orientation state (EMA once warmed up, plain average before)."""
 
+    mu: float = 0.0
+    var: float = 0.0
+    n: int = 0
 
-@dataclass
-class _Stats:
-    imp_mu: float
-    imp_sd: float
-    gen_mu: Optional[float] = None
-    gen_sd: Optional[float] = None
+    def add(self, x: float, alpha: float) -> None:
+        self.n += 1
+        a = max(1.0 / self.n, alpha)
+        d = x - self.mu
+        self.mu += a * d
+        self.var = (1.0 - a) * self.var + a * d * (x - self.mu)
+
+    def sigma(self, floor: float) -> float:
+        return float(np.sqrt(max(self.var, floor * floor)))
 
 
 @dataclass
@@ -288,11 +308,11 @@ class _TidState:
     width: float
     last_frame: int
     side: Optional[str]
-    ema: Optional[np.ndarray] = None
-    fast: Optional[np.ndarray] = None  # quick EMA: breaks a hold on a silent swap
+    ema: Optional[np.ndarray] = None    # slow EMA of the 4 player similarities
+    fast: Optional[np.ndarray] = None   # quick EMA: catches a silent swap
     n: int = 0
     heights: Deque[float] = field(default_factory=lambda: deque(maxlen=15))
-    hold: Optional[int] = None  # player index held by this track id
+    hold: Optional[int] = None          # player index held by this track id
 
 
 def _other(view: str) -> str:
@@ -302,52 +322,61 @@ def _other(view: str) -> str:
 class TeamIdentityResolver:
     """Per-frame P1A/P2A/P1B/P2B labels that survive side switches.
 
-    Evidence that body ``b`` (seen in view ``v``) is player ``p`` is
-    ``e = z + f``, both from one similarity ``s`` (appearance + height):
+    ORIENTATION (which squad is near) uses only the FIXED enrollment anchors:
+    per side, ``x = mean over the side's bodies of [best squad-1 similarity -
+    best squad-2 similarity]``. Its level in the current orientation is
+    learned online (per side); a switch is a SHIFT of both sides' levels in
+    opposite, known directions (near: squad 1 -> 2 means x_near drops and
+    x_far rises). Standardised directional deviations feed one CUSUM per side
+    and a flip needs BOTH. Because the test is relative to the side's own
+    baseline, constant biases cancel -- the near/far view gap, uneven
+    calibration -- which an absolute 'which hypothesis scores higher' test
+    cannot survive (#83's first real run: 18 flips for 4 switches). Learned
+    prototypes never enter this statistic, so a wrong label cannot feed back
+    into the orientation.
 
-    * ``z`` -- DISCRIMINATION: ``s`` standardised against the impostor
-      distribution, i.e. every OTHER player's samples (both views) scored
-      against ``p``'s model for ``v``. "More like p than the others are."
-    * ``f`` -- FIT: ``s`` standardised against ``p``'s OWN samples in ``v``
-      (only when ``p`` has a native model for ``v``; 0 otherwise), capped at
-      +1. "As typical for p as p usually is." A same-view comparison, so it is
-      free of the near/far view bias: when the near pair is replaced at a side
-      switch, the near pair's fit collapses on both sides even before any
-      cross-view comparison is trusted.
+    WHO IS WHO within a side: per-tracklet EMAs of the similarity to each
+    player (anchors + prototypes learned in that view + height), assigned by
+    the better permutation with hysteresis scaled by the video's own teammate
+    margin spread. Every in-court body on a side gets one of that side's two
+    labels (strangers excepted), so labels are shown whenever the orientation
+    is not in doubt.
     """
 
-    # Similarity / normalisation
     HEIGHT_WEIGHT = 0.25
     HEIGHT_SIGMA_M = 0.15
-    Z_CAP = 6.0
-    FIT_CAP = 1.0
-    SIGMA_FLOOR = 0.04
-    MIN_IMPOSTORS = 5
-    MIN_GENUINE = 8
-    FALLBACK_MU, FALLBACK_SIGMA = 0.3, 0.15
-    POOL_PER_PLAYER_VIEW = 80
     N_ANCHOR_SAMPLES = 4
-    MAX_PROTOS = 12
-    MIN_NATIVE_PROTOS = 3
+    MAX_LEARNED = 10
+    # Orientation
+    LEVEL_ALPHA = 0.002          # baseline memory ~500 frames
+    LEVEL_WARMUP = 100           # observations before a side's CUSUM is armed
+    X_SIGMA_FLOOR = 0.01
+    U_CLIP = 3.0
+    STRONG_U = 1.0               # a sample this far toward the switch is post-change
+    SEED_GAP_FRAMES = 30
+    DOUBT_FRACTION = 0.5
+    RECENT_FRAMES = 3000
     # Per-tracklet evidence
     EMA_ALPHA = 0.1
     FAST_EMA_ALPHA = 0.5
-    HOLD_BONUS = 1.0
-    HOLD_FLOOR = -1.0
-    HOLD_GAP_FRAMES = 30       # an id unseen this long may come back on anyone
-    CLAIM_MIN_FRAMES = 5       # a fresh tracklet needs a few frames of evidence
-    # Orientation change-point detector
-    D_CLIP = 4.0
-    DOUBT_FRACTION = 0.25
-    INSTANT_DOUBT_D = 3.0      # one frame this strongly for the swap = blank now
-    INSTANT_DOUBT_MIN_BODIES = 2
-    # Learning
-    LEARN_MIN_EVIDENCE = 1.5
+    OCCLUDED_IOU = 0.15          # behind another body: crop is not this player
+    MIXED_IOU = 0.3              # two same-side bodies this merged: both crops mixed
+    HOLD_GAP_FRAMES = 30         # an id unseen this long may come back on anyone
+    CLAIM_MIN_FRAMES = 5         # a fresh tracklet needs a few frames of evidence
+    HYST_K = 0.5                 # hysteresis, in teammate-margin spreads
+    SWAP_K = 1.0                 # quick-EMA swap override, same units (a real
+                                 # swap reverses the margin: ~2 spreads per body)
+    MARGIN_SIGMA_FLOOR = 0.01
+    MARGIN_ALPHA = 0.01
+    STRANGER_K = 4.0             # best similarity this many spreads below usual
+    STRANGER_SIGMA_FLOOR = 0.05  # (overlaps and blur move it by ~0.1 legitimately)
+    STRANGER_MIN_N = 50
+    # Learning (within-side models only)
+    LEARN_K = 0.75               # learn when the margin is a solid share of the usual one
     LEARN_MIN_FRAMES = 10
     LEARN_INTERVAL = 90
-    LEARN_SETTLE_FRAMES = 60
+    LEARN_SETTLE_FRAMES = 150
     LEARN_MAX_IOU = 0.05
-    LEARN_MAX_CUSUM_FRACTION = 0.1
     # Housekeeping
     HISTORY_FRAMES = 900
     TID_STATE_TTL = 900
@@ -359,11 +388,9 @@ class TeamIdentityResolver:
         *,
         court_slack_px: float = 16.0,
         serve_zone_eligible: bool = True,
-        switch_threshold: float = 40.0,
+        switch_threshold: float = 25.0,
         switch_drift: float = 0.5,
-        min_switch_interval_frames: int = 900,
-        claim_evidence: float = 1.0,
-        learn_margin: float = 2.0,
+        min_switch_interval_frames: int = 1500,
     ):
         if len(references) != 4:
             raise ValueError("TeamIdentityResolver needs exactly 4 references")
@@ -373,47 +400,39 @@ class TeamIdentityResolver:
         self.switch_threshold = float(switch_threshold)
         self.switch_drift = float(switch_drift)
         self.min_switch_interval_frames = int(min_switch_interval_frames)
-        self.claim_evidence = float(claim_evidence)
-        self.learn_margin = float(learn_margin)
 
         self.players: List[_PlayerModel] = []
-        self._pool: Dict[Tuple[int, str], Deque[_PoolEntry]] = {
-            (i, v): deque(maxlen=self.POOL_PER_PLAYER_VIEW) for i in range(4) for v in VIEWS
-        }
-        for i, ref in enumerate(references):
+        samples_by_player: List[List[Descriptor]] = []
+        for ref in references:
             view = NEAR if int(ref["squad"]) == 1 else FAR
             model = _PlayerModel(
                 label=ref["label"], squad=int(ref["squad"]), slot=ref["slot"],
                 anchor_view=view,
             )
-            samples = [s for s in (ref.get("identity_samples") or []) if s is not None]
-            heights = list(ref.get("identity_heights") or [])
-            if len(heights) != len(samples):
-                heights = [None] * len(samples)
-            anchors: List[Descriptor] = []
+            samples = [d for d in (ref.get("identity_samples") or []) if d is not None]
             mean = mean_descriptor(samples)
             if mean is not None:
-                anchors.append(mean)
+                model.anchors.append(mean)
             if samples:
                 n_pick = min(self.N_ANCHOR_SAMPLES, len(samples))
                 for k in np.linspace(0, len(samples) - 1, n_pick):
-                    anchors.append(samples[int(round(k))])
-            model.protos[view] = anchors
-            model.n_anchor[view] = len(anchors)
-            model.heights[view].extend(h for h in heights if h)
+                    model.anchors.append(samples[int(round(k))])
+            model.heights = [float(h) for h in (ref.get("identity_heights") or []) if h]
             self.players.append(model)
-            for desc, h in zip(samples, heights):
-                self._pool[(i, view)].append(_PoolEntry(desc, h))
+            samples_by_player.append(samples)
         self._squad_players = {
             q: [i for i, p in enumerate(self.players) if p.squad == q] for q in (1, 2)
         }
         if any(len(v) != 2 for v in self._squad_players.values()):
             raise ValueError("TeamIdentityResolver needs a 2+2 squad split")
-
-        self._proto_cache: Dict[Tuple[int, str], Tuple[List[Descriptor], np.ndarray, np.ndarray]] = {}
-        self._height_cache: Dict[Tuple[int, str], Optional[float]] = {}
-        self._stats: Dict[Tuple[int, str], _Stats] = {}
-        self._dirty = {(i, v) for i in range(4) for v in VIEWS}
+        if not all(p.anchors for p in self.players):
+            raise ValueError("TeamIdentityResolver needs identity samples for all 4 players")
+        self._anchor_stack = [stack_descriptors(p.anchors) for p in self.players]
+        self._model_cache: Dict[Tuple[int, str], Tuple[np.ndarray, np.ndarray]] = {}
+        self._ref_h = [
+            float(np.median(p.heights)) if len(p.heights) >= 3 else None for p in self.players
+        ]
+        self._init_margin_scale(samples_by_player)
         self.reset_state()
 
     @classmethod
@@ -429,22 +448,47 @@ class TeamIdentityResolver:
             logger.warning("Team identity resolver disabled: %s", exc)
             return None
 
+    def _init_margin_scale(self, samples_by_player) -> None:
+        """Teammate-margin and best-similarity spreads per view, seeded from
+        the enrollment samples (each sample vs its own and its mate's model)
+        and then tracked online. They scale hysteresis, learning and the
+        stranger test to this video's own separability."""
+        self._margin_level = {NEAR: _Level(), FAR: _Level()}
+        self._best_level = {NEAR: _Level(), FAR: _Level()}
+        for p, samples in enumerate(samples_by_player):
+            if not samples:
+                continue
+            view = self.players[p].anchor_view
+            mate = self._mate(p)
+            parts, mask = stack_descriptors(samples)
+            own = self._sims_from_stack(self._model_stack(p, view), parts, mask)
+            other = self._sims_from_stack(self._model_stack(mate, view), parts, mask)
+            for o, m in zip(own, other):
+                self._margin_level[view].add(float(o - m) ** 2, self.MARGIN_ALPHA)
+                self._best_level[view].add(float(max(o, m)), self.MARGIN_ALPHA)
+
     # ------------------------------------------------------------------ #
     # State
     # ------------------------------------------------------------------ #
 
     def reset_state(self) -> None:
         self.near_squad = 1
-        self.cusum = 0.0
-        self._onset: Optional[int] = None
+        self._levels: Dict[int, Dict[str, _Level]] = {
+            1: {NEAR: _Level(), FAR: _Level()}, 2: {NEAR: _Level(), FAR: _Level()},
+        }
+        self._cusum = {NEAR: 0.0, FAR: 0.0}
+        # (frame, side) -> (x, directional deviation u); seeds a new state.
+        self._recent: Dict[str, Deque[Tuple[int, float, float]]] = {
+            NEAR: deque(maxlen=self.RECENT_FRAMES), FAR: deque(maxlen=self.RECENT_FRAMES)}
         self.last_flip_frame = 0
         self.flips: List[Dict[str, Any]] = []
         self.doubt = False
-        self.last_evidence: Optional[float] = None
+        self.last_x: Dict[str, Optional[float]] = {NEAR: None, FAR: None}
         self._tids: Dict[int, _TidState] = {}
         self._labels: Dict[int, Tuple[str, int, str]] = {}
         self._history: Dict[int, Dict[int, Tuple[str, int, str]]] = {}
         self._history_order: Deque[int] = deque()
+        self.last_observations: List[BodyObs] = []
 
     def set_court_calibration(self, court) -> None:
         self.court = court
@@ -452,18 +496,27 @@ class TeamIdentityResolver:
     def squad_on(self, side: str) -> int:
         return self.near_squad if side == NEAR else 3 - self.near_squad
 
+    def _mate(self, p: int) -> int:
+        return next(q for q in self._squad_players[self.players[p].squad] if q != p)
+
+    @property
+    def cusum(self) -> float:
+        """The side switch fires when BOTH sides' CUSUMs pass the threshold,
+        so the binding value is the smaller one."""
+        return min(self._cusum[NEAR], self._cusum[FAR])
+
     def state(self) -> Dict[str, Any]:
         """Diagnostics for logs / probes / the live panel."""
         return {
             "near_squad": self.near_squad,
             "cusum": round(self.cusum, 2),
-            "evidence": None if self.last_evidence is None else round(self.last_evidence, 2),
+            "cusum_near": round(self._cusum[NEAR], 2),
+            "cusum_far": round(self._cusum[FAR], 2),
+            "x_near": None if self.last_x[NEAR] is None else round(self.last_x[NEAR], 4),
+            "x_far": None if self.last_x[FAR] is None else round(self.last_x[FAR], 4),
             "doubt": self.doubt,
             "flips": list(self.flips),
-            "learned": {
-                p.label: {v: len(p.protos[v]) - p.n_anchor[v] for v in VIEWS}
-                for p in self.players
-            },
+            "learned": {p.label: {v: len(p.learned[v]) for v in VIEWS} for p in self.players},
         }
 
     def labels(self) -> Dict[int, Tuple[str, int, str]]:
@@ -478,113 +531,42 @@ class TeamIdentityResolver:
         return self._labels.get(tid)
 
     # ------------------------------------------------------------------ #
-    # Scoring
+    # Similarities
     # ------------------------------------------------------------------ #
 
-    def _protos_for(self, p: int, view: str):
-        """(descriptor list, stacked parts, stacked mask) used for ``view``:
-        the native prototypes once there are enough, else native + the other
-        view's (cross-view)."""
-        cached = self._proto_cache.get((p, view))
-        if cached is not None:
-            return cached
-        model = self.players[p]
-        native = model.protos[view]
-        descs = list(native)
-        if len(native) < self.MIN_NATIVE_PROTOS:
-            descs += model.protos[_other(view)]
-        parts, mask = stack_descriptors(descs)
-        self._proto_cache[(p, view)] = (descs, parts, mask)
-        return self._proto_cache[(p, view)]
+    def _model_stack(self, p: int, view: str) -> Tuple[np.ndarray, np.ndarray]:
+        """Anchors + the prototypes learned in ``view`` (the within-side model)."""
+        key = (p, view)
+        if key not in self._model_cache:
+            model = self.players[p]
+            self._model_cache[key] = stack_descriptors(model.anchors + model.learned[view])
+        return self._model_cache[key]
 
-    def _is_native(self, p: int, view: str) -> bool:
-        return len(self.players[p].protos[view]) >= self.MIN_NATIVE_PROTOS
+    @staticmethod
+    def _sims_from_stack(stack, parts, mask) -> np.ndarray:
+        return appearance_scores(stack[0], stack[1], parts, mask)
 
-    def _ref_height(self, p: int, view: str) -> Optional[float]:
-        if (p, view) in self._height_cache:
-            return self._height_cache[(p, view)]
-        model = self.players[p]
-        ref = None
-        for v in (view, _other(view)):
-            if len(model.heights[v]) >= 3:
-                ref = float(np.median(model.heights[v]))
-                break
-        self._height_cache[(p, view)] = ref
-        return ref
+    def _anchor_sims(self, desc: Descriptor) -> np.ndarray:
+        """Appearance similarity to each player's FIXED anchors (orientation)."""
+        parts, mask = stack_descriptors([desc])
+        return np.array([float(self._sims_from_stack(st, parts, mask)[0])
+                         for st in self._anchor_stack])
 
-    def _similarities(
-        self, p: int, view: str, entries: Sequence[_PoolEntry], leave_out: bool = False,
-    ) -> np.ndarray:
-        """Similarity of each entry to player ``p``'s model for ``view``.
-
-        ``leave_out`` drops, per entry, the prototype that IS that entry (a
-        player's own samples are also its anchors), so genuine statistics are
-        not inflated by self-matches.
-        """
-        descs, pp, pm = self._protos_for(p, view)
-        if not entries or pp.shape[0] == 0:
-            return np.zeros(len(entries))
-        parts, mask = stack_descriptors([e.desc for e in entries])
-        dots = np.einsum("kpb,npb->knp", pp, parts)
-        valid = pm[:, None, :] & mask[None, :, :]
-        w = PART_WEIGHTS[None, None, :] * valid
-        denom = w.sum(axis=2)
-        sims = np.where(denom > 0, (dots * w).sum(axis=2) / np.maximum(denom, 1e-9), 0.0)
-        if leave_out:
-            proto_ids = np.array([id(d) for d in descs])
-            entry_ids = np.array([id(e.desc) for e in entries])
-            sims = np.where(proto_ids[:, None] == entry_ids[None, :], -np.inf, sims)
-        app = sims.max(axis=0)
-        app = np.where(np.isfinite(app), app, 0.0)
-        ref_h = self._ref_height(p, view)
-        if ref_h is None:
-            return app
-        out = app.copy()
-        for n, e in enumerate(entries):
-            if e.height is None:
-                continue
-            s_h = float(np.exp(-0.5 * ((e.height - ref_h) / self.HEIGHT_SIGMA_M) ** 2))
-            out[n] = (1.0 - self.HEIGHT_WEIGHT) * app[n] + self.HEIGHT_WEIGHT * s_h
-        return out
-
-    def _refresh_stats(self) -> None:
-        """Re-standardise after the models or pools changed (enrollment, or
-        a learning event -- at most one per player and view per
-        LEARN_INTERVAL). Immediately: scores and their statistics must come
-        from the same prototype set."""
-        for p, view in sorted(self._dirty):
-            imps = [
-                e for (q, _v), dq in self._pool.items() if q != p for e in dq
-            ]
-            if len(imps) >= self.MIN_IMPOSTORS:
-                s = self._similarities(p, view, imps)
-                st = _Stats(float(s.mean()), max(float(s.std()), self.SIGMA_FLOOR))
-            else:
-                st = _Stats(self.FALLBACK_MU, self.FALLBACK_SIGMA)
-            gen = list(self._pool[(p, view)])
-            if self._is_native(p, view) and len(gen) >= self.MIN_GENUINE:
-                g = self._similarities(p, view, gen, leave_out=True)
-                st.gen_mu = float(g.mean())
-                st.gen_sd = max(float(g.std()), self.SIGMA_FLOOR)
-            self._stats[(p, view)] = st
-        self._dirty.clear()
-
-    def evidence(self, desc: Descriptor, view: str, height: Optional[float]) -> np.ndarray:
-        """``e = z + f`` for each of the 4 players (see class docstring)."""
-        entry = [_PoolEntry(desc, height)]
+    def _model_sims(self, desc: Descriptor, view: str, height: Optional[float]) -> np.ndarray:
+        """Similarity to each player's within-side model (+ height)."""
+        parts, mask = stack_descriptors([desc])
         out = np.zeros(4)
         for p in range(4):
-            s = float(self._similarities(p, view, entry)[0])
-            st = self._stats[(p, view)]
-            z = float(np.clip((s - st.imp_mu) / st.imp_sd, -self.Z_CAP, self.Z_CAP))
-            f = 0.0
-            if st.gen_mu is not None:
-                f = float(np.clip((s - st.gen_mu) / st.gen_sd, -self.Z_CAP, self.FIT_CAP))
-            out[p] = z + f
+            app = float(self._sims_from_stack(self._model_stack(p, view), parts, mask)[0])
+            ref_h = self._ref_h[p]
+            if height is not None and ref_h is not None:
+                s_h = float(np.exp(-0.5 * ((height - ref_h) / self.HEIGHT_SIGMA_M) ** 2))
+                app = (1.0 - self.HEIGHT_WEIGHT) * app + self.HEIGHT_WEIGHT * s_h
+            out[p] = app
         return out
 
     # ------------------------------------------------------------------ #
-    # Geometry
+    # Measurement
     # ------------------------------------------------------------------ #
 
     def _side(self, bbox) -> Optional[str]:
@@ -619,63 +601,69 @@ class TeamIdentityResolver:
                 return True, False
         return False, False
 
-    @staticmethod
-    def _iou(a, b) -> float:
-        x1, y1 = max(a[0], b[0]), max(a[1], b[1])
-        x2, y2 = min(a[2], b[2]), min(a[3], b[3])
-        inter = max(0.0, x2 - x1) * max(0.0, y2 - y1)
-        if inter <= 0:
-            return 0.0
-        area_a = (a[2] - a[0]) * (a[3] - a[1])
-        area_b = (b[2] - b[0]) * (b[3] - b[1])
-        return inter / max(1e-9, area_a + area_b - inter)
+    def measure(self, frame: Optional[np.ndarray], players: List[Dict[str, Any]]) -> List[BodyObs]:
+        """Everything the decision needs from a frame, per tracked player."""
+        obs: List[BodyObs] = []
+        for p_dict in players:
+            tid = p_dict.get("track_id")
+            bbox = p_dict.get("bbox")
+            if tid is None or not bbox:
+                continue
+            box = [float(v) for v in bbox]
+            o = BodyObs(tid=tid, bbox=box, side=self._side(box),
+                        predicted=bool(p_dict.get("predicted")))
+            if not o.predicted:
+                o.eligible, o.in_court = self._eligibility(box)
+                if o.eligible and o.side is not None:
+                    o.desc = compute_descriptor(frame, box)
+                    o.height = lateral_height_m(self.court, box)
+            obs.append(o)
+        return obs
 
     # ------------------------------------------------------------------ #
-    # Per-frame update
+    # Per-frame decision
     # ------------------------------------------------------------------ #
 
     def update(
         self, frame_index: int, frame: Optional[np.ndarray], players: List[Dict[str, Any]]
     ) -> Dict[int, Tuple[str, int, str]]:
-        """Resolve labels for this frame's tracked players; returns tid->label."""
-        if self._dirty:
-            self._refresh_stats()
+        """Measure this frame's tracked players and resolve their labels."""
+        return self.update_observed(frame_index, self.measure(frame, players))
 
-        bodies = self._observe(frame_index, frame, players)
+    def update_observed(
+        self, frame_index: int, observations: List[BodyObs]
+    ) -> Dict[int, Tuple[str, int, str]]:
+        """Resolve labels from measured observations; returns tid -> label."""
+        self.last_observations = observations
+        bodies = self._track_states(frame_index, observations)
         self._update_orientation(frame_index, bodies)
 
         taken: Dict[int, int] = {}  # player index -> tid
         if not self.doubt:
             for side in VIEWS:
-                taken.update(
-                    self._assign_side(side, [b for b in bodies if b["side"] == side])
-                )
-            self._maybe_learn(frame_index, bodies, taken, players)
+                taken.update(self._assign_side(side, [b for b in bodies if b["side"] == side]))
+            self._maybe_learn(frame_index, bodies, taken, observations)
 
         labels: Dict[int, Tuple[str, int, str]] = {}
         for p, tid in taken.items():
             m = self.players[p]
             labels[tid] = (m.label, m.squad, m.slot)
-        # Tracks not evaluated this frame (coasting, or off court -- e.g. the
-        # server behind the baseline) keep their label while nobody else
-        # claims it and they are still on that squad's side of the net.
+        # Tracks not evaluated this frame (coasting, or off court) keep their
+        # label while nobody else claims it and they are on that squad's side.
         evaluated = {b["tid"] for b in bodies}
-        for p_dict in players:
-            tid = p_dict.get("track_id")
-            st = self._tids.get(tid) if tid is not None else None
-            if st is None or tid in evaluated or st.hold is None:
+        for o in observations:
+            st = self._tids.get(o.tid)
+            if st is None or o.tid in evaluated or st.hold is None:
                 continue
             if st.hold in taken:
                 st.hold = None
                 continue
-            bbox = p_dict.get("bbox")
-            side = self._side(bbox) if bbox else None
-            if side is not None and self.squad_on(side) != self.players[st.hold].squad:
+            if o.side is not None and self.squad_on(o.side) != self.players[st.hold].squad:
                 st.hold = None
                 continue
             if not self.doubt:
                 m = self.players[st.hold]
-                labels[tid] = (m.label, m.squad, m.slot)
+                labels[o.tid] = (m.label, m.squad, m.slot)
 
         self._labels = labels
         self._history[frame_index] = labels
@@ -687,30 +675,34 @@ class TeamIdentityResolver:
             self._tids.pop(tid)
         return labels
 
-    def _observe(self, frame_index, frame, players) -> List[Dict[str, Any]]:
-        """Evidence for every real, eligible body; maintains per-id state."""
+    def _track_states(self, frame_index: int, observations: List[BodyObs]) -> List[Dict[str, Any]]:
+        """Per-id evidence for every measured, eligible body.
+
+        A crop behind another body (occluded) or merged with a same-side body
+        (mixed) shows two people: it neither updates the evidence nor, when
+        mixed, gets a label -- the hold is kept until the boxes separate.
+        """
         bodies: List[Dict[str, Any]] = []
-        for p_dict in players:
-            tid = p_dict.get("track_id")
-            bbox = p_dict.get("bbox")
-            if tid is None or not bbox or p_dict.get("predicted"):
+        real = [o for o in observations if not o.predicted]
+        for o in observations:
+            if o.desc is None or o.side is None or not o.eligible:
                 continue
-            eligible, in_court = self._eligibility(bbox)
-            if not eligible:
-                continue
-            side = self._side(bbox)
-            if side is None:
-                continue
-            desc = compute_descriptor(frame, bbox)
-            if desc is None:
-                continue
-            x1, y1, x2, y2 = (float(v) for v in bbox)
+            occluded = mixed = False
+            for other in real:
+                if other.tid == o.tid:
+                    continue
+                iou = self._iou(o.bbox, other.bbox)
+                if iou > self.MIXED_IOU and other.side == o.side:
+                    mixed = True
+                if iou > self.OCCLUDED_IOU and other.bbox[3] > o.bbox[3]:
+                    occluded = True
+            x1, y1, x2, y2 = o.bbox
             center = ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
             width = max(1.0, x2 - x1)
-            st = self._tids.get(tid)
+            st = self._tids.get(o.tid)
             if st is None:
-                st = _TidState(center=center, width=width, last_frame=frame_index, side=side)
-                self._tids[tid] = st
+                st = _TidState(center=center, width=width, last_frame=frame_index, side=o.side)
+                self._tids[o.tid] = st
                 reset = True
             else:
                 gap = max(1, frame_index - st.last_frame)
@@ -721,231 +713,274 @@ class TeamIdentityResolver:
                 reset = (
                     gap > self.HOLD_GAP_FRAMES
                     or dist > max(60.0, st.width) + 12.0 * (gap - 1)
-                    or st.side != side
+                    or st.side != o.side
                 )
             if reset:
                 st.ema, st.fast, st.n, st.hold = None, None, 0, None
                 st.heights.clear()
-            st.center, st.width, st.last_frame, st.side = center, width, frame_index, side
-            h = lateral_height_m(self.court, bbox)
-            if h is not None:
-                st.heights.append(h)
+            st.center, st.width, st.last_frame, st.side = center, width, frame_index, o.side
+            if o.height is not None:
+                st.heights.append(o.height)
             height = float(np.median(st.heights)) if st.heights else None
-            e = self.evidence(desc, side, height)
-            st.ema = e.copy() if st.ema is None else (
-                (1.0 - self.EMA_ALPHA) * st.ema + self.EMA_ALPHA * e
-            )
-            st.fast = e.copy() if st.fast is None else (
-                (1.0 - self.FAST_EMA_ALPHA) * st.fast + self.FAST_EMA_ALPHA * e
-            )
-            st.n += 1
-            bodies.append({
-                "tid": tid, "bbox": [x1, y1, x2, y2], "side": side,
-                "in_court": in_court, "desc": desc, "height": height,
-                "e": e, "state": st, "pair_margin": None,
-            })
+            clean = not (occluded or mixed)
+            if clean or st.ema is None:
+                sims = self._model_sims(o.desc, o.side, height)
+                st.ema = sims.copy() if st.ema is None else (
+                    (1.0 - self.EMA_ALPHA) * st.ema + self.EMA_ALPHA * sims)
+                st.fast = sims.copy() if st.fast is None else (
+                    (1.0 - self.FAST_EMA_ALPHA) * st.fast + self.FAST_EMA_ALPHA * sims)
+                st.n += 1
+            body = {
+                "tid": o.tid, "bbox": o.bbox, "side": o.side, "in_court": o.in_court,
+                "desc": o.desc, "height": height, "state": st, "mixed": mixed,
+                "clean": clean, "x": None,
+            }
+            if clean:
+                anchor = self._anchor_sims(o.desc)
+                q1, q2 = self._squad_players[1], self._squad_players[2]
+                body["x"] = float(anchor[q1].max() - anchor[q2].max())
+            bodies.append(body)
         return bodies
 
-    def _side_total(self, side_bodies, squad: int) -> Tuple[float, int]:
-        """Best assignment total of a side's bodies to a squad's 2 players."""
-        if not side_bodies:
-            return 0.0, 0
-        cols = self._squad_players[squad]
-        m = np.array([[b["e"][p] for p in cols] for b in side_bodies])
-        rows, cs = linear_sum_assignment(-m)
-        return float(m[rows, cs].sum()), len(rows)
+    # --- orientation ------------------------------------------------------ #
 
     def _update_orientation(self, frame_index: int, bodies) -> None:
-        """One-sided CUSUM on the per-body advantage of the swapped
-        orientation; flips only past the threshold and the minimum dwell.
-        Doubt (labels withheld) starts at a fraction of the threshold, or at
-        once on a single frame where the swap is strongly better for several
-        bodies (ids silently swapped across the net)."""
-        cur = alt = 0.0
-        n = 0
+        """Per-side, baseline-relative, directional CUSUM; a flip needs both
+        sides (a switch moves all four players -- an occlusion, a crouch or a
+        bystander moves one side's statistic, not both)."""
+        x = {}
         for side in VIEWS:
-            side_bodies = [b for b in bodies if b["side"] == side]
-            q = self.squad_on(side)
-            sc, k = self._side_total(side_bodies, q)
-            sa, _ = self._side_total(side_bodies, 3 - q)
-            cur, alt, n = cur + sc, alt + sa, n + k
-        self.last_evidence = None
-        instant = False
-        if n > 0:
-            d = float(np.clip((alt - cur) / n, -self.D_CLIP, self.D_CLIP))
-            self.last_evidence = d
-            instant = d >= self.INSTANT_DOUBT_D and n >= self.INSTANT_DOUBT_MIN_BODIES
-            before = self.cusum
-            self.cusum = max(0.0, self.cusum + d - self.switch_drift)
-            if before == 0.0 and self.cusum > 0.0:
-                self._onset = frame_index
-            elif self.cusum == 0.0:
-                self._onset = None
+            vals = [b["x"] for b in bodies if b["side"] == side and b["x"] is not None]
+            x[side] = float(np.mean(vals)) if vals else None
+        self.last_x = dict(x)
+        levels = self._levels[self.near_squad]
+        instant = 0
+        for side in VIEWS:
+            if x[side] is None:
+                continue
+            level = levels[side]
+            if level.n < self.LEVEL_WARMUP:
+                level.add(x[side], self.LEVEL_ALPHA)
+                continue
+            dev = (x[side] - level.mu) / level.sigma(self.X_SIGMA_FLOOR)
+            # Direction of a switch: squad 1 leaving the near side lowers
+            # x_near and raises x_far; squad 1 coming back does the opposite.
+            toward = -1.0 if (side == NEAR) == (self.near_squad == 1) else 1.0
+            u = float(np.clip(toward * dev, -self.U_CLIP, self.U_CLIP))
+            self._recent[side].append((frame_index, x[side], u))
+            self._cusum[side] = max(0.0, self._cusum[side] + u - self.switch_drift)
+            if self._cusum[side] <= self.switch_drift:
+                # Noise band: the baseline follows slow drift (light, kit).
+                level.add(x[side], self.LEVEL_ALPHA)
+            instant += u >= self.U_CLIP
         if self.cusum >= self.switch_threshold:
             if frame_index - self.last_flip_frame >= self.min_switch_interval_frames:
                 self._flip(frame_index)
-                instant = False  # this frame's evidence was FOR the new orientation
+                instant = 0
             else:
-                self.cusum = self.switch_threshold
-        # Labels go blank while the orientation is in doubt: a missing label
-        # costs an unattributed action, a wrong one corrupts a player's stats.
-        self.doubt = instant or self.cusum >= self.DOUBT_FRACTION * self.switch_threshold
+                for side in VIEWS:
+                    self._cusum[side] = min(self._cusum[side], self.switch_threshold)
+        self.doubt = (
+            instant == 2 or self.cusum >= self.DOUBT_FRACTION * self.switch_threshold
+        )
+
+    def _post_change(self, side: str, frame_index: int) -> List[Tuple[int, float, float]]:
+        """The last unbroken run of samples that sat clearly on the switch
+        side of the baseline (u >= STRONG_U, gaps <= SEED_GAP_FRAMES): what
+        the side looks like AFTER the change, without the pre-change noise."""
+        run: List[Tuple[int, float, float]] = []
+        last = frame_index
+        for rec in reversed(self._recent[side]):
+            if last - rec[0] > self.SEED_GAP_FRAMES or rec[2] < self.STRONG_U:
+                break
+            run.append(rec)
+            last = rec[0]
+        return run[::-1]
 
     def _flip(self, frame_index: int) -> None:
-        self.near_squad = 3 - self.near_squad
-        event = {
-            "frame": frame_index,
-            "onset": self._onset if self._onset is not None else frame_index,
-            "near_squad": self.near_squad,
-        }
+        old = self.near_squad
+        new = 3 - old
+        runs = {side: self._post_change(side, frame_index) for side in VIEWS}
+        starts = [r[0][0] for r in runs.values() if r]
+        onset = min(starts) if starts else frame_index
+        # The new orientation's baselines: kept from the last time it held,
+        # else seeded from what was measured since the change.
+        for side in VIEWS:
+            level = self._levels[new][side]
+            if level.n >= self.LEVEL_WARMUP:
+                continue
+            old_level = self._levels[old][side]
+            vals = [r[1] for r in runs[side]]
+            self._levels[new][side] = _Level(
+                mu=float(np.mean(vals)) if vals else old_level.mu,
+                var=old_level.var, n=self.LEVEL_WARMUP,
+            )
+        self.near_squad = new
+        event = {"frame": frame_index, "onset": onset, "near_squad": new}
         self.flips.append(event)
         logger.info(
             "Identity: side switch detected at frame %d (onset %d) -- squad %d now near",
-            frame_index, event["onset"], self.near_squad,
+            frame_index, onset, new,
         )
-        self.cusum = 0.0
-        self._onset = None
+        self._cusum = {NEAR: 0.0, FAR: 0.0}
         self.last_flip_frame = frame_index
         for st in self._tids.values():
             st.hold = None
 
+    # --- who is who within a side ------------------------------------------ #
+
+    def _margin_sigma(self, view: str) -> float:
+        """RMS teammate margin in ``view`` (the level tracks squared margins)."""
+        return float(np.sqrt(max(self._margin_level[view].mu, self.MARGIN_SIGMA_FLOOR ** 2)))
+
+    def _is_stranger(self, best: float, view: str) -> bool:
+        level = self._best_level[view]
+        if level.n < self.STRANGER_MIN_N:
+            return False
+        return best < level.mu - self.STRANGER_K * level.sigma(self.STRANGER_SIGMA_FLOOR)
+
     def _assign_side(self, side: str, side_bodies) -> Dict[int, int]:
         """Which of the side's bodies is which teammate; player index -> tid.
 
-        Hungarian on the per-id evidence (EMA) plus a hysteresis bonus for the
-        current holder. A body keeps a held label down to HOLD_FLOOR; a new
-        claim needs CLAIM_MIN_FRAMES of tracklet and ``claim_evidence`` -- or,
-        with exactly two bodies, a decided partner plus the pair beating its
-        swap by ``claim_evidence`` (by elimination). A hold whose quick EMA falls
-        below HOLD_FLOOR is broken first: the id silently moved to another
-        body (an overlap swap, no box jump) and must not carry the label.
+        A body merged with its teammate's box (``mixed``) keeps its hold but
+        is not labeled, and its player is reserved. The others: tracklets
+        with CLAIM_MIN_FRAMES of evidence or a held label, at most as many as
+        free players (the ones that look most like the squad), strangers
+        dropped. They take the better assignment of the free players, leaving
+        the held one only when the slow evidence beats it by HYST_K
+        teammate-margin spreads per body, or one clean body's quick evidence
+        by SWAP_K (an id that silently moved to the other body).
         """
-        if not side_bodies:
-            return {}
-        for b in side_bodies:
-            st = b["state"]
-            if st.hold is not None and float(st.fast[st.hold]) < self.HOLD_FLOOR:
-                st.hold = None
-                st.ema = st.fast.copy()  # the slow memory belongs to the old body
         cols = self._squad_players[self.squad_on(side)]
-        ev = np.array([[b["state"].ema[p] for p in cols] for b in side_bodies])
-        bonus = np.array([
-            [self.HOLD_BONUS if b["state"].hold == p else 0.0 for p in cols]
-            for b in side_bodies
-        ])
-        rows, cs = linear_sum_assignment(-(ev + bonus))
-        pair_margin = None
-        if len(side_bodies) == 2 and len(rows) == 2:
-            chosen = sum(ev[r, c] for r, c in zip(rows, cs))
-            swapped = sum(ev[r, 1 - c] for r, c in zip(rows, cs))
-            pair_margin = float(chosen - swapped)
-        # Pass 1: strong decisions (held, or a clear claim on its own).
-        decided: Dict[int, bool] = {}
-        for r, c in zip(rows, cs):
-            st, p = side_bodies[r]["state"], cols[c]
-            e = float(ev[r, c])
-            if st.hold == p:
-                decided[int(r)] = e >= self.HOLD_FLOOR
-            else:
-                decided[int(r)] = st.n >= self.CLAIM_MIN_FRAMES and e >= self.claim_evidence
-        # Pass 2, by elimination: with exactly two bodies, a weak body takes
-        # the remaining player when its partner is decided AND the pair beats
-        # its swap clearly. Never on the pair margin alone -- the man/woman
-        # structure of mixed teams gives a margin whichever team it is.
-        for r, c in zip(rows, cs):
-            r = int(r)
-            if decided[r] or pair_margin is None:
-                continue
-            partner = next(int(o) for o in rows if int(o) != r)
-            e = float(ev[r, c])
-            decided[r] = (
-                decided[partner]
-                and side_bodies[r]["state"].n >= self.CLAIM_MIN_FRAMES
-                and pair_margin >= self.claim_evidence
-                and e >= self.HOLD_FLOOR
+        hyst = self.HYST_K * self._margin_sigma(side)
+        swap = self.SWAP_K * self._margin_sigma(side)
+        reserved = set()
+        for b in side_bodies:
+            if b["mixed"]:
+                if b["state"].hold in cols:
+                    reserved.add(b["state"].hold)
+                else:
+                    b["state"].hold = None
+        free = [c for c in range(2) if cols[c] not in reserved]
+        bodies = [b for b in side_bodies if not b["mixed"]]
+        cands = [
+            b for b in bodies
+            if b["state"].n >= self.CLAIM_MIN_FRAMES or b["state"].hold in cols
+        ]
+        cands.sort(key=lambda b: -float(b["state"].ema[cols].max()))
+        kept = []
+        for b in cands:
+            best = float(b["state"].ema[cols].max())
+            self._best_level[side].add(best, self.MARGIN_ALPHA)
+            # A stranger by the slow AND the quick evidence (right after a
+            # swap the slow memory is mixed and reads low on its own).
+            quick = float(b["state"].fast[cols].max())
+            if len(kept) < len(free) and not self._is_stranger(max(best, quick), side):
+                kept.append(b)
+        for b in bodies:
+            if b not in kept:
+                b["state"].hold = None
+        if not kept:
+            return {}
+
+        def total(perm, key):
+            return sum(float(getattr(b["state"], key)[cols[c]]) for b, c in zip(kept, perm))
+
+        perms = [(free[0], free[1]), (free[1], free[0])] if len(kept) == 2 else [(c,) for c in free]
+        held = [
+            perm for perm in perms
+            if all(b["state"].hold in (None, cols[c]) for b, c in zip(kept, perm))
+            and any(b["state"].hold == cols[c] for b, c in zip(kept, perm))
+        ]
+        n = len(kept)
+        base = held[0] if held else max(perms, key=lambda perm: total(perm, "ema"))
+        choice = base
+        if len(perms) == 2:
+            other = next(perm for perm in perms if perm != base)
+            # Quick override, judged per CLEAN body (an occluded partner's
+            # evidence is frozen; with two bodies, one clear verdict decides
+            # both by elimination).
+            turned = any(
+                float(b["state"].fast[cols[co]] - b["state"].fast[cols[cb]]) > swap
+                for b, cb, co in zip(kept, base, other) if b["clean"]
             )
+            if turned:
+                # The quick evidence has clearly turned: an id silently moved
+                # to the other body. Its slow memory belongs to the old body.
+                choice = other
+                for b in kept:
+                    b["state"].ema = b["state"].fast.copy()
+            elif held and total(other, "ema") - total(base, "ema") > hyst * n:
+                choice = other
+            runner_up = next(perm for perm in perms if perm != choice)
+            pair_margin = (total(choice, "ema") - total(runner_up, "ema")) / n
+        else:
+            pair_margin = None   # one free player: nothing to compare against
         out: Dict[int, int] = {}
-        assigned_rows = set()
-        for r, c in zip(rows, cs):
-            b = side_bodies[r]
+        for b, c in zip(kept, choice):
+            p = cols[c]
+            out[p] = b["tid"]
+            b["state"].hold = p
             b["pair_margin"] = pair_margin
-            if decided[int(r)]:
-                out[cols[c]] = b["tid"]
-                b["state"].hold = cols[c]
-                assigned_rows.add(int(r))
-            else:
-                b["state"].hold = None
-        for r, b in enumerate(side_bodies):
-            if r not in assigned_rows:
-                b["state"].hold = None
+            m = float(b["state"].ema[p] - b["state"].ema[cols[1 - c]])
+            self._margin_level[side].add(m * m, self.MARGIN_ALPHA)
         side_tids = {b["tid"] for b in side_bodies}
         for tid, st in self._tids.items():
             if tid not in side_tids and st.hold in out:
                 st.hold = None
         return out
 
-    def _maybe_learn(self, frame_index, bodies, taken, players) -> None:
+    # --- learning (within-side models only) ----------------------------- #
+
+    def _maybe_learn(self, frame_index, bodies, taken, observations) -> None:
         """Add prototypes from confidently identified, isolated, in-court
-        bodies -- this is how each player acquires the view they were not
-        enrolled in. Never during orientation doubt or right after a flip."""
-        if self.cusum > self.LEARN_MAX_CUSUM_FRACTION * self.switch_threshold:
+        bodies: how each player acquires the view it was not enrolled in.
+        Only while the orientation is settled; the orientation statistic
+        never reads these prototypes."""
+        if self._cusum[NEAR] > self.switch_drift or self._cusum[FAR] > self.switch_drift:
             return
-        if self.flips and frame_index - self.last_flip_frame < self.LEARN_SETTLE_FRAMES:
+        if frame_index - self.last_flip_frame < self.LEARN_SETTLE_FRAMES and self.flips:
             return
         tid_to_player = {tid: p for p, tid in taken.items()}
         for b in bodies:
             p = tid_to_player.get(b["tid"])
-            if p is None or not b["in_court"]:
+            if p is None or not b["in_court"] or b.get("pair_margin") is None:
                 continue
             st = b["state"]
+            view = b["side"]
+            model = self.players[p]
             if st.n < self.LEARN_MIN_FRAMES:
                 continue
-            model = self.players[p]
-            view = b["side"]
             if frame_index - model.last_learn[view] < self.LEARN_INTERVAL:
                 continue
-            own = float(st.ema[p])
-            if b["pair_margin"] is not None:
-                if b["pair_margin"] < self.learn_margin or own < 0.0:
-                    continue
-            else:
-                mate = next(q for q in self._squad_players[model.squad] if q != p)
-                if own - float(st.ema[mate]) < self.learn_margin or own < self.LEARN_MIN_EVIDENCE:
-                    continue
+            if b["pair_margin"] < self.LEARN_K * self._margin_sigma(view):
+                continue
             if any(
-                self._iou(b["bbox"], o["bbox"]) > self.LEARN_MAX_IOU
-                for o in players
-                if o.get("bbox") and o.get("track_id") != b["tid"]
+                self._iou(b["bbox"], o.bbox) > self.LEARN_MAX_IOU
+                for o in observations if o.tid != b["tid"]
             ):
                 continue
-            self._add_proto(p, view, b["desc"])
-            if b["height"] is not None:
-                model.heights[view].append(b["height"])
-            self._pool[(p, view)].append(_PoolEntry(b["desc"], b["height"]))
+            learned = model.learned[view]
+            if len(learned) < self.MAX_LEARNED:
+                learned.append(b["desc"])
+            else:
+                parts, mask = stack_descriptors(learned)
+                dparts, dmask = stack_descriptors([b["desc"]])
+                sims = [float(appearance_scores(parts[k:k + 1], mask[k:k + 1], dparts, dmask)[0])
+                        for k in range(len(learned))]
+                learned[int(np.argmax(sims))] = b["desc"]   # keep the set diverse
+            self._model_cache.pop((p, view), None)
             model.last_learn[view] = frame_index
-            self._height_cache.clear()
-            self._dirty.update((q, v) for q in range(4) for v in VIEWS)
-            logger.debug(
-                "Identity: learned %s %s prototype at frame %d", model.label, view, frame_index,
-            )
+            logger.debug("Identity: learned %s %s prototype at frame %d",
+                         model.label, view, frame_index)
 
-    def _add_proto(self, p: int, view: str, desc: Descriptor) -> None:
-        """Append, or replace the learned prototype most similar to ``desc``
-        (keeps the set diverse). Enrollment anchors are never replaced."""
-        model = self.players[p]
-        protos = model.protos[view]
-        self._proto_cache.pop((p, NEAR), None)
-        self._proto_cache.pop((p, FAR), None)
-        if len(protos) < self.MAX_PROTOS:
-            protos.append(desc)
-            return
-        start = model.n_anchor[view]
-        if start >= len(protos):
-            return
-        parts, mask = stack_descriptors(protos[start:])
-        dparts, dmask = stack_descriptors([desc])
-        sims = [
-            float(appearance_scores(parts[k:k + 1], mask[k:k + 1], dparts, dmask)[0])
-            for k in range(parts.shape[0])
-        ]
-        protos[start + int(np.argmax(sims))] = desc
+    @staticmethod
+    def _iou(a, b) -> float:
+        x1, y1 = max(a[0], b[0]), max(a[1], b[1])
+        x2, y2 = min(a[2], b[2]), min(a[3], b[3])
+        inter = max(0.0, x2 - x1) * max(0.0, y2 - y1)
+        if inter <= 0:
+            return 0.0
+        area_a = (a[2] - a[0]) * (a[3] - a[1])
+        area_b = (b[2] - b[0]) * (b[3] - b[1])
+        return inter / max(1e-9, area_a + area_b - inter)

@@ -78,9 +78,9 @@ class PlayerTracker:
         identity_resolver: bool = True,
         identity_court_slack_px: float = 16.0,
         identity_mode: str = "team",
-        identity_switch_threshold: float = 40.0,
+        identity_switch_threshold: float = 25.0,
         identity_switch_drift: float = 0.5,
-        identity_min_switch_interval_frames: int = 900,
+        identity_min_switch_interval_frames: int = 1500,
     ):
         """Initialize the player tracker.
 

@@ -222,3 +222,50 @@ def test_sequential_pass_records_labels_actions_and_sheets(tmp_path, monkeypatch
     paths = probe.write_sheets(sheets, record["fps"], tmp_path)
     assert len(paths) == 1 and paths[0].exists()
     assert probe.print_report(record, None)["labels"]["coverage"]["P1A"] > 0.5
+
+
+def test_feature_dump_replays_to_the_same_labels(tmp_path, monkeypatch):
+    """Dump the measured bodies during the pass, replay the decision layer
+    offline: the replay must reproduce the live labels frame by frame."""
+    import src.analysis.frame_processor as fp
+
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import replay_identity  # noqa: E402
+
+    video = str(tmp_path / "synth.mp4")
+    writer = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*"mp4v"), 10, (_W, _H))
+    for _ in range(30):
+        writer.write(_frame())
+    writer.release()
+    monkeypatch.setattr(fp, "FrameProcessor", _StubProcessor)
+
+    features = probe.FeatureRecorder()
+    record, _ = probe.sequential_pass(video, {}, max_frames=25, sheet_every_s=1.0,
+                                      features=features)
+    path = tmp_path / "identity_features.npz"
+    features.save(path, record["fps"], len(record["frames"]))
+
+    meta, refs, frames = probe.load_features(path)
+    assert meta["n_frames"] == 25 and [r["label"] for r in refs] == ["P1A", "P2A", "P1B", "P2B"]
+    assert all(len(r["identity_samples"]) == 10 for r in refs)
+    assert sum(len(v) for v in frames.values()) == 25 * 4
+
+    replayed, res = replay_identity.replay(path, record)
+    live = [sorted((b[0], b[1]) for b in f["bodies"]) for f in record["frames"]]
+    again = [sorted((b[0], b[1]) for b in f["bodies"]) for f in replayed["frames"]]
+    assert again == live
+    assert replayed["actions"][0]["label"] == "P2B"
+    assert replayed["actions"][0]["legacy_label"] == record["actions"][0]["legacy_label"]
+
+
+def test_replay_overrides_split_kwargs_and_constants():
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import replay_identity  # noqa: E402
+
+    kwargs, consts = replay_identity.parse_overrides(
+        ["switch_threshold=30", "LEVEL_ALPHA=0.001", "serve_zone_eligible=False"])
+    assert kwargs == {"switch_threshold": 30, "serve_zone_eligible": False}
+    assert consts == {"LEVEL_ALPHA": 0.001}
+    import pytest
+    with pytest.raises(SystemExit):
+        replay_identity.parse_overrides(["not_a_knob=1"])

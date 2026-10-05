@@ -2596,3 +2596,70 @@ Open point 2 as it stood before the #83 rewrite, verbatim:
     around an official switch to measure hop rate → then judge the
     dead-time gallery horizon (18a lever) vs a stronger appearance
     tie-breaker. Not blocked by 22 (tracks dump is ball-independent).
+
+## Archived 2026-10-05 (#84): header paragraph #83 + the #83 identity block of "Where we are" + open point 2 as of #83, verbatim
+
+**Last updated:** 2026-10-05 (eighty-third session — **#83: side-switch-aware
+TEAM IDENTITY RESOLVER shipped (output labels only; tracking byte-identical by
+construction).** New `src/tracking/identity_resolver.py` (`TeamIdentityResolver`)
+re-derives P1A/P2A/P1B/P2B every frame from the structural fact that teammates
+share a side: (1) ORIENTATION (which squad is near) by a one-sided CUSUM over
+per-body evidence with a 900 f minimum dwell, labels withheld while in doubt;
+(2) within-side slots by per-tracklet evidence EMA + hysteresis + elimination.
+Evidence = impostor-normalised DISCRIMINATION + same-view FIT, both calibrated on
+the video's own enrollment samples (no venue/kit constant); background-weighted,
+resolution-normalised part histograms (H x S + achromatic V) + lateral-scale
+height; each player LEARNS the view it was not enrolled in after a confident flip
+(anchors never replaced). The #82 resolver keeps running only to feed the
+tracker's enrollment guards. Synthetic validation (drawn near/back vs far/front
+players, scrambled ids): switches flip in ~10 frames with ZERO wrong labels, 3
+consecutive switches, no flip through occlusion, silent teammate swap fixed in
+≤4 f. NOT yet run on real footage (no video in the cloud session) — owner runs
+`scripts/probe_identity_switches.py` on the 20260920 match next. Suite **1475**
+(+30). Config `player_identity_mode` ("team"/"legacy") + 3 CUSUM keys.)
+
+**#83 SHIPPED: TEAM IDENTITY RESOLVER — the owner's side-switch request (labels
+must find the same person again after a switch; a few wrong/blank frames are
+acceptable, actions are ~10% of frames).** Identity stack today, all output-only
+(no tracking decision reads it): E1 enrollment pre-pass (#81) → 4 references,
+now also carrying per-sample identity descriptors + heights → `TeamIdentityResolver`
+(#83, `player_identity_mode: "team"`, default) stamps `player_label`/`squad`/`slot`
+on tracked players and actions; actions take the label at their CONTACT frame
+(`label_for(tid, frame)`, 900 f history), falling back to the emission-time label.
+The #82 per-frame resolver still runs and still writes `_track_labels`, which ONLY
+the tracker's enrollment guards read — so tracking is identical in "team" and
+"legacy" modes (unit-pinned). Mechanism: orientation CUSUM (threshold 40, drift
+0.5, min dwell 900 f; doubt at 25% of the threshold or one frame with mean swap
+advantage ≥3 over ≥2 bodies → labels blank, never wrong); within-side slots by
+EMA evidence (+1 hold bonus, −1 hold floor, quick-EMA hold break for overlap
+swaps, 5-frame claim delay, elimination only with a decided partner); evidence
+`e = z + f` (z = vs all other players' samples in both views, f = vs the player's
+own same-view samples, capped +1); learning only when settled, isolated
+(IoU < 0.05), in court, pair margin ≥2. Eligible bodies = in court (+16 px
+slack) or in a serve zone (the server). **Validation status:** synthetic only —
+the real-footage gate is the owner's run of `scripts/probe_identity_switches.py`
+(one sequential production pass, team vs legacy labels side by side, contact
+sheets rows = P1A..P2B, and with `--contacts-gt
+ground_truth/20260920_match_contacts.json`: orientation at all 184 GT contacts,
+one flip per GT switch window after P7/P14/P21/P28, action-label squad accuracy
+team vs legacy). Entreno A/B for action F1 is unchanged by construction (labels
+never reach the classifier) but a fresh run is still owed per §1. Open risks,
+unmeasured: cross-view similarity on real far players (weak sims 0.3-0.6 in #82),
+lighting drift over a long match, same-gender teams with similar kit.
+
+2.  **Side-change survival (player identity) — status: BUILT, awaiting the
+    real-footage gate (#83).** Problem: labels mixed after side switches (#82's
+    resolver had no team constraint, position continuity locked swaps in, and
+    enrollment only ever saw squad 1 near / squad 2 far). #83 ships
+    `TeamIdentityResolver` (orientation CUSUM + within-side slots + per-video
+    calibrated evidence + learned second view), output labels only. Prior
+    roster facts stand (full match: ids 1-4 only, swap-rate 0.00, 46
+    resurrections, a mid-rally id hop f1250-1350 — the resolver is designed to
+    absorb hops, not prevent them). **Next:** owner runs
+    `scripts/probe_identity_switches.py <20260920 match> --contacts-gt
+    ground_truth/20260920_match_contacts.json`; pre-registered reading: PASS =
+    4/4 switch windows ok, 0 stray flips, orientation wrong at 0 GT contacts
+    outside the first ~5 s after a switch, team-resolver action squad errors <
+    legacy's, contact-sheet rows one person each. Then entreno A/B (§1) and
+    vall_dhebron only after its held-out lock is lifted. History:
+    `docs/history/status_where_we_are_archive.md` (#83 section).

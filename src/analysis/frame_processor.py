@@ -210,13 +210,13 @@ class FrameProcessor:
                 ),
                 identity_mode=self.config.get("player_identity_mode", "team"),
                 identity_switch_threshold=self.config.get(
-                    "player_identity_switch_threshold", 40.0
+                    "player_identity_switch_threshold", 25.0
                 ),
                 identity_switch_drift=self.config.get(
                     "player_identity_switch_drift", 0.5
                 ),
                 identity_min_switch_interval_frames=self.config.get(
-                    "player_identity_min_switch_interval_frames", 900
+                    "player_identity_min_switch_interval_frames", 1500
                 ),
             )
 
