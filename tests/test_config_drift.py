@@ -132,6 +132,9 @@ CTOR_PARITY = [
     ("player_serve_zone_trial_frames", PlayerTracker, "serve_zone_trial_frames"),
     ("player_serve_zone_ball_votes", PlayerTracker, "serve_zone_ball_votes"),
     ("player_label_min_similarity", PlayerTracker, "label_min_similarity"),
+    ("player_label_new_track_min_similarity", PlayerTracker, "label_new_track_min_similarity"),
+    ("player_identity_resolver", PlayerTracker, "identity_resolver"),
+    ("player_identity_court_slack_px", PlayerTracker, "identity_court_slack_px"),
     # PlayerEnrollment (E1 pre-pass; references are display-only)
     ("player_enrollment_frames", PlayerEnrollment, "max_frames"),
     ("player_enrollment_stride", PlayerEnrollment, "stride"),
@@ -139,6 +142,8 @@ CTOR_PARITY = [
     ("player_enrollment_chain_gate_px", PlayerEnrollment, "chain_gate_px"),
     ("player_enrollment_chain_gap_samples", PlayerEnrollment, "chain_gap_samples"),
     ("player_enrollment_merge_gap_frames", PlayerEnrollment, "merge_gap_frames"),
+    ("player_enrollment_court_slack_px", PlayerEnrollment, "court_slack_px"),
+    ("player_enrollment_max_start_frame", PlayerEnrollment, "max_start_frame"),
 ]
 
 

@@ -133,7 +133,12 @@ class Config:
         "player_enrollment_chain_gate_px": 120.0,  # foot-distance gate between consecutive samples of one chain (VENUE-COUPLED px: beach court is 206 px deep vs 464-479 at the practice venue)
         "player_enrollment_chain_gap_samples": 6,  # consecutive missed samples before a chain dies (occlusion fragments re-join in the merge pass)
         "player_enrollment_merge_gap_frames": 60,  # max time gap for merging a chain fragment back into its predecessor (~2.3 s)
+        "player_enrollment_court_slack_px": 16.0,  # accept samples whose foot sits this far OUTSIDE the strict court (on-line players read ~0-3 px out; bystanders >=100 px)
+        "player_enrollment_max_start_frame": 150,  # a reference chain must START within this frame (walkers/bystanders arriving late lose the slot to waiting players)
         "player_label_min_similarity": 0.35,   # ensemble-similarity floor to attach an enrollment label to a track (greedy best-of-unclaimed; sticky once assigned)
+        "player_label_new_track_min_similarity": 0.55,  # stricter floor for labels claimed AFTER the bootstrap lock (a recycled track must clearly match its reference)
+        "player_identity_resolver": True,       # per-frame display-only identity resolver: labels follow the body (appearance + continuity), not the tracker id, so an id swap never moves a label
+        "player_identity_court_slack_px": 16.0, # a body only competes for a label when its foot is in court or within this many px of the line
 
         # Enhanced trajectory-based tracking settings
         "low_confidence_threshold": 0.4,  # Min confidence for the tracker to accept a detection

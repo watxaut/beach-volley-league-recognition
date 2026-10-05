@@ -140,10 +140,10 @@ def _standard_samples():
     return [[(cx, cy, color) for cx, cy, color in CAST] for _ in range(N_SAMPLES)]
 
 
-def _make_enroller(tmp_path, samples, **overrides):
+def _make_enroller(tmp_path, samples, court=None, **overrides):
     video = os.path.join(str(tmp_path), "synth.mp4")
     _write_video(video, samples)
-    court = _FakeCourt()
+    court = court or _FakeCourt()
     tracker = PlayerTracker(court_calibration=court, max_players=4)
     params = dict(
         court_calibration=court,
@@ -171,17 +171,22 @@ def test_enroll_builds_four_references_with_labels_and_squads(tmp_path):
     assert refs is not None
     assert sorted(r["label"] for r in refs) == ["P1A", "P1B", "P2A", "P2B"]
     squads = {r["label"]: r["squad"] for r in refs}
-    assert squads["P1A"] == 1 and squads["P1B"] == 1
-    assert squads["P2A"] == 2 and squads["P2B"] == 2
+    # Label = player number + TEAM letter (owner request 2026-10-05): team A
+    # (P1A, P2A) is the near pair = squad 1; team B (P1B, P2B) the far pair.
+    assert squads["P1A"] == 1 and squads["P2A"] == 1
+    assert squads["P1B"] == 2 and squads["P2B"] == 2
     # Near pair = squad 1; far pair = squad 2 (fake court: foot y vs MID_Y).
     by_label = {r["label"]: r for r in refs}
     assert by_label["P1A"]["last_foot"][1] >= MID_Y
-    assert by_label["P1B"]["last_foot"][1] >= MID_Y
-    assert by_label["P2A"]["last_foot"][1] < MID_Y
+    assert by_label["P2A"]["last_foot"][1] >= MID_Y
+    assert by_label["P1B"]["last_foot"][1] < MID_Y
     assert by_label["P2B"]["last_foot"][1] < MID_Y
-    # Slot A = left of slot B within the squad (x at the shared frame).
-    assert by_label["P1A"]["last_foot"][0] < by_label["P1B"]["last_foot"][0]
-    assert by_label["P2A"]["last_foot"][0] < by_label["P2B"]["last_foot"][0]
+    # Mirrored slot rule (owner-ratified 2026-10-06): "A" is the pair's LEFT
+    # as the pair FACES the net. The near pair faces away from the lens, so
+    # its A is the camera-RIGHT player; the far pair faces the lens, so its A
+    # is camera-LEFT.
+    assert by_label["P1A"]["last_foot"][0] > by_label["P2A"]["last_foot"][0]
+    assert by_label["P1B"]["last_foot"][0] < by_label["P2B"]["last_foot"][0]
     # Every reference carries the ensemble signature channels the tracker's
     # _signature_similarity consumes.
     for r in refs:
@@ -222,12 +227,13 @@ def test_enroll_merges_occlusion_fragments_of_the_same_player(tmp_path):
     refs = enroller.enroll(os.path.join(str(tmp_path), "synth.mp4"))
 
     assert refs is not None
-    # The occluded player (blue = near left = P1A) saw samples 0-9 and 20-29:
-    # its two 10-observation fragments were merged back into one 20-obs
-    # chain, while the ever-present three kept all 30 samples.
+    # The occluded player (blue = near left = P2A under the mirrored slot
+    # rule) saw samples 0-9 and 20-29: its two 10-observation fragments were
+    # merged back into one 20-obs chain, while the ever-present three kept
+    # all 30 samples.
     by_label = {r["label"]: r["n_observations"] for r in refs}
-    assert by_label["P1A"] == 20, by_label
-    assert by_label["P1B"] == 30 and by_label["P2A"] == 30 and by_label["P2B"] == 30
+    assert by_label["P2A"] == 20, by_label
+    assert by_label["P1A"] == 30 and by_label["P1B"] == 30 and by_label["P2B"] == 30
 
 
 def test_enroll_disabled_returns_none(tmp_path):
@@ -446,3 +452,323 @@ def test_tracking_outputs_byte_identical_with_and_without_enrollment():
     _seed(t, CAST)
     frame, dets = _frame_with(CAST)
     assert any(p["player_label"] for p in t.update(dets, frame))
+
+
+# --------------------------------------------------------------------------- #
+# Match-theft fixes (owner feedback 2026-10-06): on-line slack, late chains,
+# stricter post-lock claim bar, enrolled-player immunity
+# --------------------------------------------------------------------------- #
+
+class _BoundedCourt(_FakeCourt):
+    """Court = the box x in [20, 300], y in [10, 230]. Feet outside read
+    out-of-court, with a true pixel distance to the box (the stand-in for
+    CourtCalibration.distance_to_court_px)."""
+
+    def is_point_in_court(self, point):
+        x, y = point
+        return 20 <= x <= 300 and 10 <= y <= 230
+
+    def distance_to_court_px(self, point):
+        x, y = point
+        dx = max(20 - x, 0, x - 300)
+        dy = max(10 - y, 0, y - 230)
+        return float((dx * dx + dy * dy) ** 0.5)
+
+
+# Near pair unchanged; the far-left player stands 3 px OUTSIDE the sideline
+# (ON the court line -- the real 20260920 match P2A geometry).
+CAST_ONLINE = [(80, 170, BLUE), (240, 170, TEAL), (303, 40, RED), (260, 40, YELLOW)]
+
+
+def test_enrollment_keeps_on_line_players_within_court_slack(tmp_path):
+    court = _BoundedCourt()
+    enroller = _make_enroller(tmp_path, [CAST_ONLINE] * N_SAMPLES, court=court)
+    refs = enroller.enroll(os.path.join(str(tmp_path), "synth.mp4"))
+
+    assert refs is not None, f"reason={enroller.last_result}"
+    by_label = {r["label"]: r for r in refs}
+    # The on-line player is enrolled (mirrored rule: far pair A = camera-left
+    # of the pair = yellow at x=260 = P1B; red at x=303 is P2B).
+    assert "P1B" in by_label and "P2B" in by_label
+    assert by_label["P2B"]["last_foot"][0] == 303
+
+
+def test_enrollment_strict_slack_zero_drops_on_line_player(tmp_path):
+    court = _BoundedCourt()
+    enroller = _make_enroller(
+        tmp_path, [CAST_ONLINE] * N_SAMPLES, court=court, court_slack_px=0.0
+    )
+    refs = enroller.enroll(os.path.join(str(tmp_path), "synth.mp4"))
+    # Only 3 court-side chains -> fallback (no enrollment).
+    assert refs is None
+    assert enroller.last_result["reason"] == "fewer_than_4_persistent_chains"
+
+
+def test_enrollment_rejects_late_arriving_chain(tmp_path):
+    # Blue (near pair) leaves after sample 11 (12 obs); an orange walker
+    # arrives at sample 13 beyond the 120px chain gate from blue's last spot
+    # and stays (17 obs). Without the start filter the walker would OUT-VOTE
+    # the waiting player for the 4th slot.
+    samples = [list(CAST) for _ in range(N_SAMPLES)]
+    for s in range(12, N_SAMPLES):
+        samples[s][0] = None
+    for s in range(13, N_SAMPLES):
+        samples[s].append((300, 160, (0, 128, 255)))  # orange, near half, far from blue
+    enroller = _make_enroller(tmp_path, samples, max_start_frame=60)
+    refs = enroller.enroll(os.path.join(str(tmp_path), "synth.mp4"))
+
+    assert refs is not None
+    labels = {r["label"] for r in refs}
+    counts = {r["label"]: r["n_observations"] for r in refs}
+    assert len(labels) == 4
+    assert "P2A" in labels           # blue survived with only 12 observations
+    assert counts["P2A"] == 12
+    assert all(r["first_frame"] <= 60 for r in refs)
+
+
+def test_enrollment_start_filter_disabled_admits_walker(tmp_path):
+    # Control for the test above: with the window wide open the walker (17
+    # obs) beats the departed player (12 obs) for the 4th slot.
+    samples = [list(CAST) for _ in range(N_SAMPLES)]
+    for s in range(12, N_SAMPLES):
+        samples[s][0] = None
+    for s in range(13, N_SAMPLES):
+        samples[s].append((300, 160, (0, 128, 255)))
+    enroller = _make_enroller(tmp_path, samples, max_start_frame=10_000)
+    refs = enroller.enroll(os.path.join(str(tmp_path), "synth.mp4"))
+    assert refs is not None
+    counts = {r["label"]: r["n_observations"] for r in refs}
+    assert 17 in counts.values() and 12 not in counts.values()
+
+
+def test_tracker_new_track_claim_bar_is_stricter_than_bootstrap():
+    tracker = _tracker()
+    tracker.set_enrollment(_refs_from_cast(tracker, CAST, CAST_LABELS))
+    det = _det(150, 100)
+
+    # Sim floor stub: every reference scores 0.5 -- between the two bars.
+    tracker._signature_similarity = lambda ref, subject: 0.5
+
+    # Bootstrap-lock seeding (initial=True) keeps the 0.35 floor -> assigned.
+    tracker._maybe_assign_label(1, det, initial=True)
+    assert tracker.label_for(1) == "P1A"
+
+    # Post-lock creation (initial=False, the recycled-id path) needs 0.55.
+    tracker2 = _tracker()
+    tracker2.set_enrollment(_refs_from_cast(tracker2, CAST, CAST_LABELS))
+    tracker2._signature_similarity = lambda ref, subject: 0.5
+    tracker2._maybe_assign_label(1, det)
+    assert tracker2.label_for(1) is None
+
+    # ... and a clear match (0.6) still claims.
+    tracker3 = _tracker()
+    tracker3.set_enrollment(_refs_from_cast(tracker3, CAST, CAST_LABELS))
+    tracker3._signature_similarity = lambda ref, subject: 0.6
+    tracker3._maybe_assign_label(1, det)
+    assert tracker3.label_for(1) == "P1A"
+
+
+def test_tracker_serve_zone_trial_does_not_expire_enrolled_player():
+    tracker = _tracker(serve_zone_trial_frames=5)
+    tracker.set_enrollment(_refs_from_cast(tracker, CAST, CAST_LABELS))
+    frame, _ = _frame_with(CAST)
+    tracker._current_frame = frame
+    # Seed ONE track over the blue player (bootstrap path -> labelled).
+    tid = tracker._create_track(_det(80, 170), require_court_admission=False,
+                                initial_label=True)
+    tracker.tracks[tid]["last_in_court_frame"] = None  # never entered court
+    tracker.frame_count = 200                          # trial long over
+    tracker._expire_serve_zone_trials()
+    assert tid in tracker.tracks, "enrolled player must not be trial-expired"
+
+    # Control: the same track WITHOUT a matching label still expires.
+    tracker2 = _tracker(serve_zone_trial_frames=5)
+    tracker2.set_enrollment(_refs_from_cast(tracker2, CAST, CAST_LABELS))
+    tracker2._current_frame = frame
+    tid2 = tracker2._create_track(_det(80, 170), require_court_admission=False,
+                                  initial_label=True)
+    tracker2.tracks[tid2]["last_in_court_frame"] = None
+    tracker2._track_labels.pop(tid2)                   # unlabelled stray
+    tracker2.frame_count = 200
+    tracker2._expire_serve_zone_trials()
+    assert tid2 not in tracker2.tracks
+
+
+def test_tracker_squatter_review_skips_enrolled_player():
+    tracker = _tracker(squatter_review_frames=10, squatter_min_fed_frames=5,
+                       squatter_min_in_court_frac=0.35)
+    tracker.set_enrollment(_refs_from_cast(tracker, CAST, CAST_LABELS))
+    frame, _ = _frame_with(CAST)
+    tracker._current_frame = frame
+    tid = tracker._create_track(_det(80, 170), require_court_admission=False,
+                                initial_label=True)
+    tr = tracker.tracks[tid]
+    tr["fed_frames"] = 50
+    tr["in_court_fed_frames"] = 0          # lifetime all out-of-court
+    tr["created_frame"] = 0
+    tracker.frame_count = 100
+    tracker._expire_squatters()
+    assert tid in tracker.tracks, "enrolled player must not be squatter-expired"
+
+    tracker2 = _tracker(squatter_review_frames=10, squatter_min_fed_frames=5,
+                        squatter_min_in_court_frac=0.35)
+    tracker2.set_enrollment(_refs_from_cast(tracker2, CAST, CAST_LABELS))
+    tracker2._current_frame = frame
+    tid2 = tracker2._create_track(_det(80, 170), require_court_admission=False,
+                                  initial_label=True)
+    tr2 = tracker2.tracks[tid2]
+    tr2["fed_frames"] = 50
+    tr2["in_court_fed_frames"] = 0
+    tr2["created_frame"] = 0
+    # Theft control: the box has drifted onto empty sand (no colour support),
+    # so the track's CURRENT appearance no longer matches its reference --
+    # immunity is appearance-verified each review, not label-membership.
+    tr2["bbox"] = list(_det(160, 130)["bbox"])
+    tr2["center"] = [160.0, 130.0]
+    tracker2.frame_count = 100
+    assert not tracker2._enrollment_holds(tid2, tr2)
+    tracker2._expire_squatters()
+    assert tid2 not in tracker2.tracks
+
+
+def test_tracker_cooldown_block_bypassed_for_enrolled_detection():
+    tracker = _tracker()
+    tracker.set_enrollment(_refs_from_cast(tracker, CAST, CAST_LABELS))
+    frame, _ = _frame_with(CAST)
+    tracker._current_frame = frame
+    # The trial-expired bbox of the blue player blocks the serve zone.
+    tracker._serve_zone_cooldown.append(list(_det(80, 170)["bbox"]))
+    item = (99, _det(80, 170))
+    # Force the serve-zone path (out-of-court + in-zone) without world
+    # geometry; the candidate then hits the cooldown check.
+    tracker._detection_in_court = lambda det: False
+    tracker._detection_in_serve_zone = lambda det: True
+
+    keep = tracker._filter_serve_zone_candidates([item])
+    assert keep, "enrolled-matching detection must bypass the cooldown block"
+
+    # Control: an appearance-less detection is still blocked.
+    tracker2 = _tracker()
+    tracker2.set_enrollment(_refs_from_cast(tracker2, CAST, CAST_LABELS))
+    tracker2._serve_zone_cooldown.append(list(_det(80, 170)["bbox"]))
+    tracker2._detection_in_court = lambda det: False
+    tracker2._detection_in_serve_zone = lambda det: True
+    blind = (99, {"bbox": _det(80, 170)["bbox"], "center": [80.0, 170.0],
+                  "confidence": 0.9})
+    keep2 = tracker2._filter_serve_zone_candidates([blind])
+    assert not keep2
+
+
+def test_enrolled_player_on_sideline_keeps_feeding_past_off_court_hold():
+    """20260920 match f151: the far P2A stands just OFF the sideline; once
+    off_court_hold_frames lapsed the bystander guard refused to feed her track,
+    Hungarian paired the id with her teammate's box and the two same-squad
+    labels swapped. An enrolled track must keep feeding off-court while the
+    detection still matches its own reference."""
+    tracker = _tracker(court_calibration=_BoundedCourt(), off_court_hold_frames=10)
+    tracker.set_enrollment(_refs_from_cast(tracker, CAST_ONLINE, CAST_LABELS))
+    tids = _seed(tracker, CAST_ONLINE)
+    on_line = tids[2]  # red, foot at x=303 -> out of court
+    track = tracker.tracks[on_line]
+    assert tracker.label_for(on_line) == "P2A"
+
+    frame, dets = _frame_with(CAST_ONLINE)
+    tracker._current_frame = frame
+    det = dets[2]
+    assert tracker._detection_in_court(det) is False
+    track["last_in_court_frame"] = tracker.frame_count - 50  # past the hold
+    track["last_matched_frame"] = tracker.frame_count - 1
+
+    assert tracker._may_feed_track(track, det, tid=on_line) is True
+    # Guard unchanged without enrollment identity (no tid / unlabeled track)...
+    assert tracker._may_feed_track(track, det) is False
+    tracker._track_labels.pop(on_line)
+    assert tracker._may_feed_track(track, det, tid=on_line) is False
+    # ...and a different-looking off-court walker never inherits the track.
+    tracker._track_labels[on_line] = ("P2A", 2, "A")
+    walker_frame, _ = _frame_with([(303, 40, (255, 255, 255))])
+    tracker._current_frame = walker_frame
+    assert tracker._may_feed_track(track, _det(303, 40), tid=on_line) is False
+
+
+# --------------------------------------------------------------------------- #
+# Identity resolver: labels follow the body, never the tracker id
+# --------------------------------------------------------------------------- #
+
+def _bodies(order, boxes):
+    """tracked-player dicts: tid i+1 sits at boxes[order[i]]."""
+    out = []
+    for tid, idx in enumerate(order, start=1):
+        cx, cy = boxes[idx][0], boxes[idx][1]
+        d = _det(cx, cy)
+        out.append({
+            "track_id": tid, "bbox": d["bbox"], "center": d["center"],
+            "confidence": 0.9,
+        })
+    return out
+
+
+def _resolver_tracker(court=None):
+    tracker = _tracker(court_calibration=court or _FakeCourt())
+    tracker.set_enrollment(_refs_from_cast(tracker, CAST, CAST_LABELS))
+    return tracker
+
+
+def _label_at(players, cx):
+    return next(p["player_label"] for p in players if p["center"][0] == cx)
+
+
+def test_resolver_label_follows_the_body_when_track_ids_swap():
+    tracker = _resolver_tracker()
+    frame, _ = _frame_with(CAST)
+    tracker._current_frame = frame
+    for _ in range(5):
+        tracker.frame_count += 1
+        out = tracker._stamp_identities(_bodies([0, 1, 2, 3], CAST))
+    assert _label_at(out, 80) == "P1A" and _label_at(out, 240) == "P1B"
+
+    # The tracker swaps ids 1 and 2 (the f151 failure): tid 1 now rides the
+    # teal body, tid 2 the blue one. Labels must stay with the colours.
+    tracker.frame_count += 1
+    out = tracker._stamp_identities(_bodies([1, 0, 2, 3], CAST))
+    assert _label_at(out, 80) == "P1A"
+    assert _label_at(out, 240) == "P1B"
+    assert _label_at(out, 100) == "P2A" and _label_at(out, 260) == "P2B"
+    assert {p["player_label"] for p in out} == {"P1A", "P1B", "P2A", "P2B"}
+
+
+def test_resolver_never_labels_an_out_of_court_body():
+    tracker = _resolver_tracker(_BoundedCourt())
+    frame, _ = _frame_with(CAST + [(400, 170, BLUE)])  # blue lookalike beyond x=300
+    tracker._current_frame = frame
+    bodies = _bodies([0, 1, 2, 3, 4], CAST + [(400, 170, BLUE)])
+    for _ in range(3):
+        tracker.frame_count += 1
+        out = tracker._stamp_identities(bodies)
+    assert _label_at(out, 400) is None
+    assert _label_at(out, 80) == "P1A"
+
+
+def test_resolver_leaves_an_unmatched_in_court_extra_unlabeled():
+    orange = (0, 128, 255)
+    extra = CAST + [(180, 120, orange)]
+    tracker = _resolver_tracker()
+    frame, _ = _frame_with(extra)
+    tracker._current_frame = frame
+    for _ in range(3):
+        tracker.frame_count += 1
+        out = tracker._stamp_identities(_bodies([0, 1, 2, 3, 4], extra))
+    assert _label_at(out, 180) is None
+    assert sorted(p["player_label"] for p in out if p["player_label"]) == [
+        "P1A", "P1B", "P2A", "P2B",
+    ]
+
+
+def test_resolver_disabled_keeps_legacy_tid_labels():
+    tracker = _resolver_tracker()
+    tracker.identity_resolver = False
+    tracker._track_labels = {1: ("P2B", 2, "B")}
+    frame, _ = _frame_with(CAST)
+    tracker._current_frame = frame
+    out = tracker._stamp_identities(_bodies([0, 1, 2, 3], CAST))
+    assert out[0]["player_label"] == "P2B"

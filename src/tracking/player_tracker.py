@@ -72,6 +72,9 @@ class PlayerTracker:
         coast_vertical_damping: float = 0.5,
         debug_assignments: bool = False,
         label_min_similarity: float = 0.35,
+        label_new_track_min_similarity: float = 0.55,
+        identity_resolver: bool = True,
+        identity_court_slack_px: float = 16.0,
     ):
         """Initialize the player tracker.
 
@@ -243,6 +246,20 @@ class PlayerTracker:
         self.serve_zone_trial_frames = serve_zone_trial_frames
         self.serve_zone_ball_votes = serve_zone_ball_votes
         self.label_min_similarity = label_min_similarity
+        # Stricter floor for labels claimed AFTER the bootstrap lock (Fix C,
+        # 20260920 match f166: a recycled track claimed P2A at sim 0.477 --
+        # above the 0.35 lock floor, far below an unambiguous match). A
+        # post-lock creation must clearly match its reference or stay
+        # unlabeled (green P<id> display).
+        self.label_new_track_min_similarity = label_new_track_min_similarity
+        # Per-frame identity resolver (display-only): re-derives which
+        # enrolled player each in-court body is from appearance + continuity,
+        # so a tracker id swap between two players never moves a label.
+        self.identity_resolver = identity_resolver
+        self.identity_court_slack_px = identity_court_slack_px
+        self._identity_ema: Dict[int, np.ndarray] = {}
+        self._identity_center: Dict[int, Tuple[float, float]] = {}
+        self._label_pos: Dict[str, Tuple[int, Tuple[float, float]]] = {}
 
         # Enrollment references (E1): stable appearance anchors + labels
         # (P1A/P1B/P2A/P2B) built by the PlayerEnrollment pre-pass. Labels are
@@ -358,7 +375,10 @@ class PlayerTracker:
             return True
         return bool(self.serve_zone_enabled and self._detection_in_serve_zone(detection))
 
-    def _may_feed_track(self, track: Dict[str, Any], detection: Dict[str, Any]) -> bool:
+    def _may_feed_track(
+        self, track: Dict[str, Any], detection: Dict[str, Any],
+        tid: Optional[int] = None,
+    ) -> bool:
         """Bystander-hijack guard for ONGOING assignment (new tracks have their
         own admission test in _create_track).
 
@@ -390,7 +410,19 @@ class PlayerTracker:
             last_in = track.get("last_in_court_frame")
             if last_in is None:
                 return True  # never in court: zone-seed rules govern (trial expiry)
-            return (self.frame_count - last_in) <= self.off_court_hold_frames
+            if (self.frame_count - last_in) <= self.off_court_hold_frames:
+                return True
+            # Enrolled player legally standing off-court (20260920 match f151:
+            # the far P2A on the sideline, detection sim 0.956 to its own
+            # track): the hold horizon would expire and force a same-squad
+            # tid swap with the teammate. The pre-pass validated this
+            # identity, so keep feeding while the detection matches it.
+            return (
+                tid is not None
+                and self._enrollment_holds(tid, track)
+                and self._signature_similarity(track, detection)
+                >= self.label_min_similarity
+            )
         last_in = track.get("last_in_court_frame")
         if last_in is None:
             # Never in court yet: a serve-zone seed. Identity may continue
@@ -569,7 +601,7 @@ class PlayerTracker:
             # a failed seed here would leave the tracker stuck for the video.
             seed = frames[-1] if frames else self._last_strict_detections
             for det in seed:
-                self._create_track(det, require_court_admission=False)
+                self._create_track(det, require_court_admission=False, initial_label=True)
             return
 
         centers_arr = np.array(all_centers, dtype=np.float32)
@@ -614,7 +646,7 @@ class PlayerTracker:
                     "Bootstrap: skipped duplicate seed (overlaps an already-locked player)"
                 )
                 continue
-            if self._create_track(best_det, require_court_admission=False) >= 0:
+            if self._create_track(best_det, require_court_admission=False, initial_label=True) >= 0:
                 locked_boxes.append(best_det["bbox"])
 
         self.logger.info(
@@ -660,7 +692,7 @@ class PlayerTracker:
         for i, tid in enumerate(track_ids):
             track = self.tracks[tid]
             for j, det in enumerate(detections):
-                cost = self._compute_assignment_cost(track, det)
+                cost = self._compute_assignment_cost(track, det, tid=tid)
                 if cost is not None:
                     cost_matrix[i, j] = cost
 
@@ -702,7 +734,7 @@ class PlayerTracker:
                 ov = self._iou(det["bbox"], self.tracks[tid]["bbox"])
                 if ov > best_iou:
                     best_iou, best_tid = ov, tid
-            if best_tid is not None and self._may_feed_track(self.tracks[best_tid], det):
+            if best_tid is not None and self._may_feed_track(self.tracks[best_tid], det, tid=best_tid):
                 self._log_assignment("iou_reattach", best_tid, det)
                 self._update_track(best_tid, det)
                 matched_tracks.add(best_tid)
@@ -874,8 +906,14 @@ class PlayerTracker:
         for item in serve_zone:
             det = item[1]
             if any(self._iou(det["bbox"], cb) > 0.4 for cb in self._serve_zone_cooldown):
-                self.logger.debug("Serve-zone admission blocked: trial-expired squatter")
-                continue
+                if self._enrollment_refs and self._best_enrollment_sim(det) >= self.label_min_similarity:
+                    self.logger.debug(
+                        "Serve-zone admission allowed despite cooldown: "
+                        "detection matches an enrolled reference"
+                    )
+                else:
+                    self.logger.debug("Serve-zone admission blocked: trial-expired squatter")
+                    continue
             keep.append(item)
         return keep
 
@@ -899,6 +937,8 @@ class PlayerTracker:
             if tr.get("last_in_court_frame") is None
         ]:
             seed = self.tracks[tid]
+            if self._enrollment_holds(tid, seed):
+                continue  # enrolled player: never hand their slot to a contender
             if self._iou(seed["bbox"], winner["bbox"]) > 0.4:
                 continue  # the winner IS the seed's person, already tracked
             if self._ball_in_column_now(seed["bbox"]):
@@ -912,7 +952,8 @@ class PlayerTracker:
             )
 
     def _compute_assignment_cost(
-        self, track: Dict[str, Any], detection: Dict[str, Any]
+        self, track: Dict[str, Any], detection: Dict[str, Any],
+        tid: Optional[int] = None,
     ) -> Optional[float]:
         """Compute cost of assigning a detection to a track.
 
@@ -923,7 +964,7 @@ class PlayerTracker:
 
         # Bystander-hijack guard: an out-of-court detection can only continue
         # a recently-in-court track (see _may_feed_track).
-        if not self._may_feed_track(track, detection):
+        if not self._may_feed_track(track, detection, tid=tid):
             return None
 
         # Gate on the actual gap to the last known position.
@@ -1021,7 +1062,8 @@ class PlayerTracker:
     # --- Track management ---
 
     def _create_track(
-        self, detection: Dict[str, Any], require_court_admission: bool = True
+        self, detection: Dict[str, Any], require_court_admission: bool = True,
+        initial_label: bool = False,
     ) -> int:
         """Create a new track.
 
@@ -1121,7 +1163,7 @@ class PlayerTracker:
         }
         self.disappeared[tid] = 0
         self.logger.debug(f"Created track {tid}")
-        self._maybe_assign_label(tid, detection)
+        self._maybe_assign_label(tid, detection, initial=initial_label)
         return tid
 
     def _expire_serve_zone_trials(self) -> None:
@@ -1143,6 +1185,14 @@ class PlayerTracker:
             if tr.get("last_in_court_frame") is None
             and self.frame_count - tr.get("created_frame", 0) > self.serve_zone_trial_frames
         ]
+        if self._enrollment_refs:
+            immune = [tid for tid in expired if self._enrollment_holds(tid, self.tracks[tid])]
+            for tid in immune:
+                self.logger.debug(
+                    f"Serve-zone trial kept for track {tid}: enrolled player "
+                    f"{self.label_for(tid)} still matches its reference"
+                )
+            expired = [tid for tid in expired if tid not in immune]
         for tid in expired:
             track = self.tracks.pop(tid)
             self.disappeared.pop(tid, None)
@@ -1198,6 +1248,12 @@ class PlayerTracker:
                 continue
             in_court = tr.get("in_court_fed_frames", 0)
             if in_court / fed >= self.squatter_min_in_court_frac:
+                continue
+            if self._enrollment_holds(tid, tr):
+                self.logger.debug(
+                    f"Squatter review skipped for track {tid}: enrolled player "
+                    f"{self.label_for(tid)} still matches its reference"
+                )
                 continue
             expired.append(tid)
         for tid in expired:
@@ -1623,7 +1679,8 @@ class PlayerTracker:
         return sig
 
     def _signature_similarity(
-        self, track_or_gallery: Dict[str, Any], detection: Dict[str, Any]
+        self, track_or_gallery: Dict[str, Any], detection: Dict[str, Any],
+        sig: Optional[Dict[str, Any]] = None,
     ) -> float:
         """Confidence-weighted ensemble similarity in [0,1]: torso colour +
         head/hair + relative body height + body proportions.
@@ -1632,7 +1689,8 @@ class PlayerTracker:
         silently dropped when unavailable -- no frame, or too few samples).
         When nothing discriminates, returns 0 -- callers then defer to motion.
         """
-        sig = self._detection_signature(detection)
+        if sig is None:
+            sig = self._detection_signature(detection)
         w = self.signature_weights
         sim_sum = 0.0
         total_w = 0.0
@@ -1717,6 +1775,9 @@ class PlayerTracker:
         """
         self._enrollment_refs = list(references or [])
         self._track_labels = {}
+        self._identity_ema = {}
+        self._identity_center = {}
+        self._label_pos = {}
         if self._enrollment_refs:
             self.logger.info(
                 "Enrollment active: %s", [r.get("label") for r in self._enrollment_refs]
@@ -1725,6 +1786,45 @@ class PlayerTracker:
     @property
     def enrollment_active(self) -> bool:
         return bool(self._enrollment_refs)
+
+    def _best_enrollment_sim(self, subject: Dict[str, Any]) -> float:
+        """Max ensemble similarity between ``subject`` (a detection or a track
+        dict -- both work as _signature_similarity's second argument) and any
+        enrolled reference. 0.0 when enrollment is inactive."""
+        if not self._enrollment_refs:
+            return 0.0
+        return max(
+            (
+                self._signature_similarity(ref, subject)
+                for ref in self._enrollment_refs
+            ),
+            default=0.0,
+        )
+
+    def _enrollment_holds(self, tid: int, track: Dict[str, Any]) -> bool:
+        """True when ``track`` carries an enrollment label whose reference
+        still matches the track's CURRENT appearance at >= label_min_similarity.
+
+        Enrollment-gated guards (trial expiry, squatter review, contested
+        server, cooldown blocks) treat such tracks as validated players: the
+        pre-pass watched them for ~600 frames, so drill-tuned expiries tuned
+        on bystanders must not remove them (20260920 match f153: the real P2A
+        standing legally ON the far sideline was trial-expired, her label
+        recycled, and a walking bystander took the box).
+        """
+        if not self._enrollment_refs:
+            return False
+        entry = self._track_labels.get(tid)
+        if not entry:
+            return False
+        label = entry[0]
+        for ref in self._enrollment_refs:
+            if ref.get("label") == label:
+                return (
+                    self._signature_similarity(ref, track)
+                    >= self.label_min_similarity
+                )
+        return False
 
     def label_for(self, track_id: int) -> Optional[str]:
         """Enrolled label (e.g. ``P1A``) for a track id, else None.
@@ -1765,14 +1865,23 @@ class PlayerTracker:
             "world_width_samples": world_width_samples,
         }
 
-    def _maybe_assign_label(self, tid: int, detection: Dict[str, Any]) -> None:
+    def _maybe_assign_label(
+        self, tid: int, detection: Dict[str, Any], initial: bool = False
+    ) -> None:
         """Attach an enrollment label to an unlabeled track, if one fits.
 
         Greedy best-of-unclaimed: the reference with the highest ensemble
         similarity to the creating/feeding detection wins, provided it beats
-        label_min_similarity and is not already claimed by an ACTIVE track.
-        Sticky: a labeled track keeps its label for life (restores keep the
-        tid, so the label follows the gallery id).
+        the floor and is not already claimed by an ACTIVE track. Sticky: a
+        labeled track keeps its label for life (restores keep the tid, so the
+        label follows the gallery id).
+
+        ``initial=True`` marks the bootstrap-roster seedings, which use the
+        regular ``label_min_similarity`` floor (they were k-means-selected
+        over in-court ball-active frames, so the risk of a bystander seed is
+        minimal). Every LATER claim uses the stricter
+        ``label_new_track_min_similarity``: a recycled track id must clearly
+        match its reference or stay unlabeled.
         """
         if not self._enrollment_refs or tid in self._track_labels:
             return
@@ -1781,7 +1890,12 @@ class PlayerTracker:
             for t in self.tracks
             if t in self._track_labels
         }
-        best_ref, best_sim = None, self.label_min_similarity
+        floor = (
+            self.label_min_similarity
+            if initial
+            else self.label_new_track_min_similarity
+        )
+        best_ref, best_sim = None, floor
         for ref in self._enrollment_refs:
             if ref.get("label") in claimed:
                 continue
@@ -1807,6 +1921,12 @@ class PlayerTracker:
         without a label (pre-lock temps, fallback videos, low-similarity
         creations) get None -- the overlay then shows today's green P<id>.
         """
+        if (
+            self.identity_resolver
+            and self._enrollment_refs
+            and self._current_frame is not None
+        ):
+            self._resolve_identities(players)
         for p in players:
             tid = p.get("track_id")
             label_info = self._track_labels.get(tid) if tid is not None else None
@@ -1817,6 +1937,161 @@ class PlayerTracker:
                 p["squad"] = None
                 p["slot"] = None
         return players
+
+    # --- Identity resolver (labels follow the body, not the track id) ---
+
+    _ID_EMA_ALPHA = 0.3        # per-frame smoothing of the appearance vector
+    _ID_POS_WEIGHT = 0.4       # continuity-with-last-seen-position weight
+    _ID_STICKY_BONUS = 0.1     # keep the current holder unless clearly beaten
+    _ID_POS_MEMORY_FRAMES = 90
+    _ID_ADAPT_ALPHA = 0.01     # slow reference drift (lighting / side switch)
+    _ID_ADAPT_MIN_SIM = 0.55
+    _ID_ADAPT_MIN_MARGIN = 0.10
+
+    def _identity_eligible(self, bbox: List[float]) -> bool:
+        """Players are the only people INSIDE the court: a body counts only
+        when its lower bound (foot) is in court, within a small slack for
+        players standing on the line. Uncalibrated -> everyone is eligible."""
+        court = self.court_calibration
+        if court is None or not getattr(court, "is_calibrated", False):
+            return True
+        foot = court.foot_point(bbox)
+        point = (float(foot[0]), float(foot[1]))
+        if court.is_point_in_court(point):
+            return True
+        if self.identity_court_slack_px <= 0.0:
+            return False
+        dist_fn = getattr(court, "distance_to_court_px", None)
+        dist = dist_fn(point) if dist_fn is not None else None
+        return dist is not None and dist <= self.identity_court_slack_px
+
+    def _position_score(self, label: str, foot: Tuple[float, float]) -> float:
+        """1.0 when ``foot`` is where ``label`` was just seen; fades with the
+        gap and with the distance beyond what the player could have walked."""
+        rec = self._label_pos.get(label)
+        if rec is None:
+            return 0.0
+        dt = self.frame_count - rec[0]
+        if dt > self._ID_POS_MEMORY_FRAMES:
+            return 0.0
+        dist = float(np.hypot(foot[0] - rec[1][0], foot[1] - rec[1][1]))
+        excess = max(0.0, dist - (12.0 * max(dt, 1) + 20.0))
+        return max(0.0, 1.0 - excess / 100.0) * (1.0 - dt / self._ID_POS_MEMORY_FRAMES)
+
+    def _resolve_identities(self, players: List[Dict[str, Any]]) -> None:
+        """Re-derive ``_track_labels`` for this frame's real in-court bodies.
+
+        One joint assignment (Hungarian) of the enrolled players to the
+        bodies, scored by smoothed appearance similarity + continuity with
+        where each label was last seen + a sticky bonus for the current
+        holder. The per-id appearance memory is wiped when a track's box
+        jumps (that id now follows a different body), so a same-squad id swap
+        corrects on the very frame it happens instead of persisting.
+        """
+        refs = self._enrollment_refs
+        n_ref = len(refs)
+        bodies = []
+        for p in players:
+            tid = p.get("track_id")
+            bbox = p.get("bbox")
+            if tid is None or not bbox or p.get("predicted"):
+                continue
+            if not self._identity_eligible(bbox):
+                continue
+            x1, y1, x2, y2 = (float(v) for v in bbox)
+            bodies.append({
+                "tid": tid, "bbox": bbox, "foot": ((x1 + x2) / 2.0, y2),
+                "center": (float(p["center"][0]), float(p["center"][1])),
+                "width": max(1.0, x2 - x1),
+            })
+        if not bodies:
+            return
+
+        for b in bodies:
+            sig = self._detection_signature({"bbox": b["bbox"]})
+            raw = np.array(
+                [self._signature_similarity(r, {"bbox": b["bbox"]}, sig=sig) for r in refs],
+                dtype=np.float64,
+            )
+            b["sig"], b["raw"] = sig, raw
+            prev_c = self._identity_center.get(b["tid"])
+            ema = self._identity_ema.get(b["tid"])
+            jumped = (
+                prev_c is None or ema is None
+                or float(np.hypot(b["center"][0] - prev_c[0], b["center"][1] - prev_c[1]))
+                > max(60.0, b["width"])
+            )
+            b["jumped"] = jumped
+            b["ema"] = raw.copy() if jumped else (
+                (1.0 - self._ID_EMA_ALPHA) * ema + self._ID_EMA_ALPHA * raw
+            )
+            self._identity_ema[b["tid"]] = b["ema"]
+            self._identity_center[b["tid"]] = b["center"]
+
+        score = np.full((len(bodies), n_ref), -1e6)
+        for i, b in enumerate(bodies):
+            holder = self._track_labels.get(b["tid"])
+            for k, ref in enumerate(refs):
+                pos = self._position_score(ref["label"], b["foot"])
+                held = bool(holder and holder[0] == ref["label"] and not b["jumped"])
+                sim = b["ema"][k]
+                if held:
+                    floor = 0.0  # continuity: only a rival body can take it
+                elif pos >= 0.7:
+                    floor = self.label_min_similarity
+                else:
+                    floor = self.label_new_track_min_similarity
+                if sim < floor:
+                    continue
+                score[i, k] = (
+                    sim + self._ID_POS_WEIGHT * pos
+                    + (self._ID_STICKY_BONUS if held else 0.0)
+                )
+        rows, cols = linear_sum_assignment(-score)
+        assigned: Dict[int, int] = {}
+        for i, k in zip(rows, cols):
+            if score[i, k] > -1e5:
+                assigned[i] = k
+
+        taken_labels = {refs[k]["label"] for k in assigned.values()}
+        evaluated = {b["tid"] for b in bodies}
+        for tid in list(self._track_labels):
+            if tid in evaluated:
+                continue
+            if self._track_labels[tid][0] in taken_labels:
+                self._track_labels.pop(tid)
+        for i, b in enumerate(bodies):
+            k = assigned.get(i)
+            if k is None:
+                if self._track_labels.pop(b["tid"], None) is not None:
+                    self.logger.debug("Identity: track %d lost its label", b["tid"])
+                continue
+            ref = refs[k]
+            new = (ref["label"], ref["squad"], ref["slot"])
+            if self._track_labels.get(b["tid"]) != new:
+                self.logger.info(
+                    "Identity: track %d -> %s (sim %.2f, frame %d)",
+                    b["tid"], new[0], b["ema"][k], self.frame_count,
+                )
+            self._track_labels[b["tid"]] = new
+            self._label_pos[ref["label"]] = (self.frame_count, b["foot"])
+            self._adapt_reference(ref, b, k)
+
+    def _adapt_reference(self, ref: Dict[str, Any], body: Dict[str, Any], k: int) -> None:
+        """Drift a reference's colour histograms slowly toward a body that
+        matches it clearly and unambiguously (lighting/side-switch shifts)."""
+        if body["jumped"]:
+            return
+        raw = body["raw"]
+        others = np.delete(raw, k)
+        margin = raw[k] - (others.max() if others.size else 0.0)
+        if raw[k] < self._ID_ADAPT_MIN_SIM or margin < self._ID_ADAPT_MIN_MARGIN:
+            return
+        a = self._ID_ADAPT_ALPHA
+        for key, sig_key in (("histogram", "color"), ("head_histogram", "head")):
+            cur, new = ref.get(key), body["sig"].get(sig_key)
+            if cur is not None and new is not None and cur.shape == new.shape:
+                ref[key] = ((1.0 - a) * cur + a * new).astype(cur.dtype)
 
     # --- Public API ---
 
@@ -1840,6 +2115,9 @@ class PlayerTracker:
         self.disappeared = {}
         self.gallery = {}
         self._track_labels = {}
+        self._identity_ema = {}
+        self._identity_center = {}
+        self._label_pos = {}
         self._squatter_cooldown.clear()
         self.frame_count = 0
         self._initialized = False

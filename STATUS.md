@@ -2132,7 +2132,10 @@ survive across sessions; provenance in the archives.
 
 - **A calibration consumer wired ONLY in `set_court_calibration` never receives the batch calibration — `FrameProcessor.__init__` loads `self.court_calibration` itself and the batch path never calls the setter (measured #80).** Both the #77 possession and the #80 ground-contact observers silently ran on their FALLBACK px bands in every batch run (e3: fallback 19/33 px vs real 22.8/39.0, diag `net_width_px: null`) until the #80 probe showed 672/672 `state: None`. Fix = wire every calibration consumer in `__init__` right after construction and PIN it with a wiring grep test (possession + ground both). Live-debug was unaffected (it calls the setter); only batch was degraded — suspect this bug class whenever a batch diag shows fallback constants while live looks right.
 
+- **Identity labels must converge, not be perfect (owner contract, #82).** P1A/P2A/P1B/P2B only have to land on the same person again within a few frames; a lost box, a momentary id swap or a stolen box is fine. The tracker swapped the two far teammates at f151 of the 20260920 match because `_may_feed_track`'s 90 f off-court hold expired for the on-sideline player (detection sim 0.956 to her own track) and Hungarian paired her id with the teammate's box; fixed for enrolled tracks, and a per-frame display-only resolver (`_resolve_identities`: smoothed appearance + last-seen-position continuity + sticky bonus, history wiped on a box jump) now makes labels follow the body. Far-player appearance is weak (sims ~0.3-0.6, near ~0.9) and an occluded far player gets ~0.5 on every reference, so expect brief None/flicker, not swaps.
+
 ## Session index (one line each)
+- #82 **Identity labels follow the body (per-frame resolver), team-letter labels P1A/P2A/P1B/P2B, readable colours**
 - #81 **Player ENROLLMENT pre-pass (E1) + squad colours (E3) SHIPPED (display-only)**
   — `src/tracking/player_enrollment.py` builds 4 averaged-signature references from a
   sequential decode of the first 600 frames (detector every 5th, foot-in-court, greedy
@@ -2280,6 +2283,16 @@ summaries) + `docs/history/status_log_archive.md` (detailed entries,
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 
 ## Log (newest first)
+
+### 2026-10-05 (eighty-second session) — #82: labels renamed to team letters, readable colours, per-frame identity resolver, f151 teammate id-swap fixed
+
+**Asked (owner):** (1) first/second player of a team = P1A/P2A (team B = P1B/P2B); (2) the dark navy is unreadable on black; (3) players must stop swapping ids -- a pre-video pass over colours/features so a label sticks from start to end (only in-court bodies; full matches, not entreno; side switches every 7 points). Follow-up contract: a momentary loss/swap/steal is fine as long as the same id returns to the same person after some frames.
+
+**Found:** labels were never reassigned (`_track_labels` only changes on removal); the f189 flip was a TRACKER id swap at f151 -- `_may_feed_track` stopped feeding P2A's track (off-court hold 90 f expired, her detection sits just off the sideline) and Hungarian paired it with her teammate's box.
+
+**Changed (display + one guard):** enrolled tracks keep feeding off-court while the detection matches their reference (`tid` param on `_may_feed_track`/`_compute_assignment_cost`); label text = number + team letter (`_build_reference`); `PLAYER_SQUAD_COLORS` vivid blue/red (contrast >= 4.5 on black, tested); `PlayerTracker._resolve_identities` per-frame resolver (config `player_identity_resolver`, `player_identity_court_slack_px`); slow reference drift for lighting/side switches (not validated on a real switch).
+
+**Measured (20260920 match, f1-2500):** f74/f189 correct; label teleports 10 -> 6 (all one id hopping between two people at f1305-1363, tracker-side), label changes 4 -> 25 (more None flicker, fewer wrong-person labels). Suite 1569 passed. Full 26k-frame run NOT done; no identity GT exists.
 
 ### 2026-10-05 (eighty-first session) — #81: player enrollment (E1) + squad colours (E3) shipped: sticky P1A/P1B/P2A/P2B labels, squad-stable colours on boxes and actions, tracking byte-identical (gate ΔF1 0.000 ×7)
 

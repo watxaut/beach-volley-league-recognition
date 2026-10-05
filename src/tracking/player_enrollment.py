@@ -119,6 +119,8 @@ class PlayerEnrollment:
         chain_gate_px: float = 120.0,
         chain_gap_samples: int = 6,
         merge_gap_frames: int = 60,
+        court_slack_px: float = 16.0,
+        max_start_frame: int = 150,
         enabled: bool = True,
     ):
         self.court_calibration = court_calibration
@@ -130,6 +132,15 @@ class PlayerEnrollment:
         self.chain_gate_px = chain_gate_px
         self.chain_gap_samples = chain_gap_samples
         self.merge_gap_frames = merge_gap_frames
+        # On-line players: a foot standing ON a court line reads ~0-3 px
+        # outside the strict polygon; bystanders sit >=100 px out. Samples
+        # within this slack count as court-side (20260920 match: the real P2A
+        # was lost entirely without it).
+        self.court_slack_px = max(0.0, float(court_slack_px))
+        # A reference chain must START early in the window: real players are
+        # present from frame 0; a bystander who wanders in late must not take
+        # the 4th slot from a waiting player.
+        self.max_start_frame = max(0, int(max_start_frame))
         self.enabled = enabled
         # Diagnostics of the last enroll() call (tests + logs).
         self.last_result: Dict[str, Any] = {}
@@ -165,6 +176,15 @@ class PlayerEnrollment:
         chains = self._build_chains(sampled)
         chains = self._merge_chains(chains)
         persistent = [c for c in chains if len(c.observations) >= self.min_observations]
+        late = [c for c in persistent if c.observations[0]["frame"] > self.max_start_frame]
+        if late:
+            persistent = [c for c in persistent if c not in late]
+            logger.info(
+                "Player enrollment: dropped %d late-starting chain(s) (first "
+                "frame > %d; likely bystanders): starts=%s",
+                len(late), self.max_start_frame,
+                [c.observations[0]["frame"] for c in late],
+            )
         persistent.sort(key=lambda c: len(c.observations), reverse=True)
         self.last_result["n_chains"] = len(chains)
         self.last_result["n_persistent"] = len(persistent)
@@ -226,13 +246,30 @@ class PlayerEnrollment:
         return sampled
 
     def _sample_one(self, frame: np.ndarray, frame_idx: int) -> List[Dict[str, Any]]:
-        """Detect players on one sampled frame; keep foot-strictly-in-court."""
+        """Detect players on one sampled frame; keep court-side feet.
+
+        Court-side = foot strictly inside the court polygon OR within
+        ``court_slack_px`` of it (players standing ON a line read 0-3 px
+        outside the strict mask; bystanders sit >=100 px out).
+        """
         detections = self.player_detector.detect(frame)
         if not detections:
             return []
-        strict = self.court_calibration.filter_detections_by_court(detections)
+        court_side: List[Dict[str, Any]] = []
+        for det in detections:
+            bbox = det.get("bbox")
+            if not bbox or len(bbox) != 4:
+                continue
+            foot = self.court_calibration.foot_point(bbox)
+            if not self.court_calibration.is_point_in_court(foot):
+                if self.court_slack_px <= 0.0:
+                    continue
+                dist = self.court_calibration.distance_to_court_px(foot)
+                if dist is None or dist > self.court_slack_px:
+                    continue
+            court_side.append(det)
         obs: List[Dict[str, Any]] = []
-        for det in strict:
+        for det in court_side:
             bbox = det.get("bbox")
             if not bbox or len(bbox) != 4:
                 continue
@@ -405,7 +442,16 @@ class PlayerEnrollment:
 
         refs: List[Dict[str, Any]] = []
         for squad, pair in ((1, near), (2, far)):
-            slot_a, slot_b = self._left_right(pair)
+            left, right = self._left_right(pair)
+            # Mirrored slot rule (owner-ratified 2026-10-06, match f74): "A"
+            # is each pair's LEFT as the pair faces the net. On the LONG-AXIS
+            # camera the near pair faces AWAY from the lens, so its A is the
+            # camera-RIGHT player; the far pair faces the lens, so its A is
+            # the camera-LEFT player.
+            if squad == 1:
+                slot_a, slot_b = right, left
+            else:
+                slot_a, slot_b = left, right
             for slot, chain in (("A", slot_a), ("B", slot_b)):
                 refs.append(self._build_reference(chain, squad, slot))
         return refs
@@ -434,7 +480,9 @@ class PlayerEnrollment:
         ]
         widths = [o["world_width"] for o in chain.observations if o.get("world_width")]
         return {
-            "label": f"P{squad}{slot}",
+            # Team letter (A = near/squad 1, B = far/squad 2) + player number
+            # within the team: P1A, P2A are team A; P1B, P2B are team B.
+            "label": f"P{1 if slot == 'A' else 2}{'A' if squad == 1 else 'B'}",
             "squad": squad,
             "slot": slot,
             "histogram": chain.mean_hist(),

@@ -227,14 +227,16 @@ def draw_kill_marker(frame, x: float, y: float, text: str) -> None:
 
 # Squad display palette (E3): color follows the TEAM (enrollment-time squad,
 # owner convention), NOT the current side -- a side switch shows the blue pair
-# moving to the far side. Within a squad, slot A = clear/light, B = dark.
-# BGR values: light blue #64C8FF, dark blue #143CB4, light red #FF968C,
-# dark red #C82828.
+# moving to the far side. Team A (P1A, P2A) is blue, team B (P1B, P2B) is red;
+# within a team the two players are a light and a saturated shade. Both are
+# bright enough to read on the black label plate (no navy / maroon).
+# BGR values: light blue #64C8FF, vivid blue #1E90FF, light red #FF968C,
+# vivid red #FF4545.
 PLAYER_SQUAD_COLORS = {
-    (1, "A"): (255, 200, 100),   # P1A clear blue
-    (1, "B"): (180, 60, 20),     # P1B dark blue
-    (2, "A"): (140, 150, 255),   # P2A clear red
-    (2, "B"): (40, 40, 200),     # P2B dark red
+    (1, "A"): (255, 200, 100),   # P1A light blue
+    (1, "B"): (255, 144, 30),    # P2A vivid blue
+    (2, "A"): (140, 150, 255),   # P1B light red
+    (2, "B"): (69, 69, 255),     # P2B vivid red
 }
 
 
@@ -286,14 +288,21 @@ def draw_player(
         id_color = PLAYER_COLOR
     id_text = label or f"P{track_id}"
 
+    def _plate_text(text, org, scale, text_color, thickness):
+        """Text on a filled black plate (owner request 2026-10-06: bright sand
+        + thin court lines make bare text unreadable)."""
+        (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, thickness)
+        ox, oy = org
+        cv2.rectangle(frame, (ox - 2, oy - th - 3), (ox + tw + 2, oy + 3), (0, 0, 0), -1)
+        cv2.putText(frame, text, (ox, oy), cv2.FONT_HERSHEY_SIMPLEX, scale,
+                    text_color, thickness)
+
     cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
     if action:
         conf_str = f" ({confidence:.2f})" if confidence is not None else ""
         action_color = box_color if color is not None else ACTION_COLORS.get(action, PLAYER_COLOR)
-        cv2.putText(frame, f"{action}{conf_str}", (x1, y1 - 25),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, action_color, 2)
-    cv2.putText(frame, id_text, (x1, y1 - 8),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, id_color, 1)
+        _plate_text(f"{action}{conf_str}", (x1, y1 - 25), 0.6, action_color, 2)
+    _plate_text(id_text, (x1, y1 - 8), 0.5, id_color, 1)
 
 
 def draw_frame_counter(frame, frame_idx: int, total: Optional[int] = None) -> None:

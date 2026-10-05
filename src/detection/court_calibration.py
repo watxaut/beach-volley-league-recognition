@@ -698,6 +698,22 @@ class CourtCalibration:
             return False
         return self.court_mask[int(y), int(x)] > 0
 
+    def distance_to_court_px(self, point: Tuple[int, int]) -> Optional[float]:
+        """Signed pixel distance from ``point`` to the court polygon.
+
+        Negative = inside, positive = outside, None when uncalibrated. Line
+        calls: a foot standing ON a court line reads ~0..3 px outside the
+        strict mask (the clicked polygon traces the line's inner edge), while
+        real bystanders sit >=100 px out on every validated video -- a small
+        positive slack cleanly separates on-line players from bystanders
+        without loosening the strict :meth:`is_point_in_court` used for live
+        admission.
+        """
+        if self.court_polygon is None or len(self.court_polygon) != 4:
+            return None
+        contour = self.court_polygon.reshape(-1, 1, 2).astype(np.float32)
+        return float(cv2.pointPolygonTest(contour, (float(point[0]), float(point[1])), True))
+
     def is_near_net(self, point: Tuple[int, int], threshold_px: int = 80) -> bool:
         """Check if a point is near the midcourt/net line."""
         if self.midcourt_points is None:

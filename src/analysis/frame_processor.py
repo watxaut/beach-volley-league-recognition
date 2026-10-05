@@ -201,6 +201,13 @@ class FrameProcessor:
                 serve_zone_ball_votes=self.config.get("player_serve_zone_ball_votes", 2),
                 coast_vertical_damping=self.config.get("coast_vertical_damping", 0.5),
                 label_min_similarity=self.config.get("player_label_min_similarity", 0.35),
+                label_new_track_min_similarity=self.config.get(
+                    "player_label_new_track_min_similarity", 0.55
+                ),
+                identity_resolver=self.config.get("player_identity_resolver", True),
+                identity_court_slack_px=self.config.get(
+                    "player_identity_court_slack_px", 16.0
+                ),
             )
 
             # Pose estimation (video mode for temporal smoothing)
@@ -307,6 +314,8 @@ class FrameProcessor:
                 "player_enrollment_chain_gap_samples", 6
             ),
             merge_gap_frames=self.config.get("player_enrollment_merge_gap_frames", 60),
+            court_slack_px=self.config.get("player_enrollment_court_slack_px", 16.0),
+            max_start_frame=self.config.get("player_enrollment_max_start_frame", 150),
         )
         references = enroller.enroll(video_path)
         self.player_tracker.set_enrollment(references)

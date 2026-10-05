@@ -153,6 +153,18 @@ realities, not tuning opportunities:
   camera — **STALE, it contradicts the validated geometry.** Rewrite it to the
   long-axis spec (open point 29) rather than moving the camera.
 
+- **Player identity contract (owner, 2026-10-05):** the labels P1A, P2A (team A,
+  near at the start) and P1B, P2B (team B) only need to **converge** on the same
+  person within a few frames. A momentary lost box, a brief tracker-id swap or a
+  stolen box is acceptable; what matters is that actions end up attributed to the
+  same people most of the time. Do NOT harden tracker association to prevent every
+  swap -- the display-only identity resolver
+  (`PlayerTracker._resolve_identities`, `player_identity_resolver`) re-derives the
+  label per frame from enrollment appearance + continuity, so labels follow the
+  body, not the track id. Label text = player number + TEAM letter (squad 1 = A,
+  squad 2 = B); colours are keyed on (squad, slot) and must stay readable on the
+  black label plate (contrast test).
+
 ## Project memory
 
 ### 1. entreno validation protocol
