@@ -193,7 +193,7 @@ secrets.json
 logs/
 
 # Temporary files
-tmp/
+tracking-artifacts/
 temp/
 *.tmp
 *.temp
