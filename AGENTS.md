@@ -13,14 +13,21 @@ removed; the verbatim original stays recoverable via
    last ~3 session Log entries. Read it before planning any work; update it
    at the end of every session that changes anything and commit it with the
    work.
-   **Lean-STATUS convention (reorganized 2026-09-27):** *Where we are* is
-   rewritten each session (never appended to); *Open points* get one compact
-   entry each (status / problem / next step — collapse resolved
-   `[UPDATE …]` stacks); the Log keeps only the last ~3 sessions verbatim;
-   older entries move VERBATIM (never deleted) to
-   `docs/history/status_log_archive.md` and
+   **Lean-STATUS convention (reorganized 2026-09-27, hard budgets since
+   2026-10-06):** *Where we are* is rewritten each session (never appended
+   to); *Open points* get one compact entry each (status / problem / next
+   step — collapse resolved `[UPDATE …]` stacks); the Log keeps only the
+   last 2-3 sessions verbatim; older entries move VERBATIM (never deleted)
+   to `docs/history/status_log_archive.md` and
    `docs/history/status_where_we_are_archive.md`, and the session gets a
-   one-line entry in the *Session index*. New durable protocol rules go
+   one-line entry in the *Session index*. **HARD BUDGETS are enforced by
+   `tests/test_status_leanness.py`** (≤600 total lines; per-section caps;
+   one line ≤240 chars per session index entry; ≤3 Log sessions; the
+   `## Next task cards` section holds only cards not yet DONE/REFUTED —
+   finished cards are archived to `docs/history/status_log_archive.md`
+   under their session date, then deleted from STATUS.md). When the guard
+   fails: archive-then-shrink, never delete history and never relax a
+   budget without an owner decision. New durable protocol rules go
    here in AGENTS.md; new cross-session technical facts go one-line-each
    into STATUS.md's *Learnings*.
 2. **`ground_truth/README.md`** — GT format (incl. spike enrichment fields

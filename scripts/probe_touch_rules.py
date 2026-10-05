@@ -100,7 +100,7 @@ CLIPS: Tuple[Dict[str, str], ...] = (
     for i in range(1, 8)
 )
 
-#: #68's numbers, pinned as literals by tests/test_touch_rules.py.
+#: #68's numbers, pinned as literals by tests/test_touch_rules.py (test deleted 2026-10-06 lean pass; recoverable from git history).
 G1_EXPECT = {"accepted": 185, "bump_set": 157, "found": 139, "touch_correct": 96,
              "r0_correct": 79, "gt_sub_correct": 110, "fidelity": 168,
              # the two REFERENCE lines, which reproduce only when measured on

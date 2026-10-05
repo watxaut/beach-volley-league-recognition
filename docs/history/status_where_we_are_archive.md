@@ -2550,7 +2550,11 @@ keys, drift-guard extended. **Gate PASS:** fresh A/B on all 7 entrenos — actio
 fresh-run variance in the base, rule 'compare A/B, never vs recorded' extended to e2.
 Next: E2 identity-drift + side-switch observers (display/diag only, OWNER GATE);
 owner visual pass on live debug pending.)
+---
 
+## Archived 2026-10-06 (lean rewrite, session #83) — 'Where we are' block as of #82 (lines 234-439 of the pre-rewrite file)
+
+## Where we are
 **#81 SHIPPED: player-enrollment pre-pass (E1) + squad colours (E3) — the first
 half of the owner's player-identity request (m00001, plan m00055/m00056).** Stable
 labels **P1A/P1B (near/squad 1) and P2A/P2B (far/squad 2)**, slots left→right at the
@@ -2743,3 +2747,180 @@ construction).
     switch, team-resolver squad errors < legacy's, contact-sheet rows one
     person each. History: `docs/history/status_where_we_are_archive.md` (#83,
     #84 sections).
+**#80 SHIPPED: ball GROUND-CONTACT / OUT-of-court observer, display+diag, beside
+possession (#77-#79).** New always-on pure observer
+`src/analysis/ball_ground_contact.py` in `process_frame` (step 3d): maps the TRACKED
+ball's bbox bottom-center through the ground homography
+(`compute_ground_homography`, SIGN-normalized — `cv2.findHomography` normalization is
+arbitrary and the owner's convention yields w<0 on-court) and reads groundedness =
+bbox width / projected ground diameter (D = 0.67/π) at the mapped point; hysteresis
+AIR (ratio ≥1.45 or degenerate) → GROUND (≤1.25 AND inside court rect +0.25 m) / OUT
+(grounded outside; the band re-locates in/out for a rolling ball); BOUNCE = gated
+image-vy sign flip (≥+2 → ≤−2 px/f, gap 1, armed by the fall). Noise inflates the
+ratio only → cannot fake GROUND. Live-debug GROUND/OUT/AIR label at the ball +
+per-candidate GND/AIR tags in the `b` overlay + panel `ground:` line; diag
+`ball_ground`, SCHEMA_VERSION 3; NO Config key, NO `pipeline_output.json` key.
+Validated on the game_state video (13 GT point windows, 8196 f): IN-window 95.5% AIR
+vs BETWEEN-points 39.3% GROUND/OUT; live GROUND/OUT within ≤2 s of 11/13 GT point
+stops (the 2 misses = ball carried at once — honest AIR); 10 bounces (5 in-rally, 5
+dead-ball). **Known half-gap (open point 31, OWNER GATE before any `src/` change): a
+point-ending ball comes to REST and the static-ball suppression removes it from the
+track BY DESIGN — the tracker drops the final descent (e3 f616) and the label
+honestly HOLDS AIR; v1.5 would read a near-stationary post-suppression detection on
+lost-track frames (§6-pure, tagged `from_candidate`)**. The probe also FIXED a latent
+wiring bug: `FrameProcessor.__init__` loads the calibration itself and the batch path
+never called `set_court_calibration`, so POSSESSION ran on FALLBACK px bands in every
+batch run since #77 — both observers now wired at init, tests pin it. Possession
+stands as recalibrated #79 (asymmetric evidence — NEAR on rolling max ≥1.45×d_net,
+FAR on max ≤0.85× OR ≥4 of last 12 measured ≤0.85×; measured regimes: near flight
+1.49-1.6×, net-plane rest AND blurred far flight 1.0-1.35× indistinguishable, far
+ground 0.5-0.8×d_net). Ratified post-hoc sequencing stands: **C1** fitted ball-fate
+measurement (pre-registered at the m ≤ 2k−12 budget) → **C2** possession timeline →
+**C3** overpass relabel on the held-out → **C4** ambiguous-touch reattribution.
+The serves track
+below remains the standing record.
+**Serves are the active track and they are NOT reliable (#56 SR0 measured them;
+#58 SR1b measured WHY the near side fails; `docs/serve_reliability_plan.md`,
+`docs/sr0_serve_scorer.md`, `docs/sr1b_near_serve_causes.md`, open point 30).**
+
+Honest per-side serve baseline, all from `scripts/score_serves.py` (contact
+level, ±15 f, greedy one-to-one, side-correct; match P1-P33, 33 owner serves):
+
+| stream | near | far | other |
+|---|---|---|---|
+| production | **8/16** (dev 1/3, held-out 7/13) | **0/17** (0/5, 0/12) | 12 FP (precision 0.40, 0.36/point); timing of every hit within ±2 f |
+| pass-2 re-label (GT-derived squad) | 12/16 | 0/17 | 14 near FP; squad acc 0.58 even though GT-derived |
+| rally onset (`game_on`, time only) | 3/16 | **11/17** (median &#124;offset&#124; 3 f) | no side read; 17 of 31 onsets unmatched |
+| far-only evidence layer | not observed | **13/17** coverage (**in-sample**), **9/17** bound (held-out **4/12**) | precision 0.47 as a claim; 1 owner FP |
+| entreno e2-e7, fresh runs | 3/5 (e3 +0, e6 +1, e7 +0) | — | e2 f32, e5 f20 missed; near recall 11/21 = 0.52 overall |
+
+**Why near serves are lost — MEASURED (#58, supersedes SR1's inferred story):**
+
+| misses | mechanism | candidate fix (owner gate before `src/`) |
+|---|---|---|
+| P9, P10, P11, P12 | `behind_baseline` reads the toucher's foot on the CONTACT frame; airborne/landing feet sit 0.8-24.5 px inside the 761 px threshold (past it 7 f later). Server tracked and attributed. | **M-a** takeoff stance (pre-contact foot) — measured next as card SR1c |
+| P5, P7 | the near server's PLAYER track stops being fed 91 f after its last in-court sighting (`player_off_court_hold_frames = 90`, tuned on drills) and coasts frozen through the serve; contact dies at the reach gate. Lifting it: P7 → hit; P5 → `dig` (rally_start killed by a pre-serve handling 78 f earlier) | **M-b** serve-zone exemption from the hold — cost measured as card SR1d |
+| e2 | server never tracked (sideline bystander holds the 4th slot from bootstrap) | none planned (drill artefact) |
+| e5 | ball not sighted | none planned |
+| P24, P33 | not re-measured (outside the [0,15000] pass); P33 = rally_start cascade from our own early serve | — |
+
+`docs/g3_heldout_p9_p33.md`'s near 11/13 counts production OR pass-2 serves. The
+production stream alone is 7/13.
+
+**Held-out lock (#58):** `ground_truth/20290928_entreno_vall_dhebron_serve_anchors.json`
+(SR3, owner-dictated 2026-10-01: 19 serves, 8 near / 11 far, 1 `ace`, 1 `net`) is the
+held-out session. The video has NEVER been run. Do not run, score or look at
+pipeline output on it until a card says "score held-out once" with frozen rules.
+With 8 near serves, "≥0.90" passes only at 8/8 (Wilson 95% CI on 8/8 = [0.68, 1.0]):
+report counts + CI, never a bare rate.
+
+**Plan: SR0-SR7.**
+- **SR0:** DONE (#56). **SR1:** DONE (#57), corrected by **SR1b** (#58).
+- **SR1c CLOSED #60 / SR1d REFUTED #61 → D4 DECIDED #62** (see *Next task
+  cards* and `docs/d4_gate_brief.md`): **M-a stays closed, M-b is PARKED.** Its
+  ceiling is **+1 near serve of 16** (+2 only with P5) against a 0.90 bar that
+  needs 15 of 16, and the blunt version measured **net 0** (+P7 / −P18, false
+  serves 12→14). **SR4a** (the near-opening table, no decode) goes first.
+- **SR2:** audio onset probe — DEMOTED (#58): timing is not the bottleneck on either
+  side. Run only after the near-side mechanisms, if far binding stays the gap.
+- **SR3:** owner half DONE (vall_dhebron GT committed, #58). Worker half (the run) is
+  held behind the held-out lock.
+- **SR4:** per-point serve record, both sides, post-hoc. Near side consumes the
+  production near label once M-a/M-b land; far side = rally onset time + side vote.
+- **SR5:** beach-rules serve-sequence decoding (server identity needs the server's
+  track at the serve — M-b). resources/full_videos/20290928_entreno_vall_dhebron.mp4 
+  is not real gameplay, there are no side switches, but you can use it for serve testing.
+- **SR6:** ace / service fault. **SR7:** learned detector, deferred.
+
+**STOP list:** no more px-space or contact-geometry far-serve thresholds, selector
+constants, or tracker admission tuned on the 17 match far serves. No relabeling of
+the reception as the serve. No look at vall_dhebron outputs (held-out lock).
+
+**Production state (unchanged since #54):**
+- **Weights:** `models/volleyball_ball_best.pt` v3. The match is native 720p,
+  upscaled once to `_up1080`. Perf 68 ms/frame. Pose gates are live in
+  `classify_actions`.
+- **Match:** 31/33 points. That is a count comparison, not matched recall. 207
+  actions.
+- **Held-out contacts P9-P33:** P 0.785 / R 0.760 / F1 0.772, class 0.590. Team
+  0.518 raw, 0.755 squad-mapped (S3), so 34 genuine side errors. Taxonomy: 46
+  correct / 57 wrong label / 36 wrong team / 44 missed. `overpass` 0/18.
+- **Pass-2 layers** (scripts only, no `src/`):
+  - `relabel_serves.py`: point-level only. Its far contact on dev is 0/5, so never
+    consume it as a label.
+  - `resolve_side_switches.py`: `[7,14,21,28]`, exact.
+  - `resolve_point_winners.py`: 18/33.
+  - `consume_serve_evidence.py`: far-only, 13/17 covered, 9/17 bound.
+- **`--serve-events` observers:** default OFF. Inertness is measured
+  (byte-identical).
+- **Entreno gate record** (`evaluate --ignore-player` F1): e1 0.706, e2 0.571,
+  e3 1.0, e4 0.933, e5 0.923, e6 0.933, e7 0.75 — CAVEAT #81: e2's 0.571 reads
+  0.400 on BOTH fresh MPS arms (pre-existing fresh-run variance in the base; same-
+  session A/B is the valid comparison). Suite **1549**.
+
+**Refuted and parked** (do not reopen without new data): T5 tracker admission, R1
+departure gate, S1 looming, scale-aware geometry, M1 far-end crop, possession
+signal, overpass width crossing, R2 confidence calibration.
+
+**Known defects:** `scripts/annotate_player_gt.py` and `src/db/ingest.py` seek on
+VFR. Both are allow-listed in `tests/test_vfr_seek_guard.py`. Fix the annotator
+before any frame-shown annotation pass.
+
+**Active next (ranked) — execute via the task cards below (`/next-task`):**
+0. **TC1 DONE (#69): `touch_rule_gate = TOUCH_COUNT_LEVER_REFUTED/0.6187` — the possession count is NOT re-derivable from the emitted contacts; nothing ships, no architect card is justified.** `docs/tc1_touch_rules.md`, `logs/tc1_report.md`, transcript `logs/tc1_stdout.txt`, `scripts/probe_touch_rules.py` (imports `ActionContextResolver` + the existing matchers, no `cv2`, no decode, no seek, exit 2 on FAIL), `tests/test_touch_rules.py` (+41; suite **1327**). G1 reproduced #68 EXACTLY (185 accepted; bump_set 157 / attack 16 / block 12; 139 found; touch accuracy **96/139 = 0.691**; R0 replay control **79/139 = 0.568**; GT-touch substitution **110/139 = 0.791**; timing medians dig/set/spike/overpass **−2 f**, serve **+23 f**; shipped stream 85/139 = 0.612 / 0.589). **Step 2 is the centre: the 43 wrong-touch found contacts are STARVED, not mis-reset** — `under_counted` **20** + `previous_contact_missing` **13** = **33 of 43 (77 %)**, `team_change_not_reset` **5**, `over_counted` **4**, `attack_not_reset` **1** — which independently re-confirms #68's "errors cluster where fewer contacts were emitted" mechanism and says the fix is UPSTREAM (emit the missing contacts; open points 2/5), not in the counter. **Step 3 (dev + e1–e7 only; R0 = emitted count, R1 = +reset on any team change, R2 = +reset after an attack gesture, R3 = +reset on `rally_id` change, R4 = +ball-width cross confirmation, abstaining where `ball_side is None` — 64 of 185; every rule replayed through the UNMODIFIED `_decide`)**: summed F1 R0 5.577 / R1–R3 5.591 / R4 **5.745 → R4 chosen**; per-drill R0 is never beaten on more than one drill (e5 0.923 → 0.769 under R1–R3). **Step 4, ONE held-out shot: label accuracy 86/139 = 0.6187 = +0.050 over the R0 control** (PASS bar +0.132, PARTIAL +0.082 → **neither met**) at touch accuracy **103/139 = 0.741**; the non-serve arm is **86/127 = 0.677** vs R0 79/127 = 0.622 and the GT-touch arm 110/127 = 0.866 — a perfect count is worth +0.244, the best re-derived count +0.055. **Step 5 (offline approximation, NOT the real gate): R4 vs the recorded F1 — e1 0.706→0.706, e2 0.571→0.533, e3 1.000→0.929, e4 0.933→0.933, e5 0.923→0.923, e6 0.933→0.800, e7 0.750→0.500 — 4 of 7 outside ±0.01, but the R0 REPLAY is itself off-record on 4 of 7 (e2 −0.171, e3 −0.071, e6 −0.133, e7 −0.250), so criterion (ii) as literally written is unsatisfiable by any replay; reported, NOT reinterpreted (the verdict already fails on (i)). Rule-relative, R4 made no drill worse than R0 (+0.133 on e2, 0.000 elsewhere). **Step 6: NO `src/` change** — #68's +0.223 survives as a DIAGNOSTIC lever only; what is refuted is recovering it by re-deriving the count. Three card defects reported to the coordinator: (a) (ii) as above; (b) **R2 is a no-op by construction** — the card also mandates keeping the resolver's own `attack_before` reset in EVERY arm, which IS R2, so R2 ≡ R1 always (pinned by `test_r2_is_subsumed_by_the_base_attack_reset`); (c) G1's timing / 0.589 references only reproduce on the PRODUCTION stream over ALL region events, not on the found subset. **Next task (coordinator's): DONE as #72** — the reach-gate bucket WAS that diagnosis, and the cascade verdict is NEGATIVE for labels (item 0z): the recall work stays parked for contact completeness (open points 2/5), NOT class accuracy. No card written or reordered by this card.
+0a. **POST-INSERT-CLOSURE RANKING (coordinator, 2026-10-03) — [CORRECTED #76, 2026-10-04: the "no SINGLE lever reaches the bar / COMPOUND levers / owner scope decision" conclusion is WITHDRAWN as a category error; keep the INSERT measurements, discard the ceiling arithmetic.]** The `90/139 = 0.6475` "label-only ceiling" quoted here is TOUCH accuracy, not label accuracy: `docs/g3_reach_cascade.md:43` records `label 78/139 = 0.561  touch 90/139 = 0.647` on the same 139 found contacts, and the label-only oracle on those contacts is **139/139 = 1.000** (`scripts/probe_label_ceilings.py`, `logs/label_ceilings_report.md`, suite 1448). **MEASURED: the `overpass` lever alone crosses 0.70 on the bar arm — `diag` 0.6131 → 0.7080 (+0.0949, 13/137); `production` 0.5899 → 0.6835; `pass2` 0.5612 → 0.6547.** The bar needs +12 labels (84 → 96 of 137); `overpass` supplies 13. Contact F1 is invariant across every arm because `evaluate_timed.match_events` is class-agnostic by design — **the bar is `class_accuracy`, so a lever's value is exactly its label count.** Second coherent bucket, newly named: **`spike → block` x7** (the match GT has ZERO `block` events). The remaining original findings stand as measurements: INSERT-of-far-serves **96/150 = 0.6400 IN-SAMPLE** (#74c, precision 0.6111, 0 near misclaims, 0 owner-negative FP; a RECALL lever on a different denominator, never part of the 0.70 arithmetic); #74b's "103/139 = 0.741" was a numerator-only artefact (consistent 103/152 ≈ 0.678); all 11 INSERT hits at_seam, all 6 misses (P2/P4/P8 dev, P13/P31/P32 held-out) in_gap — the point map's uniform lateness (PM1), not the evidence layer's. **Remaining single label lever: overpass +0.094 — now THE blocking question for the match half of G3, and a LAYER-2 RULE-DESIGN problem, not a discovery problem (the resolver emits `overpass` only at `touch == 2 and not has_follow`; the 13 matched overpasses sit at the same counts as dig/set/spike).** Goal bars today: match shipped **0.612** (diag `action`) / 0.589 (`pipeline_output.json`) vs the 0.70 bar. **Entreno (#74d): the recorded baselines reproduce exactly (7/7 drills, Δ=0.000, script path, MPS) and 4 of 7 already pass 0.90 (e3 1.000, e4/e6 0.933, e5 0.923); the losing drills are e1 0.706 / e2 0.571 / e7 0.750 and their verdict is `NEW MECHANISMS DOMINATE` — known mechanisms cover only 2/9 reachable losses (count error e2 f257; behind_baseline at INVERTED polarity e2 f32), the 7 new ones are `gesture_miss` ×2, `contact_gate` ×4 (reach gate fires ONLY far-side — 7/7 rejections team B — plus ball-out-of-frame and dead geometry) and `emitted_vocabulary` ×1 (`freeball` ∉ `VolleyballAction`); 2 ceiling events. Fixing the KNOWN mechanisms alone: e1 0.706 / e2 0.857 / e7 0.750 — all still under. Per-drill 0.90 ceilings: e1 0.941 nominal but a MEASURED 0.824 without the vocabulary change (the f256 spike relabel steals the f258 block match; `MIN_CONTACT_GAP=9` makes the 1-f-apart pair un-emittable), e2 0.933, e7 0.947 (needs all 3 of its far-side events). The metric-definition question stays open, but the diagnosis is convention-agnostic.** The far-side/upstream-emission story (open points 2/5) now spans BOTH halves of the goal.
+0z. **REACH-GATE BUCKET — DIAGNOSED (#71) then REFUTED as a label lever (#72): the scalar reach relaxation does NOT fix the labels, and the pose-anchored arm inherits the same failure mode. NOTHING SHIPS, CARD RG1 is NOT written. The 44 missed contacts are a RECALL story, not the 0.70 class-accuracy path.** #72 (`docs/g3_reach_cascade.md`) replayed the unmodified `ActionContextResolver` over the 185 accepted rows plus every scalar-reachable `reach` rejection: BASE 78/139 = 0.561 label / 90/139 touch; K=1.1 +4 found → +1 label; **K=1.2 +14 found (14/14 within ±15 f of a GT contact — the precision-clean gate) → −4 LABELS**; K=1.3 +21 → −5; K=2.0 +48 → +1 at 0.513. Admitting ALL 71 repairs only **9 of 49** wrong touch numbers. Reason: the count is driven by the resolver's own resets, not by recall. The #71 diagnosis below stands as the measured record. [UPDATED #74b: the far-side slice of the recall story IS now the 0.70 path — the serve bucket's 13 not-found contacts carry 0.647→0.741; the reach-gate refutation stands for the reach mechanism specifically.] [UPDATED #74c: the 0.647→0.741 step is itself corrected — 0.741 was numerator-only; the measured INSERT ceiling is 96/150 = 0.640 IN-SAMPLE and the in-gap 6 are point-map-blocked. See item 0a.]
+
+    #71 diagnosis (kept): the reach gate blocks **20 of the 44 held-out GT contacts that have no accepted contact within ±15 f** (median nearest 33 f); every one has a rejected row within 15 f. Base-rate-normalised against frame coverage, **`reach` is 9.78× enriched** (71 rejections, 4.65 % coverage → 20 observed vs 2.05 expected); `no_contact_geometry` is the residual bucket (1.76×, blocks 43 of 44, not itself actionable), `no_ball_sighting` is at chance (0.99×), `min_contact_gap` is DEPLETED (0.42×). All 20 reach-carrying misses sit in points where accepted < GT (P10 3, P18 1, P19 4, P22 1, P25 4, P26 2, P30 4, P31 1). Raw-scalar admission curve: 1.1× 4/4 (1.00), **1.2× 14/14 (1.00)**, 1.3× 21/19 (0.90), 2.0× 48/32 (0.67); of the 20 misses 2 within 1.05×, 6 within 1.2×, 9 within 1.3×, 16 within 2.0×; the other 24 of 44 have no candidate geometry at all. **Three measured reasons the scalar could not ship from the diagnosis alone:** (i) the match's OWN dev split (P≤8, cut f4910) admits 12-15 candidates carrying **ZERO** GT contacts at every threshold, so the threshold is NOT selectable out of sample from the match — only the standalone dev clip + 7 drills can select it (a dev-selected 2.0× gate, dev precision 0.80, generalises to 32/36 = 0.89 but admits 6 false drill contacts); (ii) at 1.2× only **6 of 14** carry the correct `target_team`, and across all 71 rejections `target_team` is **B 64 / A 6**; (iii) `CONTACT_REACH = 140 px` (`src/recognition/action_classifier.py:53`) is a px constant on GT-validated action logic, venue-coupled (206 px vs 464-479 px court depth, AGENTS.md §7). The tier-2 architect call (`docs/reach_gate_architect_call.md`) proposed a pose-anchored reach (`0.5 × bbox_width_px` hand radius, class constant default OFF, no new `Config` key) with its own A/B gates — **but it targets the same 20 contacts through the same resolver and so inherits #72's negative result; its only distinct argument was scale-freedom, which is not a label argument.**
+0b. **PG2 DONE (#67): `point_map_alignment = PG1_VERDICT_IS_A_PAIRING_ARTIFACT` — PASS. PG1's `point_map_gate = REFUTED/1` ("uniformly late") is an ARTIFACT of its ordinal pairing (GT *P* ↔ pipeline *P−1*); the window starts ARE serve-anchored, so SR4-FAR is MIS-KEYED, not blocked.** `docs/point_map_seam.md`, `logs/pg2_report.md`, `scripts/score_point_map_alignment.py` (imports `score_point_map` → `probe_point_map`, no `cv2`, exit 2 on FAIL), `tests/test_point_map_alignment.py` (+49; suite **1286** = 1237 + 49). Pairing-independent, all three pre-registered criteria PASS: **14 of 31** window starts within ±15 f of ANY GT serve (23/31 at ±30 f, 25/31 at ±60 f) vs a seeded Monte-Carlo chance baseline of **1.21 of 31** (20 000 draws, seed 20261002, serve balls cover 3.93 % of frames) = **11.56×** (bar ≥ 5×); monotone order-preserving DP keeps **14 pairs within ±15 f at every skip cost** 60/120/240 f (27–28 pairs, median −6/−8 f). PG1's ordinal numbers reproduce exactly (1 of 33, 31 of 31 non-negative, +6/+3153/+1700 f) and now decide nothing. Seam: far serves **AT a window start** (11/17 at_seam, 0 interior, 6 in a gap), near serves **INSIDE** one (11/16, geometrically 14/16) — #65's "far 14/17 in the gaps" is a seam. Step 5 narrow `far_flight` (`width_start <= 28`, fixed) keyed on window starts: **11/17 far, 0/16 near misclaimed, 5 unanchored** at ±10 and ±15 f — **IN-SAMPLE re-test target, NOT shippable** (STOP list, AGENTS.md §5). Card defect logged: 1(e) asks for a "sign-free" median of −6 f (impossible); −6 f is the nearest-**boundary** signed median (nearest-start signed −1 f, sign-free +17 f) — all three readings serve-anchored, so the verdict does not turn on it. **Next task (coordinator's):** the far-serve rule keyed on WINDOW STARTS, re-tested OUT of sample against a non-serve control (AGENTS.md §6 rules) — the corrected-opener architect card is NOT justified by either run, and SR4-FAR stays OFF until that rule has an out-of-sample score. No card written or reordered by this card.
+1. **PM1 DONE (#64): `FAIL=blocked`** — `docs/pm1_point_map.md`,
+   `logs/pm1_report.md`. The probe ran both gates green (G1 baseline reproduced
+   near 8/16 / far 0/17 / 12 FP; G2 plateau re-derived far 16-27 px vs near
+   39-50 px, 16/17 far and 0/16 near at every cut 26-32) and returned the
+   pre-registered FAIL: unbound (frame, side) = **16/17 far hits with 294 false
+   serves**; best binding rule = **11/17 with 35 false serves**; first-after =
+   **16/17 with 288**. **The next task is open point 22** (the episode->point map):
+   PM1 shows the far-serve signal is complete (16/17) and that no binding rule can
+   make it precise, because the map's window opener is one-signed **+6 … +3153 f
+   late** and the far serves sit in inter-point gaps (16 of 33) while the near ones
+   sit in windows (14 of 16) — the fix must move the opener to the serve or to the
+   rally it heads. SR4-FAR stays blocked behind that; it is not the next card.
+2. **SR4a** (DONE #62+, `docs/sr4a_near_openings.md`): the near-opening table —
+   G1 reproduced on both arms (near 8/16, far 0/17, 12 FP, drills 3/5); the 8 near
+   misses bucket into **2 mislabeled_opener + 3 not_opener + 3 not_emitted**.
+   **G2 verdicts: SR4's near side proceeds after the fact (5 repairable of 8, rule
+   >= 4) and M-b is REOPENED as a fresh architect call only (3 never produced, 2 of
+   them coasting, rules >= 3 AND >= 2) — nothing ships.** Trap guard 0. Superseded
+   on the near side by #63: the near record's bar (15/16) is above its measured
+   coverage ceiling (13/16), so **SR4-NEAR does not get built as planned** — it
+   waits on perception.
+3. **SR4-FAR is BLOCKED behind open point 22** (was "next after the probe"; #64
+   measured why): the detection exists (ball width 16-27 px far vs 39-50 px near,
+   plateau 26-32 px, far 16/17, near 0/16) but **no binding rule makes it precise**
+   — unbound 16/17 with 294 false serves, best binding 11/17 with 35. It becomes a
+   one-rule job only AFTER the point map opens at the serve. Keep the cut
+   per-session (camera-scale biased, AGENTS.md §5), never frozen. **#68 demoted
+   it further: the far serve is the SMALLEST lever on the goal metric** — making
+   all 12 far serves perfect moves class accuracy only 0.589→0.621
+   (+0.032; total-correct 0.456→0.522, +0.066 = exactly 12/182), while the label
+   bucket is 58 losses and the touch count alone is worth +0.223. Do the label
+   work first.
+4. **SR3 worker half, ONCE, after the rules are frozen**: teach `score_serves.py`
+   the `serve-anchors-v1` format, run the held-out session, score it once. Still
+   not run — the serve rules are not frozen, so the freeze gate is not met.
+5. **SR5 -> SR6.**
+6. **Deferred edit, not a card:** the `player_off_court_hold_frames` comment at
+   `src/utils/config.py:101` is **STALE** (it credits the 90 f horizon with killing
+   e2's sideline bystander; that bystander is fed on **400 of 423** frames at the
+   horizon today, #61). Fix it **comment-only**, inside whichever session next
+   touches `src/` for another reason — never as a change of its own.
+
+The non-serve backlog is unchanged: the label bucket (open point 9), the reach-gate
+bucket, e4/e5/e6 re-adjudication.
+
+**Deferred triggers:** unchanged (detector v4, T7/T10, T6, T8, T12, R2), with one
+exception. T9's PTS timebase is pulled forward, because SR2/SR3 map audio and
+dictated timestamps to frames by PTS.
+
+The full #54 block (production facts, G0-G4/S0-S4 histories) is archived verbatim in
+`docs/history/status_where_we_are_archive.md`.

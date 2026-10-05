@@ -520,7 +520,7 @@ def _join_continuations(raw_lines: Sequence[str]) -> List[Tuple[int, str]]:
     The owner's P20 dictation wraps inside a parenthetical across two physical
     lines (an unbalanced '(' at the end of one); joining while parens are
     unbalanced is the only wrap shape in the file, checked by
-    tests/test_build_dev_clip_gt.py.
+    tests/test_build_dev_clip_gt.py (test deleted 2026-10-06 lean pass; recoverable from git history).
     """
     out: List[Tuple[int, str]] = []
     for i, raw in enumerate(raw_lines, start=1):
