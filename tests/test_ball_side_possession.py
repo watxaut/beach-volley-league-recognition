@@ -303,7 +303,7 @@ def test_far_small_count_in_row():
 # --------------------------------------------------------------------- #
 
 def test_diag_persists_ball_possession(tmp_path):
-    assert SCHEMA_VERSION == 3  # bumped 2 -> 3 by #80 (ball_ground row)
+    assert SCHEMA_VERSION == 4  # 3 = #80 ball_ground row; 4 = post-run ball bbox/velocity + player labels
     rec = _new_frame_record(3)
     assert "ball_possession" in rec and rec["ball_possession"] is None
     d = DiagRecorder(str(tmp_path / "diag.jsonl"))

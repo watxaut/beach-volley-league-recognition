@@ -348,7 +348,7 @@ def test_observe_is_pure():
 # --------------------------------------------------------------------- #
 
 def test_schema_bumped_and_ground_persisted(tmp_path):
-    assert SCHEMA_VERSION == 3   # bumped 2 -> 3 by #80 (ball_ground row)
+    assert SCHEMA_VERSION == 4  # 3 = #80 ball_ground row; 4 = post-run ball bbox/velocity + player labels
     rec = _new_frame_record(7)
     assert "ball_ground" in rec and rec["ball_ground"] is None
     d = DiagRecorder(str(tmp_path / "diag.jsonl"))

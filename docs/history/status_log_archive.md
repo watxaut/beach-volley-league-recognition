@@ -6526,3 +6526,104 @@ open point 31 (v1.5 raw-candidate extension, OWNER GATE).
 **Measured (synthetic only):** stable rally 0 wrong; 3 consecutive switches with scrambled ids: flip 10-11 f after reappearance, 0 wrong labels (blank instead), all views learned; occlusion 0 flips; silent teammate swap 2 wrong frames then corrected; ~3 ms/frame at 640x360 with 4 bodies. Suite 1475 passed (+19 resolver, +7 probe, +4 drift rows); the 4 failed + 42 errors are the pre-existing missing-`output/` artifacts (identical set before/after).
 
 **Not done / owed:** real-footage run (owner: `scripts/probe_identity_switches.py`, pre-registered reading in open point 2); fresh entreno A/B (§1; action F1 unchanged by construction). E2 drift observers are subsumed by the resolver's doubt/flip diagnostics.
+
+# Log entry moved from STATUS.md on 2026-10-05 (#87), verbatim
+
+### 2026-10-05 (eighty-fourth session) — #84: identity resolver round 2 — the first real run diagnosed (18 flips for 4 switches) and the orientation layer redesigned
+
+**Asked (owner):** ran `scripts/probe_identity_switches.py` on the 20260920 match and shared the log, the report and 3 contact sheets: sheet 02 all right; sheet 00 right except 0:59B/1:19B (P1A also missing some); sheet 01 swaps around 11:19/12:19/13:19.
+
+**Measured (owner run, #83 design):** flips at f1163, 2292, 3743, 5855, 7052, 9488, 11000, 12001, 12901, 13801, 15544, 17054, 18214, 19938, 20840, 21740, 22820, 23720 (GT switch windows: after P7 [4040,4770] missed -- the state was already flipped by the stray f3743; P14 9488, P21 15544, P28 21740 on time); orientation at GT contacts 127 ok / 21 wrong / 63 withheld of 211; label coverage 0.40-0.48; action squad (159 matched) team 71/28/60 vs legacy 83/71/5. Every sheet error is a whole-team swap inside a wrong-orientation stretch.
+
+**Diagnosed (code + numbers; no footage in the container):** (1) the orientation evidence `e = z + f` had f = 0 for (player, view) pairs without native stats -- every cross-view comparison -- while the current hypothesis's f was often strongly negative on real poses (enrollment genuine spread is tight), so the swapped hypothesis was favoured at rest; (2) learning ran after wrong flips and fed the corrupted prototypes back into the orientation statistic (12 learned far prototypes for P1A by the end); (3) the dwell clamp held the CUSUM at threshold, so a flip fired as soon as the 900 f dwell expired (flips spaced 900-1100 f: 12001/12901/13801, 22820/23720).
+
+**Changed:** `src/tracking/identity_resolver.py` decision layer rewritten (see Where we are): `measure()` / `update_observed()` split (`BodyObs`); orientation = per-side baseline-relative directional CUSUM on FIXED anchors, both sides, baseline seeding from the post-change run, defaults threshold 25 / drift 0.5 / dwell 1500 (Config + tracker + drift guard); within-side = always label with margin-scaled hysteresis, per-clean-body quick swap override, occluded/merged crops ignored, lenient stranger test; learning only for within-side models. Probe: records x/CUSUM per side and writes `identity_features.npz`; new `scripts/replay_identity.py` (re-run + re-score offline, `--set NAME=VALUE` overrides). Tests: resolver suite adapted (warm-up-realistic timings, steady-state CUSUM bound instead of exactly 0), +2 dump/replay round-trip tests; suite 1477 passed (same pre-existing missing-`output/` failures).
+
+**Not done / owed:** the real-footage check of #84 (owner re-run + dump); entreno A/B (§1).
+
+## Archived 2026-10-05 (#87): text replaced in STATUS.md by the post-run session, verbatim (pre-#87 state)
+
+### Active next (ranked) as of #86
+
+1. **E2 observers** (owner-approved scope, next session): identity-drift
+   (sustained signature mismatch vs enrolled reference) + side-switch
+   (sustained foot-side ≠ squad side) — display/diag only, OWNER GATE
+   before acting.
+2. **SR4-FAR rule keyed on window starts**, re-tested OUT-OF-SAMPLE with a
+   non-serve control window (AGENTS §6) — before SR4-NEAR.
+3. **Overpass label lever** = Layer-2 rule design on new instrumentation:
+   C1 fitted ball-fate read → C3 relabel via `probe_label_ceilings.py`
+   (open point 9; owner-ratified post-hoc direction #77).
+4. Owner visual pass on live debug (squad colours/labels, ground observer,
+   possession labels).
+5. Deferred comment-only fix: `src/utils/config.py:101` (next src-touching
+   session).
+
+### North-star bullets as of #86
+
+- Stat coverage: kill/dig/block/attack-error DONE; assist derivable (set →
+  same-team spike kill in the same point; metric unbuilt); ace + serve-error
+  blocked on 21.3 + 22 (parked as 13); ball-handling error not perceptible →
+  manual override in the review UI; point winner (21.3) groups the lines.
+- Critical path: 22 → 21.3 → 13 → fantasy module from DB + points-table UI
+  (14e). Rollout gate = 21.4/21.5 + fast human review.
+
+### Open points as of #86 (30, 22, 21, 25, 26, 31, 9, 13)
+
+30. **Serve reliability.** Status: near 8/16, far 0/17, 12 FP (see
+    Where-we-are table); SR0–SR1b done, near/far loss causes measured
+    (near = opener/label/emission; far = mis-keyed rule, see 22). Next:
+    SR4-FAR window-start rule out-of-sample, then SR3 worker half.
+
+22. **Far-side serves.** PG2 (#67): window starts ARE serve-anchored (14/31
+    within ±15f of a GT serve vs 1.21 chance = 11.56×; far 11/17 AT a start,
+    near 11/16 inside), so SR4-FAR is MIS-KEYED, not blocked; far evidence
+    exists (width plateau / far_flight; 13/17 coverage in-sample, held-out
+    4/12). Next: key the rule on window starts + dead-time episodes,
+    out-of-sample re-test + non-serve control; STOP list applies.
+
+21. **Owner's match-feedback backlog** (agreed order): (1) point count 31/33
+    — residual 2 = far-serve losses (→22); (2) per-point + per-action
+    confidence surfaces UNBUILT; (3) winner layer shipped 18/33 (8 misses =
+    terminal-touch attribution →22; 3 kill/ace endings lack ball-death
+    side); (4) side-switch shipped exact [7,14,21,28]; (5) player-number GT
+    pass pending owner; (6) landing/outcome confidence. Next: (2), then
+    winner accuracy via perception.
+
+25. **Dig at ball death (owner-flagged, P15 f10180).** A contact whose ball
+    dies within the same contact window is NOT a dig — encode as an
+    EXCLUSION in the contact-GT build (not a pipeline change), then count
+    how many FPs it removes.
+
+26. **One contact attributed to two players (owner-flagged: P16 f10703, P19
+    f13074, P20 live flap).** `evaluate_timed` already reports
+    `duplicates`; next: score them vs GT, then look at the emit path (one
+    inflect, two actors) — same proximity ambiguity as 5, measure together.
+
+31. **Point-end REST invisible to the ground-contact observer (OWNER GATE
+    before any `src/` change).** Static suppression removes resting balls
+    BY DESIGN → the tracker drops the final descent (e3 f616: 56 f rolling
+    ball visible in diag, track=none) and the label honestly holds AIR
+    (BETWEEN read 60.7% AIR). Next: v1.5 = on lost-track frames, if last
+    read was AIR + downward vy + near-stationary post-suppression detection
+    near the last position, emit a grounded row tagged `from_candidate`
+    (§6-pure, display/diag only); parked rack balls (e3 (290,444)/(436,465))
+    are the FP control.
+
+9.  **Overpass label lever (owner-ratified post-hoc direction #77).** The
+    crossing signal is NOT in the stream (4 families killed; dig and
+    overpass kinematically identical); TC1 touch-count rules refuted
+    0.6187 (+0.050; counter STARVED not mis-reset, 33/43 — upstream is
+    contact recall, points 2/5); GT-touch oracle upper bound 0.791.
+    Shipped substrate: `src/analysis/ball_side_possession.py` display-only
+    (bands 0.85/1.45 × d_net, rolling max 12, far persistent-smallness).
+    Sequencing: **C1** fitted ball-fate read (PASS m ≤ 2k−12, one held-out
+    shot; e4 f347 must NOT fire, f24948 must fire via the terminal branch)
+    → **C2** possession timeline (squad-mapped) → **C3** overpass relabel
+    via `probe_label_ceilings.py` → **C4** ambiguous-touch reattribution
+    (26 = named test). If C1 fails, C2–C4 still build as attribution tooling.
+
+13. **Ace metric.** Needs point-outcome detection: (a) derived heuristic
+    (serve + no opposing touch ≈ likely ace, flagged derived) or (b) real
+    outcome detection (game_state score machinery unvalidated). Assist
+    proxy parked with it.

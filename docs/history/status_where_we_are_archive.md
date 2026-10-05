@@ -2924,3 +2924,93 @@ dictated timestamps to frames by PTS.
 
 The full #54 block (production facts, G0-G4/S0-S4 histories) is archived verbatim in
 `docs/history/status_where_we_are_archive.md`.
+
+## Archived 2026-10-05 (#87): header paragraph #86 + the "Where we are" block as of #86, verbatim
+
+Last updated: **2026-10-06 (86th session) — repo lean pass, merged with
+the parallel identity sessions (#83–#85, PR #1).** Lean pass (no `src/`
+change): STATUS compacted 2465 → ~530 lines per the budgets above (every
+removed line verbatim in `docs/history/`); 21 closed-investigation test
+files deleted (530 tests — suites whose subject is a DONE/REFUTED one-off
+probe); leanness guard added; suite **1083** all green. Identity state =
+#85 (side switches solved offline on the owner's match dump). Numbering:
+#83–#85 = identity resolver sessions; this lean pass = #86.
+
+### Where we are (as of #86)
+
+Display/interpretation layers (all display-only or post-hoc; perception
+byte-identical). **Identity (#85, side switches SOLVED offline on the
+owner's match dump):** E1 enrollment (#81) → `TeamIdentityResolver`
+(`player_identity_mode:"team"`, default) stamps `player_label`/`squad`/
+`slot` on players and actions at their CONTACT frame; output-only, tracking
+identical in team/legacy (unit-pinned). Orientation = two-state
+log-likelihood test on fixed-anchor per-body evidence (e = ±(best squad-1 −
+best squad-2 sim)); levels measured in the opening, unseen state mirrored,
+slow drift only while quiet; per-body LLR clipped ±2, tempered ×0.2 into a
+CUSUM, flip at 8, min interval 300 f, instant doubt on one clearly-swapped
+frame. Within side: EMA-similarity permutation, hysteresis 0.5, quick swap
+override 2.0. Record (20260920 replay, `scripts/replay_identity.py`, 17 s):
+4/4 switches in-window, 0 stray, orientation 211/211 GT contacts, action
+squad 128/27/4 vs legacy 83/71/5 (23 of 27 = classifier side-attribution,
+not identity); d' 3.9 near / 2.3 far; far within-squad flips 760→51;
+robust across a 4× range of every knob. Owed: owner contact-sheet re-run
+(per-PLAYER check), entreno 0-flip run. Also display-only: ball
+ground-contact/out observer (#80, always-on §6-pure); possession labels
+recalibrated twice on owner feedback (#78/#79: NEAR rolling-max ≥1.45×d_net,
+FAR max ≤0.85× OR ≥4 of last 12 ≤0.85×); pass-2 relabel/winner/side-switch/
+serve-evidence layers (below).
+
+**Production state:** weights `volleyball_ball_best.pt` v3; match 720p
+upscaled `_up1080`; 68 ms/frame (pose gating shipped, byte-identical);
+match 31/33 points (count, not recall), 207 actions; held-out P9–P33
+contact P 0.785 / R 0.760 / F1 0.772, class 0.590, team 0.518 raw →
+**0.755 squad-mapped** (34 genuine side errors); taxonomy 46 correct /
+57 wrong label / 36 wrong team / 44 missed; overpass 0/18. Pass-2:
+`relabel_serves` (near 12/16, far 0/17 — NEVER consume far as label),
+`resolve_side_switches` [7,14,21,28] exact, `resolve_point_winners` 18/33,
+`consume_serve_evidence` 13/17 covered 9/17 bound. `--serve-events`
+observers default OFF (inertness measured). Entreno action gate: e1 0.706,
+e2 0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933, e7 0.75 (e2 caveat: 0.400
+on both fresh arms — same-session A/B only). Test suite **1083** (post
+lean-pass + identity #83–#85).
+
+**Serves (score_serves.py, ±15f, match P1–P33):** production near **8/16**
+(dev 1/3, held-out 7/13), far **0/17** (0/5, 0/12), 12 FP, precision 0.40;
+pass-2 relabel near 12/16 far 0/17 + 14 near FP; rally-onset (game_on time
+only) near 3/16, **far 11/17** (median |offset| 3f); far evidence layer far
+13/17 coverage IN-SAMPLE, 9/17 bound, held-out 4/12, precision 0.47 as
+claim, 1 owner FP; entreno fresh 3/5 (e3+0, e6+1, e7+0; e2 f32 + e5 f20
+missed; near recall 11/21).
+
+**Near-loss record (#58, 16 near serves):** P9–P12 behind_baseline reads the
+contact-frame foot (0.8–24.5 px inside the 761 px threshold) → M-a closed
+#60; P5/P7 `player_off_court_hold_frames=90` starves the server track 91 f
+(coasts frozen through the serve) → M-b parked (D4: ceiling +1/16, blunt
+lever net 0, +P7/−P18); e2 server never tracked (bystander slot); e5 no ball
+sighting; P24/P33 unmeasured (P33 = rally_start cascade from own early serve).
+
+**Held-out lock:** `ground_truth/20290928_entreno_vall_dhebron_serve_anchors.json`
+= 19 serves (8 near / 11 far, 1 ace, 1 net); the video has NEVER been run;
+≥0.90 passes only at 8/8 near (Wilson CI [0.68,1.0]); use only via a card
+"score held-out once" with frozen rules.
+
+**SR plan status:** SR0/SR1/SR1b DONE; SR1c closed; SR1d refuted; D4 decided;
+SR4a DONE (near bar 15/16 > ceiling 13/16 → SR4-NEAR waits on perception);
+SR4-FAR mis-keyed not blocked — its rule keyed on window starts, still
+IN-SAMPLE (PG2); SR2 demoted; SR3 worker half behind the held-out lock;
+SR5/SR6 after SR4; SR7 deferred.
+
+**STOP list:** no more px-space/contact-geometry far-serve thresholds or
+selector constants tuned on the 17 match far serves; no relabeling reception
+as serve; no vall_dhebron output looks (band diagnosis #78 was the one
+sanctioned exception).
+
+**Refuted/parked mechanisms** (harnesses in `scripts/`, never `src/`): T5
+tracker admission, R1 departure gate, S1 looming, scale-aware geometry, M1
+far-end crop, possession signal, overpass width-crossing, R2 confidence
+calibration, reach-gate cascade (#72), touch-count rules (TC1).
+
+**Known defects:** `annotate_player_gt.py` + `src/db/ingest.py` seek on VFR
+(allow-listed in `test_vfr_seek_guard.py`); stale comment at
+`src/utils/config.py:101` (`player_off_court_hold_frames`; comment-only fix
+deferred).

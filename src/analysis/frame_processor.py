@@ -542,6 +542,9 @@ class FrameProcessor:
                     "center": p.get("center"),
                     "predicted": bool(p.get("predicted", False)),
                     "confidence": p.get("confidence"),
+                    "player_label": p.get("player_label"),
+                    "squad": p.get("squad"),
+                    "slot": p.get("slot"),
                 }
                 for p in tracked_players
             ],

@@ -192,6 +192,8 @@ class BallTracker:
                 "missing": self.missing_count,
                 "await_reentry": self._await_reentry,
                 "center": (result or {}).get("center"),
+                "bbox": (result or {}).get("bbox"),
+                "velocity": (result or {}).get("velocity"),
                 "conf": (result or {}).get("confidence"),
                 "reason": self._diag_reason,
             }

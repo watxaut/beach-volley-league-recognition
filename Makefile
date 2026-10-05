@@ -22,7 +22,7 @@ OUTPUT_DIR := output/$(VIDEO_NAME)
 # Skip visualization unless VIZ is set.
 VIZ_FLAG := $(if $(VIZ),,--skip-visualization)
 
-.PHONY: run run-video run-live ingest ingest-all db-reset ui help
+.PHONY: run run-video run-live run-match postrun ingest ingest-all db-reset ui help
 
 run:
 ifeq ($(strip $(VIDEO)),)
@@ -47,6 +47,23 @@ endif
 	$(PYTHON) -m src.main "$(VIDEO)" --output-dir "$(OUTPUT_DIR)" --debug-live --debug-speed 2
 	@echo ""
 	@echo "Per-player results CSV: $(OUTPUT_DIR)/results.csv"
+
+# Full match: the normal run plus the per-frame stream sidecar the post-run
+# layer needs (--diag-dump, same frame path, off by default), then the
+# post-run reconstruction (points, touches, players, winners, score).
+run-match:
+ifeq ($(strip $(VIDEO)),)
+	$(error VIDEO is not set. Usage: make run-match VIDEO=path/to/video.mp4)
+endif
+	$(PYTHON) -m src.main "$(VIDEO)" --output-dir "$(OUTPUT_DIR)" $(VIZ_FLAG) --diag-dump "$(OUTPUT_DIR)/diag.jsonl"
+	$(PYTHON) -m src.postrun "$(OUTPUT_DIR)"
+	@echo ""
+	@echo "Match reconstruction: $(OUTPUT_DIR)/match_reconstruction.json (+ .txt play-by-play)"
+
+# Re-run only the post-run reconstruction over an existing run directory
+# (seconds, no video decode): make postrun VIDEO=... or OUTPUT_DIR=output/<dir>.
+postrun:
+	$(PYTHON) -m src.postrun "$(OUTPUT_DIR)"
 
 # Upsert one video's extraction output into the analysis DB (separate process
 # from `run` by design: extraction writes output/<stem>/pipeline_output.json,
@@ -75,6 +92,8 @@ help:
 	@echo "make run VIDEO=path/to/video.mp4        Analyze a video -> $(OUTPUT_DIR)/results.csv + pipeline_output.json"
 	@echo "make run-video VIDEO=path/to/video.mp4  Also save an annotated .mp4 (two-pass, contact-anchored labels)"
 	@echo "make run-live VIDEO=path/to/video.mp4   Play the annotated video live (buffered ~3s so labels land on contact)"
+	@echo "make run-match VIDEO=path/to/video.mp4  Run + post-run reconstruction -> match_reconstruction.json/.txt"
+	@echo "make postrun VIDEO=path/to/video.mp4    Redo only the reconstruction over an existing run (no decode)"
 	@echo "  VIZ=1                                 Also generate summary_graphs.png (run / run-video)"
 	@echo "  PYTHON=...                            Override the python interpreter"
 	@echo "make ingest VIDEO=path/to/video.mp4   Upsert that video's output into the DB"

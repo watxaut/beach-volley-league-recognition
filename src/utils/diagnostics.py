@@ -23,9 +23,11 @@ Record schema (one JSONL line per frame, plus a first ``meta`` line)::
      "ball_dets":  [{"center": [x, y], "conf": 0.8, "persist": 0.1,
                      "suspect": false, "removed": false}, ...],
      "ball_track": {"state": "tracked|predicted|unlocked|none", "locked": true,
-                    "missing": 0, "center": [x, y], "conf": 0.7,
+                    "missing": 0, "center": [x, y], "bbox": [...],
+                    "velocity": [vx, vy], "conf": 0.7,
                     "reason": "locked_admitted"},
-     "players":   [{"track_id": 1, "team": "A", "bbox": [...], "predicted": false}],
+     "players":   [{"track_id": 1, "team": "A", "bbox": [...], "predicted": false,
+                    "player_label": "P1A", "squad": 1, "slot": 1}],
      "actions":   [{"frame": 1230, "action": "dig", "gesture": "bump_set",
                      "team": "A", "track_id": 2, "touch_number": 1, ...}],
      "candidates": [{"frame": 1230, "seen_at": 1237, "stage": "accepted|rejected",
@@ -40,6 +42,11 @@ confirmed on, so a consumer can look a contact up in one place.
 net_crossing, ...). ``ball_ground`` (#80) is the per-frame ground-contact
 row (state air|ground|out, ratio, world, bounce, ...). Both are pure-observer
 output, display/diag only.
+
+Schema 4 (post-run reconstruction layer): ``ball_track`` also mirrors the
+tracked ball's ``bbox`` + ``velocity`` and every ``players`` row carries the
+identity resolver's ``player_label`` / ``squad`` / ``slot`` AT that frame, so
+the post-run layer can re-attribute a touch without a second video pass.
 """
 
 from __future__ import annotations
@@ -49,7 +56,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 #: Bumped when the record shape changes; recorded in the file header.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def _new_frame_record(frame: int) -> Dict[str, Any]:

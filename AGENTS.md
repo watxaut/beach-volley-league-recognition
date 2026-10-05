@@ -39,6 +39,8 @@ removed; the verbatim original stays recoverable via
 ```bash
 make run VIDEO=resources/video_entreno_3.mp4        # full pipeline (device auto -> MPS on Apple Silicon); VIZ=1 adds graphs
 make run-live VIDEO=...                              # --debug-live at 2x speed
+make run-match VIDEO=...                             # run + --diag-dump sidecar + post-run reconstruction (points/touches/score)
+make postrun OUTPUT_DIR=output/<dir>                 # reconstruction only over an existing run (~3 s, no decode)
 make ui                                              # local web UI over data/volley.db
 make ingest-all                                      # (re)ingest output/*/pipeline_output.json into SQLite
 make db-reset                                        # DELETES the DB incl. owner player labels — ask first
@@ -54,7 +56,11 @@ reference for any action A/B), `dump_player_tracks.py` +
 `evaluate.py --predictions <dir> --ground-truth ground_truth/` (ALWAYS with
 `--ignore-player`; see STATUS Learnings), `evaluate_game_state.py`,
 `evaluate_match_points.py`, `annotate_player_gt.py` / `annotate_video.py`
-(owner GT passes).
+(owner GT passes). Post-run layer: `score_postrun.py <match_reconstruction.json>`
+(points / serves / winners / touches vs the owner match GT, with the causal
+stream as baseline), `score_postrun_entreno.py output/postrun` (practice
+clips), `sweep_postrun.py <run_dir>` (one-at-a-time sensitivity of every
+constant).
 
 > **Warning (measured #61): `evaluate.py --predictions <dir>` grades ZERO
 > predictions on `src.main` output.** It expects an entry named `actions` in a
@@ -73,7 +79,9 @@ calibration) → `tracking/` (BallTracker, PlayerTracker) → `recognition/`
 per-frame; game_state_manager, spike_analyzer are pure observers) →
 `output_gen/` (CSV/visualization; plus `db/` + `web/` fed by
 `pipeline_output.json`). `FrameProcessor.process_frame` is the ONE shared
-path — batch, scripts, and live-debug must all go through it.
+path — batch, scripts, and live-debug must all go through it. A sixth,
+offline layer, `postrun/` (§11), reads the `--diag-dump` sidecar of a finished
+run and writes `match_reconstruction.json`; it never touches the frame path.
 
 Component invariants that bite if ignored:
 - **BallDetector**: custom model (`ball_model_path`) needs no class filter;
@@ -331,3 +339,36 @@ STATUS edits on completion). Executors run one card via `/next-task`
 (`.pi/prompts/next-task.md`) and STOP on any ambiguity, failed gate, or missing
 name instead of inferring. An executor never writes, edits or reorders cards,
 and never crosses an owner-gate card.
+
+### 11. Post-run reconstruction layer (owner-stated 2026-10-05)
+
+`src/postrun/` makes the match make sense AFTER the causal pass (design +
+measured record: `docs/postrun_reconstruction.md`). It is the §6 post-hoc
+layer for points, touches, players, winners and score; perception stays
+causal and untouched. Owner rules it encodes — keep them when changing it:
+
+* **Precision first.** "I prefer not having false positives (a spike or a kill
+  that did not happen assigned to someone) than the other way around; if some
+  action did not get recorded it's fine." A touch is credited to a player only
+  with a player at the ball; touches the stream never saw are never credited;
+  an ambiguous attack is an overpass; a kill needs the ball seen coming down.
+* **Rally rules are hard constraints:** the same player never touches twice in
+  a row while the ball is up, a touch happens on the half the ball is in, at
+  most three touches per possession, the match reaches 21 (win by 2) with side
+  switches every 7 points, the winner of a point serves the next one.
+* **Point start = serve, point end = ball on the sand** (or dropping at the
+  net, or no touch for longer than a ball stays up). Dead-time ball handling
+  never starts or extends a point.
+* **Generalise:** every constant is metres, seconds or a likelihood cost,
+  derived through the per-video calibration (ball width = depth). Never add a
+  pixel threshold there (§7: px constants are venue-coupled).
+
+Validation protocol for any change: `score_postrun.py` on the 20260920 match
+(the bar: 33/33 points, 0 false, winners 33/33, score A 21 – B 12, touch
+precision ≥ 0.95, no touch on the wrong half, 0 rule breaks —
+`tests/test_postrun.py` pins it when the run is on disk), then
+`score_postrun_entreno.py` (other venue), then `sweep_postrun.py` (no row may
+lose a point or a winner). Per-player correctness has no GT: it is checked by
+the owner on contact sheets, never claimed from these scores. The input is
+the `--diag-dump` JSONL (schema ≥ 4); a new per-frame need is added to the
+dump as an observation of an already-computed value, never as a second pass.
