@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { LANDING_LABEL, landingError, landingKind, landingSummary, type LandingKind } from '../lib/landings'
+import type { Landing } from '../lib/types'
 
 /** Attack origin, 3×3 zones of the attacker's own half, drawn as seen from
  * behind their own baseline (net at the top). Zone numbers follow
@@ -41,35 +43,89 @@ export function ZoneGrid({ counts }: { counts: Record<string, number> }) {
   )
 }
 
-/** Where attacks came down on the opponents' half, attacker's frame:
- * y 8 (net) … 16 (their baseline), x 0..8 from the attacker's left. */
-export function LandingMap({ landings }: {
-  landings: { x: number | null; y: number; in: boolean | null; outcome: string | null }[]
-}) {
-  const s = 22
-  const W = 8 * s + 4
-  const H = 8 * s + 22
-  const placed = landings.filter((l) => l.x !== null)
+/** Metres drawn around the opponents' half (attacker's frame: x 0..8 from the
+ * attacker's left, y 8 = net .. 16 = their baseline), with room for balls
+ * that went out and for the ones that came down at the net. */
+const VIEW = { x0: -2.5, x1: 10.5, y0: 7, y1: 18.5 }
+const PX_PER_M = 24
+const KIND_COLOR: Record<LandingKind, string> = {
+  kill: 'var(--good)', dug: 'var(--accent)', out: 'var(--bad)', net: 'var(--bad)',
+  error: 'var(--bad)', unresolved: 'var(--muted)',
+}
+
+function Glyph({ kind, x, y }: { kind: LandingKind; x: number; y: number }) {
+  const c = KIND_COLOR[kind]
+  if (kind === 'kill') return <circle cx={x} cy={y} r={4.5} fill={c} stroke="var(--surface)" strokeWidth={1.5} />
+  if (kind === 'dug') return <circle cx={x} cy={y} r={3.5} fill="var(--surface)" stroke={c} strokeWidth={2} />
+  if (kind === 'unresolved') return <circle cx={x} cy={y} r={3} fill={c} />
+  return <path d={`M${x - 4} ${y - 4}L${x + 4} ${y + 4}M${x - 4} ${y + 4}L${x + 4} ${y - 4}`}
+               stroke={c} strokeWidth={2.5} strokeLinecap="round" />
+}
+
+/** Where attacks came down on the opponents' half. Every spot is a best
+ * effort read from a low camera, so each one is drawn with the area it may
+ * really be in (`ex` across, `ey` along the court; depth is the weak axis). */
+export function LandingMap({ landings }: { landings: Landing[] }) {
+  const [hover, setHover] = useState<number | null>(null)
+  const s = PX_PER_M
+  const W = (VIEW.x1 - VIEW.x0) * s
+  const H = (VIEW.y1 - VIEW.y0) * s
+  const px = (x: number) => (Math.min(Math.max(x, VIEW.x0), VIEW.x1) - VIEW.x0) * s
+  const py = (y: number) => (VIEW.y1 - Math.min(Math.max(y, VIEW.y0), VIEW.y1)) * s
+  const placed = landings.flatMap((l) => (l.x == null || l.y == null ? [] : [{
+    l, kind: landingKind(l), cx: px(l.x), cy: py(l.y),
+    off: l.x < VIEW.x0 || l.x > VIEW.x1 || l.y < VIEW.y0 || l.y > VIEW.y1,
+  }]))
+  const { counts, unplaced } = landingSummary(landings)
+  const noError = placed.filter((p) => landingError(p.l) === null).length
+  const tip = hover === null ? null : placed[hover]
   return (
-    <div className="chart" style={{ maxWidth: W }}>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Landing points of attacks on the opponents' half">
-        <rect x={2} y={2} width={8 * s} height={8 * s} rx={4} fill="var(--surface-2)" stroke="var(--axis)" />
-        <rect x={0} y={8 * s + 2} width={W} height={4} rx={2} fill="var(--ink-2)" />
-        <text x={W / 2} y={H - 2} textAnchor="middle">net</text>
-        {placed.map((l, i) => (
-          <circle key={i} cx={2 + (l.x as number) * s} cy={2 + (16 - l.y) * s} r={5}
-                  fill={l.outcome === 'kill' ? 'var(--good)' : l.in === false ? 'var(--bad)' : 'var(--accent)'}
-                  stroke="var(--surface)" strokeWidth={2}>
-            <title>{l.outcome === 'kill' ? 'kill' : l.in === false ? 'out' : 'in play'}</title>
-          </circle>
-        ))}
-      </svg>
-      <div className="legend">
-        <span><span className="team-dot" style={{ background: 'var(--good)' }} />kill</span>
-        <span><span className="team-dot" style={{ background: 'var(--accent)' }} />in play</span>
-        <span><span className="team-dot" style={{ background: 'var(--bad)' }} />out</span>
-        {landings.length > placed.length && <span className="muted">{landings.length - placed.length} with depth only</span>}
+    <div style={{ maxWidth: W }}>
+      <div className="chart">
+        <svg viewBox={`0 0 ${W} ${H}`} role="img"
+             aria-label="Where attacks came down on the opponents' half, each with its position uncertainty">
+          <rect x={px(0)} y={py(16)} width={8 * s} height={8 * s} rx={2} fill="var(--surface-2)" stroke="var(--axis)" />
+          <rect x={px(0) - 6} y={py(8) - 2} width={8 * s + 12} height={4} rx={2} fill="var(--ink-2)" />
+          <text x={px(8) + 12} y={py(8) + 4}>net</text>
+          <text x={px(8) + 8} y={py(16) + 4}>baseline</text>
+          {placed.map((p, i) => p.l.ex != null && p.l.ey != null && (
+            <ellipse key={i} cx={p.cx} cy={p.cy} rx={p.l.ex * s} ry={p.l.ey * s}
+                     fill={KIND_COLOR[p.kind]} opacity={hover === i ? 0.4 : 0.2} />
+          ))}
+          {placed.map((p, i) => (
+            <g key={i} onPointerEnter={() => setHover(i)} onPointerLeave={() => setHover(null)}>
+              <circle cx={p.cx} cy={p.cy} r={9} fill="transparent" />
+              <Glyph kind={p.kind} x={p.cx} y={p.cy} />
+            </g>
+          ))}
+        </svg>
+        {tip && (
+          <div className="tooltip" style={{ left: `${(tip.cx / W) * 100}%`, top: `${(tip.cy / H) * 100}%` }}>
+            <strong>{LANDING_LABEL[tip.kind]}</strong>
+            {tip.kind === 'dug' && ' · where the defender played it'}
+            {tip.kind === 'error' && tip.l.in == null && ' · line too close to call'}
+            {tip.off && ' · beyond the map'}
+            <br />
+            <span className="muted">{landingError(tip.l) ?? 'position error not recorded'}</span>
+          </div>
+        )}
       </div>
+      <div className="legend">
+        {counts.map(([kind, n]) => (
+          <span key={kind}>
+            <svg width={12} height={12} viewBox="0 0 12 12" style={{ marginRight: 5, verticalAlign: -1 }} aria-hidden="true">
+              <Glyph kind={kind} x={6} y={6} />
+            </svg>
+            <strong className="num">{n}</strong> {LANDING_LABEL[kind].toLowerCase()}{n > 1 && (kind === 'kill' || kind === 'error') ? 's' : ''}
+          </span>
+        ))}
+      </div>
+      <p className="muted small" style={{ marginTop: 6 }}>
+        Best-effort positions from a low camera: the shaded area is where each ball may really have come
+        down, and depth (up and down here) is the least certain. A dug ball is shown where the defender played it.
+        {unplaced > 0 && ` ${unplaced} of ${landings.length} attacks have no position and are not on the map.`}
+        {noError > 0 && ` ${noError} were published before the uncertainty was recorded.`}
+      </p>
     </div>
   )
 }

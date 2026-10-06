@@ -29,6 +29,8 @@ BUNDLE_VERSION = 1
 SLOTS = ("P1A", "P2A", "P1B", "P2B")
 ACTIONS = ("serve", "dig", "set", "spike", "overpass", "block", "ball_handling")
 ATTACKS = ("spike", "overpass")
+#: What became of an attack (``landing_result``); None = the run cannot tell.
+LANDING_RESULTS = ("kill", "dug", "out", "net", "error")
 #: Causal SpikeAnalyzer record <-> post-run attack touch: same vertex, so the
 #: frames normally agree; ±15 f is the contact-scoring tolerance.
 SPIKE_JOIN_FRAMES = 15
@@ -107,25 +109,58 @@ def _credited_slot(t: Dict[str, Any]) -> Optional[str]:
     return player if t["observed"] else None
 
 
+def _err(err: Any) -> Tuple[Optional[float], Optional[float]]:
+    """``[across, along]`` metres from the reconstruction (schema >= 2)."""
+    if isinstance(err, (list, tuple)) and len(err) == 2:
+        return err[0], err[1]
+    return None, None
+
+
+def _landing_result(t: Dict[str, Any], nxt: Optional[Dict[str, Any]],
+                    end: Optional[Dict[str, Any]]) -> Optional[str]:
+    """What became of an attack. ``out`` and ``net`` are only said when the
+    run saw it (ball-death line call / net stop); an attack error it cannot
+    place is a plain ``error``, and a ball nobody ruled on is None."""
+    if t.get("outcome") == "kill":
+        return "kill"
+    if nxt is not None:
+        return "dug" if nxt["side"] != t["side"] else None
+    if t.get("outcome") != "error":
+        return None
+    kind = (end or {}).get("kind")
+    if kind == "net":
+        return "net"
+    if kind == "ground" and (end or {}).get("in_court") is False:
+        return "out"
+    return "error"
+
+
 def _landing(i: int, touches: List[Dict[str, Any]],
              end: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """Where an attack came down, in the ATTACKER's own frame: the next
-    touch's position when the other half played it (``next_touch``), else
-    the point's ball-death read (``ball_death``; line calls are weak, open
-    point 31), else nothing."""
+    """Where an attack came down, in the ATTACKER's own frame: where the
+    other half played it (``next_touch``, the ball at that touch), else the
+    point's ball-death read (``ball_death``; line calls are weak, open point
+    31), else nothing. ``landing_err_*`` is how far off that may be (about
+    one sigma; depth is the weak axis from a low tripod) -- None on runs
+    reconstructed before the error was recorded."""
     t = touches[i]
     nxt = touches[i + 1] if i + 1 < len(touches) else None
+    out: Dict[str, Any] = {"landing_result": _landing_result(t, nxt, end)}
     if nxt is not None:
         if nxt["side"] != t["side"] and nxt.get("court_y_m") is not None:
-            _, y = to_own_frame(None, nxt["court_y_m"], t["side"])
-            return {"landing_y_m": y, "landing_source": "next_touch"}
-        return {}
+            x, y = to_own_frame(nxt.get("court_x_m"), nxt["court_y_m"], t["side"])
+            ex, ey = _err(nxt.get("court_err_m"))
+            out.update({"landing_x_m": x, "landing_y_m": y, "landing_err_x_m": ex,
+                        "landing_err_y_m": ey, "landing_source": "next_touch"})
+        return out
     if end and end.get("kind") == "ground" and end.get("court_xy_m"):
         x, y = end["court_xy_m"]
         own_x, own_y = to_own_frame(x, y, t["side"])
-        return {"landing_x_m": own_x, "landing_y_m": own_y,
-                "landing_in": end.get("in_court"), "landing_source": "ball_death"}
-    return {}
+        ex, ey = _err(end.get("court_xy_err_m"))
+        out.update({"landing_x_m": own_x, "landing_y_m": own_y,
+                    "landing_err_x_m": ex, "landing_err_y_m": ey,
+                    "landing_in": end.get("in_court"), "landing_source": "ball_death"})
+    return out
 
 
 def build_actions(points: List[Dict[str, Any]],
@@ -139,7 +174,8 @@ def build_actions(points: List[Dict[str, Any]],
             action = t["action"]
             if action not in ACTIONS:
                 raise BundleError(f"point {pt['point']} f{t['frame']}: unknown action {action!r}")
-            own_x, own_y = to_own_frame(None, t.get("court_y_m"), t.get("side"))
+            own_x, own_y = to_own_frame(t.get("court_x_m"), t.get("court_y_m"),
+                                        t.get("side"))
             row: Dict[str, Any] = {
                 "point_no": pt["point"],
                 "seq": i,
@@ -162,12 +198,16 @@ def build_actions(points: List[Dict[str, Any]],
                 "spike_type": None,
                 "landing_x_m": None,
                 "landing_y_m": None,
+                "landing_err_x_m": None,
+                "landing_err_y_m": None,
                 "landing_in": None,
                 "landing_source": None,
+                "landing_result": None,
                 "dug_zone": None,
                 "extra": {
                     "player": t.get("player"),
                     "court_y_m": t.get("court_y_m"),
+                    "court_err_m": t.get("court_err_m"),
                     "reach_body_heights": t.get("reach_body_heights"),
                     "perception_action": t.get("perception_action"),
                 },
@@ -339,6 +379,8 @@ def validate_bundle(bundle: Dict[str, Any]) -> None:
             raise BundleError(f"unknown slot {a['slot']!r}")
         if a["outcome"] not in (None, "ace", "kill", "error"):
             raise BundleError(f"unknown outcome {a['outcome']!r}")
+        if a["landing_result"] not in (None, *LANDING_RESULTS):
+            raise BundleError(f"unknown landing_result {a['landing_result']!r}")
         if a["attack_zone"] is not None and not 1 <= a["attack_zone"] <= 9:
             raise BundleError(f"attack_zone {a['attack_zone']} outside 1-9")
     if sorted(s["slot"] for s in bundle["slots"]) != sorted(SLOTS):

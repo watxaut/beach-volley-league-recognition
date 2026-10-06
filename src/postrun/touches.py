@@ -124,6 +124,8 @@ class Touch:
     reach: Optional[float] = None     # body heights between ball and player
     height_m: Optional[float] = None
     court_y: Optional[float] = None
+    court_x: Optional[float] = None   # ball at the touch, camera frame (0 = image-left line)
+    court_err: Optional[Tuple[float, float]] = None   # (across, along) m it may be off
     ends_possession: bool = False     # the ball crosses (or dies) after it
     outcome: Optional[str] = None     # ace | kill | error (match layer)
     player_source: Optional[str] = None   # how the player was decided
@@ -496,13 +498,14 @@ class TouchSolver:
         credited = key if (key is not None and d is not None
                            and d <= REACH_CREDIT_MAX) else None
         y = e.court_y()
-        height = None
+        x = height = err = None
         if y is not None and np.isfinite(e.u):
-            height = self.geometry.ball_world(e.u, e.v, y)[2]
+            x, _, height = self.geometry.ball_world(e.u, e.v, y)
+            err = self.geometry.ball_read_error_m(e.u, e.v, y, e.depth_samples())
         return Touch(
             frame=e.frame, side=side, touch_number=k, action="", observed=True,
             player=credited, squad=roster.squad_on(side), reach=d,
-            height_m=height, court_y=y,
+            height_m=height, court_y=y, court_x=x, court_err=err,
             player_source=SOURCE_REACH if credited else None,
             perception_action=e.candidate.action if e.candidate else None, event=e)
 

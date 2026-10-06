@@ -78,17 +78,25 @@ class BallEvent:
     def accepted(self) -> bool:
         return bool(self.candidate is not None and self.candidate.accepted)
 
-    def court_y(self) -> Optional[float]:
-        """Best single read of where along the court the event happened."""
+    def _depth_reads(self) -> List[Tuple[float, int]]:
         ys = [(self.y_in, self.flight_in), (self.y_out, self.flight_out)]
         vals = [(y, fl.n) for y, fl in ys
                 if y is not None and fl is not None and fl.n >= MIN_DEPTH_SAMPLES]
         if not vals:                    # a couple of samples beat no read at all
             vals = [(y, fl.n) for y, fl in ys if y is not None and fl is not None]
+        return vals
+
+    def court_y(self) -> Optional[float]:
+        """Best single read of where along the court the event happened."""
+        vals = self._depth_reads()
         if not vals:
             return None
         total = sum(n for _, n in vals)
         return sum(y * n for y, n in vals) / total
+
+    def depth_samples(self) -> int:
+        """Flight samples behind ``court_y()``."""
+        return sum(n for _, n in self._depth_reads())
 
 
 @dataclass
@@ -184,6 +192,13 @@ class BallTimeline:
         if not np.isfinite(b[0]):
             return None
         return self.geometry.image_to_world((b[0] + b[2]) / 2.0, b[3])
+
+    def ground_world_error(self, frame: int) -> Optional[Tuple[float, float]]:
+        """(across, along) metres ``ground_world(frame)`` may be off by."""
+        b = self.stream.ball_bbox[frame]
+        if not np.isfinite(b[0]):
+            return None
+        return self.geometry.ground_read_error_m((b[0] + b[2]) / 2.0, b[3])
 
     # -- runs and gaps ---------------------------------------------------- #
 

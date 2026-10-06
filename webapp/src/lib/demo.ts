@@ -259,7 +259,16 @@ export function demoApi(): Api {
           kill_rate: sum('attacks') ? Math.round((sum('kills') / sum('attacks')) * 1000) / 1000 : null,
           attack_error_rate: 0.12, ace_rate: sum('serves') ? Math.round((sum('aces') / sum('serves')) * 1000) / 1000 : null, serve_error_rate: 0.08,
           attack_zones: { '1': 4, '2': 7, '3': 2, '5': 3, '6': 1 },
-          landings: Array.from({ length: 18 }, () => ({ x: 0.5 + r() * 7, y: 8.6 + r() * 7, in: r() > 0.15, outcome: r() > 0.6 ? 'kill' : null, source: 'next_touch' })),
+          landings: Array.from({ length: 22 }, () => {
+            const k = r()
+            const y = 8.6 + r() * 7
+            const spot = { x: 0.5 + r() * 7, y, zone: 2, type: 'hard' }
+            // depth is the weak axis, and worse far from the camera
+            if (k < 0.55) return { ...spot, ex: 0.4, ey: 0.7, in: null, outcome: null, result: 'dug' as const, source: 'next_touch' }
+            if (k < 0.8) return { ...spot, ex: 0.3, ey: 0.3 + (y - 8) * 0.1, in: true, outcome: 'kill', result: 'kill' as const, source: 'ball_death' }
+            if (k < 0.92) return { ...spot, x: r() > 0.5 ? 9.4 : -1.2, ex: 0.3, ey: 0.3 + (y - 8) * 0.1, in: false, outcome: 'error', result: 'out' as const, source: 'ball_death' }
+            return { x: null, y: null, in: null, outcome: 'error', result: 'net' as const, source: null }
+          }),
           touch_depths: [],
         } : null,
       }

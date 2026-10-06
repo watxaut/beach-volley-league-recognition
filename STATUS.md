@@ -74,7 +74,7 @@ in/out reads wrong (overridden by the next serve).
 `make inbox` (name, calibration wait, run-match, publish DRAFT) → one
 transactional Supabase RPC (applied/unchanged, admin rows untouched) → RLS +
 React SPA. Verified offline (scratch PG16, parity, CLI e2e, SPA screenshots);
-hosted Supabase/Cloudflare/Drive/launchd untested — owner deploys (#90 Log).
+hosted Supabase/Cloudflare/Drive/launchd untested — owner deploys (#90 Log). #91: attack landings carry both axes, a per-axis error and a result (recon schema 2, migration `20261006180000_landing_confidence`); needs `make postrun` + re-publish per match.
 
 **Identity (#85):** `TeamIdentityResolver` (`player_identity_mode:"team"`,
 default) stamps P1A/P2A/P1B/P2B per frame; orientation = two-state LLR on
@@ -93,7 +93,7 @@ colours/labels. Pass-2 scripts (`relabel_serves`, `resolve_side_switches`,
 `resolve_point_winners` 18/33, `consume_serve_evidence`) are SUPERSEDED by
 `src/postrun` for points/serves/winners; kept as provenance. Entreno action
 gate (causal): e1 0.706, e2 0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933,
-e7 0.75 (same-session A/B only). Test suite **1173** (#90 +34, 3 PG-gated).
+e7 0.75 (same-session A/B only). Test suite **1178** (#91 +4; 3 PG-gated; `test_inbox` run-match order fails at HEAD, not #91).
 
 **Speed (#89, results-neutral — AGENTS §12).** `prefetch_depth: 8` reads
 decode + both detectors' `infer()` ahead on background threads
@@ -346,9 +346,11 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Delegation: >1 KB prompt kills the child pi (EXIT 137) — few hundred bytes + the child reads a brief file.
 - Retraining: four-leg gate; fine-tune FROM `best.pt`; mine frames with NO pre-labels.
 - Web/infra facts (#90, checked 2026-10-06): Telegram bot `getFile` caps 20 MB (local Bot API server: 2000 MB), undelivered updates kept 24 h, "video" sends re-encode; Supabase free = 50 MB/file, 1 GB storage, 500 MB DB, pauses after 7 idle days; torch for Intel macOS ends at 2.2.x.
+- Court positions (#91, 20260920, 136 credited touches, ball at the touch vs the toucher's feet — a noisy reference, NOT GT): agree ~0.4 m across / ~0.7 m along at 1σ, 83–96 % within 2×; flight fits have 54+ width samples so the floor is systematic, not noise. Ground reads at ±4 px: ±0.1 m depth at the near baseline, ±1.1 m at the far one (lens 1.5 m up). `geometry.ground_read_error_m` / `ball_read_error_m` (the ground one shrinks by itself with a higher tripod).
 - Postgres: `jsonb_populate_recordset` fills a MISSING key from its base record (NULL), never the column DEFAULT — pass a base row carrying the defaults (#90 smoke test).
 
 ## Session index (one line each)
+- #91 **Web "Where they land": landings 17→57 of 63 attacks placed (touch x from the ball read), per-axis position error + `landing_result`; recon schema 2, new migration, map with uncertainty areas + out-of-court margin**
 - #91 **Stats/fantasy brainstorm (docs-only): measurement budget from the calibrations (left–right cm-precise, height ±0.15 m, far depth weak), owner ideas graded, new ideas + validation cards; owner picks**
 - #90 **Video→web platform designed, ratified + BUILT: supabase/ (RLS, RPCs, fantasy rule tables), src/publish (publisher, Drive inbox, backup), webapp/ SPA, launchd, CI; deploy guide; 32f fixed; owner deploys next**
 - #89 **Offline run 2.3–2.5× faster, byte-identical: read-ahead decode+detectors (`frame_prefetch.py`) + exact detector fast path (`yolo_inference.py`); match 1955→783 s, 7 clips 291→131 s; suite 1139**
@@ -450,6 +452,37 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-08-15 — bystander-hijack fix (assignment-level court membership); first player-ID GT + occlusion-aware eval; ghosts excluded from the classifier.
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 ## Log (newest first)
+
+### 2026-10-06 (ninety-first session) — #91: "Where they land" gets real coverage and honest uncertainty
+
+**Asked (owner):** make the web's "Where they land" widget better through the
+events; then "start with this ... the camera is at 1.5 m, do a best effort and
+be honest with the confidence".
+
+**Measured first (20260920):** 17 of 63 attacks had a spot (touches carried
+depth only); 4 of those 17 were drawn outside the SVG (the out balls); 41 of
+63 had no outcome and were coloured "in play".
+
+**Built:** `src/postrun` — touches carry `court_x_m` (ball at the touch) +
+`court_err_m`, ground ends `court_xy_err_m` (schema 2; points/touches otherwise
+identical to the #87 run). `src/publish/bundle.py` — `own_x_m` filled,
+`landing_x_m` for dug balls, `landing_err_x_m/_y_m`, `landing_result`
+(kill/dug/out/net/error; out/net only when the run saw it). Migration
+`20261006180000_landing_confidence.sql` (3 columns + `player_profile`).
+`webapp` — `LandingMap` redrawn: 2.5 m out-of-court margin, glyph per result,
+shaded error area per ball, counts, plain-words caveat; tolerates old rows.
+
+**Result:** 57 of 63 attacks placed (39 dug, 10 kill, 3 out, 1 net, 8 error,
+2 unresolved). Error model: see Learnings (#91).
+
+**Honest limits:** no position GT — the error is calibrated against players'
+feet, itself a read; the ground-read error is a pixel-slip model, unvalidated;
+line calls stay as weak as before (3 of 10 wrong, open 31) and `landing_in`
+is passed through untouched.
+
+**Not done / owed:** owner: `supabase db push`, then `make postrun` + publish
+per match (old rows show without error areas). `test_inbox`
+`test_calibrated_video_is_run_published_and_archived` fails at HEAD (not #91).
 
 ### 2026-10-06 (ninety-first session) — #91: stats & fantasy feature brainstorm (docs only)
 

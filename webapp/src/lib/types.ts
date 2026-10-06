@@ -182,9 +182,27 @@ export interface PlayerProfile {
     ace_rate: number | null
     serve_error_rate: number | null
     attack_zones: Record<string, number>
-    landings: { x: number | null; y: number; in: boolean | null; outcome: string | null; source: string }[]
+    landings: Landing[]
     touch_depths: { action: string; y: number }[]
   } | null
+}
+
+/** One attack and where it came down, in the attacker's frame: x 0..8 from
+ * their left sideline, y 8 (net) .. 16 (the opponents' baseline). `ex` / `ey`
+ * are how far off the spot may be, in metres across / along the court (about
+ * one sigma, best effort). The fields after `source` are missing on a
+ * database that has not run the landing_confidence migration. */
+export interface Landing {
+  x: number | null
+  y: number | null
+  in: boolean | null
+  outcome: string | null
+  source: string | null
+  ex?: number | null
+  ey?: number | null
+  result?: 'kill' | 'dug' | 'out' | 'net' | 'error' | null
+  zone?: number | null
+  type?: string | null
 }
 
 export interface MatchSource {

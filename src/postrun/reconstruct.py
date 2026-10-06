@@ -26,7 +26,8 @@ from .rallies import RallySegmenter
 from .stream import MatchStream, load_stream
 from .touches import SOURCE_ALTERNATION, Touch, TouchSolver
 
-SCHEMA_VERSION = 1
+#: 2 = touches carry ``court_x_m`` + ``court_err_m``, ground ends ``court_xy_err_m``.
+SCHEMA_VERSION = 2
 logger = logging.getLogger(__name__)
 
 
@@ -178,6 +179,13 @@ def _round(value: Optional[float], digits: int) -> Optional[float]:
     return round(float(value), digits)
 
 
+def _err(err) -> Optional[List[float]]:
+    """(across, along) position error in metres, or None when unknown."""
+    if err is None or not all(np.isfinite(v) for v in err):
+        return None
+    return [round(float(err[0]), 2), round(float(err[1]), 2)]
+
+
 def _letter(squad: Optional[int]) -> Optional[str]:
     return SQUAD_LETTER.get(squad) if squad is not None else None
 
@@ -207,7 +215,9 @@ def _touch_payload(pt: Point, t: Touch) -> Dict[str, Any]:
         "ends_possession": bool(t.ends_possession),
         "outcome": t.outcome,
         "height_m": _round(t.height_m, 2),
+        "court_x_m": _round(t.court_x, 1),
         "court_y_m": _round(t.court_y, 1),
+        "court_err_m": _err(t.court_err),
         "reach_body_heights": _round(t.reach, 2),
         "perception_action": t.perception_action,
     }
@@ -238,6 +248,7 @@ def _point_payload(index: int, pt: Point) -> Dict[str, Any]:
             "in_court": end.in_court,
             "court_xy_m": None if end.court_xy is None else [
                 _round(end.court_xy[0], 1), _round(end.court_xy[1], 1)],
+            "court_xy_err_m": _err(end.court_xy_err),
         },
         "winner": _letter(pt.winner_squad),
         "winner_source": pt.winner_source,

@@ -113,6 +113,7 @@ class RallyEnd:
     kind: str
     frame: int
     court_xy: Optional[Tuple[float, float]] = None   # where the ball died (m)
+    court_xy_err: Optional[Tuple[float, float]] = None   # (across, along) m it may be off
     side: Optional[str] = None       # half the ball died in (None = unknown)
     in_court: Optional[bool] = None  # ground ends only; None = too close to call
 
@@ -496,10 +497,11 @@ class RallySegmenter:
     def _ground_end(self, frame: int) -> RallyEnd:
         f = self.tl._nearest_tracked(frame)
         xy = self.tl.ground_world(f) if f is not None else None
-        side = in_court = None
+        side = in_court = err = None
         if xy is not None:
             side, in_court = classify_landing(xy)
-        return RallyEnd(kind=END_GROUND, frame=frame, court_xy=xy,
+            err = self.tl.ground_world_error(f)
+        return RallyEnd(kind=END_GROUND, frame=frame, court_xy=xy, court_xy_err=err,
                         side=side, in_court=in_court)
 
     def _lost_end(self, e: BallEvent, prev: BallEvent,

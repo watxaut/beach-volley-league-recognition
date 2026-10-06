@@ -194,6 +194,59 @@ def test_spike_join_and_attacker_frame_landing(tmp_path, recon):
             assert a["landing_y_m"] > 8.0, a
 
 
+def test_landings_carry_position_error_and_result(tmp_path, recon):
+    bundle = build_bundle(_run_dir(tmp_path, recon))
+    attacks = [a for a in bundle["actions"] if a["action"] in ("spike", "overpass")]
+    dug = [a for a in attacks if a["landing_source"] == "next_touch"]
+    assert dug, "the synthetic match has attacks the other half plays"
+    for a in dug:
+        # the ball where the other half played it, both axes, with its error
+        assert a["landing_x_m"] is not None and a["landing_in"] is None
+        assert a["landing_err_x_m"] >= 0.4 and a["landing_err_y_m"] >= 0.7
+        assert a["landing_result"] == ("kill" if a["outcome"] == "kill" else "dug")
+    for a in attacks:
+        if a["outcome"] == "kill":
+            assert a["landing_result"] == "kill"
+    assert all(a["landing_result"] is None for a in bundle["actions"]
+               if a["action"] not in ("spike", "overpass"))
+
+
+def test_position_error_grows_with_distance_from_the_lens():
+    g = sim.StreamBuilder(1.0).g
+    near = g.ground_read_error_m(*g.world_to_image(4.0, 15.0))
+    far = g.ground_read_error_m(*g.world_to_image(4.0, 1.0))
+    assert far[1] > near[1] >= 0.3 and far[1] > far[0]      # depth is the weak axis
+    u, v = g.world_to_image(4.0, 12.0)
+    few, many = g.ball_read_error_m(u, v, 12.0, 2), g.ball_read_error_m(u, v, 12.0, 60)
+    assert few[1] > many[1] >= 0.7 and many[0] >= 0.4       # never below the measured floor
+
+
+def test_landing_result_only_says_what_the_run_saw():
+    from src.publish.bundle import _landing_result
+    hit = {"side": "near", "outcome": "error"}
+    assert _landing_result(hit, None, {"kind": "net"}) == "net"
+    assert _landing_result(hit, None, {"kind": "ground", "in_court": False}) == "out"
+    # too close to call, or the ball was lost: an error, not an invented "out"
+    assert _landing_result(hit, None, {"kind": "ground", "in_court": None}) == "error"
+    assert _landing_result(hit, None, {"kind": "lost"}) == "error"
+    assert _landing_result({"side": "near", "outcome": None}, None, {"kind": "lost"}) is None
+    assert _landing_result({"side": "near", "outcome": None}, {"side": "far"}, None) == "dug"
+    assert _landing_result({"side": "near", "outcome": "kill"}, {"side": "far"}, None) == "kill"
+
+
+def test_bundle_from_a_schema_1_reconstruction(tmp_path, recon):
+    """Runs reconstructed before touch x / position error still publish."""
+    old = json.loads(json.dumps(recon))
+    for p in old["points"]:
+        (p["end"] or {}).pop("court_xy_err_m", None)
+        for t in p["touches"]:
+            t.pop("court_x_m"), t.pop("court_err_m")
+    bundle = build_bundle(_run_dir(tmp_path, old))
+    assert all(a["own_x_m"] is None and a["landing_err_y_m"] is None
+               for a in bundle["actions"])
+    assert any(a["landing_result"] for a in bundle["actions"])
+
+
 def test_to_own_frame():
     assert to_own_frame(1.0, 12.0, "near") == (1.0, 4.0)      # 4 m from the near baseline
     assert to_own_frame(1.0, 3.0, "far") == (7.0, 3.0)        # far team: x mirrored

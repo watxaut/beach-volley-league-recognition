@@ -36,6 +36,25 @@ NET_Y_M = COURT_LENGTH_M / 2.0
 SIDE_NEAR = "near"
 SIDE_FAR = "far"
 
+# How far off a court position may be, as (across, along) metres -- about one
+# sigma, a best effort and never a guarantee. The lens sits ~1.5 m up, so the
+# court's long axis is squeezed into few image rows and DEPTH is the weak axis
+# of every read; a higher tripod shrinks the ground-plane numbers by itself.
+#
+# Ground reads (a ball on the sand): what a +-GROUND_READ_PX slip of the box's
+# bottom point moves on the sand (blurred box edge + calibration clicks), never
+# below the floor (a ball rolls / is caught a frame late).
+GROUND_READ_PX = 4.0
+GROUND_ERR_FLOOR_M = 0.3
+# Ball reads (depth from its pixel width, fitted over a flight). Measured
+# (20260920, 136 credited touches, ball position vs the toucher's feet): the
+# width noise averages out over a flight (median 54+ samples) and what is left
+# -- blur, arm reach, the fit's straight line -- is ~0.4 m across and ~0.7 m
+# along; with these floors 68-80 % of touches fall within the error and
+# 83-96 % within twice it. The feet are a noisy reference, not ground truth.
+BALL_WIDTH_READ_PX = 1.5
+BALL_ERR_FLOOR_M = (0.4, 0.7)
+
 
 def other_side(side: Optional[str]) -> Optional[str]:
     if side == SIDE_NEAR:
@@ -149,6 +168,30 @@ class CourtGeometry:
         scale = float(self.px_per_metre(court_y))
         uc, vg = self.world_to_image(COURT_WIDTH_M / 2.0, court_y)
         return (COURT_WIDTH_M / 2.0 + (u - uc) / scale, court_y, (vg - v) / scale)
+
+    def ground_read_error_m(self, u: float, v: float) -> Optional[Tuple[float, float]]:
+        """(across, along) error of the ground-plane read at pixel (u, v).
+        None when the slip reaches the horizon (no usable position)."""
+        px = GROUND_READ_PX
+        up, down = self.image_to_world(u, v - px), self.image_to_world(u, v + px)
+        left, right = self.image_to_world(u - px, v), self.image_to_world(u + px, v)
+        if up is None or down is None or left is None or right is None:
+            return None
+        return (math.hypot(abs(right[0] - left[0]) / 2.0, GROUND_ERR_FLOOR_M),
+                math.hypot(abs(up[1] - down[1]) / 2.0, GROUND_ERR_FLOOR_M))
+
+    def ball_read_error_m(self, u: float, v: float, court_y: float, samples: int
+                          ) -> Tuple[float, float]:
+        """(across, along) error of ``ball_world(u, v, court_y)`` when the
+        depth was fitted over ``samples`` width reads."""
+        w = float(self.width_at(court_y))
+        dw = min(BALL_WIDTH_READ_PX * 2.0 / math.sqrt(max(samples, 1)), 0.5 * w)
+        along = abs(float(self.court_y_from_width(w - dw))
+                    - float(self.court_y_from_width(w + dw))) / 2.0
+        across = abs(self.ball_world(u, v, court_y + along)[0]
+                     - self.ball_world(u, v, court_y - along)[0]) / 2.0
+        return (math.hypot(across, BALL_ERR_FLOOR_M[0]),
+                math.hypot(along, BALL_ERR_FLOOR_M[1]))
 
     def net_top_height_m(self) -> Optional[float]:
         """Net-top height implied by the calibration clicks (sanity read:

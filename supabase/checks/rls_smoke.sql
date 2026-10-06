@@ -56,7 +56,9 @@ returns jsonb language sql as $$
       jsonb_build_object('point_no', 1, 'seq', 3, 'frame', 345, 'slot', 'P1A', 'team', 'A',
                          'action', 'spike', 'outcome', 'kill', 'observed', true,
                          'attack_zone', 2, 'landing_x_m', 3.1, 'landing_y_m', 12.0,
-                         'landing_in', true, 'landing_source', 'ball_death'),
+                         'landing_in', true, 'landing_source', 'ball_death',
+                         'landing_err_x_m', 0.3, 'landing_err_y_m', 0.9,
+                         'landing_result', 'kill'),
       jsonb_build_object('point_no', 1, 'seq', 4, 'frame', 360, 'slot', null, 'team', 'B',
                          'action', 'dig', 'observed', false),
       jsonb_build_object('point_no', 2, 'seq', 0, 'frame', 811, 'slot', 'P1A', 'team', 'A',
@@ -248,6 +250,9 @@ begin
   v_prof := public.player_profile((select id from public.players where display_name = 'Check Ari'));
   assert (v_prof ->> 'can_see_analytics')::boolean, 'a player sees her own analytics';
   assert (v_prof -> 'analytics' ->> 'kill_rate')::numeric = 1.0, 'kill rate 1/1';
+  assert (v_prof -> 'analytics' -> 'landings' -> 0 ->> 'result') = 'kill'
+     and (v_prof -> 'analytics' -> 'landings' -> 0 ->> 'ey')::numeric = 0.9,
+         'landings carry their result and position error';
   assert public.set_my_privacy(true), 'ari flips her privacy';
 end $$;
 reset role;
