@@ -1,0 +1,51 @@
+STATUS.md
+  s_9ed08fada71d0a::t_fdb340d9393379 79,98,349,353,455-485
+docs/history/status_log_archive.md
+  s_9ed08fada71d0a::t_d8b980ea60d773 6668-6692
+docs/web_platform_design.md
+  s_9ed08fada71d0a::t_034c1f78638fda 434
+src/postrun/ball_flights.py
+  s_9ed08fada71d0a::t_e0d243fa1e5b6a 81,87-91,97-100,196-202
+src/postrun/geometry.py
+  s_9ed08fada71d0a::t_4f82b63c37c68e 39-57,172-195
+src/postrun/rallies.py
+  s_9ed08fada71d0a::t_b39c7d64bc192f 116,500,503-504
+src/postrun/reconstruct.py
+  s_9ed08fada71d0a::t_10ebe6d26cbd37 29-30,182-188,218,220,251
+src/postrun/touches.py
+  s_9ed08fada71d0a::t_fb4bd287ba0243 127-128,501,503-504,508
+src/publish/bundle.py
+  s_9ed08fada71d0a::t_d5f097c79c6ee5 32-33,112-137,140-145,148,151-155,159-163,177-178,201-202,205,210,382-383
+supabase/checks/rls_smoke.sql
+  s_9ed08fada71d0a::t_1c827ba91d3109 59-61,253-255
+supabase/migrations/20261006180000_landing_confidence.sql
+  s_9ed08fada71d0a::t_13907b90984f48 1-109
+tests/test_publish.py
+  s_9ed08fada71d0a::t_4c8f2262648d32 197-249
+webapp/src/components/Court.tsx
+  s_9ed08fada71d0a::t_e9107cc377f751 2-3,46-81,83-112,114-121,123-128
+webapp/src/lib/demo.ts
+  s_9ed08fada71d0a::t_c4a4bdfcce3dc8 262-271
+webapp/src/lib/landings.test.ts
+  s_9ed08fada71d0a::t_bc1ba2c092525e 1-34
+webapp/src/lib/landings.ts
+  s_9ed08fada71d0a::t_968d6f7e3278b8 1-34
+webapp/src/lib/types.ts
+  s_9ed08fada71d0a::t_5608fa0f9299fc 185,190-207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "727368463cdeb32dbce3f9b383037e7ac4c28781",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
