@@ -1,0 +1,47 @@
+AGENTS.md
+  s_9ed08fada71d0a::t_9bb4b3957b94d1 375-398
+STATUS.md
+  s_9ed08fada71d0a::t_8ba02d3eec4327 21-26,84-85,92-103,139-146,244-250,337-341,347,447-460
+docs/history/status_log_archive.md
+  s_9ed08fada71d0a::t_48a176536dc87b 6644-6651
+src/analysis/frame_prefetch.py
+  s_9ed08fada71d0a::t_f907ddedd4ecd6 1-139
+src/analysis/frame_processor.py
+  s_9ed08fada71d0a::t_788a6eb31adc7b 26,132,143,360-367,373,381-382,411-416,533-536
+src/analysis/live_debug_processor.py
+  s_9ed08fada71d0a::t_b3f9cbc23fdf91 690,692-699
+src/analysis/video_processor.py
+  s_9ed08fada71d0a::t_6002cc1441272c 12,96-98,100,102-104,107-109,125-139
+src/detection/ball_detector.py
+  s_9ed08fada71d0a::t_1c4e413bac3392 50,90,92,178-196,201,212,215-217,220-237
+src/detection/base_detector.py
+  s_9ed08fada71d0a::t_2032ff9051f56b 14-15,62-63,71-73,77,80,90-109
+src/detection/player_detector.py
+  s_9ed08fada71d0a::t_6335082f851c6b 29-30,45,47,83-93,98,108-109,112,124-125,128-129,136-152
+src/detection/yolo_inference.py
+  s_9ed08fada71d0a::t_0fd1c5de326b7d 1-224
+src/utils/config.py
+  s_9ed08fada71d0a::t_c3e58c5c7c8beb 189-199
+tests/test_frame_prefetch.py
+  s_9ed08fada71d0a::t_23607219795be3 1-204
+tests/test_serve_events.py
+  s_9ed08fada71d0a::t_b5c28ef2751f43 406-407,409,429-431,433-434,437-438
+tests/test_yolo_inference.py
+  s_9ed08fada71d0a::t_e2a449d5596d92 1-205
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "5715201d29af749a6652ed6bd06c5c8adc5576b2",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
