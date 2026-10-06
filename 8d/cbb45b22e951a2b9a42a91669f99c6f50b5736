@@ -1,0 +1,29 @@
+STATUS.md
+  s_9ed08fada71d0a::t_116460af6deb80 57,223-224
+docs/postrun_reconstruction.md
+  s_9ed08fada71d0a::t_e702dd81b26290 71-77,129-130
+src/postrun/match.py
+  s_9ed08fada71d0a::t_e07d76b387736d 36,152
+src/postrun/reconstruct.py
+  s_9ed08fada71d0a::t_94b8276d86f599 27,145-146,193
+src/postrun/touches.py
+  s_9ed08fada71d0a::t_5b5747dc6e9b35 19-22,44-47,506,543-599
+tests/test_postrun.py
+  s_9ed08fada71d0a::t_ab19a76fa98e72 62-68,366,373-425
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "8dcbb45b22e951a2b9a42a91669f99c6f50b5736",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
