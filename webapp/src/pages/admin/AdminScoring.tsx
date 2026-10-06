@@ -55,7 +55,10 @@ export function AdminScoring() {
                   const changed = Number(value) !== Number(r.points)
                   return (
                     <tr key={r.rule_key}>
-                      <td className="left"><strong>{r.label}</strong></td>
+                      <td className="left">
+                        <strong>{r.label}</strong>
+                        {r.actions.includes('block') && <> <span className="badge" title="The camera cannot see blocks">not measured</span></>}
+                      </td>
                       <td className="left small muted" style={{ whiteSpace: 'normal' }}>
                         {r.actions.map((a) => ACTION_LABEL[a] ?? a).join(' / ')}
                         {r.outcome ? ` → ${OUTCOME_LABEL[r.outcome] ?? r.outcome}` : ''}
@@ -78,6 +81,12 @@ export function AdminScoring() {
               </tbody>
             </table>
           </div>
+        )}
+        {(rules.data ?? []).some((r) => r.actions.includes('block')) && (
+          <p className="muted small" style={{ marginTop: 8 }}>
+            The Block rule can never fire today: the camera cannot tell a block from the touches around it.
+            Its value changes nothing until blocks are measured.
+          </p>
         )}
         <div className="row" style={{ marginTop: 12 }}>
           <button onClick={() => {

@@ -6692,3 +6692,56 @@ small fix owed in `src/postrun`, parked as open 32f.
 **Not done / owed:** entreno 0-flip identity run (open 2b); DB ingest +
 points table + fantasy (Active next 1); second match; GT P31 serve frame
 (~f24630) confirmation.
+
+## Archived 2026-10-07 (#92): Log entries moved out of STATUS.md verbatim (Log keeps 3 sessions)
+
+### 2026-10-06 (ninetieth session) — #90: video → web platform designed, ratified and built (Supabase + publisher + Drive inbox + web app)
+
+**Asked (owner):** design the video → fantasy/stats web flow (video transfer,
+processing machine, idempotent upsert keyed by the video name with an upload
+log, login-only Supabase web with admins/viewers, data model); then, after
+ratifying D1–D8 (Drive, no Telegram; file name gets the time; scoring in its
+own table): "implement what you can here, leave me a detailed deploy plan".
+
+**Built:** `supabase/` (2 migrations: schema, RLS tiers, stats views,
+`fantasy_rulesets`/`fantasy_rules` + clone/activate RPCs, `ingest_match_bundle`,
+`publish_preview`, storage buckets; config + email templates; `checks/rls_smoke.sql`);
+`src/publish/` (naming, bundle, fantasy mirror, thumbs by sequential grab,
+stdlib REST client, CLI, Drive inbox runner, backup); `webapp/` (Vite React
+TS SPA, demo mode); `ops/launchd/`; `.github/workflows/` (keep-alive, web
+CI); Makefile targets; `docs/deploy_web_platform.md`; AGENTS §13; 32f fix in
+`postrun.player_stats` (+ txt `hErr` column). Tests +34 (`test_publish` 21,
+`test_inbox` 10, `test_supabase_schema` 3 — the latter need `VOLLEY_TEST_PG_DSN`).
+
+**Verified here:** scratch PG16 migrations + RLS smoke (also fails on a
+broken expectation); SQL fantasy == bundle == `player_stats` on a real
+reconstruction of the simulated match; publish CLI end-to-end through a
+stand-in gateway (applied/unchanged/video guard/bad key); SPA typecheck,
+lint, vitest, build, Chromium screenshots 1280/390 px (no console errors).
+The full pytest suite was NOT run (no torch in this container; the touched
+modules' tests ran with a scratch import shim).
+
+**Rebased on #89 (speed):** session renumbered #89→#90 and AGENTS §12→§13;
+processing-time figures updated to the #89 speed (~0.8× the video length).
+
+**Not done / owed:** owner deployment (guide steps 0–7) and the first real
+publish; nothing ran against hosted Supabase/Cloudflare/Drive yet.
+
+### 2026-10-06 (eighty-ninth session) — #89: the offline run is 2.3–2.5× faster with byte-identical results (read-ahead + exact detector fast path)
+
+**Asked (owner):** on branch `opus-video-processing-fast`, make the offline evaluation (video + post-processing) faster while keeping the same results.
+
+**Diagnosed first (MPS, entreno_3, 77 ms/frame):** ball YOLO 23 + player YOLO 28 + MediaPipe pose 21 + tracker 3 + decode 2; post-run 3 s. Of the 51 ms detector stage only ~23 ms is network forward: ultralytics' NMS + rescale on MPS cost 10–20 ms/frame in GPU syncs (3 ms on CPU), preprocessing ~7. HEAD is run-to-run deterministic on MPS and reproduces `output/postrun/` byte for byte, so those runs are the golden reference.
+
+**Built:** `src/detection/yolo_inference.py` (`YoloInference`: the predictor's own stage methods; CPU post-processing only when a certificate proves it exact — every candidate pair's IoU ≥1e-4 from the NMS threshold, no tied score or class maximum, device box arithmetic bit-equal to the CPU on a probe — else the device path; off on ultralytics releases not in `VERIFIED_ULTRALYTICS`); `infer()` / `detect(frame, inference=)` split on both detectors; `src/analysis/frame_prefetch.py` (`FramePrefetcher`: decode thread + one worker per detector, bounded, in decode order) behind `FrameProcessor.read_ahead`, used by `VideoProcessor` and the two-pass `--save-video`; config `prefetch_depth: 8`, `detector_fast_inference: True`; AGENTS §12; +18 tests (8/8 mutants killed), suite 1139.
+
+**Measured (same machine, MPS, final code, vs the golden runs):** match 1955 → 783 s (74.9 → 29.8 ms/frame; an earlier pass 836 s / 31.8), 7 practice clips 291 → 131 s; `diag.jsonl` (49 MB on the match), `pipeline_output.json`, all CSVs and `match_reconstruction.txt`/`.json` identical on all 8 (`score_postrun.py` unchanged: 33/33, P 0.976, action 0.982). `--device cpu` (e5, 231 → 159 ms/frame) and `--save-video` (annotated mp4 byte-identical, 37 → 19 s) identical to a true-HEAD worktree run; every switch combination identical on e5 (81 / 67 / 50 / 31–35 ms/frame). The certificate sent 310 of 26181 player frames and 6 ball frames to the device path on the match.
+
+**Found, not touched (results-changing):** the player detector feeds ultralytics an RGB frame it treats as BGR; one MediaPipe video-mode `Pose` is shared by all players.
+
+**Not done / owed:** pose on its own thread (the new bound, open point 33); read-ahead for the `--debug-live` producer and the enrollment pre-pass; the fast path turns itself off on any ultralytics release other than the verified 8.3.169 (`venv/` is the only environment; the uv `.venv` was deleted by the owner).
+
+## Archived 2026-10-07 (#92): two oldest Session index lines moved out of STATUS.md verbatim (index budget 100)
+
+- 2026-08-15 — bystander-hijack fix (assignment-level court membership); first player-ID GT + occlusion-aware eval; ghosts excluded from the classifier.
+- 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.

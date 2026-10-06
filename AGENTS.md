@@ -431,3 +431,18 @@ Pages). Rules that keep it correct:
   the processing laptop; `webapp/` only ever gets the publishable key.
 * **Publish from the prod worktree** (§8): the publisher refuses a dirty tree
   unless `--allow-dirty`, which is recorded in the publication log.
+* **Rules change -> republish everything (#92).** A stat is comparable across
+  matches only if every match went through the same post-run rules. After a
+  `src/postrun` change run `make republish-all` (`DRY=1` first); it needs each
+  match's `diag.jsonl` (~50 MB), so **keep the diag dump of every published
+  match** -- a run without one is reported as skipped and fails the command.
+* **Stats are SQL, honest in the UI (#92).** Aggregate stats live in
+  security-definer functions (`leaderboard`, `player_profile`, `match_report`;
+  raw touches stay participant-only); `webapp/src/lib/analytics.ts` is the demo
+  mode's copy of the same definitions, and both are pinned by the same fixture
+  (`supabase/checks/rls_smoke.sql`, `lib/analytics.test.ts`) plus a Python
+  recount (`tests/test_supabase_schema.py`). Every rate shows its `k/n`, a
+  percentage only from `MIN_N` (10) attempts, with a 95 % Wilson range; an
+  unmeasured stat (blocks) reads "not measured", never 0; each stat carries its
+  A/B/C grade (`/measure`). A validation card (V1/V2) fixes its PASS bars
+  BEFORE the first run and reports both what was run and any filter added after.

@@ -1,18 +1,21 @@
 import { Link } from 'react-router-dom'
 import { useApp, useLoad, useMatchList } from '../app/state'
 import { MatchList } from './Matches'
+import { Sparkline } from '../components/Charts'
 import { Card, ErrorBox, Loading, Tile } from '../components/ui'
 import { signed } from '../lib/format'
+import { ALL_TIME } from '../lib/window'
 
 export function Home() {
   const { api, me, isAdmin } = useApp()
-  const profile = useLoad(() => (me ? api.playerProfile(me.id) : Promise.resolve(null)), [me?.id])
-  const board = useLoad(() => api.leaderboard(null), [])
+  const profile = useLoad(() => (me ? api.playerProfile(me.id, ALL_TIME) : Promise.resolve(null)), [me?.id])
+  const board = useLoad(() => api.leaderboard(ALL_TIME), [])
   const list = useMatchList()
 
   const drafts = (list.data?.matches ?? []).filter((m) => m.status === 'draft')
   const rank = me && board.data ? board.data.findIndex((r) => r.player_id === me.id) + 1 : 0
   const t = profile.data?.totals
+  const form = profile.data?.form
 
   return (
     <>
@@ -48,6 +51,13 @@ export function Home() {
                 <Tile label="Assists" value={t.assists} />
                 <Tile label="Errors" value={t.errors} hint="Service + attack + ball handling" />
               </div>
+              {form && form.n >= 2 && (
+                <div className="row small" style={{ marginTop: 12 }}>
+                  <span className="muted">Form</span>
+                  <Sparkline values={form.last5} label={`Fantasy points in your last ${form.last5.length} matches`} />
+                  <span>{form.avg5?.toFixed(1)} <span className="muted">avg of last {form.last5.length}</span></span>
+                </div>
+              )}
               <p style={{ marginTop: 12, marginBottom: 0 }}>
                 <Link to={`/players/${me.id}`}>My full stats →</Link>
               </p>

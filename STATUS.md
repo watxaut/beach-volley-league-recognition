@@ -18,10 +18,10 @@ update at the end of every session that changes anything and commit with the wor
 - New durable protocol rules go in `AGENTS.md`; new cross-session technical
   facts go one-line-each into *Learnings* below.
 
-Last updated: **2026-10-06 (91st session) — stats/fantasy feature brainstorm
-written (`docs/stats_feature_brainstorm.md`, IDs O1–O5, N1–N20, V1–V3, H1–H4,
-I1–I6); owner picks Now/Next/Never. No code change.** #90 (web platform BUILT,
-owner deploys via `docs/deploy_web_platform.md`) is the state underneath.
+Last updated: **2026-10-07 (92nd session) — the brainstorm's "Now" picks are BUILT
+(time windows, N1–N4, report card, H1–H3 page, `make republish-all`, V1/V2 scripts);
+V1 hard/touch and V2 ±0.2 m heights both FAIL their pre-registered bars.** #91 (landings) and
+#90 (web platform, owner deploys via `docs/deploy_web_platform.md`) are the state underneath.
 
 ## North-star goals (set session 24)
 
@@ -74,7 +74,7 @@ in/out reads wrong (overridden by the next serve).
 `make inbox` (name, calibration wait, run-match, publish DRAFT) → one
 transactional Supabase RPC (applied/unchanged, admin rows untouched) → RLS +
 React SPA. Verified offline (scratch PG16, parity, CLI e2e, SPA screenshots);
-hosted Supabase/Cloudflare/Drive/launchd untested — owner deploys (#90 Log). #91: attack landings carry both axes, a per-axis error and a result (recon schema 2, migration `20261006180000_landing_confidence`); needs `make postrun` + re-publish per match.
+hosted Supabase/Cloudflare/Drive/launchd untested — owner deploys (#90 Log). #91: attack landings carry both axes, a per-axis error and a result (recon schema 2, migration `20261006180000_landing_confidence`); needs `make postrun` + re-publish per match. #92: stats windows + side-out/break + serve targets + reception outcome + hitting % + report card + `/measure` (migration `20261007100000`, no re-publish needed); `make republish-all` redoes post-run + publish for every published match (needs its diag dump).
 
 **Identity (#85):** `TeamIdentityResolver` (`player_identity_mode:"team"`,
 default) stamps P1A/P2A/P1B/P2B per frame; orientation = two-state LLR on
@@ -125,8 +125,9 @@ P31 serve f24543 is 128 f before its reception (owner to confirm ~f24630).
 
 ## Active next (ranked)
 
-0. **Owner picks from `docs/stats_feature_brainstorm.md` §5** (Now / Next /
-   Never per ID); picked items become entries here or task cards.
+0. **Owner: `supabase db push` (`20261007100000`), review the stats pages**
+   (`?w=n5`, report card, `/measure`); give `scripts/check_heights.py --heights P1A=…`
+   the real heights. Next picks (§5): I3 → O3 (relative heights, V2), N10/O2, O1+I4, N7/N9, F1.
 1. **Deploy the product (owner):** `docs/deploy_web_platform.md` steps 0–7,
    then publish 20260920 with `MATCH_KEY=20260920_<HHMM>_…` (dry run first:
    fantasy must equal the txt footer). Then: action_overrides UI, in-app
@@ -348,8 +349,12 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Web/infra facts (#90, checked 2026-10-06): Telegram bot `getFile` caps 20 MB (local Bot API server: 2000 MB), undelivered updates kept 24 h, "video" sends re-encode; Supabase free = 50 MB/file, 1 GB storage, 500 MB DB, pauses after 7 idle days; torch for Intel macOS ends at 2.2.x.
 - Court positions (#91, 20260920, 136 credited touches, ball at the touch vs the toucher's feet — a noisy reference, NOT GT): agree ~0.4 m across / ~0.7 m along at 1σ, 83–96 % within 2×; flight fits have 54+ width samples so the floor is systematic, not noise. Ground reads at ±4 px: ±0.1 m depth at the near baseline, ±1.1 m at the far one (lens 1.5 m up). `geometry.ground_read_error_m` / `ball_read_error_m` (the ground one shrinks by itself with a higher tripod).
 - Postgres: `jsonb_populate_recordset` fills a MISSING key from its base record (NULL), never the column DEFAULT — pass a base row carrying the defaults (#90 smoke test).
+- V1 (#92, 20260920, 32 owner-labelled spikes): `SpikeAnalyzer` hard/touch is published for 16 and right on 10 (acc 0.625, cov 0.50; bars 0.85 / 0.80) → FAIL, the web does not show hard/touch; 25 of 63 post-run attacks have any causal record. `scripts/score_spike_type.py`.
+- V2 (#92): live net crossings with a well-conditioned timing clear the tape (33/33, median +0.61 m) but the far half reads people 5–12 % shorter and digs 0.29 m higher than near → no "±0.2 m". Dead-time balls rolling past the net read 2.3 m under the tape (on the sand) — always filter to rallies. `scripts/check_heights.py`.
+- SQL stats (#92): possession = running count of `touch_number = 1` per point (0 = serve, 1 = reception); a `bool_or` over a column that is NULL for most rows returns NULL, not false — `coalesce` it. New Supabase functions get EXECUTE for anon by default: revoke explicitly.
 
 ## Session index (one line each)
+- #92 **Stats "Now" picks BUILT: windows, side-out/break, serve targets, reception outcome, hitting %, report card, /measure, republish-all; V1 hard/touch FAILS (10/16 right on 16 of 32), V2 ±0.2 m heights FAIL (net clearance passes)**
 - #91 **Web "Where they land": landings 17→57 of 63 attacks placed (touch x from the ball read), per-axis position error + `landing_result`; recon schema 2, new migration, map with uncertainty areas + out-of-court margin**
 - #91 **Stats/fantasy brainstorm (docs-only): measurement budget from the calibrations (left–right cm-precise, height ±0.15 m, far depth weak), owner ideas graded, new ideas + validation cards; owner picks**
 - #90 **Video→web platform designed, ratified + BUILT: supabase/ (RLS, RPCs, fantasy rule tables), src/publish (publisher, Drive inbox, backup), webapp/ SPA, launchd, CI; deploy guide; 32f fixed; owner deploys next**
@@ -449,9 +454,45 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-08-18 — e5 serve-zone squatter fixed (server vote + trial expiry + contested swap); e4/e5 GT checked.
 - 2026-08-17 — config-drift guard; config-default divergence FIXED (f539 block provenance); e3 GT serve frame fixed; live-debug frame counter; near-net flag closed by diagnosis — …(log archive 2026-10-06)
 - 2026-08-16 — team-aware contact attribution (team 0.69→0.92); server tracking fixed + ghost damping.
-- 2026-08-15 — bystander-hijack fix (assignment-level court membership); first player-ID GT + occlusion-aware eval; ghosts excluded from the classifier.
-- 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 ## Log (newest first)
+
+### 2026-10-07 (ninety-second session) — #92: the brainstorm's "Now" picks, built
+
+**Asked (owner):** implement the suggested "Now" ideas of `docs/stats_feature_brainstorm.md`
+(O4+I1, H1–H3, N1, N2, N3+N4, N8+F3, V1+V2, I2).
+
+**Built (no new perception, so no re-publish is needed for any of it):** migration
+`20261007100000_stats_windows_and_analytics.sql` — `window_matches` (season / from / to /
+last N), `leaderboard(…)` and `player_profile(…)` take the window and return denominators,
+fantasy per 21 points, form; `player_profile.analytics` adds attack split (reception vs
+transition), side-out / break-point, serve targeting, reception outcome, progress series;
+new `match_report(match)` (per-player line vs their own average, team side-out / break, who
+took the serves, per-point fantasy where the play-by-play is visible); view `touch_context`
+(possession numbers). `webapp` — `?w=` time filter, Wilson ranges + minimum 10 attempts +
+`k/n` on every rate (H1), "not measured" blocks (H2), `/measure` page + A/B/C badges (H3),
+rolling-rate chart with band, fantasy race, form sparkline, report card on the match page,
+demo mode mirrors it (`lib/analytics.ts`). `make republish-all` (`src/publish/republish.py`):
+postrun + publish for every run that has a `match_bundle.json`, skips (and fails on) runs
+whose diag dump was deleted. `scripts/score_spike_type.py` (V1), `scripts/check_heights.py` (V2).
+
+**Verified:** schema check 5/5 (smoke extended; SQL N1–N4 == a plain-Python recount on the
+simulated match AND the real 20260920 bundle — that recount caught a NULL `bool_or` bug);
+vitest 32; full suite 1201 pass (3 fail: `test_inbox` already at HEAD + 2 STATUS-guard
+budgets already over at HEAD, fixed here by archiving); `npm run build`; SPA screenshots.
+
+**V1 (bars fixed first: accuracy ≥ 0.85, coverage ≥ 0.80):** **FAIL.** 32 owner-labelled
+spikes: a type is published for 16 (0.50), right on 10 (0.625). Hard/touch is not shown.
+**V2 (bars fixed first):** **FAIL** overall, so "±0.2 m" is not claimed. Net clearance PASS
+(live + well-conditioned: 33 crossings, 100 % at/above −0.15 m, median +0.61 m; the first run
+scored dead-time balls and timing-noisy crossings and failed — both filters added after
+seeing it, bars unchanged, unfiltered numbers still printed). Stature: far half reads 5–6 %
+shorter (P2A 12 % — FAIL); no real heights given. Contacts: spike 2.52/2.51 m, set, overpass
+agree; digs 1.37 near vs 1.66 far (0.29 — FAIL).
+
+**Not done / owed:** owner: `supabase db push` (new migration, no re-publish needed), give
+the four real heights to `check_heights.py --heights`; O3 (net view) stays "Next" and, per V2,
+would show relative heights only. Next-list: I3 → O3, N10/O2, O1+I4, N7/N9, F1.
+
 
 ### 2026-10-06 (ninety-first session) — #91: "Where they land" gets real coverage and honest uncertainty
 
@@ -507,49 +548,3 @@ owner-labelled hard/touch spikes (13/19) — `spike_type` never scored on the
 match (card V1).
 
 **Not done / owed:** owner's pick; nothing implemented.
-
-### 2026-10-06 (ninetieth session) — #90: video → web platform designed, ratified and built (Supabase + publisher + Drive inbox + web app)
-
-**Asked (owner):** design the video → fantasy/stats web flow (video transfer,
-processing machine, idempotent upsert keyed by the video name with an upload
-log, login-only Supabase web with admins/viewers, data model); then, after
-ratifying D1–D8 (Drive, no Telegram; file name gets the time; scoring in its
-own table): "implement what you can here, leave me a detailed deploy plan".
-
-**Built:** `supabase/` (2 migrations: schema, RLS tiers, stats views,
-`fantasy_rulesets`/`fantasy_rules` + clone/activate RPCs, `ingest_match_bundle`,
-`publish_preview`, storage buckets; config + email templates; `checks/rls_smoke.sql`);
-`src/publish/` (naming, bundle, fantasy mirror, thumbs by sequential grab,
-stdlib REST client, CLI, Drive inbox runner, backup); `webapp/` (Vite React
-TS SPA, demo mode); `ops/launchd/`; `.github/workflows/` (keep-alive, web
-CI); Makefile targets; `docs/deploy_web_platform.md`; AGENTS §13; 32f fix in
-`postrun.player_stats` (+ txt `hErr` column). Tests +34 (`test_publish` 21,
-`test_inbox` 10, `test_supabase_schema` 3 — the latter need `VOLLEY_TEST_PG_DSN`).
-
-**Verified here:** scratch PG16 migrations + RLS smoke (also fails on a
-broken expectation); SQL fantasy == bundle == `player_stats` on a real
-reconstruction of the simulated match; publish CLI end-to-end through a
-stand-in gateway (applied/unchanged/video guard/bad key); SPA typecheck,
-lint, vitest, build, Chromium screenshots 1280/390 px (no console errors).
-The full pytest suite was NOT run (no torch in this container; the touched
-modules' tests ran with a scratch import shim).
-
-**Rebased on #89 (speed):** session renumbered #89→#90 and AGENTS §12→§13;
-processing-time figures updated to the #89 speed (~0.8× the video length).
-
-**Not done / owed:** owner deployment (guide steps 0–7) and the first real
-publish; nothing ran against hosted Supabase/Cloudflare/Drive yet.
-
-### 2026-10-06 (eighty-ninth session) — #89: the offline run is 2.3–2.5× faster with byte-identical results (read-ahead + exact detector fast path)
-
-**Asked (owner):** on branch `opus-video-processing-fast`, make the offline evaluation (video + post-processing) faster while keeping the same results.
-
-**Diagnosed first (MPS, entreno_3, 77 ms/frame):** ball YOLO 23 + player YOLO 28 + MediaPipe pose 21 + tracker 3 + decode 2; post-run 3 s. Of the 51 ms detector stage only ~23 ms is network forward: ultralytics' NMS + rescale on MPS cost 10–20 ms/frame in GPU syncs (3 ms on CPU), preprocessing ~7. HEAD is run-to-run deterministic on MPS and reproduces `output/postrun/` byte for byte, so those runs are the golden reference.
-
-**Built:** `src/detection/yolo_inference.py` (`YoloInference`: the predictor's own stage methods; CPU post-processing only when a certificate proves it exact — every candidate pair's IoU ≥1e-4 from the NMS threshold, no tied score or class maximum, device box arithmetic bit-equal to the CPU on a probe — else the device path; off on ultralytics releases not in `VERIFIED_ULTRALYTICS`); `infer()` / `detect(frame, inference=)` split on both detectors; `src/analysis/frame_prefetch.py` (`FramePrefetcher`: decode thread + one worker per detector, bounded, in decode order) behind `FrameProcessor.read_ahead`, used by `VideoProcessor` and the two-pass `--save-video`; config `prefetch_depth: 8`, `detector_fast_inference: True`; AGENTS §12; +18 tests (8/8 mutants killed), suite 1139.
-
-**Measured (same machine, MPS, final code, vs the golden runs):** match 1955 → 783 s (74.9 → 29.8 ms/frame; an earlier pass 836 s / 31.8), 7 practice clips 291 → 131 s; `diag.jsonl` (49 MB on the match), `pipeline_output.json`, all CSVs and `match_reconstruction.txt`/`.json` identical on all 8 (`score_postrun.py` unchanged: 33/33, P 0.976, action 0.982). `--device cpu` (e5, 231 → 159 ms/frame) and `--save-video` (annotated mp4 byte-identical, 37 → 19 s) identical to a true-HEAD worktree run; every switch combination identical on e5 (81 / 67 / 50 / 31–35 ms/frame). The certificate sent 310 of 26181 player frames and 6 ball frames to the device path on the match.
-
-**Found, not touched (results-changing):** the player detector feeds ultralytics an RGB frame it treats as BGR; one MediaPipe video-mode `Pose` is shared by all players.
-
-**Not done / owed:** pose on its own thread (the new bound, open point 33); read-ahead for the `--debug-live` producer and the enrollment pre-pass; the fast path turns itself off on any ultralytics release other than the verified 8.3.169 (`venv/` is the only environment; the uv `.venv` was deleted by the owner).

@@ -51,7 +51,7 @@ deploy `main`.
    ```bash
    supabase login
    supabase link --project-ref <ref>      # asks for the DB password
-   supabase db push                       # applies the 2 migrations
+   supabase db push                       # applies every file in supabase/migrations/
    ```
    **Check:** Table Editor shows `matches`, `points`, `actions`,
    `fantasy_rules` (8 G1 rows), …; Storage shows two **private** buckets,

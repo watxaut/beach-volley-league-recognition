@@ -3,10 +3,12 @@
 // The data is synthetic; the rules (credited touches, fantasy rules,
 // privacy tiers) mirror the SQL so the pages behave like production.
 import type { Api } from './api'
+import { hitSplit, playerAnalytics, pointFantasy, serveTargets, teamRally, type Seat, type Touch } from './analytics'
 import type {
-  ActionName, ActionRow, BoxRow, FantasyRule, LeaderRow, Match, PointRow, Participant, Player,
-  PlayerProfile, Profile, Publication, Ruleset, Session, Slot, Team,
+  ActionName, ActionRow, BoxRow, FantasyRule, LeaderRow, Match, PointRow, Participant,
+  Player, PlayerProfile, Profile, Publication, ReportPlayer, Ruleset, Session, Slot, Team, WindowParams,
 } from './types'
+
 
 const SLOTS: Slot[] = ['P1A', 'P2A', 'P1B', 'P2B']
 const ME = '00000000-0000-0000-0000-0000000000a1'
@@ -30,15 +32,17 @@ const G1: Omit<FantasyRule, 'ruleset_id'>[] = [
   { rule_key: 'handling_error', label: 'Ball handling', actions: ['set', 'dig', 'ball_handling'], outcome: 'error', assist_only: false, points: -1, sort_order: 80 },
 ]
 
+type DemoAction = ActionRow & { touch_number: number }
+
 interface DemoMatch {
   match: Match
   slots: Record<Slot, number | null>
   points: PointRow[]
-  actions: ActionRow[]
+  actions: DemoAction[]
   publications: Publication[]
 }
 
-function simulate(id: number, seed: number, finalA: number, finalB: number): { points: PointRow[]; actions: ActionRow[] } {
+function simulate(id: number, seed: number, finalA: number, finalB: number): { points: PointRow[]; actions: DemoAction[] } {
   const r = rng(seed)
   const order: Team[] = []
   let a = 0
@@ -53,7 +57,7 @@ function simulate(id: number, seed: number, finalA: number, finalB: number): { p
     order.push(pickA ? 'A' : 'B')
   }
   const points: PointRow[] = []
-  const actions: ActionRow[] = []
+  const actions: DemoAction[] = []
   let sa = 0
   let sb = 0
   let server: Team = 'A'
@@ -61,14 +65,14 @@ function simulate(id: number, seed: number, finalA: number, finalB: number): { p
   order.forEach((winner, i) => {
     const pointNo = i + 1
     const serverSlot = (server === 'A' ? (pointNo % 4 < 2 ? 'P1A' : 'P2A') : (pointNo % 4 < 2 ? 'P1B' : 'P2B')) as Slot
-    const touches: Omit<ActionRow, 'match_id' | 'point_no' | 'seq'>[] = []
-    const push = (slot: Slot | null, team: Team, action: ActionName, outcome: ActionRow['outcome'] = null, assist = false) =>
-      touches.push({ frame: (frame += 30 + Math.floor(r() * 25)), slot, team, action, outcome, is_assist: assist, observed: slot !== null })
+    const touches: Omit<DemoAction, 'match_id' | 'point_no' | 'seq'>[] = []
+    const push = (slot: Slot | null, team: Team, action: ActionName, touchNo: number, outcome: ActionRow['outcome'] = null, assist = false) =>
+      touches.push({ frame: (frame += 30 + Math.floor(r() * 25)), slot, team, action, outcome, is_assist: assist, observed: slot !== null, touch_number: touchNo })
     const roll = r()
     if (roll < 0.06) {
-      push(serverSlot, server, 'serve', winner === server ? 'ace' : 'error')
+      push(serverSlot, server, 'serve', 0, winner === server ? 'ace' : 'error')
     } else {
-      push(serverSlot, server, 'serve')
+      push(serverSlot, server, 'serve', 0)
       let side: Team = server === 'A' ? 'B' : 'A'
       const exchanges = 1 + Math.floor(r() * 3)
       for (let k = 0; k < exchanges; k++) {
@@ -80,13 +84,13 @@ function simulate(id: number, seed: number, finalA: number, finalB: number): { p
         const kill = ends && winner === side
         const err = ends && winner !== side
         if (err && r() < 0.15) {
-          push(digger, side, 'dig')
-          push(setter, side, 'set', 'error')
+          push(digger, side, 'dig', 1)
+          push(setter, side, 'set', 2, 'error')
           break
         }
-        push(r() < 0.08 ? null : digger, side, 'dig')
-        push(setter, side, 'set', null, kill)
-        push(digger, side, r() < 0.12 ? 'overpass' : 'spike', kill ? 'kill' : err ? 'error' : null)
+        push(r() < 0.08 ? null : digger, side, 'dig', 1)
+        push(setter, side, 'set', 2, null, kill)
+        push(digger, side, r() < 0.12 ? 'overpass' : 'spike', 3, kill ? 'kill' : err ? 'error' : null)
         side = side === 'A' ? 'B' : 'A'
       }
     }
@@ -133,6 +137,8 @@ export function demoApi(): Api {
     ['20260920_1830_bogatell_ari_joan', 'Bogatell', 'published', 21, 12, { P1A: 1, P2A: 2, P1B: 3, P2B: 4 }],
     ['20260927_1900_bogatell_laia_nil', 'Bogatell', 'published', 19, 21, { P1A: 5, P2A: 6, P1B: 1, P2B: 2 }],
     ['20261004_1805_vall_dhebron', "Vall d'Hebron", 'draft', 21, 17, { P1A: null, P2A: null, P1B: null, P2B: null }],
+    ['20260906_1000_bogatell_ari_marc', 'Bogatell', 'published', 21, 15, { P1A: 1, P2A: 3, P1B: 2, P2B: 4 }],
+    ['20260913_1730_bogatell_joan_pau', 'Bogatell', 'published', 17, 21, { P1A: 2, P2A: 4, P1B: 1, P2B: 5 }],
   ]
   const matches: DemoMatch[] = defs.map(([key, venue, status, a, b, slots], i) => {
     const id = i + 1
@@ -183,6 +189,14 @@ export function demoApi(): Api {
   }
 
   const byId = (id: number) => matches.find((m) => m.match.id === id)
+  /** The matches a window keeps, newest first (the SQL `window_matches`). */
+  const windowed = (list: DemoMatch[], w: WindowParams) => {
+    const kept = list
+      .filter((m) => (!w.season || m.match.season === w.season) && (!w.from || m.match.match_date >= w.from)
+        && (!w.to || m.match.match_date <= w.to))
+      .sort((a, b) => `${b.match.match_date}${b.match.start_time}`.localeCompare(`${a.match.match_date}${a.match.start_time}`))
+    return w.lastN ? kept.slice(0, w.lastN) : kept
+  }
   const delay = <T,>(v: T) => new Promise<T>((res) => setTimeout(() => res(structuredClone(v)), 60))
 
   return {
@@ -215,12 +229,12 @@ export function demoApi(): Api {
     boxScore: (id) => delay(byId(id) && visible(byId(id)!) ? box(byId(id)!) : []),
     points: (id) => delay(byId(id) && canDetail(byId(id)!) ? byId(id)!.points : []),
     actions: (id) => delay(byId(id) && canDetail(byId(id)!) ? byId(id)!.actions : []),
-    leaderboard(season) {
+    leaderboard(w) {
       const rows = new Map<number, LeaderRow>()
-      for (const m of matches.filter((x) => x.match.status === 'published' && (!season || x.match.season === season))) {
+      for (const m of windowed(matches.filter((x) => x.match.status === 'published'), w)) {
         for (const b of box(m)) {
           if (!b.player_id) continue
-          const r = rows.get(b.player_id) ?? { player_id: b.player_id, display_name: b.display_name ?? '?', matches: 0, wins: 0, fantasy: 0, kills: 0, aces: 0, digs: 0, assists: 0, blocks: 0, errors: 0 }
+          const r = rows.get(b.player_id) ?? { player_id: b.player_id, display_name: b.display_name ?? '?', matches: 0, wins: 0, fantasy: 0, kills: 0, aces: 0, digs: 0, assists: 0, blocks: 0, errors: 0, attacks: 0, attack_errors: 0, serves: 0, points_played: 0, fantasy_per_21: null }
           r.matches++
           r.wins += b.team === m.match.winner_team ? 1 : 0
           r.fantasy = Math.round((r.fantasy + b.fantasy) * 10) / 10
@@ -229,35 +243,63 @@ export function demoApi(): Api {
           r.digs += b.digs
           r.assists += b.assists
           r.errors += b.serve_errors + b.attack_errors + b.handling_errors
+          r.attacks += b.attacks
+          r.attack_errors += b.attack_errors
+          r.serves += b.serves
+          r.points_played += m.match.n_points ?? 0
           rows.set(b.player_id, r)
         }
       }
+      for (const r of rows.values()) r.fantasy_per_21 = r.points_played ? Math.round((r.fantasy / r.points_played) * 210) / 10 : null
       return delay([...rows.values()].sort((a, b) => b.fantasy - a.fantasy))
     },
     seasons: () => delay(['2026 Autumn']),
-    async playerProfile(playerId) {
+    async playerProfile(playerId, w) {
       const p = players.find((x) => x.id === playerId)
       if (!p) return null
-      const history = matches.filter((m) => (m.match.status === 'published' || isAdmin()) && SLOTS.some((s) => m.slots[s] === playerId)).map((m) => {
+      const mine = matches.filter((m) => visible(m) && SLOTS.some((s) => m.slots[s] === playerId))
+      const inWindow = windowed(mine, w)
+      const row = (m: DemoMatch) => {
         const slot = SLOTS.find((s) => m.slots[s] === playerId)!
         const b = box(m).find((x) => x.slot === slot)!
-        return {
-          match_id: m.match.id, match_key: m.match.match_key, match_date: m.match.match_date, start_time: m.match.start_time,
-          title: m.match.title, venue: m.match.venue, season: m.match.season, score_a: m.match.score_a, score_b: m.match.score_b,
-          team: b.team, slot, won: b.team === m.match.winner_team, fantasy: b.fantasy, kills: b.kills, aces: b.aces, digs: b.digs,
-          assists: b.assists, blocks: 0, serves: b.serves, attacks: b.attacks, errors: b.serve_errors + b.attack_errors + b.handling_errors,
-        }
-      }).sort((a, b) => b.match_date.localeCompare(a.match_date))
-      const sum = (k: 'fantasy' | 'kills' | 'aces' | 'digs' | 'assists' | 'blocks' | 'errors' | 'serves' | 'attacks') => Math.round(history.reduce((t, h) => t + h[k], 0) * 10) / 10
+        return { m, slot, b }
+      }
+      const history = inWindow.map(row).map(({ m, slot, b }) => ({
+        match_id: m.match.id, match_key: m.match.match_key, match_date: m.match.match_date, start_time: m.match.start_time,
+        title: m.match.title, venue: m.match.venue, season: m.match.season, score_a: m.match.score_a, score_b: m.match.score_b,
+        team: b.team, slot, won: b.team === m.match.winner_team, fantasy: b.fantasy, kills: b.kills, aces: b.aces, digs: b.digs,
+        assists: b.assists, blocks: 0, serves: b.serves, attacks: b.attacks, errors: b.serve_errors + b.attack_errors + b.handling_errors,
+        attack_errors: b.attack_errors, serve_errors: b.serve_errors, n_points: m.match.n_points,
+      }))
+      type Sum = 'fantasy' | 'kills' | 'aces' | 'digs' | 'assists' | 'blocks' | 'errors' | 'serves' | 'attacks' | 'attack_errors' | 'serve_errors'
+      const sum = (k: Sum) => Math.round(history.reduce((t, h) => t + h[k], 0) * 10) / 10
+      const pointsPlayed = history.reduce((t, h) => t + (h.n_points ?? 0), 0)
       const allowed = isAdmin() || p.profile_public || p.user_id === session?.userId
       const r = rng(playerId * 31)
+      const all = mine.map(row).map((x) => x.b.fantasy)       // newest first
+      const last5 = all.slice(0, 5).reverse()
+      const seats: Seat[] = [...inWindow].reverse().map((m) => {
+        const slot = SLOTS.find((s) => m.slots[s] === playerId)!
+        return {
+          slot, team: slot.slice(2) as Team, date: m.match.match_date, points: m.points, touches: m.actions,
+          who: (sl) => ({ player_id: m.slots[sl], display_name: players.find((x) => x.id === m.slots[sl])?.display_name ?? sl }),
+        }
+      })
       const prof: PlayerProfile = {
         player: { id: p.id, display_name: p.display_name, profile_public: p.profile_public, is_me: p.user_id === session?.userId, handedness: null, preferred_side: null },
-        totals: { matches: history.length, wins: history.filter((h) => h.won).length, fantasy: sum('fantasy'), kills: sum('kills'), aces: sum('aces'), digs: sum('digs'), assists: sum('assists'), blocks: 0, errors: sum('errors'), serves: sum('serves'), attacks: sum('attacks') },
+        totals: {
+          matches: history.length, wins: history.filter((h) => h.won).length, fantasy: sum('fantasy'), kills: sum('kills'),
+          aces: sum('aces'), digs: sum('digs'), assists: sum('assists'), blocks: 0, errors: sum('errors'), serves: sum('serves'),
+          attacks: sum('attacks'), attack_errors: sum('attack_errors'), serve_errors: sum('serve_errors'),
+          points_played: pointsPlayed, fantasy_per_21: pointsPlayed ? Math.round((sum('fantasy') / pointsPlayed) * 210) / 10 : null,
+        },
+        form: {
+          n: all.length, avg5: last5.length ? Math.round((last5.reduce((a, b) => a + b, 0) / last5.length) * 100) / 100 : null,
+          avg_all: all.length ? Math.round((all.reduce((a, b) => a + b, 0) / all.length) * 100) / 100 : null, last5,
+        },
         history, can_see_analytics: allowed,
         analytics: allowed ? {
-          kill_rate: sum('attacks') ? Math.round((sum('kills') / sum('attacks')) * 1000) / 1000 : null,
-          attack_error_rate: 0.12, ace_rate: sum('serves') ? Math.round((sum('aces') / sum('serves')) * 1000) / 1000 : null, serve_error_rate: 0.08,
+          ...playerAnalytics(seats),
           attack_zones: { '1': 4, '2': 7, '3': 2, '5': 3, '6': 1 },
           landings: Array.from({ length: 22 }, () => {
             const k = r()
@@ -273,6 +315,35 @@ export function demoApi(): Api {
         } : null,
       }
       return delay(prof)
+    },
+    async matchReport(id) {
+      const m = byId(id)
+      if (!m || !visible(m)) return null
+      const fantasyOf = (t: Touch, assist: boolean) => activeRules().reduce((sum, rule) =>
+        sum + (rule.actions.includes(t.action) && (rule.outcome === null || t.outcome === rule.outcome) && (!rule.assist_only || assist) ? rule.points : 0), 0)
+      const assistIds = new Set(m.actions.filter((a) => a.is_assist).map((a) => `${a.point_no}:${a.seq}`))
+      const timeline = canDetail(m)
+        ? pointFantasy(m.actions, fantasyOf, (t) => assistIds.has(`${t.point_no}:${t.seq}`)) : null
+      const players_: ReportPlayer[] = box(m).map((b) => {
+        const others = b.player_id === null ? [] : matches.filter((o) => o.match.status === 'published' && o.match.id !== m.match.id
+          && SLOTS.some((s) => o.slots[s] === b.player_id)).map((o) => box(o).find((x) => o.slots[x.slot] === b.player_id)!)
+        const mean = (f: (x: BoxRow) => number) => others.length ? Math.round((others.reduce((t, x) => t + f(x), 0) / others.length) * 100) / 100 : null
+        return {
+          slot: b.slot, team: b.team, player_id: b.player_id, display_name: b.display_name, fantasy: b.fantasy,
+          fantasy_per_21: m.match.n_points ? Math.round((b.fantasy / m.match.n_points) * 210) / 10 : null,
+          serves: b.serves, aces: b.aces, serve_errors: b.serve_errors, digs: b.digs, sets: b.sets, assists: b.assists,
+          attacks: b.attacks, kills: b.kills, attack_errors: b.attack_errors, handling_errors: b.handling_errors,
+          hit: hitSplit(m.actions, b.slot),
+          own_serve: { n: m.points.filter((p) => p.winner_team && p.server_slot === b.slot).length,
+                       won: m.points.filter((p) => p.server_slot === b.slot && p.winner_team === b.team).length },
+          avg: b.player_id === null ? null : {
+            matches: others.length, fantasy: mean((x) => x.fantasy), kills: mean((x) => x.kills), aces: mean((x) => x.aces),
+            digs: mean((x) => x.digs), assists: mean((x) => x.assists),
+            errors: mean((x) => x.serve_errors + x.attack_errors + x.handling_errors), attacks: mean((x) => x.attacks),
+          },
+        }
+      })
+      return delay({ match_id: m.match.id, teams: teamRally(m.points), players: players_, serve_targets: serveTargets(m.points, m.actions), timeline })
     },
     async updateMatch(id, patch) {
       Object.assign(byId(id)!.match, patch)

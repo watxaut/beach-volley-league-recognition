@@ -48,26 +48,26 @@ returns jsonb language sql as $$
                          'score_a_after', 2, 'score_b_after', 0, 'flags', jsonb_build_array('x'))),
     'actions', jsonb_build_array(
       jsonb_build_object('point_no', 1, 'seq', 0, 'frame', 211, 'slot', 'P1B', 'team', 'B',
-                         'action', 'serve', 'observed', true),
+                         'action', 'serve', 'touch_number', 0, 'observed', true),
       jsonb_build_object('point_no', 1, 'seq', 1, 'frame', 247, 'slot', 'P1A', 'team', 'A',
-                         'action', 'dig', 'observed', true, 'own_y_m', 3.5),
+                         'action', 'dig', 'touch_number', 1, 'observed', true, 'own_y_m', 3.5),
       jsonb_build_object('point_no', 1, 'seq', 2, 'frame', 304, 'slot', 'P2A', 'team', 'A',
-                         'action', 'set', 'observed', true, 'is_assist', true),
+                         'action', 'set', 'touch_number', 2, 'observed', true, 'is_assist', true),
       jsonb_build_object('point_no', 1, 'seq', 3, 'frame', 345, 'slot', 'P1A', 'team', 'A',
-                         'action', 'spike', 'outcome', 'kill', 'observed', true,
+                         'action', 'spike', 'touch_number', 3, 'outcome', 'kill', 'observed', true,
                          'attack_zone', 2, 'landing_x_m', 3.1, 'landing_y_m', 12.0,
                          'landing_in', true, 'landing_source', 'ball_death',
                          'landing_err_x_m', 0.3, 'landing_err_y_m', 0.9,
                          'landing_result', 'kill'),
       jsonb_build_object('point_no', 1, 'seq', 4, 'frame', 360, 'slot', null, 'team', 'B',
-                         'action', 'dig', 'observed', false),
+                         'action', 'dig', 'touch_number', 1, 'observed', false),
       jsonb_build_object('point_no', 2, 'seq', 0, 'frame', 811, 'slot', 'P1A', 'team', 'A',
-                         'action', 'serve', 'observed', true))
+                         'action', 'serve', 'touch_number', 0, 'observed', true))
     || case when p_second_rally then jsonb_build_array(
       jsonb_build_object('point_no', 2, 'seq', 1, 'frame', 840, 'slot', 'P1B', 'team', 'B',
-                         'action', 'dig', 'observed', true),
+                         'action', 'dig', 'touch_number', 1, 'observed', true),
       jsonb_build_object('point_no', 2, 'seq', 2, 'frame', 870, 'slot', 'P2B', 'team', 'B',
-                         'action', 'set', 'outcome', 'error', 'observed', true))
+                         'action', 'set', 'touch_number', 2, 'outcome', 'error', 'observed', true))
        else '[]'::jsonb end,
     'provenance', jsonb_build_object('pipeline_version', 'check', 'git_dirty', false));
 $$;
@@ -80,8 +80,17 @@ begin
     'service_role must be able to publish';
   assert not has_function_privilege('authenticated', 'public.ingest_match_bundle(jsonb,text,text)', 'execute'),
     'authenticated must NOT be able to publish';
-  assert not has_function_privilege('anon', 'public.leaderboard(text)', 'execute'),
+  assert not has_function_privilege('anon', 'public.leaderboard(text,date,date,int)', 'execute'),
     'anon must not read the leaderboard';
+  assert not has_function_privilege('anon', 'public.player_profile(bigint,text,date,date,int)', 'execute'),
+    'anon must not read profiles';
+  assert not has_function_privilege('anon', 'public.match_report(bigint)', 'execute'),
+    'anon must not read reports';
+  assert has_function_privilege('authenticated', 'public.match_report(bigint)', 'execute'),
+    'members read reports';
+  assert not has_function_privilege('authenticated',
+    'public.window_matches(text,date,date,int,bigint,boolean)', 'execute'),
+    'the window helper is internal';
   assert has_function_privilege('anon', 'public.ping()', 'execute'), 'anon must reach ping()';
 
   r := public.ingest_match_bundle(pg_temp.bundle('h1', 'vid1', false), 'b/h1.json', 'check');
@@ -204,7 +213,15 @@ begin
 end $$;
 reset role;
 
-update public.matches set status = 'published' where match_key = '20260920_1830_check_court';
+update public.matches set status = 'published', season = 'S1'
+where match_key = '20260920_1830_check_court';
+-- a second, newer published match (no touches) so windows have something to cut
+with m2 as (
+  insert into public.matches (match_key, match_date, start_time, season, status, n_points)
+  values ('20260927_1900_check_second', '2026-09-27', '19:00', 'S2', 'published', 20)
+  returning id)
+insert into public.match_participants (match_id, slot, player_id)
+select m2.id, 'P1A', (select id from public.players where display_name = 'Check Ari') from m2;
 
 -- bob after publishing: league tier only
 set local role authenticated;
@@ -229,6 +246,42 @@ begin
           ->> 'can_see_analytics')::boolean = false, 'analytics private by default';
   assert (public.player_profile((select id from public.players where display_name = 'Check Ari'))
           -> 'totals' ->> 'fantasy')::numeric = 2.0, 'profile totals are league tier';
+  -- time windows (I1): season, date range, last N matches
+  assert (select count(*) from public.leaderboard()) = 4, 'unfiltered: 4 players';
+  assert (select count(*) from public.leaderboard(p_season => 'S1')) = 4, 'season S1';
+  assert (select count(*) from public.leaderboard(p_season => 'nope')) = 0, 'unknown season';
+  assert (select count(*) from public.leaderboard(p_from => '2026-09-21')) = 1, 'from: only the newer match';
+  assert (select count(*) from public.leaderboard(p_to => '2026-09-20')) = 4, 'to: only the older match';
+  assert (select matches from public.leaderboard(p_last_n => 1)) = 1
+     and (select fantasy from public.leaderboard(p_last_n => 1)) = 0, 'last 1 match = the newer one';
+  assert (select points_played from public.leaderboard() where display_name = 'Check Ari') = 22,
+    'points played = the points of every match in the window';
+  assert (select attacks from public.leaderboard() where display_name = 'Check Ari') = 1, 'attack denominator';
+  assert (public.player_profile((select id from public.players where display_name = 'Check Ari'),
+                                p_last_n => 1) -> 'totals' ->> 'matches')::int = 1, 'profile last 1';
+  assert (public.player_profile((select id from public.players where display_name = 'Check Ari'),
+                                p_season => 'S1') -> 'totals' ->> 'fantasy')::numeric = 2.0, 'profile season';
+  assert (public.player_profile((select id from public.players where display_name = 'Check Ari'),
+                                p_season => 'S1') -> 'totals' ->> 'fantasy_per_21')::numeric = 21.0,
+    'fantasy per 21 points: 2.0 over 2 points';
+  assert (public.player_profile((select id from public.players where display_name = 'Check Ari'))
+          -> 'form' ->> 'n')::int = 2, 'form counts all matches, window or not';
+
+  -- match report (league tier; no per-point timeline for a non-participant)
+  declare r jsonb;
+  begin
+    r := public.match_report(v_id);
+    assert (r -> 'teams' -> 'A' ->> 'recv_n')::int = 1 and (r -> 'teams' -> 'A' ->> 'recv_won')::int = 1,
+      'team A side-out 1/1';
+    assert (r -> 'teams' -> 'B' ->> 'serve_n')::int = 1 and (r -> 'teams' -> 'B' ->> 'serve_won')::int = 0,
+      'team B break 0/1';
+    assert jsonb_array_length(r -> 'players') = 4, 'a line per slot';
+    assert (select (x -> 'avg' ->> 'matches')::int from jsonb_array_elements(r -> 'players') x
+            where x ->> 'slot' = 'P1A') = 1, 'Ari has one OTHER published match to compare with';
+    assert r ->> 'timeline' is null, 'the per-point timeline needs match detail';
+    assert (r -> 'serve_targets' -> 'A' -> 'to' ->> 'P1B')::int = 1
+       and (r -> 'serve_targets' -> 'B' -> 'to' ->> 'P1A')::int = 1, 'serve targets';
+  end;
   assert not public.set_my_privacy(true), 'bob has no player to change';
   update public.players set display_name = 'hacked';
   assert not exists (select 1 from public.players where display_name = 'hacked'),
@@ -253,6 +306,34 @@ begin
   assert (v_prof -> 'analytics' -> 'landings' -> 0 ->> 'result') = 'kill'
      and (v_prof -> 'analytics' -> 'landings' -> 0 ->> 'ey')::numeric = 0.9,
          'landings carry their result and position error';
+  -- the analytics a window of one match gives: counts with denominators ...
+  assert (v_prof -> 'analytics' ->> 'n_attacks')::int = 1
+     and (v_prof -> 'analytics' ->> 'n_kills')::int = 1
+     and (v_prof -> 'analytics' ->> 'n_serves')::int = 1, 'denominators';
+  -- N4: her one attack came off the reception
+  assert (v_prof -> 'analytics' -> 'hit' -> 'reception' ->> 'n')::int = 1
+     and (v_prof -> 'analytics' -> 'hit' -> 'reception' ->> 'kills')::int = 1
+     and (v_prof -> 'analytics' -> 'hit' -> 'transition' ->> 'n')::int = 0, 'attack split';
+  -- N1: she served point 2 (won); her team received point 1 (won) and served point 2 (won)
+  assert (v_prof -> 'analytics' -> 'rally' -> 'own_serve') = '{"n": 1, "won": 1}'::jsonb, 'break % as server';
+  assert (v_prof -> 'analytics' -> 'rally' -> 'team_receiving') = '{"n": 1, "won": 1}'::jsonb, 'side-out %';
+  assert (v_prof -> 'analytics' -> 'rally' -> 'team_serving') = '{"n": 1, "won": 1}'::jsonb, 'team break %';
+  -- N2: Opp1 took her serve; she took the one serve that came to her team
+  assert (v_prof -> 'analytics' -> 'serve_in') = '{"opp_serves": 1, "team_credited": 1, "mine": 1}'::jsonb,
+    'serves received';
+  assert (v_prof -> 'analytics' -> 'serve_out' -> 'to' -> 0 ->> 'display_name') = 'Check Opp1'
+     and (v_prof -> 'analytics' -> 'serve_out' ->> 'unseen')::int = 0, 'serve targets';
+  -- N3: her reception became a spike, and a first-ball kill
+  assert (v_prof -> 'analytics' -> 'reception') =
+    '{"n": 1, "none": 0, "error": 0, "spike": 1, "overpass": 0, "first_ball_kills": 1}'::jsonb,
+    'reception outcome';
+  assert (v_prof -> 'analytics' -> 'attack_series' -> 0 ->> 'r') = 'kill'
+     and (v_prof -> 'analytics' -> 'serve_series' -> 0 ->> 'r') = 'other', 'progress series';
+  -- F3: per-point fantasy timeline for a participant
+  assert (select jsonb_array_length(public.match_report(v_id) -> 'timeline')) = 4,
+    'a participant reads the per-point fantasy';
+  assert (select (x ->> 'pts')::numeric from jsonb_array_elements(public.match_report(v_id) -> 'timeline') x
+          where x ->> 'point_no' = '1' and x ->> 'slot' = 'P1A') = 2.0, 'point 1: dig + kill = 2.0';
   assert public.set_my_privacy(true), 'ari flips her privacy';
 end $$;
 reset role;

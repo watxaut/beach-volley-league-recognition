@@ -7,9 +7,9 @@
 // viewer did not play in unless an admin opened its detail).
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type {
-  ActionRow, BoxRow, FantasyRule, LeaderRow, Match, MatchPatch, MatchSource, Participant,
-  Player, PlayerPatch, PlayerProfile, PointRow, Profile, Publication, Role, Ruleset, Session,
-  Slot,
+  ActionRow, BoxRow, FantasyRule, LeaderRow, Match, MatchPatch, MatchReport, MatchSource,
+  Participant, Player, PlayerPatch, PlayerProfile, PointRow, Profile, Publication, Role, Ruleset,
+  Session, Slot, WindowParams,
 } from './types'
 
 export interface Api {
@@ -31,9 +31,10 @@ export interface Api {
   boxScore(matchId: number): Promise<BoxRow[]>
   points(matchId: number): Promise<PointRow[]>
   actions(matchId: number): Promise<ActionRow[]>
-  leaderboard(season: string | null): Promise<LeaderRow[]>
+  leaderboard(window: WindowParams): Promise<LeaderRow[]>
   seasons(): Promise<string[]>
-  playerProfile(playerId: number): Promise<PlayerProfile | null>
+  playerProfile(playerId: number, window: WindowParams): Promise<PlayerProfile | null>
+  matchReport(matchId: number): Promise<MatchReport | null>
   // admin
   updateMatch(matchId: number, patch: MatchPatch): Promise<void>
   assignSlot(matchId: number, slot: Slot, playerId: number | null): Promise<void>
@@ -147,16 +148,21 @@ export function supabaseApi(url: string, publishableKey: string): Api {
         .select('match_id,point_no,seq,frame,slot,team,action,outcome,is_assist,observed')
         .eq('match_id', matchId).order('point_no').order('seq'))
     },
-    async leaderboard(season) {
-      return must(await sb.rpc('leaderboard', { p_season: season }))
+    async leaderboard(w) {
+      return must(await sb.rpc('leaderboard', {
+        p_season: w.season, p_from: w.from, p_to: w.to, p_last_n: w.lastN }))
     },
     async seasons() {
       const rows: { season: string | null }[] =
         must(await sb.from('matches').select('season').not('season', 'is', null))
       return [...new Set(rows.map((r) => r.season as string))].sort().reverse()
     },
-    async playerProfile(playerId) {
-      return must(await sb.rpc('player_profile', { p_player_id: playerId }))
+    async playerProfile(playerId, w) {
+      return must(await sb.rpc('player_profile', {
+        p_player_id: playerId, p_season: w.season, p_from: w.from, p_to: w.to, p_last_n: w.lastN }))
+    },
+    async matchReport(matchId) {
+      return must(await sb.rpc('match_report', { p_match_id: matchId }))
     },
 
     async updateMatch(matchId, patch) {

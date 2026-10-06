@@ -94,6 +94,11 @@ def build_from_run(args: argparse.Namespace) -> Dict[str, Any]:
         else:
             print("no thumbnails: the decoded video or diag.jsonl is missing", flush=True)
 
+    if not diag.exists():
+        print("warning: no diag.jsonl in this run directory. Keep the diag dump of every "
+              "published match: without it the match cannot be recomputed when the post-run "
+              "rules change (make republish-all).", flush=True)
+
     provenance = {**git_state(), "diag_schema": _diag_schema(diag) if diag.exists() else None,
                   "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                   "host": socket.gethostname()}

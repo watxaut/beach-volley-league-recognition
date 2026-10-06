@@ -1,4 +1,4 @@
-# Stats & fantasy feature brainstorm (session #91, 2026-10-06)
+# Stats & fantasy feature brainstorm (session #91, 2026-10-06; "Now" built in #92)
 
 Owner ask: brainstorm new stats and fantasy features (position heat maps by
 possession, an attack start → end map, a net-view chart of attack heights, a
@@ -7,7 +7,36 @@ be honest about what the camera can really measure. **The owner picks Now /
 Next / Never per ID**; picked items then go to STATUS (Active next, open points
 or task cards).
 
-Nothing here is built. The numbers come from the 20260920 match (the only full
+**Status (2026-10-07, session #92): the "Now" picks are built** (see the table below);
+V1 and V2 were run and both **fail** their pre-registered bars, which changes the
+"Next" list (O3 shows relative heights only; hard/touch is not shown).
+
+| Pick | Built as | Where |
+|---|---|---|
+| O4 + I1 | `?w=` filter (all / last 3·5·10 matches / last 7·30·60 days / season); SQL `window_matches`, `leaderboard(…)`, `player_profile(…)` take season, from, to, last N (league's N on the league, the player's own N on a profile) | migration `20261007100000`, `WindowPicker` |
+| H1 | `k/n` on every rate, percentage from 10 attempts (`MIN_N`), 95 % Wilson range, rolling-window trends with a band, leaderboard ranks a rate only from the minimum | `lib/stats.ts`, `Rate.tsx`, `Charts.tsx` |
+| H2 | blocks read "not measured"; the Block rule is flagged on the scoring page | `PlayerPage`, `AdminScoring` |
+| H3 | `/measure` page: what the camera reads, how well, A/B/C badges on every stat, the V1/V2 results | `Measure.tsx` |
+| N1 | side-out %, break-point % (own serve, team serving, team receiving; per team in a match) | `player_profile`, `match_report` |
+| N2 | serve targeting (who took each serve; share of the serves aimed at your team that you took) | same |
+| N3 | reception outcome: the possession after your reception became a spike / free ball / error / nothing; first-ball kills | same |
+| N4 | hitting % `(K − E) / attacks`, split reception vs transition attacks | same, leaderboard column |
+| N8 + F3 | match report card: MVP, each player vs their own average, fantasy per 21 points, side-out / break, serve targets, per-point fantasy race with best point (play-by-play viewers only); form (newest 5 matches) | `MatchReport.tsx` |
+| I2 | `make republish-all` (`DRY=1` lists): post-run + publish for every run with a `match_bundle.json`; a run whose diag dump is gone is skipped and fails the command | `src/publish/republish.py` |
+| V1 | `scripts/score_spike_type.py` | **FAIL**: a type is published for 16 of the 32 owner-labelled spikes (coverage 0.50, bar 0.80), right on 10 of those 16 (0.625, bar 0.85). 25 of 63 post-run attacks have any causal record. The hard / touch encoding is dropped. |
+| V2 | `scripts/check_heights.py` | **FAIL** overall, so O3 may not say "±0.2 m". Net: PASS — 33 live, well-conditioned crossings, all at or above −0.15 m of the tape, median +0.61 m. Stature: far half reads 5–6 % shorter, P2A 12 % (FAIL; real heights not given yet). Contacts: spike 2.52 / 2.51 m near / far, set and overpass agree, **digs 1.37 vs 1.66 m (0.29, FAIL)**. |
+
+How V2 was run: bars fixed first (see the script's docstring). The first run
+scored every net crossing and failed on dead-time balls rolling on the sand
+(−2.3 m under the tape) and on crossings whose height is wrong by timing alone;
+both filters were added after seeing that, bars unchanged, and the unfiltered
+numbers are still printed. Owner input still wanted: the four real heights
+(`--heights P1A=1.80,…`) for the absolute stature check.
+
+Not touched by this session: everything marked Next / Later / Park below.
+
+Below this status block the original brainstorm is unchanged
+(only the title carries the "built in #92" note). The numbers come from the 20260920 match (the only full
 match so far), its owner-ratified per-player CSV
 (`ground_truth/20260920_match_reconstruction_player_review.csv`), the owner
 contact GT (`ground_truth/20260920_match_contacts.json`) and two calibrations

@@ -14,6 +14,7 @@ export function Layout() {
             <NavLink to="/" end className={link}>Home</NavLink>
             <NavLink to="/league" className={link}>League</NavLink>
             <NavLink to="/matches" className={link}>Matches</NavLink>
+            <NavLink to="/measure" className={link}>How we measure</NavLink>
             {isAdmin && <NavLink to="/admin" className={link}>Admin</NavLink>}
           </nav>
           <Link to="/settings" className="userchip" title={session?.email}>

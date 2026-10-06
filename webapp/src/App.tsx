@@ -11,6 +11,7 @@ import { League } from './pages/League'
 import { Login } from './pages/Login'
 import { MatchPage } from './pages/MatchPage'
 import { Matches } from './pages/Matches'
+import { Measure } from './pages/Measure'
 import { PlayerPage } from './pages/PlayerPage'
 import { Settings } from './pages/Settings'
 
@@ -27,6 +28,7 @@ export function App() {
           <Route path="matches" element={<Matches />} />
           <Route path="matches/:key" element={<MatchPage />} />
           <Route path="players/:id" element={<PlayerPage />} />
+          <Route path="measure" element={<Measure />} />
           <Route path="settings" element={<Settings />} />
           <Route path="admin" element={<AdminLayout />}>
             <Route index element={<AdminMatches />} />

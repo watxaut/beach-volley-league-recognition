@@ -23,7 +23,7 @@ OUTPUT_DIR := output/$(VIDEO_NAME)
 VIZ_FLAG := $(if $(VIZ),,--skip-visualization)
 
 .PHONY: run run-video run-live run-match postrun ingest ingest-all db-reset ui help \
-        calibrate process publish inbox backup schema-check
+        calibrate process publish republish-all inbox backup schema-check
 
 run:
 ifeq ($(strip $(VIDEO)),)
@@ -114,6 +114,11 @@ publish:
 	$(PYTHON) -m src.publish "$(OUTPUT_DIR)" $(if $(DRY),--dry-run) \
 		$(if $(MATCH_KEY),--match-key "$(MATCH_KEY)") $(if $(NOTE),--note "$(NOTE)") $(PUBLISH_FLAGS)
 
+# Re-run post-run + publish for EVERY match published from this machine, so old
+# matches follow the current rules (needs each match's diag.jsonl; DRY=1 lists only).
+republish-all:
+	$(PYTHON) -m src.publish.republish $(if $(DRY),--dry-run) $(REPUBLISH_FLAGS)
+
 # One pass over the Drive inbox: download + name, wait for calibration, run,
 # publish as draft, archive on Drive (launchd runs this every 30 min).
 inbox:
@@ -144,6 +149,7 @@ help:
 	@echo "make calibrate VIDEO=resources/<key>.mp4  Court calibration (8 clicks, once per video)"
 	@echo "make process VIDEO=resources/<key>.mp4    run-match + publish as a draft"
 	@echo "make publish OUTPUT_DIR=output/<key>      Publish a finished run (DRY=1 to diff only)"
+	@echo "make republish-all                        Redo post-run + publish for every published match (DRY=1: list)"
 	@echo "make inbox                                One pass over the Drive inbox"
 	@echo "make backup                               Export admin-owned tables to backups/"
 	@echo "make schema-check                         Migrations + RLS check on a local Postgres"

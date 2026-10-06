@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { useApp, useLoad } from '../app/state'
 import { BoxScore } from '../components/BoxScore'
+import { MatchReport } from '../components/MatchReport'
 import { PlayByPlay } from '../components/PlayByPlay'
 import { ScoreWorm } from '../components/ScoreWorm'
 import { Card, ErrorBox, Loading, StatusBadge } from '../components/ui'
@@ -13,16 +14,16 @@ export function MatchPage() {
   const data = useLoad(async () => {
     const match = await api.match(key)
     if (!match) return null
-    const [participants, players, box, points, actions] = await Promise.all([
+    const [participants, players, box, points, actions, report] = await Promise.all([
       api.participants([match.id]), api.players(), api.boxScore(match.id),
-      api.points(match.id), api.actions(match.id)])
-    return { match, participants, players, box, points, actions }
+      api.points(match.id), api.actions(match.id), api.matchReport(match.id)])
+    return { match, participants, players, box, points, actions, report }
   }, [key])
 
   if (data.loading) return <Loading />
   if (data.error) return <ErrorBox error={data.error} />
   if (!data.data) return <p>Match not found (or not published yet). <Link to="/matches">All matches</Link></p>
-  const { match: m, participants, players, box, points, actions } = data.data
+  const { match: m, participants, players, box, points, actions, report } = data.data
   const teamNames: Record<Team, string> = {
     A: teamName('A', participants, players), B: teamName('B', participants, players)}
   const names: Partial<Record<Slot, string>> = {}
@@ -72,6 +73,12 @@ export function MatchPage() {
       <Card title="Box score">
         <BoxScore rows={box} myPlayerId={me?.id ?? null} />
       </Card>
+
+      {report && (
+        <Card title="Report card">
+          <MatchReport report={report} nPoints={m.n_points ?? 0} names={names} teamNames={teamNames} myPlayerId={me?.id ?? null} />
+        </Card>
+      )}
 
       <Card title="Play-by-play">
         {points.length ? (

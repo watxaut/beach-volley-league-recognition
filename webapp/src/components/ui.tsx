@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { GRADE_HINT, type Grade } from '../lib/grades'
 import type { MatchStatus, Team } from '../lib/types'
 
 export function Loading() {
@@ -9,13 +11,22 @@ export function ErrorBox({ error }: { error: string | null }) {
   return error ? <div className="error" role="alert">{error}</div> : null
 }
 
-export function Tile({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
+export function Tile({ label, value, hint, sub, grade }: {
+  label: string; value: ReactNode; hint?: string; sub?: ReactNode; grade?: Grade
+}) {
   return (
     <div className="tile" title={hint}>
       <div className="tile-value">{value}</div>
-      <div className="tile-label">{label}</div>
+      <div className="tile-label">{label}{grade && <> <GradeBadge grade={grade} /></>}</div>
+      {sub && <div className="tile-sub">{sub}</div>}
     </div>
   )
+}
+
+/** The grade of a stat; links to the page that explains each. */
+export function GradeBadge({ grade }: { grade: Grade }) {
+  return <Link to="/measure" className={`grade grade-${grade}`} title={`${GRADE_HINT[grade]} · how we measure`}
+               aria-label={GRADE_HINT[grade]}>{grade}</Link>
 }
 
 export function StatusBadge({ status }: { status: MatchStatus }) {
