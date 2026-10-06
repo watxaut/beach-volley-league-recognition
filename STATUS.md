@@ -18,12 +18,10 @@ update at the end of every session that changes anything and commit with the wor
 - New durable protocol rules go in `AGENTS.md`; new cross-session technical
   facts go one-line-each into *Learnings* below.
 
-Last updated: **2026-10-06 (90th session) — video → web platform designed,
-owner-ratified (D1–D8) and BUILT; waiting on the owner's deployment**
-(`docs/deploy_web_platform.md`). Built: `supabase/` (schema + RLS + RPCs +
-fantasy rule tables), `src/publish/` (publisher, Drive inbox runner, backup),
-`webapp/` (React SPA), `ops/launchd/`, `.github/workflows/`, AGENTS §13.
-Open 32f fixed (set/dig error = ball handling −1). Speed: see #89 below.
+Last updated: **2026-10-06 (91st session) — stats/fantasy feature brainstorm
+written (`docs/stats_feature_brainstorm.md`, IDs O1–O5, N1–N20, V1–V3, H1–H4,
+I1–I6); owner picks Now/Next/Never. No code change.** #90 (web platform BUILT,
+owner deploys via `docs/deploy_web_platform.md`) is the state underneath.
 
 ## North-star goals (set session 24)
 
@@ -127,6 +125,8 @@ P31 serve f24543 is 128 f before its reception (owner to confirm ~f24630).
 
 ## Active next (ranked)
 
+0. **Owner picks from `docs/stats_feature_brainstorm.md` §5** (Now / Next /
+   Never per ID); picked items become entries here or task cards.
 1. **Deploy the product (owner):** `docs/deploy_web_platform.md` steps 0–7,
    then publish 20260920 with `MATCH_KEY=20260920_<HHMM>_…` (dry run first:
    fantasy must equal the txt footer). Then: action_overrides UI, in-app
@@ -349,6 +349,7 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Postgres: `jsonb_populate_recordset` fills a MISSING key from its base record (NULL), never the column DEFAULT — pass a base row carrying the defaults (#90 smoke test).
 
 ## Session index (one line each)
+- #91 **Stats/fantasy brainstorm (docs-only): measurement budget from the calibrations (left–right cm-precise, height ±0.15 m, far depth weak), owner ideas graded, new ideas + validation cards; owner picks**
 - #90 **Video→web platform designed, ratified + BUILT: supabase/ (RLS, RPCs, fantasy rule tables), src/publish (publisher, Drive inbox, backup), webapp/ SPA, launchd, CI; deploy guide; 32f fixed; owner deploys next**
 - #89 **Offline run 2.3–2.5× faster, byte-identical: read-ahead decode+detectors (`frame_prefetch.py`) + exact detector fast path (`yolo_inference.py`); match 1955→783 s, 7 clips 291→131 s; suite 1139**
 - #88 **Owner ratified post-run per-player attributions: 208-touch review CSV all correct, 0 corrections → per-player GT; found fantasy set-error gap (P6 f3229)**
@@ -450,6 +451,30 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 ## Log (newest first)
 
+### 2026-10-06 (ninety-first session) — #91: stats & fantasy feature brainstorm (docs only)
+
+**Asked (owner):** brainstorm stats/fantasy features (position heat maps by
+possession, attack start → end map with hard/touch and kill/dug/error, a
+net-view chart of attack heights, advertised matches with betting, time
+filters / seasons / progress), add new ideas, stay honest about what can be
+measured; the owner then picks what goes Now / Next.
+
+**Written:** `docs/stats_feature_brainstorm.md` — §1 measurement budget, §2
+owner ideas assessed (O1–O5), §3 new ideas (N1–N20), validation cards V1–V3,
+UI honesty rules H1–H4, §4 enablers I1–I6, §5 pick list with a suggested slicing.
+
+**Measured here (calibrations only, `src/postrun/geometry.py`; no run output
+in this container):** beach match: 3 px = 3–4 cm left–right at every depth;
+foot depth per 3 px 0.09 m near baseline / 0.34 m net / 0.76 m far baseline
+(practice e3: 0.29 m far); a 1.3 m ball-depth error moves a 2.8 m contact
+height ±0.15 m (beach) / ±0.01 m (practice); 1 px ball width = 0.64 m depth at
+the net, 1.23 m at the far baseline. Per player per match (ratified CSV):
+5–14 serves, 7–13 spikes, 13–17 digs, 10–15 sets. Found: the match GT holds 32
+owner-labelled hard/touch spikes (13/19) — `spike_type` never scored on the
+match (card V1).
+
+**Not done / owed:** owner's pick; nothing implemented.
+
 ### 2026-10-06 (ninetieth session) — #90: video → web platform designed, ratified and built (Supabase + publisher + Drive inbox + web app)
 
 **Asked (owner):** design the video → fantasy/stats web flow (video transfer,
@@ -495,28 +520,3 @@ publish; nothing ran against hosted Supabase/Cloudflare/Drive yet.
 **Found, not touched (results-changing):** the player detector feeds ultralytics an RGB frame it treats as BGR; one MediaPipe video-mode `Pose` is shared by all players.
 
 **Not done / owed:** pose on its own thread (the new bound, open point 33); read-ahead for the `--debug-live` producer and the enrollment pre-pass; the fast path turns itself off on any ultralytics release other than the verified 8.3.169 (`venv/` is the only environment; the uv `.venv` was deleted by the owner).
-
-### 2026-10-06 (eighty-eighth session) — #88: owner pass on the reconstruction — per-player attributions RATIFIED, review CSV becomes the per-player GT
-
-**Asked (owner):** explain what the owner pass (Active next #1) needs given
-the GT already exists, then "I reviewed the results, the post result got it
-all right on the players, set it as done."
-
-**Built:** `ground_truth/20260920_match_reconstruction_player_review.csv`
-straight from `match_reconstruction.json` (208 rows: point, frame, player,
-team, action, outcome, note; notes mark by_alternation ×10 /
-by_service_order ×5 / unseen / not_credited ×1 / gap_evidence ×2),
-cross-checked against the txt footer (serves 14/5/6/8, aces, kills
-2/3/3/2, error split exact). Format documented in `ground_truth/README.md`.
-
-**Owner verdict: all players correct, 0 corrections** — WHO gates closed
-(Active next #1, open 2a/21.5/32a); the CSV is the per-player GT for the
-20260920 match (provenance: generated from the #87 run, ratified unedited).
-
-**Found:** postrun fantasy charges no penalty for the P6 f3229 set error
-(G1: ball-handling −1; the footer aErr counts only attack/serve errors) —
-small fix owed in `src/postrun`, parked as open 32f.
-
-**Not done / owed:** entreno 0-flip identity run (open 2b); DB ingest +
-points table + fantasy (Active next 1); second match; GT P31 serve frame
-(~f24630) confirmation.

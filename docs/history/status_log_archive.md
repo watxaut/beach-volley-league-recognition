@@ -6665,3 +6665,30 @@ open point 31 (v1.5 raw-candidate extension, OWNER GATE).
 **Honest limits:** per-player correctness is unscored (no identity GT; service-order agreement 84 % / 89 % is indirect); constants were set looking at the whole match, not P1–P8; the practice clips drove five bug fixes, so they are no longer blind; line calls 7/10; blocks unlabelled; `vall_dhebron` untouched.
 
 **Not done / owed:** owner pass on `match_reconstruction.txt` + per-player contact sheets; DB ingest of the reconstruction (points table, fantasy); a second match; GT P31 serve frame (f24543 → ~f24630?) for the owner to confirm.
+
+# Log entry moved from STATUS.md on 2026-10-06 (#91), verbatim
+
+### 2026-10-06 (eighty-eighth session) — #88: owner pass on the reconstruction — per-player attributions RATIFIED, review CSV becomes the per-player GT
+
+**Asked (owner):** explain what the owner pass (Active next #1) needs given
+the GT already exists, then "I reviewed the results, the post result got it
+all right on the players, set it as done."
+
+**Built:** `ground_truth/20260920_match_reconstruction_player_review.csv`
+straight from `match_reconstruction.json` (208 rows: point, frame, player,
+team, action, outcome, note; notes mark by_alternation ×10 /
+by_service_order ×5 / unseen / not_credited ×1 / gap_evidence ×2),
+cross-checked against the txt footer (serves 14/5/6/8, aces, kills
+2/3/3/2, error split exact). Format documented in `ground_truth/README.md`.
+
+**Owner verdict: all players correct, 0 corrections** — WHO gates closed
+(Active next #1, open 2a/21.5/32a); the CSV is the per-player GT for the
+20260920 match (provenance: generated from the #87 run, ratified unedited).
+
+**Found:** postrun fantasy charges no penalty for the P6 f3229 set error
+(G1: ball-handling −1; the footer aErr counts only attack/serve errors) —
+small fix owed in `src/postrun`, parked as open 32f.
+
+**Not done / owed:** entreno 0-flip identity run (open 2b); DB ingest +
+points table + fantasy (Active next 1); second match; GT P31 serve frame
+(~f24630) confirmation.
