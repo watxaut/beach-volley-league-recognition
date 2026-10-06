@@ -1,0 +1,99 @@
+AGENTS.md
+  s_9ed08fada71d0a::t_ba6c86eae97ea6 434-448
+Makefile
+  s_9ed08fada71d0a::t_f3a137a600de0f 26,117-121,152
+STATUS.md
+  s_9ed08fada71d0a::t_bedca139f71b09 21-24,77,128-130,352-354,357,459-496
+docs/deploy_web_platform.md
+  s_9ed08fada71d0a::t_f57d509a7f4e39 54
+docs/history/status_log_archive.md
+  s_9ed08fada71d0a::t_9a8f7bd9ee11c7 6695-6747
+docs/stats_feature_brainstorm.md
+  s_9ed08fada71d0a::t_0984ec21cd0d44 1,10-39
+scripts/check_heights.py
+  s_9ed08fada71d0a::t_9e2423d7668a72 1-308
+scripts/score_spike_type.py
+  s_9ed08fada71d0a::t_b78866a233d838 1-155
+src/publish/cli.py
+  s_9ed08fada71d0a::t_069724209d0dec 97-101
+src/publish/republish.py
+  s_9ed08fada71d0a::t_8d06da6a33d635 1-177
+supabase/checks/rls_smoke.sql
+  s_9ed08fada71d0a::t_6aa0061edf641c 51,53,55,57,63,65,68,70,83,85-93,216-224,249-284,309-336
+supabase/migrations/20261007100000_stats_windows_and_analytics.sql
+  s_9ed08fada71d0a::t_3505d89d9853cf 1-458
+tests/test_check_heights.py
+  s_9ed08fada71d0a::t_3034e5dca549ed 1-90
+tests/test_republish.py
+  s_9ed08fada71d0a::t_fc16a33d6d91a7 1-131
+tests/test_score_spike_type.py
+  s_9ed08fada71d0a::t_dec8637b2d7380 1-57
+tests/test_supabase_schema.py
+  s_9ed08fada71d0a::t_4f999ef67147f3 117-248
+webapp/src/App.tsx
+  s_9ed08fada71d0a::t_19d450a4f443d0 14,31
+webapp/src/app/window.ts
+  s_9ed08fada71d0a::t_349840a7ea63e5 1-17
+webapp/src/components/Charts.tsx
+  s_9ed08fada71d0a::t_b566f3c0e927e5 1-235
+webapp/src/components/Layout.tsx
+  s_9ed08fada71d0a::t_fe86e561633be2 17
+webapp/src/components/MatchReport.tsx
+  s_9ed08fada71d0a::t_e540f42ae897ae 1-153
+webapp/src/components/Rate.tsx
+  s_9ed08fada71d0a::t_b2f53e885def11 1-27
+webapp/src/components/WindowPicker.tsx
+  s_9ed08fada71d0a::t_82f2cba291e395 1-28
+webapp/src/components/ui.tsx
+  s_9ed08fada71d0a::t_1d99dc381631a6 2-3,14-16,20-21,26-31
+webapp/src/lib/analytics.test.ts
+  s_9ed08fada71d0a::t_437e92bd6dab7d 1-90
+webapp/src/lib/analytics.ts
+  s_9ed08fada71d0a::t_2085762724ba2e 1-234
+webapp/src/lib/api.ts
+  s_9ed08fada71d0a::t_a8040663ba1ff1 10-12,34,36-37,151-153,160-165
+webapp/src/lib/demo.ts
+  s_9ed08fada71d0a::t_3b0d86a78e0933 6,8-9,12,35-36,41,45,60,68-70,73,75,87-88,91-93,140-141,192-199,232,234,237,246-249,253,257,260-262,265-276,279-287,290-299,302,319-347
+webapp/src/lib/grades.ts
+  s_9ed08fada71d0a::t_05b6f99d98ea6a 1-10
+webapp/src/lib/stats.test.ts
+  s_9ed08fada71d0a::t_8db74aff50b611 1-49
+webapp/src/lib/stats.ts
+  s_9ed08fada71d0a::t_4ad9e0d235e014 1-86
+webapp/src/lib/types.ts
+  s_9ed08fada71d0a::t_0aef87f2771c70 129-133,158-202,226-229,231-233,236-281
+webapp/src/lib/window.test.ts
+  s_9ed08fada71d0a::t_658c89f6de9969 1-35
+webapp/src/lib/window.ts
+  s_9ed08fada71d0a::t_31a3bb8b59fdc9 1-45
+webapp/src/pages/Home.tsx
+  s_9ed08fada71d0a::t_242a7f2067a902 4,7,11-12,18,54-60
+webapp/src/pages/League.tsx
+  s_9ed08fada71d0a::t_9556fcef35bf7c 4,6,8,10,12,16,20,27-37,41,44,46,52,54,58-59,76,80,84,97-98
+webapp/src/pages/MatchPage.tsx
+  s_9ed08fada71d0a::t_989aba7e15c681 4,17,19-20,26,77-82
+webapp/src/pages/Measure.tsx
+  s_9ed08fada71d0a::t_f3ffbde84f2d93 1-112
+webapp/src/pages/PlayerPage.tsx
+  s_9ed08fada71d0a::t_5020c9dcdd1334 3-4,6-12,17-19,21,24-25,29-33,37-48,53-57,63-70,75,81,120-283
+webapp/src/pages/admin/AdminScoring.tsx
+  s_9ed08fada71d0a::t_68b3ce59ebf245 58-61,85-90
+webapp/src/styles.css
+  s_9ed08fada71d0a::t_07add0738e409c 235-261
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "015af1e6d31cbfad143356435635702c71ddfae3",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
