@@ -6541,6 +6541,20 @@ open point 31 (v1.5 raw-candidate extension, OWNER GATE).
 
 **Not done / owed:** the real-footage check of #84 (owner re-run + dump); entreno A/B (§1).
 
+# Log entry moved from STATUS.md on 2026-10-06 (#88), verbatim
+
+### 2026-10-05 (eighty-fifth session) — #85: side-switch orientation solved on the real match — two-state likelihood test, measured offline on the owner's feature dump
+
+**Asked (owner):** re-ran the probe with #84 and pushed `identity_features.npz` + `identity_probe.json` to `temp-branch`. #84 live: 16 flips (P7/P14 windows right, P21/P28 missed, 14 stray, dwell-spaced every ~1500 f), 151 of 211 GT contacts withheld, action squad 37/13/109; sheets mostly blank (doubt).
+
+**Diagnosed on the dump (no video needed):** per-body fixed-anchor evidence vs GT orientation: near +0.148±0.085 (A near) vs −0.119±0.093 (B near), far −0.172±0.108 vs +0.048±0.087 — d' ~3 / ~2.2, sign right for 81-97 % of bodies. The signal was fine; #84's detector was not: a directional 'any shift' CUSUM with drift 0.5σ freezes its baseline once a 1σ pose/light drift starts, then accumulates forever.
+
+**Changed:** orientation = two-state log-likelihood test (see Where we are) — offline simulation first (`numpy` over the dump), then in `TeamIdentityResolver`; knobs `player_identity_switch_threshold` 8, new `player_identity_switch_temper` 0.2 (replaces `_switch_drift`), `player_identity_min_switch_interval_frames` 300; instant doubt (mean per-body LLR ≥ 1 on one frame, ≥ 2 bodies; 11 false frames of 23 176); `separability()` (d' per side) in state + probe/replay reports. Within-side: SWAP_K 1.0 → 2.0 (far within-squad flips 760 → 51; HYST_K stays 0.5 — a reversed margin converges only to its own size, so ≥ 1 could never fire). Combined per-player similarity stacks; `load_features` reads each npz array once (replay >10 min → 17 s). Tests: synthetic warm-up overridden to 100 frames in the helpers, swap bound 15 frames; suite 1477.
+
+**Measured (replay of the owner's run):** flips 4510/9563/15487/21718 all in-window, 0 stray, orientation 211/211, 0 withheld; action squad 128/27/4 vs legacy 83/71/5; 23 of 27 errors = toucher on the other side (classifier), 3 identity, 1 not visible. Robustness sweep (simulation): flips and 0-error result unchanged for κ 0.05-0.2, H 8-15, clip 1-2, warm-up 150-600, dwell 0-1500, α 0.0005-0.002 (α 0.01 breaks: adaptation chases noise), far-side bias +0.05/+0.1, separation ×0.6/×0.4.
+
+**Not done / owed:** owner contact-sheet re-run (per-player); entreno run (0 flips expected); the owner may delete `temp-branch` (match-derived data).
+
 ## Archived 2026-10-05 (#87): text replaced in STATUS.md by the post-run session, verbatim (pre-#87 state)
 
 ### Active next (ranked) as of #86

@@ -105,6 +105,22 @@ venv/bin/python scripts/build_match_contact_gt.py --no-sheets  # JSON only
 - `provenance` carries the 3 preamble `unparsed` lines and the 9 owner
   `notes` lines, so nothing the owner wrote is silently dropped.
 
+## Per-player attribution GT (`20260920_match_reconstruction_player_review.csv`, player-attribution-v1)
+
+Generated 2026-10-06 (#88) from the #87 post-run reconstruction
+(`output/postrun/20260920_match/match_reconstruction.json`) as the owner
+review sheet, then **ratified by the owner with 0 corrections** — every
+player attribution on all 208 touches is correct. It is therefore the
+per-player GT for the 20260920 match (which half-slot touched, per frame);
+provenance is "generated from the #87 run, ratified unedited".
+
+Columns: `point, frame, player, team, action, outcome, note` — one row per
+reconstructed touch; `outcome` ∈ {kill, error, ace}; `note` marks the weak
+attributions (`by_alternation`, `by_service_order`, `unseen`,
+`not_credited`, `gap_evidence`). 6 rows have an empty player (5 rotation
+servers + 1 unseen spike): those carry no claim. Score future attribution
+changes against this file at the GT frame tolerance (±15 f).
+
 ## Match Points Ground Truth (`<stem>_match_points.json`, match-points-v1)
 
 For full-match videos the owner dictates a plain-text GT

@@ -18,13 +18,13 @@ update at the end of every session that changes anything and commit with the wor
 - New durable protocol rules go in `AGENTS.md`; new cross-session technical
   facts go one-line-each into *Learnings* below.
 
-Last updated: **2026-10-05 (87th session) — post-run reconstruction layer
-(`src/postrun`) built and measured.** Owner asked for a post-run logic that
-makes the match make sense. On the 20260920 match it finds 33/33 points (0
-false), every serve's half and squad, 33/33 winners and the exact score
-A 21 – B 12, with touches at precision 0.976 / action 0.982 / half 1.000 and
-zero rule breaks. Only `src/` change outside the new package: diag dump
-schema 4 (+ball bbox/velocity, +per-frame identity labels). Suite **1118**.
+Last updated: **2026-10-06 (88th session) — owner ratified the post-run
+per-player attributions (WHO).** The 208-touch review CSV
+(`ground_truth/20260920_match_reconstruction_player_review.csv`, generated
+from `match_reconstruction.json`) was checked by the owner against the
+video: every player correct, 0 corrections → it is now the per-player GT.
+Found: postrun fantasy charges no set-error penalty (P6 f3229; G1 says
+ball-handling −1).
 
 ## North-star goals (set session 24)
 
@@ -68,16 +68,18 @@ R 0.933, action 0.982, half 1.000, squad 1.000; 0 rule breaks (causal stream:
 P 0.711 / R 0.815 / action 0.559 / half 0.759; 23 same-player-twice, 45
 fourth touches). Practice e1–e7: serves 5/5, P 52/53, action 52/52. Sweep (78
 moves): no row loses a point or a winner; worst P 0.965, action 0.958.
-**Unscored:** which PLAYER (no identity GT) — observed servers agree with the
-service-order rotation 84 % (A) / 89 % (B); owner contact sheets still gate
-it. Line calls: 3 of 10 in/out reads wrong (overridden by the next serve).
+**Per-player WHO: RATIFIED (#88).** Owner reviewed the 208-row attribution
+CSV — every player right, 0 corrections (incl. the 10 by-alternation and
+rotation-named servers); the CSV is the per-player GT. Line calls: 3 of 10
+in/out reads wrong (overridden by the next serve).
 
 **Identity (#85):** `TeamIdentityResolver` (`player_identity_mode:"team"`,
 default) stamps P1A/P2A/P1B/P2B per frame; orientation = two-state LLR on
 fixed anchors (replay: 4/4 switches, 0 stray, 211/211 GT contacts). The #87
 live run confirms it end to end: the post-run squads are right on 33/33
-serves and 166/166 touches. Owed: owner contact sheets (within-half slot),
-entreno 0-flip run. Detail: `docs/history/status_where_we_are_archive.md`.
+serves and 166/166 touches. Within-half slot RATIFIED by the same owner
+review (#88). Owed: entreno 0-flip run. Detail:
+`docs/history/status_where_we_are_archive.md`.
 
 **Production state (causal pass, unchanged):** weights
 `volleyball_ball_best.pt` v3; match 720p upscaled `_up1080`; 68 ms/frame;
@@ -111,21 +113,19 @@ P31 serve f24543 is 128 f before its reception (owner to confirm ~f24630).
 
 ## Active next (ranked)
 
-1. **Owner pass on the reconstruction** — read
-   `output/postrun/20260920_match/match_reconstruction.txt` against the
-   video; the unscored part is WHO (within-half slot). Contact sheets per
-   credited player are the gate before any per-player number is trusted.
-2. **Feed the product:** ingest `match_reconstruction.json` into the DB
+1. **Feed the product:** ingest `match_reconstruction.json` into the DB
    (points table 14e, per-point views, fantasy G1) — the post-run touches
-   replace the causal actions as the stats source.
-3. **Second match / other venue through `make run-match`** — the only
+   replace the causal actions as the stats source; per-player numbers are
+   owner-ratified (#88).
+2. **Second match / other venue through `make run-match`** — the only
    21-point match so far is the one the layer was built on; practice clips
    and the sweep are the out-of-sample evidence.
-4. **Landing line calls** (3 of 10 wrong): needed only for the last point
+3. **Landing line calls** (3 of 10 wrong): needed only for the last point
    and for kill-vs-out detail; a ground-plane read from raw detections of
    the resting ball is the candidate (open point 31).
-5. E2 observers (identity drift / side-switch, display only, owner gate).
-6. Deferred comment-only fix: `src/utils/config.py:101`.
+4. E2 observers (identity drift / side-switch, display only, owner gate).
+5. Deferred fixes: comment `src/utils/config.py:101`; postrun fantasy
+   set-error charge (P6 f3229, G1 ball-handling −1).
 
 ## Next task cards
 
@@ -150,15 +150,14 @@ archived under their session date in `docs/history/status_log_archive.md`.)*
     carries `evidence` (vertex / gap / structure), `flags` and the
     ball-death cross-check per point — UI unbuilt; (3) winner 33/33 DONE
     (next-serve rule); (4) side switches exact DONE; (5) player-number GT
-    pass pending owner — now THE gate for per-player stats; (6) landing
-    confidence: line calls 7/10 (open point 31).
+    pass DONE #88 (owner CSV review, 0 corrections); (6) landing
+    confidence: line calls 7/10 (open point 31). Next: (2) with the DB
+    ingest (Active next 1).
 2.  **Side-change survival (player identity) — status: orientation SOLVED
-    on the real match (#85 replay: 4/4 switches, 0 stray, 211/211 GT
-    contacts); per-player check pending.** Remaining identity work:
-    (a) owner re-runs `scripts/probe_identity_switches.py` for contact
-    sheets — each row must be one person (the within-side slot is the
-    unmeasured part, far side weakest); (b) entreno run to confirm 0 flips
-    on switch-free footage. The 23 wrong-side action attributions in the
+    (#85 replay: 4/4 switches, 0 stray, 211/211 GT contacts) AND per-player
+    slot RATIFIED #88 (owner reviewed the 208-row attribution CSV: all
+    correct).** Remaining: (b) entreno run to confirm 0 flips on
+    switch-free footage. The 23 wrong-side action attributions in the
     replay are the classifier's (reach/side attribution, parked point 5),
     not identity. History: `docs/history/status_where_we_are_archive.md`
     (#83–#85 sections).
@@ -215,13 +214,14 @@ archived under their session date in `docs/history/status_log_archive.md`.)*
     (next serve decides) except on the LAST point. Next: read the resting
     ball from the dump's raw `removed` detections (it sits in-court at ratio
     0.93–0.98 of the ground prediction) and map its bottom point.
-32. **Post-run layer residuals (#87).** (a) WHO is unscored — within-half
-    identity rests on the resolver; contact sheets per credited player are
-    the gate; (b) built and tuned on ONE match — a second 21-point match
-    is the real test; (c) needs the `--diag-dump` sidecar (49 MB, in memory
-    until the run ends) — decide whether `make run` should always write a
-    compact one; (d) blocks are not a label; (e) 1 observed touch is
-    credited to nobody (10 more by alternation), 5 are placed as hidden touches. Next: (a), then (b).
+32. **Post-run layer residuals (#87).** (a) WHO RATIFIED #88 (owner review
+    of the 208-touch CSV, 0 corrections; CSV = per-player GT); (b) built
+    and tuned on ONE match — a second 21-point match is the real test;
+    (c) needs the `--diag-dump` sidecar (49 MB, in memory until the run
+    ends) — decide whether `make run` should always write a compact one;
+    (d) blocks are not a label; (e) 1 observed touch is credited to nobody
+    (10 more by alternation), 5 are placed as hidden touches; (f) fantasy
+    charges no set-error penalty (P6 f3229; G1: ball-handling −1). Next: (b).
 
 ### Parked / conditional
 
@@ -315,6 +315,7 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Retraining: four-leg gate; fine-tune FROM `best.pt`; mine frames with NO pre-labels.
 
 ## Session index (one line each)
+- #88 **Owner ratified post-run per-player attributions: 208-touch review CSV all correct, 0 corrections → per-player GT; found fantasy set-error gap (P6 f3229)**
 - #87 **POST-RUN RECONSTRUCTION (`src/postrun`): 20260920 points 33/33, serves 33/33, winners 33/33, score A 21–B 12 exact; touches P 0.976 / action 0.982 / half 1.000, 0 rule breaks; practice P 52/53; diag schema 4**
 - #86 **Repo lean pass**: STATUS 2465→~530 lines with hard budgets + guard test (tests/test_status_leanness.py); 21 closed-probe test files deleted (530 tests, suite 1569→1039→1083 post-merge); no src/ change
 - #85 **Side switches SOLVED on the real match (replay of the owner's dump): two-state LLR orientation → 4/4 switches, 0 stray, 211/211; squad 128/27/4 vs 83/71/5 (23/27 classifier); churn 760→51; suite 1477**
@@ -413,6 +414,31 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 ## Log (newest first)
 
+### 2026-10-06 (eighty-eighth session) — #88: owner pass on the reconstruction — per-player attributions RATIFIED, review CSV becomes the per-player GT
+
+**Asked (owner):** explain what the owner pass (Active next #1) needs given
+the GT already exists, then "I reviewed the results, the post result got it
+all right on the players, set it as done."
+
+**Built:** `ground_truth/20260920_match_reconstruction_player_review.csv`
+straight from `match_reconstruction.json` (208 rows: point, frame, player,
+team, action, outcome, note; notes mark by_alternation ×10 /
+by_service_order ×5 / unseen / not_credited ×1 / gap_evidence ×2),
+cross-checked against the txt footer (serves 14/5/6/8, aces, kills
+2/3/3/2, error split exact). Format documented in `ground_truth/README.md`.
+
+**Owner verdict: all players correct, 0 corrections** — WHO gates closed
+(Active next #1, open 2a/21.5/32a); the CSV is the per-player GT for the
+20260920 match (provenance: generated from the #87 run, ratified unedited).
+
+**Found:** postrun fantasy charges no penalty for the P6 f3229 set error
+(G1: ball-handling −1; the footer aErr counts only attack/serve errors) —
+small fix owed in `src/postrun`, parked as open 32f.
+
+**Not done / owed:** entreno 0-flip identity run (open 2b); DB ingest +
+points table + fantasy (Active next 1); second match; GT P31 serve frame
+(~f24630) confirmation.
+
 ### 2026-10-05 (eighty-seventh session) — #87: post-run reconstruction layer — the match makes sense (points, serves, touches, winners, score)
 
 **Asked (owner):** start building a post-run logic after the match: reconstruct the action→player assignment so the whole match makes sense (no two touches in a row by the same player, no touch on the half the ball is not in, a dig is not followed by the same player's set, the match reaches 21); fix point start/end (serve, ball on the sand) with the near/far and ground signals; prefer missing actions over invented ones; generalise across videos; stop and say so if serve detection itself needs more work first.
@@ -432,15 +458,3 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 **Asked (owner):** STATUS and tests/ are both getting too long; summarize STATUS, make it structurally unable to regrow, audit tests and delete the unneeded ones — goal: LLMs put fewer tokens into reading at the same repo performance.
 
 **Done:** STATUS.md 2465 → ~530 lines (every removed line VERBATIM in `docs/history/status_log_archive.md` + `status_where_we_are_archive.md`; nothing deleted); hard budgets enforced by `tests/test_status_leanness.py` (≤600 lines total, per-section caps, one-line session index ≤240 chars, ≤3 Log sessions, no DONE task cards, canonical header order — a failed guard means archive-then-shrink); AGENTS.md lean-STATUS convention now names the guard. Deleted 21 test files (6,600 lines / 530 tests) whose ONLY subject is a DONE/REFUTED one-off diagnostic probe (TC1 touch rules, PG1/PG2 point maps, PM1, SR1*/SR4a probes, overpass levers, possession signal, reach/scale/looming diagnoses, near-serve misses, takeoff stance, entreno/serve buckets, dev-clip GT builder, insert path, label ceilings, set-dig swaps) — probe scripts stay as provenance, docstrings annotated; everything guarding `src/`, standing evaluators/scorers, pass-2 layers, GT tooling, config drift and the VFR seek guard KEPT. No `src/` change. Merged with the parallel identity sessions #83–#85 (PR #1); this lean pass renumbered #83 → #86; suite 1083 all green.
-
-### 2026-10-05 (eighty-fifth session) — #85: side-switch orientation solved on the real match — two-state likelihood test, measured offline on the owner's feature dump
-
-**Asked (owner):** re-ran the probe with #84 and pushed `identity_features.npz` + `identity_probe.json` to `temp-branch`. #84 live: 16 flips (P7/P14 windows right, P21/P28 missed, 14 stray, dwell-spaced every ~1500 f), 151 of 211 GT contacts withheld, action squad 37/13/109; sheets mostly blank (doubt).
-
-**Diagnosed on the dump (no video needed):** per-body fixed-anchor evidence vs GT orientation: near +0.148±0.085 (A near) vs −0.119±0.093 (B near), far −0.172±0.108 vs +0.048±0.087 — d' ~3 / ~2.2, sign right for 81-97 % of bodies. The signal was fine; #84's detector was not: a directional 'any shift' CUSUM with drift 0.5σ freezes its baseline once a 1σ pose/light drift starts, then accumulates forever.
-
-**Changed:** orientation = two-state log-likelihood test (see Where we are) — offline simulation first (`numpy` over the dump), then in `TeamIdentityResolver`; knobs `player_identity_switch_threshold` 8, new `player_identity_switch_temper` 0.2 (replaces `_switch_drift`), `player_identity_min_switch_interval_frames` 300; instant doubt (mean per-body LLR ≥ 1 on one frame, ≥ 2 bodies; 11 false frames of 23 176); `separability()` (d' per side) in state + probe/replay reports. Within-side: SWAP_K 1.0 → 2.0 (far within-squad flips 760 → 51; HYST_K stays 0.5 — a reversed margin converges only to its own size, so ≥ 1 could never fire). Combined per-player similarity stacks; `load_features` reads each npz array once (replay >10 min → 17 s). Tests: synthetic warm-up overridden to 100 frames in the helpers, swap bound 15 frames; suite 1477.
-
-**Measured (replay of the owner's run):** flips 4510/9563/15487/21718 all in-window, 0 stray, orientation 211/211, 0 withheld; action squad 128/27/4 vs legacy 83/71/5; 23 of 27 errors = toucher on the other side (classifier), 3 identity, 1 not visible. Robustness sweep (simulation): flips and 0-error result unchanged for κ 0.05-0.2, H 8-15, clip 1-2, warm-up 150-600, dwell 0-1500, α 0.0005-0.002 (α 0.01 breaks: adaptation chases noise), far-side bias +0.05/+0.1, separation ×0.6/×0.4.
-
-**Not done / owed:** owner contact-sheet re-run (per-player); entreno run (0 flips expected); the owner may delete `temp-branch` (match-derived data).
