@@ -6641,3 +6641,11 @@ open point 31 (v1.5 raw-candidate extension, OWNER GATE).
     (serve + no opposing touch ≈ likely ace, flagged derived) or (b) real
     outcome detection (game_state score machinery unvalidated). Assist
     proxy parked with it.
+
+## Archived 2026-10-06 (#89): Log entry moved out of STATUS.md verbatim (Log keeps 3 sessions)
+
+### 2026-10-06 (eighty-sixth session) — #86: repo lean pass — STATUS compacted with hard budgets + guard; closed-probe tests deleted
+
+**Asked (owner):** STATUS and tests/ are both getting too long; summarize STATUS, make it structurally unable to regrow, audit tests and delete the unneeded ones — goal: LLMs put fewer tokens into reading at the same repo performance.
+
+**Done:** STATUS.md 2465 → ~530 lines (every removed line VERBATIM in `docs/history/status_log_archive.md` + `status_where_we_are_archive.md`; nothing deleted); hard budgets enforced by `tests/test_status_leanness.py` (≤600 lines total, per-section caps, one-line session index ≤240 chars, ≤3 Log sessions, no DONE task cards, canonical header order — a failed guard means archive-then-shrink); AGENTS.md lean-STATUS convention now names the guard. Deleted 21 test files (6,600 lines / 530 tests) whose ONLY subject is a DONE/REFUTED one-off diagnostic probe (TC1 touch rules, PG1/PG2 point maps, PM1, SR1*/SR4a probes, overpass levers, possession signal, reach/scale/looming diagnoses, near-serve misses, takeoff stance, entreno/serve buckets, dev-clip GT builder, insert path, label ceilings, set-dig swaps) — probe scripts stay as provenance, docstrings annotated; everything guarding `src/`, standing evaluators/scorers, pass-2 layers, GT tooling, config drift and the VFR seek guard KEPT. No `src/` change. Merged with the parallel identity sessions #83–#85 (PR #1); this lean pass renumbered #83 → #86; suite 1083 all green.

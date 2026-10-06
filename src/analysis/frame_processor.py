@@ -23,6 +23,7 @@ from .spike_analyzer import SpikeAnalyzer
 from .serve_events import ServeEventEmitter
 from .ball_ground_contact import BallGroundContactObserver
 from .ball_side_possession import BallSidePossessionObserver
+from .frame_prefetch import FrameInference, FramePrefetcher
 from ..utils.diagnostics import DiagRecorder
 
 
@@ -128,6 +129,7 @@ class FrameProcessor:
                 model_path=self.config.get("ball_model_path"),
                 confidence_threshold=self.config.get("ball_confidence", 0.15),
                 device=self.config.get("device", "auto"),
+                fast_inference=self.config.get("detector_fast_inference", True),
             )
 
             # Player detection (YOLO-based). The detector cap is a generous
@@ -138,6 +140,7 @@ class FrameProcessor:
                 device=self.config.get("device", "auto"),
                 max_players=self.config.get("max_detections", 20),
                 imgsz=self.config.get("player_imgsz", 1280),
+                fast_inference=self.config.get("detector_fast_inference", True),
             )
 
             # Connect court calibration to player detector for filtering
@@ -354,11 +357,20 @@ class FrameProcessor:
                 getattr(self.game_state_manager, "fps", 30.0), width, height
             )
 
+    def read_ahead(self, cap) -> FramePrefetcher:
+        """Frame source for a sequentially-read ``cap``: yields
+        ``(frame, inference)`` for ``process_frame``, with decode and detector
+        inference running ``prefetch_depth`` frames ahead on background
+        threads (0 = inline). Same functions on the same frames either way --
+        see src/analysis/frame_prefetch.py."""
+        return FramePrefetcher(cap, self, depth=self.config.get("prefetch_depth", 8))
+
     def process_frame(
         self,
         frame: np.ndarray,
         frame_index: int,
         enable_court_redetection: bool = False,
+        inference: Optional[FrameInference] = None,
     ) -> Dict[str, Any]:
         """Process a single video frame.
 
@@ -366,6 +378,8 @@ class FrameProcessor:
             frame: Input frame.
             frame_index: Current frame index.
             enable_court_redetection: Ignored (court is calibrated once).
+            inference: This frame's detector inference when it was read ahead
+                (``read_ahead``); None runs the detectors here.
 
         Returns:
             Frame processing results dict.
@@ -394,8 +408,12 @@ class FrameProcessor:
             self.court_calibration.detect_court(frame)
 
             # 1. Detection
-            ball_detections = self.ball_detector.detect(frame)
-            player_detections = self.player_detector.detect(frame)
+            if inference is None:
+                ball_detections = self.ball_detector.detect(frame)
+                player_detections = self.player_detector.detect(frame)
+            else:
+                ball_detections = self.ball_detector.detect(frame, inference=inference.ball)
+                player_detections = self.player_detector.detect(frame, inference=inference.player)
 
             frame_result["ball_detections"] = ball_detections
             frame_result["player_detections"] = player_detections
@@ -512,6 +530,10 @@ class FrameProcessor:
             )
 
         frame_result["processing_time"] = time.time() - start_time
+        if inference is not None:
+            # Read-ahead inference ran on worker threads: count its cost here
+            # so the per-frame figure keeps meaning "compute spent on the frame".
+            frame_result["processing_time"] += inference.seconds
         return frame_result
 
     def _record_diagnostics(

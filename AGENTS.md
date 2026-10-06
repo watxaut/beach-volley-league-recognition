@@ -372,3 +372,27 @@ lose a point or a winner). Per-player correctness has no GT: it is checked by
 the owner on contact sheets, never claimed from these scores. The input is
 the `--diag-dump` JSONL (schema ≥ 4); a new per-frame need is added to the
 dump as an observation of an already-computed value, never as a second pass.
+
+### 12. Speed work must be results-neutral (owner-asked 2026-10-06, #89)
+
+A throughput change ships only with a byte-identical A/B against the golden
+runs in `output/postrun/` (7 practice clips + the 20260920 match, the match
+with `--diag-dump --serve-events`; same device, weights and `venv/`):
+`scripts/compare_runs.py <golden> <new>` for `pipeline_output.json` + the CSVs,
+plus `cmp` on `diag.jsonl`. Two shipped mechanisms rest on invariants to keep:
+
+* **Read-ahead** (`src/analysis/frame_prefetch.py`, `prefetch_depth`): decode
+  and detector inference run on background threads ahead of the sequential
+  loop. Valid only while `BallDetector.infer` / `PlayerDetector.infer` stay
+  PURE functions of the frame — anything stateful (static suppression, court
+  filter, side channels) belongs in `detect()`, on the loop's thread.
+* **Detector fast path** (`src/detection/yolo_inference.py`,
+  `detector_fast_inference`): ultralytics' own predictor stages, with
+  post-processing on the CPU only on frames where that is provably exact.
+  It switches itself off on a release not in `VERIFIED_ULTRALYTICS` (`venv/`,
+  the only environment, has the verified 8.3.169) — add a release only
+  after `tests/test_yolo_inference.py` is green on it AND the A/B above holds.
+
+`prefetch_depth: 0` + `detector_fast_inference: False` is the pre-#89 path.
+The interactive `--debug-live` producer still reads inline (same
+`process_frame`, same `infer`); the consumer-side bound is MediaPipe pose.

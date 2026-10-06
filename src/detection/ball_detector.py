@@ -47,6 +47,7 @@ class BallDetector(BaseDetector):
         static_min_frames: int = 8,
         static_persist_frac: float = 0.55,
         static_suspect_frac: float = 0.30,
+        fast_inference: bool = True,
         # Legacy params accepted but ignored for backward compatibility
         **kwargs,
     ):
@@ -86,8 +87,9 @@ class BallDetector(BaseDetector):
                 may distrust for identity decisions (it must never re-lock
                 onto a ball that is not in play) without the removal cost of
                 full suppression.
+            fast_inference: Bit-identical fast model execution (BaseDetector).
         """
-        super().__init__(confidence_threshold, device)
+        super().__init__(confidence_threshold, device, fast_inference)
         self.model_path = model_path or "yolov8n.pt"
         self.max_ball_size = max_ball_size
         self._imgsz = imgsz  # None = auto
@@ -173,11 +175,30 @@ class BallDetector(BaseDetector):
         )
         return target
 
-    def detect(self, frame: np.ndarray) -> List[Dict[str, Any]]:
+    def infer(self, frame: np.ndarray) -> np.ndarray:
+        """Model half of ``detect()``: the YOLO boxes of one frame, as (N, 6)
+        float32 rows ``x1, y1, x2, y2, conf, cls``.
+
+        A pure function of the frame -- it reads no detector state that
+        ``detect()`` writes -- so it may run ahead of the frame loop on a
+        worker thread (``FramePrefetcher``) and be handed back to ``detect()``.
+        """
+        # Custom model: all classes are balls, no filtering needed.
+        # Pretrained COCO model: filter to sports ball (32) + frisbee (29).
+        classes = None if self._is_custom_model else self.BALL_CLASSES
+        return self._predict_boxes(
+            frame,
+            classes=classes,
+            conf=self.confidence_threshold,
+            imgsz=self._get_imgsz(frame),
+        )
+
+    def detect(self, frame: np.ndarray, inference: Any = None) -> List[Dict[str, Any]]:
         """Detect volleyballs in a frame.
 
         Args:
             frame: Input frame as numpy array (H, W, C).
+            inference: ``infer(frame)`` computed ahead of time; None runs it here.
 
         Returns:
             List of ball detection dicts with bbox, center, confidence.
@@ -188,47 +209,32 @@ class BallDetector(BaseDetector):
         if self.diag_enabled:
             self._diag_dets = []
         try:
-            imgsz = self._get_imgsz(frame)
-            # Custom model: all classes are balls, no filtering needed.
-            # Pretrained COCO model: filter to sports ball (32) + frisbee (29).
-            classes = None if self._is_custom_model else self.BALL_CLASSES
-            results = self._model(
-                frame,
-                verbose=False,
-                classes=classes,
-                conf=self.confidence_threshold,
-                imgsz=imgsz,
-            )
+            boxes = self.infer(frame) if inference is None else self._resolved(inference)
             detections = []
 
-            for result in results:
-                boxes = result.boxes
-                if boxes is None:
+            for box in boxes:
+                conf = float(box[-2])
+                if conf < self.confidence_threshold:
                     continue
 
-                for i in range(len(boxes)):
-                    conf = float(boxes.conf[i])
-                    if conf < self.confidence_threshold:
-                        continue
+                x1, y1, x2, y2 = box[:4].astype(int)
+                w = x2 - x1
+                h = y2 - y1
 
-                    x1, y1, x2, y2 = boxes.xyxy[i].cpu().numpy().astype(int)
-                    w = x2 - x1
-                    h = y2 - y1
+                # Size filter: reject detections too large to be a ball
+                if w > self.max_ball_size or h > self.max_ball_size:
+                    continue
 
-                    # Size filter: reject detections too large to be a ball
-                    if w > self.max_ball_size or h > self.max_ball_size:
-                        continue
+                cx = (x1 + x2) / 2
+                cy = (y1 + y2) / 2
 
-                    cx = (x1 + x2) / 2
-                    cy = (y1 + y2) / 2
-
-                    detections.append({
-                        "bbox": [int(x1), int(y1), int(x2), int(y2)],
-                        "center": [float(cx), float(cy)],
-                        "confidence": conf,
-                        "class_id": int(boxes.cls[i]),
-                        "class_name": "sports_ball",
-                    })
+                detections.append({
+                    "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                    "center": [float(cx), float(cy)],
+                    "confidence": conf,
+                    "class_id": int(box[-1]),
+                    "class_name": "sports_ball",
+                })
 
             # Stationary courtside balls: removed entirely at the suppression
             # threshold; weaker stationarity is only FLAGGED so the tracker

@@ -687,16 +687,16 @@ class LiveDebugProcessor:
         cache: List[Tuple[BallOverlay, PlayerOverlay, Optional[Dict[str, Any]], Optional[Dict[str, Any]], Optional[Dict[str, Any]]]] = []
 
         # ---- Pass 1: process every frame, cache overlay data, build the plan.
+        # Same read-ahead frame source as the batch loop (VideoProcessor).
         frame_idx = 0
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            result = self.frame_processor.process_frame(frame, frame_idx, enable_court_redetection=True)
-            self._ingest_actions(result.get("actions", []), plan)
-            self._log_resolved_spikes()
-            cache.append(self._overlay_data(result))
-            frame_idx += 1
+        with self.frame_processor.read_ahead(cap) as frames:
+            for frame, inference in frames:
+                result = self.frame_processor.process_frame(
+                    frame, frame_idx, enable_court_redetection=True, inference=inference)
+                self._ingest_actions(result.get("actions", []), plan)
+                self._log_resolved_spikes()
+                cache.append(self._overlay_data(result))
+                frame_idx += 1
         # Finalise the last contact held back for its look-ahead.
         self._ingest_actions(self.frame_processor.flush_actions(), plan)
         self._log_resolved_spikes()

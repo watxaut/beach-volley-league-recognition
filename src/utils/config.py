@@ -186,6 +186,17 @@ class Config:
         "attribution_width_near_px": 35.0,    # ball width over this = near half (A); between = abstain
         "attribution_near_net_exempt_m": 2.5,  # wrong-team candidates at the net (ground metres) stay eligible only when the CONTACT is above the net-top line; 2.5m so a beach spiker taking off ~2m back stays eligible (e5 f300: 2.14m) — a set thief stays excluded via the above-net gate
 
+        # Speed, results unchanged (2026-10-06; byte-identical A/B on all 7
+        # entrenos + the 20260920 match):
+        # detector_fast_inference -- run the YOLO models through their own
+        #   predictor stages with CPU post-processing where provably exact
+        #   (src/detection/yolo_inference.py). False = plain ultralytics call.
+        # prefetch_depth -- frames of decode + detector inference read ahead
+        #   on background threads by the batch loop
+        #   (src/analysis/frame_prefetch.py). 0 = inline, single-threaded.
+        "detector_fast_inference": True,
+        "prefetch_depth": 8,
+
         # Processing settings
         "batch_size": 1,
         "frame_skip": 1,  # Process every nth frame

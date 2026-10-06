@@ -11,6 +11,8 @@ import numpy as np
 import cv2
 import logging
 
+from .yolo_inference import YoloInference
+
 
 def resolve_device(requested: str = "auto") -> str:
     """Resolve a requested compute device to a concrete, available backend.
@@ -57,7 +59,8 @@ class BaseDetector(ABC):
     objects (players, balls) in volleyball video frames.
     """
 
-    def __init__(self, confidence_threshold: float = 0.5, device: str = "auto"):
+    def __init__(self, confidence_threshold: float = 0.5, device: str = "auto",
+                 fast_inference: bool = True):
         """Initialize the base detector.
 
         Args:
@@ -65,11 +68,16 @@ class BaseDetector(ABC):
             device: Device to run inference on -- "auto", "cpu", "cuda", or
                 "mps". "auto" picks the best available backend
                 (CUDA > MPS > CPU). Resolved to a concrete device here.
+            fast_inference: Run the model through ``YoloInference``'s
+                bit-identical fast path (see src/detection/yolo_inference.py).
+                False = always the plain ultralytics call.
         """
         self.confidence_threshold = confidence_threshold
         self.device = resolve_device(device)
+        self.fast_inference = fast_inference
         self.logger = logging.getLogger(self.__class__.__name__)
         self._model = None
+        self._inference: Optional[YoloInference] = None
 
     @abstractmethod
     def load_model(self) -> None:
@@ -78,6 +86,26 @@ class BaseDetector(ABC):
         This method must be implemented by subclasses to load their specific models.
         """
         pass
+
+    def _predict_boxes(self, frame: np.ndarray, **predict_kwargs) -> np.ndarray:
+        """``self._model(frame, **predict_kwargs)`` reduced to its boxes:
+        (N, 6) float32 rows ``x1, y1, x2, y2, conf, cls``."""
+        if self._inference is None or self._inference.model is not self._model:
+            self._inference = YoloInference(self._model, fast=self.fast_inference)
+        return self._inference(frame, **predict_kwargs)
+
+    @property
+    def inference_stats(self) -> Dict[str, int]:
+        """Frames by ``YoloInference`` route so far (empty before the first)."""
+        return dict(self._inference.stats) if self._inference is not None else {}
+
+    @staticmethod
+    def _resolved(inference):
+        """A read-ahead ``infer()`` result; a failure captured on the worker
+        thread is raised here, inside ``detect()``'s own error handling."""
+        if isinstance(inference, BaseException):
+            raise inference
+        return inference
 
     @abstractmethod
     def detect(self, frame: np.ndarray) -> List[Dict[str, Any]]:

@@ -403,7 +403,10 @@ def test_player_detector_off_area_side_channel_is_populated_and_not_returned():
 
 def test_ball_detector_keeps_pre_suppression_detections():
     """The far-flight event works on the un-suppressed stream (AGENTS.md §6)."""
+    import types
+
     import numpy as np
+    import torch
 
     from src.detection.ball_detector import BallDetector
 
@@ -422,47 +425,17 @@ def test_ball_detector_keeps_pre_suppression_detections():
     # Everything looks stationary -> the survivor list is empty, the raw one isn't.
     det._static_persist = lambda center: 1.0
 
-    class FakeTensor:
-        def __init__(self, values):
-            # ultralytics: Boxes.xyxy has shape (n, 4); xyxy[i] is one box.
-            self._values = np.array(values, dtype=np.float32).reshape(-1)
-
-        def cpu(self):
-            return self
-
-        def numpy(self):
-            return self._values
-
-    class FakeXYXY:
-        def __init__(self, data):
-            self._data = data
-
-        def __getitem__(self, i):
-            return FakeTensor([self._data[i]])
-
-    class FakeBoxes:
-        """Minimal stand-in for ultralytics' Boxes (len + indexing)."""
-
-        def __init__(self, data):
-            self.xyxy = FakeXYXY(data)
-            self.conf = [0.9]
-            self.cls = [0]
-
-        def __len__(self):
-            return 1
-
-        def __getitem__(self, i):
-            assert i == 0
-            return self
-
-    class FakeResult:
-        boxes = FakeBoxes([[10.0, 10.0, 30.0, 30.0]])
-
     class FakeModel:
+        """Stand-in for the ultralytics call: one box, as ``Results.boxes.data``
+        rows ``x1, y1, x2, y2, conf, cls``."""
+
         def __call__(self, *a, **kw):
-            return [FakeResult()]
+            data = torch.tensor([[10.0, 10.0, 30.0, 30.0, 0.9, 0.0]])
+            return [types.SimpleNamespace(boxes=types.SimpleNamespace(data=data))]
 
     det._model = FakeModel()
+    det._inference = None
+    det.fast_inference = True
     det._imgsz = 640
     det._auto_imgsz = None
     survivors = det.detect(np.zeros((1080, 1920, 3), dtype=np.uint8))

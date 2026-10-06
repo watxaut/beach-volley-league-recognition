@@ -26,7 +26,8 @@ class PlayerDetector(BaseDetector):
         confidence_threshold: float = 0.5,
         device: str = "auto",
         max_players: int = 20,
-        imgsz: int = 1280
+        imgsz: int = 1280,
+        fast_inference: bool = True,
     ):
         """Initialize the player detector.
 
@@ -41,8 +42,9 @@ class PlayerDetector(BaseDetector):
                 top-N-by-confidence cull drops real players (courtside bystanders
                 near the camera outscore distant players). Downstream stages
                 (court filter, tracker, ball proximity) do the real selection.
+            fast_inference: Bit-identical fast model execution (BaseDetector).
         """
-        super().__init__(confidence_threshold, device)
+        super().__init__(confidence_threshold, device, fast_inference)
         self.model_path = model_path or "yolov8n.pt"
         self.max_players = max_players
         # Inference resolution. Video is 1920x1080; YOLO's default 640 shrinks the
@@ -78,11 +80,22 @@ class PlayerDetector(BaseDetector):
             self.logger.error(f"Failed to load YOLO model: {e}")
             raise
 
-    def detect(self, frame: np.ndarray) -> List[Dict[str, Any]]:
+    def infer(self, frame: np.ndarray) -> np.ndarray:
+        """Model half of ``detect()``: the YOLO boxes of one frame, as (N, 6)
+        float32 rows ``x1, y1, x2, y2, conf, cls``.
+
+        A pure function of the frame -- it reads no detector state that
+        ``detect()`` writes -- so it may run ahead of the frame loop on a
+        worker thread (``FramePrefetcher``) and be handed back to ``detect()``.
+        """
+        return self._predict_boxes(self.preprocess_frame(frame), imgsz=self.imgsz)
+
+    def detect(self, frame: np.ndarray, inference: Any = None) -> List[Dict[str, Any]]:
         """Detect volleyball players in a frame.
 
         Args:
             frame: Input frame as numpy array (H, W, C)
+            inference: ``infer(frame)`` computed ahead of time; None runs it here.
 
         Returns:
             List of player detection dictionaries with bbox, confidence, etc.
@@ -92,14 +105,11 @@ class PlayerDetector(BaseDetector):
             return []
 
         try:
-            # Preprocess frame
-            processed_frame = self.preprocess_frame(frame)
-
-            # Run YOLO inference
-            results = self._model(processed_frame, verbose=False, imgsz=self.imgsz)
+            # YOLO inference (here, or read ahead by the caller)
+            boxes = self.infer(frame) if inference is None else self._resolved(inference)
 
             # Process detections
-            detections = self.postprocess_detections(results)
+            detections = self.postprocess_detections(boxes)
 
             # Filter and rank detections
             filtered_detections = self.filter_player_detections(detections, frame)
@@ -111,40 +121,35 @@ class PlayerDetector(BaseDetector):
             self.logger.error(f"Player detection failed: {e}")
             return []
 
-    def postprocess_detections(self, results) -> List[Dict[str, Any]]:
-        """Convert YOLO results to standard detection format.
+    def postprocess_detections(self, boxes: np.ndarray) -> List[Dict[str, Any]]:
+        """Convert YOLO boxes to standard detection format.
 
         Args:
-            results: YOLO detection results
+            boxes: ``infer()`` output, (N, 6) float32 rows
+                ``x1, y1, x2, y2, conf, cls``
 
         Returns:
             List of detection dictionaries
         """
         detections = []
 
-        for result in results:
-            boxes = result.boxes
-            if boxes is None:
-                continue
+        for row in boxes:
+            box = row[:4]
+            confidence = float(row[-2])
+            class_id = int(row[-1])
 
-            for i in range(len(boxes)):
-                # Get box coordinates and convert to xyxy format
-                box = boxes.xyxy[i].cpu().numpy()
-                confidence = float(boxes.conf[i].cpu().numpy())
-                class_id = int(boxes.cls[i].cpu().numpy())
-
-                # Only process person detections
-                if class_id in self._person_class_ids:
-                    detection = {
-                        "bbox": box.tolist(),  # [x1, y1, x2, y2]
-                        "confidence": confidence,
-                        "class_id": class_id,
-                        "class_name": "player",
-                        "center": self._calculate_center(box),
-                        "area": self._calculate_area(box),
-                        "aspect_ratio": self._calculate_aspect_ratio(box)
-                    }
-                    detections.append(detection)
+            # Only process person detections
+            if class_id in self._person_class_ids:
+                detection = {
+                    "bbox": box.tolist(),  # [x1, y1, x2, y2]
+                    "confidence": confidence,
+                    "class_id": class_id,
+                    "class_name": "player",
+                    "center": self._calculate_center(box),
+                    "area": self._calculate_area(box),
+                    "aspect_ratio": self._calculate_aspect_ratio(box)
+                }
+                detections.append(detection)
 
         return detections
 

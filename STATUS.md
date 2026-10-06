@@ -18,13 +18,12 @@ update at the end of every session that changes anything and commit with the wor
 - New durable protocol rules go in `AGENTS.md`; new cross-session technical
   facts go one-line-each into *Learnings* below.
 
-Last updated: **2026-10-06 (88th session) — owner ratified the post-run
-per-player attributions (WHO).** The 208-touch review CSV
-(`ground_truth/20260920_match_reconstruction_player_review.csv`, generated
-from `match_reconstruction.json`) was checked by the owner against the
-video: every player correct, 0 corrections → it is now the per-player GT.
-Found: postrun fantasy charges no set-error penalty (P6 f3229; G1 says
-ball-handling −1).
+Last updated: **2026-10-06 (89th session) — the offline run is 2.3–2.5×
+faster with byte-identical results.** Decode + both YOLO detectors run ahead
+of the sequential loop on background threads, and detector post-processing
+left the GPU wherever that is provably exact: the 20260920 match 32.6 → 13
+min (75 → 30–32 ms/frame), the 7 practice clips 291 → 131 s; `diag.jsonl`,
+`pipeline_output.json`, every CSV and the reconstruction are identical.
 
 ## North-star goals (set session 24)
 
@@ -82,15 +81,26 @@ review (#88). Owed: entreno 0-flip run. Detail:
 `docs/history/status_where_we_are_archive.md`.
 
 **Production state (causal pass, unchanged):** weights
-`volleyball_ball_best.pt` v3; match 720p upscaled `_up1080`; 68 ms/frame;
-212 actions on the #87 run; held-out P9–P33 contact F1 0.772, class 0.590;
+`volleyball_ball_best.pt` v3; match 720p upscaled `_up1080`; 30–32 ms/frame
+(#89; 75 before, dump on); 212 actions on the #87 run; held-out P9–P33 contact F1 0.772, class 0.590;
 overpass 0/18; serves near 8/16, far 0/17, 12 FP (`score_serves.py`).
 Display-only observers: possession (#77–#79), ground contact (#80), squad
 colours/labels. Pass-2 scripts (`relabel_serves`, `resolve_side_switches`,
 `resolve_point_winners` 18/33, `consume_serve_evidence`) are SUPERSEDED by
 `src/postrun` for points/serves/winners; kept as provenance. Entreno action
 gate (causal): e1 0.706, e2 0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933,
-e7 0.75 (same-session A/B only). Test suite **1118**.
+e7 0.75 (same-session A/B only). Test suite **1139**.
+
+**Speed (#89, results-neutral — AGENTS §12).** `prefetch_depth: 8` reads
+decode + both detectors' `infer()` ahead on background threads
+(`frame_prefetch.py`); `detector_fast_inference` runs ultralytics' own
+predictor stages and post-processes on the CPU only where an IoU-margin /
+tie certificate proves it exact (`yolo_inference.py`; the device path took
+310 of 26181 player frames on the match). Match 1955 → 783–836 s, practice
+clips 291 → 131 s, every artifact byte-identical to `output/postrun/`
+(`--device cpu` and `--save-video` identical to a true-HEAD worktree too).
+Per lever on e5: 81 → 67 (fast path) / 50 (read-ahead) / 31–35 ms/frame
+(both). The bound is now MediaPipe pose on the loop thread (open point 33).
 
 **Held-out lock:** `ground_truth/20290928_entreno_vall_dhebron_serve_anchors.json`
 = 19 serves; the video has NEVER been run; use only via a card "score
@@ -126,6 +136,14 @@ P31 serve f24543 is 128 f before its reception (owner to confirm ~f24630).
 4. E2 observers (identity drift / side-switch, display only, owner gate).
 5. Deferred fixes: comment `src/utils/config.py:101`; postrun fantasy
    set-error charge (P6 f3229, G1 ball-handling −1).
+6. **Bugs found in #89 (results-changing → measure with a same-session
+   A/B on e1–e7 + the match before fixing):** (a) `PlayerDetector` hands
+   ultralytics an RGB frame it treats as BGR — the person model sees R/B
+   swapped; (b) one MediaPipe video-mode `Pose` is shared by all players,
+   so one player's landmarks seed the next one's ROI/smoothing.
+7. **Speed left (results-neutral, open point 33):** pose on its own thread
+   (~30 → ~26 ms/f); read-ahead for the `--debug-live` producer and the
+   enrollment pre-pass (5 s per clip).
 
 ## Next task cards
 
@@ -223,6 +241,13 @@ archived under their session date in `docs/history/status_log_archive.md`.)*
     (10 more by alternation), 5 are placed as hidden touches; (f) fantasy
     charges no set-error penalty (P6 f3229; G1: ball-handling −1). Next: (b).
 
+33. **Speed, results-neutral (#89).** Shipped: read-ahead + exact detector
+    fast path. Left, in order: (a) pose on its own thread, call order kept
+    (~30 → ~26 ms/f; touches `ActionClassifier`); (b) read-ahead for the
+    `--debug-live` producer and the enrollment pre-pass (5 s per clip);
+    (c) re-verify the fast path before any ultralytics upgrade (it turns
+    itself off on an unverified release; `venv/` is the only env).
+
 ### Parked / conditional
 
 5.  **Same-team adjacent-player choice.** Needs the owner-specified engine
@@ -309,12 +334,17 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Layer 1 is degenerate on the match (157/185 contacts = `bump_set`); every dig/set/overpass/serve label is `ActionContextResolver._decide` keyed on `_poss_touch` — touch-count errors are downstream of MISSING contacts (starved 33/43, not mis-reset).
 
 **Perf / infra**
-- Pose gating shipped: 84.8 → 68.0 ms/f byte-identical; detector floor ~48 ms/f.
+- Pose gating shipped: 84.8 → 68.0 ms/f byte-identical. #89: the "detector floor ~48 ms/f" was half overhead — a YOLO forward is ~11 ms; ultralytics' NMS + rescale on MPS cost 10–20 ms/f in GPU syncs (3 ms on CPU).
+- MPS (M3 Pro, #89): run-to-run deterministic (HEAD reproduces `output/postrun` byte for byte); batch>1 is bit-identical to batch-1 but NOT faster (compute-bound); two models driven from two threads stay bit-identical.
+- CPU NMS ≠ MPS NMS in general: ~1 frame per 1000 has a box pair with IoU within 1e-5 of the 0.7 threshold, hence the certificate + device fallback in `yolo_inference.py`. Dead speed levers: batching, a detection cache (the loop is pose-bound), lazy pose (MediaPipe video-mode state → not exact).
+- Byte-identical gate for results-neutral changes: `scripts/compare_runs.py` + `cmp diag.jsonl` against `output/postrun/*` (AGENTS §12); `scripts/` already had the tool — check before writing one.
+- Found while profiling, NOT touched (results-changing, impact unmeasured): `PlayerDetector.preprocess_frame` hands ultralytics an RGB frame it treats as BGR (the person model sees R/B swapped); one MediaPipe `Pose(static_image_mode=False)` is shared by all players (A's landmarks seed B's ROI/smoothing).
 - VFR: `CAP_PROP_POS_FRAMES` lands −28..+30 f off — decode spans sequentially (`test_vfr_seek_guard.py`); two KNOWN-ISSUE allow-lists: `annotate_player_gt.py`, `src/db/ingest.py`.
 - Delegation: >1 KB prompt kills the child pi (EXIT 137) — few hundred bytes + the child reads a brief file.
 - Retraining: four-leg gate; fine-tune FROM `best.pt`; mine frames with NO pre-labels.
 
 ## Session index (one line each)
+- #89 **Offline run 2.3–2.5× faster, byte-identical: read-ahead decode+detectors (`frame_prefetch.py`) + exact detector fast path (`yolo_inference.py`); match 1955→783 s, 7 clips 291→131 s; suite 1139**
 - #88 **Owner ratified post-run per-player attributions: 208-touch review CSV all correct, 0 corrections → per-player GT; found fantasy set-error gap (P6 f3229)**
 - #87 **POST-RUN RECONSTRUCTION (`src/postrun`): 20260920 points 33/33, serves 33/33, winners 33/33, score A 21–B 12 exact; touches P 0.976 / action 0.982 / half 1.000, 0 rule breaks; practice P 52/53; diag schema 4**
 - #86 **Repo lean pass**: STATUS 2465→~530 lines with hard budgets + guard test (tests/test_status_leanness.py); 21 closed-probe test files deleted (530 tests, suite 1569→1039→1083 post-merge); no src/ change
@@ -414,6 +444,20 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 ## Log (newest first)
 
+### 2026-10-06 (eighty-ninth session) — #89: the offline run is 2.3–2.5× faster with byte-identical results (read-ahead + exact detector fast path)
+
+**Asked (owner):** on branch `opus-video-processing-fast`, make the offline evaluation (video + post-processing) faster while keeping the same results.
+
+**Diagnosed first (MPS, entreno_3, 77 ms/frame):** ball YOLO 23 + player YOLO 28 + MediaPipe pose 21 + tracker 3 + decode 2; post-run 3 s. Of the 51 ms detector stage only ~23 ms is network forward: ultralytics' NMS + rescale on MPS cost 10–20 ms/frame in GPU syncs (3 ms on CPU), preprocessing ~7. HEAD is run-to-run deterministic on MPS and reproduces `output/postrun/` byte for byte, so those runs are the golden reference.
+
+**Built:** `src/detection/yolo_inference.py` (`YoloInference`: the predictor's own stage methods; CPU post-processing only when a certificate proves it exact — every candidate pair's IoU ≥1e-4 from the NMS threshold, no tied score or class maximum, device box arithmetic bit-equal to the CPU on a probe — else the device path; off on ultralytics releases not in `VERIFIED_ULTRALYTICS`); `infer()` / `detect(frame, inference=)` split on both detectors; `src/analysis/frame_prefetch.py` (`FramePrefetcher`: decode thread + one worker per detector, bounded, in decode order) behind `FrameProcessor.read_ahead`, used by `VideoProcessor` and the two-pass `--save-video`; config `prefetch_depth: 8`, `detector_fast_inference: True`; AGENTS §12; +18 tests (8/8 mutants killed), suite 1139.
+
+**Measured (same machine, MPS, final code, vs the golden runs):** match 1955 → 783 s (74.9 → 29.8 ms/frame; an earlier pass 836 s / 31.8), 7 practice clips 291 → 131 s; `diag.jsonl` (49 MB on the match), `pipeline_output.json`, all CSVs and `match_reconstruction.txt`/`.json` identical on all 8 (`score_postrun.py` unchanged: 33/33, P 0.976, action 0.982). `--device cpu` (e5, 231 → 159 ms/frame) and `--save-video` (annotated mp4 byte-identical, 37 → 19 s) identical to a true-HEAD worktree run; every switch combination identical on e5 (81 / 67 / 50 / 31–35 ms/frame). The certificate sent 310 of 26181 player frames and 6 ball frames to the device path on the match.
+
+**Found, not touched (results-changing):** the player detector feeds ultralytics an RGB frame it treats as BGR; one MediaPipe video-mode `Pose` is shared by all players.
+
+**Not done / owed:** pose on its own thread (the new bound, open point 33); read-ahead for the `--debug-live` producer and the enrollment pre-pass; the fast path turns itself off on any ultralytics release other than the verified 8.3.169 (`venv/` is the only environment; the uv `.venv` was deleted by the owner).
+
 ### 2026-10-06 (eighty-eighth session) — #88: owner pass on the reconstruction — per-player attributions RATIFIED, review CSV becomes the per-player GT
 
 **Asked (owner):** explain what the owner pass (Active next #1) needs given
@@ -452,9 +496,3 @@ points table + fantasy (Active next 1); second match; GT P31 serve frame
 **Honest limits:** per-player correctness is unscored (no identity GT; service-order agreement 84 % / 89 % is indirect); constants were set looking at the whole match, not P1–P8; the practice clips drove five bug fixes, so they are no longer blind; line calls 7/10; blocks unlabelled; `vall_dhebron` untouched.
 
 **Not done / owed:** owner pass on `match_reconstruction.txt` + per-player contact sheets; DB ingest of the reconstruction (points table, fantasy); a second match; GT P31 serve frame (f24543 → ~f24630?) for the owner to confirm.
-
-### 2026-10-06 (eighty-sixth session) — #86: repo lean pass — STATUS compacted with hard budgets + guard; closed-probe tests deleted
-
-**Asked (owner):** STATUS and tests/ are both getting too long; summarize STATUS, make it structurally unable to regrow, audit tests and delete the unneeded ones — goal: LLMs put fewer tokens into reading at the same repo performance.
-
-**Done:** STATUS.md 2465 → ~530 lines (every removed line VERBATIM in `docs/history/status_log_archive.md` + `status_where_we_are_archive.md`; nothing deleted); hard budgets enforced by `tests/test_status_leanness.py` (≤600 lines total, per-section caps, one-line session index ≤240 chars, ≤3 Log sessions, no DONE task cards, canonical header order — a failed guard means archive-then-shrink); AGENTS.md lean-STATUS convention now names the guard. Deleted 21 test files (6,600 lines / 530 tests) whose ONLY subject is a DONE/REFUTED one-off diagnostic probe (TC1 touch rules, PG1/PG2 point maps, PM1, SR1*/SR4a probes, overpass levers, possession signal, reach/scale/looming diagnoses, near-serve misses, takeoff stance, entreno/serve buckets, dev-clip GT builder, insert path, label ceilings, set-dig swaps) — probe scripts stay as provenance, docstrings annotated; everything guarding `src/`, standing evaluators/scorers, pass-2 layers, GT tooling, config drift and the VFR seek guard KEPT. No `src/` change. Merged with the parallel identity sessions #83–#85 (PR #1); this lean pass renumbered #83 → #86; suite 1083 all green.

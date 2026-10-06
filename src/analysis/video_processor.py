@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional, Tuple
 import cv2
 import numpy as np
 import logging
+import time
 from pathlib import Path
 from tqdm import tqdm
 
@@ -92,18 +93,20 @@ class VideoProcessor:
             "statistics": {}
         }
 
-        # Process frames
+        # Process frames. Decode + detector inference are read ahead on
+        # background threads (prefetch_depth); the loop itself stays the one
+        # sequential process_frame pass.
         self.frame_count = 0
+        loop_start = time.perf_counter()
 
-        with tqdm(total=self.total_frames, desc="Processing frames") as pbar:
-            while True:
-                ret, frame = cap.read()
-                if not ret:
-                    break
-
+        with (tqdm(total=self.total_frames, desc="Processing frames") as pbar,
+              self.frame_processor.read_ahead(cap) as frames):
+            for frame, inference in frames:
                 try:
                     # Process single frame using shared processor
-                    frame_result = self.frame_processor.process_frame(frame, self.frame_count)
+                    frame_result = self.frame_processor.process_frame(
+                        frame, self.frame_count, inference=inference
+                    )
                     results["frame_results"].append(frame_result)
 
                     # Update progress
@@ -119,6 +122,21 @@ class VideoProcessor:
                     continue
 
         cap.release()
+        wall = time.perf_counter() - loop_start
+        if self.frame_count:
+            self.logger.info(
+                f"Processed {self.frame_count} frames in {wall:.1f}s "
+                f"({1000 * wall / self.frame_count:.1f} ms/frame, "
+                f"{self.frame_count / wall:.1f} fps wall)"
+            )
+            # How each detector's frames were executed (yolo_inference.py):
+            # cpu_post = fast path, device_post = exactness check refused the
+            # CPU, public = plain ultralytics call.
+            self.logger.info(
+                "Detector inference routes: ball %s, player %s",
+                self.frame_processor.ball_detector.inference_stats,
+                self.frame_processor.player_detector.inference_stats,
+            )
 
         # Flush the final contact held back by the action classifier's
         # one-contact look-ahead, attaching it to the last frame's results.
