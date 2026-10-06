@@ -6745,3 +6745,31 @@ publish; nothing ran against hosted Supabase/Cloudflare/Drive yet.
 
 - 2026-08-15 — bystander-hijack fix (assignment-level court membership); first player-ID GT + occlusion-aware eval; ghosts excluded from the classifier.
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
+
+## Archived 2026-10-06 (#93): the oldest Log session and the oldest Session index line moved out of STATUS.md verbatim (Log ≤3 sessions, index budget 100)
+
+### 2026-10-06 (ninety-first session) — #91: stats & fantasy feature brainstorm (docs only)
+
+**Asked (owner):** brainstorm stats/fantasy features (position heat maps by
+possession, attack start → end map with hard/touch and kill/dug/error, a
+net-view chart of attack heights, advertised matches with betting, time
+filters / seasons / progress), add new ideas, stay honest about what can be
+measured; the owner then picks what goes Now / Next.
+
+**Written:** `docs/stats_feature_brainstorm.md` — §1 measurement budget, §2
+owner ideas assessed (O1–O5), §3 new ideas (N1–N20), validation cards V1–V3,
+UI honesty rules H1–H4, §4 enablers I1–I6, §5 pick list with a suggested slicing.
+
+**Measured here (calibrations only, `src/postrun/geometry.py`; no run output
+in this container):** beach match: 3 px = 3–4 cm left–right at every depth;
+foot depth per 3 px 0.09 m near baseline / 0.34 m net / 0.76 m far baseline
+(practice e3: 0.29 m far); a 1.3 m ball-depth error moves a 2.8 m contact
+height ±0.15 m (beach) / ±0.01 m (practice); 1 px ball width = 0.64 m depth at
+the net, 1.23 m at the far baseline. Per player per match (ratified CSV):
+5–14 serves, 7–13 spikes, 13–17 digs, 10–15 sets. Found: the match GT holds 32
+owner-labelled hard/touch spikes (13/19) — `spike_type` never scored on the
+match (card V1).
+
+**Not done / owed:** owner's pick; nothing implemented.
+
+- 2026-08-16 — team-aware contact attribution (team 0.69→0.92); server tracking fixed + ghost damping.

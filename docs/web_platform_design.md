@@ -319,7 +319,7 @@ admin-owned). The admin page shows a "changed since review: rev 3 → 4" badge.
 * **Invite-only.** Turn off "Allow new users to sign up". In the MVP the
   admin invites from the Supabase dashboard; Phase 3 adds an in-app invite
   button.
-* **Login:** email magic link or 6-digit code (nothing to remember, works on
+* **Login:** email magic link or 8-digit code (nothing to remember, works on
   phones), with Google sign-in as an option.
 * **Set up custom SMTP before inviting anyone** (e.g. Resend's free tier).
   Supabase's built-in mailer is a testing service with a very low rate limit.
@@ -343,6 +343,15 @@ protected too. Recommended tiers:
 | Match detail | admins + **the 4 players of that match** (+ everyone if an admin sets `matches.detail_public`) | play-by-play, every touch | RLS on `points` / `actions` |
 | Player analytics | the player, admins, + everyone if the player turns on `players.profile_public` | heatmaps, zones, percentages, trends across matches | `player_analytics()` function that checks the flag |
 | Admin only | admins | drafts, video links, publication log, hashes, flags | RLS + a separate `match_sources` table (RLS can't hide one column) |
+
+The match report (`match_report`) mixes tiers, so it applies them per value
+(`20261007130000_match_report_privacy.sql`): the box-score line of each slot
+and the teams' side-out / break-point are League; a player's attack split,
+own-serve record, average over other matches and the serve targets are Player
+analytics, also open to whoever holds Match detail for that match (they could
+count the touches). A count that splits a team total the league already sees
+needs BOTH teammates visible, or the visible one gives the other away by
+subtraction.
 
 ### Pages
 
@@ -476,11 +485,14 @@ Your three tables are the right core. Four refinements:
 
 ## 6. Security checklist
 
-1. RLS **enabled on every table**. Nothing is granted to `anon`, and every
-   policy is `to authenticated`.
+1. RLS **enabled on every table**, and every policy is `to authenticated`.
+   Table privileges are explicit (`20261007120000_explicit_grants.sql`):
+   `anon` holds none, `authenticated` writes only the admin-owned tables
+   and columns, and a new table or view gets nothing until its migration
+   grants it. The grant is the first gate, RLS the second.
 2. The secret (service-role) key exists only on the laptop
-   (`.env.publish`, git-ignored, or macOS Keychain). It is never in
-   `webapp/` and never committed.
+   (`.env.publish`, git-ignored, mode 600 or the publisher refuses it; or
+   macOS Keychain). It is never in `webapp/` and never committed.
 3. `ingest_match_bundle` is executable by `service_role` only (revoke
    `public`). Aggregate functions check `auth.uid() is not null`.
 4. Storage buckets `match-bundles` and `match-media` are private.
@@ -491,6 +503,22 @@ Your three tables are the right core. Four refinements:
    not a table UPDATE, so they can't edit other columns of `players`.
 7. RLS tests: `supabase test db` (pgTAP) checks that a viewer can't read
    drafts, other matches' touches or `match_sources`, and that an admin can.
+8. The site sends a content security policy and refuses framing
+   (`webapp/public/_headers`): only its own bundle runs, and it talks only
+   to Supabase. A new third-party host has to be listed there.
+9. Membership is the Supabase *Allow new users to sign up* switch (off):
+   every logged-in account reads the league tier. It is a dashboard setting,
+   not code, so the deploy checklist (step 2.4) verifies it on the real
+   project.
+10. Asking for a login code gives one answer for every email. The form calls
+    the edge function `request-login-code`, never Auth: the function always
+    answers `{"ok": true}`, the database gate (`login_code_gate`, service key
+    only) applies the rate limits and says whether the address is an accepted
+    account, and only then the function asks Auth for the mail. Auth's own
+    public endpoints are locked on the hosted project with a CAPTCHA secret
+    that no page has a widget for (deploy step 2.9); requests with the
+    service key skip that check. Wrong code and unknown address already get
+    the same answer from Auth's verify endpoint.
 
 ---
 
@@ -501,7 +529,7 @@ supabase/config.toml                    # local stack; sign-ups off; email templ
 supabase/migrations/20261006120000_init.sql     # schema, RLS, views, RPCs, G1 seed
 supabase/migrations/20261006120100_storage.sql  # private buckets + admin read policy
 supabase/checks/rls_smoke.sql           # behaviour check (rolls back); plain_postgres_stub.sql
-supabase/templates/                     # magic-link (with the 6-digit code) + invite emails
+supabase/templates/                     # magic-link (with the login code) + invite emails
 src/publish/                            # naming, bundle (pure), fantasy, thumbs, client, cli,
                                         #   inbox (Drive runner), backup
 ops/launchd/                            # inbox every 30 min + weekly backup; install.sh
@@ -560,7 +588,7 @@ PTS in the diag dump for per-point video links, uploads through the web
 | D2 | Privacy tiers (§4) | as proposed: league = results + box scores + fantasy; match detail = that match's players; analytics = self unless opted in |
 | D3 | File naming / `match_key` | **`YYYYMMDD_HHMM_<venue>_<text>`** (time added by the owner); the inbox auto-renames |
 | D4 | Frontend + hosting | React SPA on Cloudflare Pages |
-| D5 | Login | magic link / 6-digit code |
+| D5 | Login | magic link / 8-digit code |
 | D6 | Review gate | every new match lands as a draft; an admin publishes |
 | D7 | Repo layout | new top-level `supabase/` and `webapp/` |
 | D8 | Scoring | **its own tables** (`fantasy_rulesets` + `fantasy_rules`), editable from the admin page |

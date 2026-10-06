@@ -5,6 +5,7 @@ post-run reconstruction of the synthetic match in ``postrun_sim``."""
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from datetime import date, datetime
@@ -22,7 +23,7 @@ from src.postrun.reconstruct import player_stats, reconstruct  # noqa: E402
 from src.publish import cli  # noqa: E402
 from src.publish.bundle import (BundleError, build_bundle, content_sha256,  # noqa: E402
                                 to_own_frame)
-from src.publish.client import SupabaseClient, load_env_file  # noqa: E402
+from src.publish.client import SupabaseClient, SupabaseError, load_env_file  # noqa: E402
 from src.publish.fantasy import G1_RULES, score_actions  # noqa: E402
 from src.publish.naming import MatchKeyError, match_key_for, parse_match_key, slugify  # noqa: E402
 
@@ -320,11 +321,34 @@ def test_env_file_and_key_headers(tmp_path, monkeypatch):
         monkeypatch.delenv(k, raising=False)
     env = tmp_path / ".env.publish"
     env.write_text("# creds\nSUPABASE_URL=https://x.supabase.co\nSUPABASE_SECRET_KEY='sb_secret_abc'\n")
+    env.chmod(0o600)
     values = load_env_file(env)
     assert values["SUPABASE_SECRET_KEY"] == "sb_secret_abc"
     c = SupabaseClient.from_env(env)
     assert "Authorization" not in c._headers() and c._headers()["apikey"] == "sb_secret_abc"
     assert SupabaseClient("https://x", "eyJabc")._headers()["Authorization"] == "Bearer eyJabc"
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file modes")
+@pytest.mark.parametrize("mode", [0o644, 0o640, 0o604])
+def test_env_file_readable_by_others_is_refused(tmp_path, monkeypatch, mode):
+    """The secret key bypasses every access rule: an env file that other users
+    of the laptop can read is refused, with the fix in the message."""
+    for k in ("SUPABASE_URL", "SUPABASE_SECRET_KEY"):
+        monkeypatch.delenv(k, raising=False)
+    env = tmp_path / ".env.publish"
+    env.write_text("SUPABASE_URL=https://x.supabase.co\nSUPABASE_SECRET_KEY=sb_secret_abc\n")
+    env.chmod(mode)
+    with pytest.raises(SupabaseError, match="chmod 600"):
+        SupabaseClient.from_env(env)
+    env.chmod(0o600)
+    assert SupabaseClient.from_env(env).key == "sb_secret_abc"
+
+
+def test_credentials_from_the_environment_need_no_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("SUPABASE_URL", "https://x.supabase.co")
+    monkeypatch.setenv("SUPABASE_SECRET_KEY", "sb_secret_env")
+    assert SupabaseClient.from_env(tmp_path / "missing.env").key == "sb_secret_env"
 
 
 def test_zone_accepts_pipeline_output_label_and_dict():

@@ -1,7 +1,7 @@
 # Task: far-side reach-gate asymmetry — is the 140 px threshold side-blind?
 
 Diagnose-only worker on the volleyball_recognition repo
-(/Users/joan.heredia/Documents/personal/projects/volley_recognition).
+(the repository root).
 Pure measurement over EXISTING artifacts. No decode, no src change, no GT edit.
 STOP on any ambiguity, failed gate, or missing name instead of inferring.
 

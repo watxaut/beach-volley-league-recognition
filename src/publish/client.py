@@ -6,13 +6,15 @@ Credentials come from the environment or ``.env.publish`` (git-ignored):
     SUPABASE_SECRET_KEY=sb_secret_...      # or a legacy service_role JWT
 
 The secret key bypasses RLS: it lives ONLY on the processing laptop, never
-in ``webapp/`` and never in git.
+in ``webapp/`` and never in git. Like ssh with a private key, the client
+refuses an env file that other users of the machine can read (``chmod 600``).
 """
 
 from __future__ import annotations
 
 import json
 import os
+import stat
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -43,6 +45,17 @@ def load_env_file(path: Path = DEFAULT_ENV_FILE) -> Dict[str, str]:
     return values
 
 
+def require_private(path: Path) -> None:
+    """Raise unless ``path`` is readable by its owner only (POSIX; a missing
+    file passes -- the credentials may come from the environment)."""
+    if os.name != "posix" or not path.exists():
+        return
+    mode = stat.S_IMODE(path.stat().st_mode)
+    if mode & 0o077:
+        raise SupabaseError(f"{path} is readable by other users (mode {mode:03o}) and holds "
+                            f"the secret key -- run: chmod 600 {path}")
+
+
 class SupabaseClient:
     def __init__(self, url: str, key: str) -> None:
         if not url or not key:
@@ -53,6 +66,7 @@ class SupabaseClient:
 
     @classmethod
     def from_env(cls, env_file: Path = DEFAULT_ENV_FILE) -> "SupabaseClient":
+        require_private(env_file)
         env = load_env_file(env_file)
         return cls(env.get("SUPABASE_URL", ""),
                    env.get("SUPABASE_SECRET_KEY") or env.get("SUPABASE_SERVICE_ROLE_KEY", ""))

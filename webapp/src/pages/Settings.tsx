@@ -36,8 +36,10 @@ export function Settings() {
       {me && (
         <Card title="Privacy">
           <p className="muted">
-            Everyone in the league always sees results, box scores and fantasy points. Your detailed
-            analytics (zones, landings, success rates) are private unless you share them.
+            Everyone in the league always sees results, box scores (serves, kills, digs, errors) and
+            fantasy points. Everything more detailed (where you attack and land, how your attacks,
+            serves and receptions break down, your trends) shows only to you and the admins unless you
+            share it. The four players of a match also see that match's play-by-play.
           </p>
           <ErrorBox error={error} />
           <label className="switch">

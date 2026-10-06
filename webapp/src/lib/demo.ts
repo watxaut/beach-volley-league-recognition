@@ -322,8 +322,17 @@ export function demoApi(): Api {
       const fantasyOf = (t: Touch, assist: boolean) => activeRules().reduce((sum, rule) =>
         sum + (rule.actions.includes(t.action) && (rule.outcome === null || t.outcome === rule.outcome) && (!rule.assist_only || assist) ? rule.points : 0), 0)
       const assistIds = new Set(m.actions.filter((a) => a.is_assist).map((a) => `${a.point_no}:${a.seq}`))
-      const timeline = canDetail(m)
+      const detail = canDetail(m)
+      const timeline = detail
         ? pointFantasy(m.actions, fantasyOf, (t) => assistIds.has(`${t.point_no}:${t.seq}`)) : null
+      // Analytics tier, as in SQL: a player's numbers show with the play-by-play,
+      // or when they are the reader's own / shared; a number that splits a team
+      // total needs BOTH teammates visible.
+      const slotOk = (slot: Slot) => {
+        const pl = players.find((x) => x.id === m.slots[slot])
+        return detail || (!!pl && (pl.profile_public || pl.user_id === session?.userId))
+      }
+      const teamOk = (team: Team) => SLOTS.filter((s) => s.slice(2) === team).every(slotOk)
       const players_: ReportPlayer[] = box(m).map((b) => {
         const others = b.player_id === null ? [] : matches.filter((o) => o.match.status === 'published' && o.match.id !== m.match.id
           && SLOTS.some((s) => o.slots[s] === b.player_id)).map((o) => box(o).find((x) => o.slots[x.slot] === b.player_id)!)
@@ -333,17 +342,20 @@ export function demoApi(): Api {
           fantasy_per_21: m.match.n_points ? Math.round((b.fantasy / m.match.n_points) * 210) / 10 : null,
           serves: b.serves, aces: b.aces, serve_errors: b.serve_errors, digs: b.digs, sets: b.sets, assists: b.assists,
           attacks: b.attacks, kills: b.kills, attack_errors: b.attack_errors, handling_errors: b.handling_errors,
-          hit: hitSplit(m.actions, b.slot),
-          own_serve: { n: m.points.filter((p) => p.winner_team && p.server_slot === b.slot).length,
-                       won: m.points.filter((p) => p.server_slot === b.slot && p.winner_team === b.team).length },
-          avg: b.player_id === null ? null : {
+          hit: slotOk(b.slot) ? hitSplit(m.actions, b.slot) : null,
+          own_serve: !teamOk(b.team) ? null : {
+            n: m.points.filter((p) => p.winner_team && p.server_slot === b.slot).length,
+            won: m.points.filter((p) => p.server_slot === b.slot && p.winner_team === b.team).length },
+          avg: b.player_id === null || !slotOk(b.slot) ? null : {
             matches: others.length, fantasy: mean((x) => x.fantasy), kills: mean((x) => x.kills), aces: mean((x) => x.aces),
             digs: mean((x) => x.digs), assists: mean((x) => x.assists),
             errors: mean((x) => x.serve_errors + x.attack_errors + x.handling_errors), attacks: mean((x) => x.attacks),
           },
         }
       })
-      return delay({ match_id: m.match.id, teams: teamRally(m.points), players: players_, serve_targets: serveTargets(m.points, m.actions), timeline })
+      const targets = serveTargets(m.points, m.actions)
+      for (const team of ['A', 'B'] as Team[]) if (!teamOk(team === 'A' ? 'B' : 'A')) delete targets[team]
+      return delay({ match_id: m.match.id, teams: teamRally(m.points), players: players_, serve_targets: targets, timeline })
     },
     async updateMatch(id, patch) {
       Object.assign(byId(id)!.match, patch)

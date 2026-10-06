@@ -67,12 +67,15 @@ function must<T>(res: Result): T {
 export function explainError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err)
   if (/signups not allowed|not allowed for otp|user not found/i.test(msg))
-    return 'This email has not been invited yet. Ask a league admin to invite you.'
+    return 'This email cannot log in yet: it was never invited, or the invite link was not ' +
+      'opened in time. Ask a league admin to send the invite (again).'
   if (/token has expired|invalid/i.test(msg) && /otp|token/i.test(msg))
     return 'That code is wrong or expired. Request a new one.'
   if (/match_participants_match_id_player_id_key|duplicate key/i.test(msg))
     return 'That player already has another slot in this match.'
   if (/rate limit/i.test(msg)) return 'Too many emails requested. Wait a minute and try again.'
+  if (/captcha/i.test(msg))
+    return 'Login is unavailable right now: the login function did not answer. Tell a league admin.'
   return msg
 }
 
@@ -97,11 +100,20 @@ export function supabaseApi(url: string, publishableKey: string): Api {
       return () => data.subscription.unsubscribe()
     },
     async sendCode(email) {
-      const { error } = await sb.auth.signInWithOtp({
+      // The login function gives every address the same answer, so the form
+      // cannot be used to test who is in the league (supabase/functions/
+      // request-login-code). If it is not deployed or does not answer, fall
+      // back to Auth's own endpoint: a fully set-up project keeps that one
+      // locked (deploy guide, step 2.9), so the fallback opens nothing there.
+      const { error } = await sb.functions.invoke('request-login-code', { body: { email } })
+      if (!error) return
+      const status = (error as { context?: { status?: number } }).context?.status
+      if (status === 400) throw new Error('That does not look like an email address.')
+      const { error: direct } = await sb.auth.signInWithOtp({
         email,
         options: { shouldCreateUser: false, emailRedirectTo: window.location.origin },
       })
-      if (error) throw new Error(error.message)
+      if (direct) throw new Error(direct.message)
     },
     async verifyCode(email, code) {
       const { error } = await sb.auth.verifyOtp({ email, token: code, type: 'email' })

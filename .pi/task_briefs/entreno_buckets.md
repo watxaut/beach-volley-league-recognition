@@ -1,7 +1,7 @@
 # Task: entreno failure structure — which mechanisms lose the 0.90 bar?
 
 Diagnose-only worker on the volleyball_recognition repo
-(/Users/joan.heredia/Documents/personal/projects/volley_recognition).
+(the repository root).
 STOP on any ambiguity, failed gate, or missing name instead of inferring.
 
 ## Background (measured, do not re-litigate)

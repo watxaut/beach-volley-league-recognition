@@ -236,8 +236,11 @@ export interface PlayerProfile {
   analytics: PlayerAnalytics | null
 }
 
-/** One player's line in a match report, against their own average over their
- * OTHER published matches (`avg.matches` of them; nulls when there are none). */
+/** One player's line in a match report. The box-score numbers are league tier;
+ * `hit`, `own_serve` and `avg` are analytics tier and come back null when the
+ * reader may not see them (`match_report`, migration 20261007130000). `avg` is
+ * the player's average over their OTHER published matches (`avg.matches` of
+ * them; nulls inside when there are none). */
 export interface ReportPlayer {
   slot: Slot
   team: Team
@@ -255,8 +258,8 @@ export interface ReportPlayer {
   kills: number
   attack_errors: number
   handling_errors: number
-  hit: { reception: Tally; transition: Tally }
-  own_serve: WonOf
+  hit: { reception: Tally; transition: Tally } | null
+  own_serve: WonOf | null
   avg: { matches: number; fantasy: number | null; kills: number | null; aces: number | null;
          digs: number | null; assists: number | null; errors: number | null; attacks: number | null } | null
 }
@@ -266,7 +269,8 @@ export interface MatchReport {
   /** N1 per team: serving = break-point, receiving = side-out. */
   teams: Partial<Record<Team, { serve_n: number; serve_won: number; recv_n: number; recv_won: number }>>
   players: ReportPlayer[]
-  /** N2: serves of each team and the credited receiver of each. */
+  /** N2: serves of each team and the credited receiver of each. A team is
+   * missing when the reader may not see both players of the receiving pair. */
   serve_targets: Partial<Record<Team, { to: Partial<Record<Slot, number>>; unseen: number }>>
   /** F3: fantasy per point and slot; null unless the play-by-play is visible. */
   timeline: { point_no: number; slot: Slot; pts: number }[] | null

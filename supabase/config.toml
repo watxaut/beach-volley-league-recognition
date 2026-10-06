@@ -213,6 +213,10 @@ token_verifications = 30
 web3 = 30
 
 # Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
+# On the HOSTED project this is ON as a lock, with a Turnstile secret no page
+# has a widget for: Auth then refuses every public request that could send a
+# mail, and only the login function (service key) gets through (deploy doc
+# 2.9). Off here, so a local stack without the function still logs in.
 # [auth.captcha]
 # enabled = true
 # provider = "hcaptcha"
@@ -231,9 +235,12 @@ enable_confirmations = false
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1s"
-# Number of characters used in the email OTP.
-otp_length = 6
-# Number of seconds before the email OTP expires (defaults to 1 hour).
+# Number of characters used in the email OTP. 8, not the default 6: the code is
+# the only login factor, and guessing it gets 100x harder (hosted: deploy doc 2.4).
+otp_length = 8
+# Number of seconds before the email OTP expires (defaults to 1 hour). Keep it:
+# the INVITE link dies with it, and with sign-ups off an invited player who
+# missed the link cannot ask for a code -- the admin has to invite again.
 otp_expiry = 3600
 
 # Use a production-ready SMTP server
@@ -246,7 +253,7 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Login emails carry BOTH the magic link and the 6-digit code (the web app
+# Login emails carry BOTH the magic link and the login code (the web app
 # accepts either; the code works when the link opens in another browser).
 [auth.email.template.invite]
 subject = "You're invited to the beach volley league"
@@ -392,6 +399,12 @@ deno_version = 2
 
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
+
+# The login form's "email me a code" endpoint. Public by design (and the
+# publishable key is not a JWT), so the platform's JWT check is off; the
+# function gives every address the same answer (supabase/functions/).
+[functions.request-login-code]
+verify_jwt = false
 
 [analytics]
 enabled = true

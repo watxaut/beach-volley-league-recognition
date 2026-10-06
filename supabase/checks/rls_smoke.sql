@@ -93,6 +93,37 @@ begin
     'the window helper is internal';
   assert has_function_privilege('anon', 'public.ping()', 'execute'), 'anon must reach ping()';
 
+  -- table privileges are explicit (20261007120000): the grant is the first
+  -- gate, RLS the second
+  -- (CASE: the planner may test the privilege before the relkind filter)
+  assert not exists (
+    select 1 from pg_class c
+    where c.relnamespace = 'public'::regnamespace
+      and case c.relkind
+            when 'S' then has_sequence_privilege('anon', c.oid, 'usage, select, update')
+            when 'r' then has_table_privilege('anon', c.oid, 'select, insert, update, delete, truncate')
+                          or has_any_column_privilege('anon', c.oid, 'select, insert, update')
+            when 'v' then has_table_privilege('anon', c.oid, 'select, insert, update, delete, truncate')
+                          or has_any_column_privilege('anon', c.oid, 'select, insert, update')
+            else false end),
+    'anon must hold no privilege on any table, view or sequence';
+  assert not has_table_privilege('authenticated', 'public.points', 'insert, update, delete')
+     and not has_table_privilege('authenticated', 'public.actions', 'insert, update, delete')
+     and not has_table_privilege('authenticated', 'public.match_sources', 'insert, update, delete')
+     and not has_table_privilege('authenticated', 'public.match_publications', 'insert, update, delete')
+     and not has_table_privilege('authenticated', 'public.matches', 'insert, delete')
+     and not has_table_privilege('authenticated', 'public.profiles', 'insert, delete'),
+    'pipeline-owned tables are not writable through the API';
+  assert has_column_privilege('authenticated', 'public.matches', 'status', 'update')
+     and not has_column_privilege('authenticated', 'public.matches', 'score_a', 'update')
+     and not has_column_privilege('authenticated', 'public.match_participants', 'thumb_path', 'update')
+     and not has_column_privilege('authenticated', 'public.profiles', 'email', 'update'),
+    'only the admin-owned columns are writable through the API';
+  assert has_table_privilege('service_role', 'public.players', 'select')
+     and not has_table_privilege('service_role', 'public.players', 'insert, update, delete')
+     and not has_table_privilege('service_role', 'public.actions', 'insert, update, delete'),
+    'the secret key reads the backup tables and writes only through the publish RPC';
+
   r := public.ingest_match_bundle(pg_temp.bundle('h1', 'vid1', false), 'b/h1.json', 'check');
   assert r ->> 'result' = 'applied', 'first publish must apply: ' || r::text;
   r := public.ingest_match_bundle(pg_temp.bundle('h1', 'vid1', false), 'b/h1.json', 'check');
@@ -169,6 +200,58 @@ begin
 end $$;
 update public.fantasy_rules set points = 1.0
 where rule_key = 'dig' and ruleset_id = (select id from public.fantasy_rulesets where is_active);
+
+-- the admin pages write through the API role: the admin-owned columns only
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', true);
+do $$
+declare
+  v_id   bigint := current_setting('check.match_id')::bigint;
+  v_opp2 bigint := (select id from public.players where display_name = 'Check Opp2');
+begin
+  insert into public.players (display_name) values ('Check New');   -- identity, no sequence grant
+  delete from public.players where display_name = 'Check New';
+  update public.matches set title = 'Check title' where id = v_id;
+  assert (select title from public.matches where id = v_id) = 'Check title', 'admin edits the match details';
+  update public.match_participants set player_id = null where match_id = v_id and slot = 'P2B';
+  update public.match_participants set player_id = v_opp2 where match_id = v_id and slot = 'P2B';
+  assert (select assigned_by from public.match_participants where match_id = v_id and slot = 'P2B')
+         = '00000000-0000-0000-0000-00000000000a', 'the assignment is stamped with the admin';
+  update public.profiles set display_name = 'Bob' where user_id = '00000000-0000-0000-0000-0000000000b0';
+  begin
+    update public.matches set score_a = 99 where id = v_id;
+    assert false, 'a score must not be writable through the API, even by an admin';
+  exception when insufficient_privilege then
+    null;
+  end;
+  begin
+    update public.match_participants set thumb_path = 'x' where match_id = v_id;
+    assert false, 'a thumbnail path must not be writable through the API';
+  exception when insufficient_privilege then
+    null;
+  end;
+  begin
+    update public.profiles set email = 'x@check.test' where user_id = '00000000-0000-0000-0000-0000000000b0';
+    assert false, 'an account email must not be writable through the API';
+  exception when insufficient_privilege then
+    null;
+  end;
+end $$;
+reset role;
+
+-- the publishable key without a login: the keep-alive, and nothing else
+set local role anon;
+do $$
+begin
+  assert public.ping() like 'ok:%', 'the keep-alive answers anon';
+  begin
+    perform count(*) from public.matches;
+    assert false, 'anon must not even reach a table';
+  exception when insufficient_privilege then
+    null;
+  end;
+end $$;
+reset role;
 
 -- an admin copies G1, changes a value and activates the copy; a viewer can't
 set local role authenticated;
@@ -267,7 +350,8 @@ begin
   assert (public.player_profile((select id from public.players where display_name = 'Check Ari'))
           -> 'form' ->> 'n')::int = 2, 'form counts all matches, window or not';
 
-  -- match report (league tier; no per-point timeline for a non-participant)
+  -- match report for a non-participant: the league tier only (box-score
+  -- lines, team side-out / break); nobody shares analytics yet
   declare r jsonb;
   begin
     r := public.match_report(v_id);
@@ -276,11 +360,15 @@ begin
     assert (r -> 'teams' -> 'B' ->> 'serve_n')::int = 1 and (r -> 'teams' -> 'B' ->> 'serve_won')::int = 0,
       'team B break 0/1';
     assert jsonb_array_length(r -> 'players') = 4, 'a line per slot';
-    assert (select (x -> 'avg' ->> 'matches')::int from jsonb_array_elements(r -> 'players') x
-            where x ->> 'slot' = 'P1A') = 1, 'Ari has one OTHER published match to compare with';
+    assert (select (x ->> 'fantasy')::numeric = 2.0 and (x ->> 'kills')::int = 1
+            from jsonb_array_elements(r -> 'players') x where x ->> 'slot' = 'P1A'),
+      'the box-score line is league tier';
+    assert (select bool_and(x -> 'hit' = 'null'::jsonb and x -> 'own_serve' = 'null'::jsonb
+                            and x -> 'avg' = 'null'::jsonb)
+            from jsonb_array_elements(r -> 'players') x),
+      'attack split, own-serve record and averages are analytics tier';
+    assert r -> 'serve_targets' = '{}'::jsonb, 'serve targets are analytics tier';
     assert r ->> 'timeline' is null, 'the per-point timeline needs match detail';
-    assert (r -> 'serve_targets' -> 'A' -> 'to' ->> 'P1B')::int = 1
-       and (r -> 'serve_targets' -> 'B' -> 'to' ->> 'P1A')::int = 1, 'serve targets';
   end;
   assert not public.set_my_privacy(true), 'bob has no player to change';
   update public.players set display_name = 'hacked';
@@ -329,6 +417,20 @@ begin
     'reception outcome';
   assert (v_prof -> 'analytics' -> 'attack_series' -> 0 ->> 'r') = 'kill'
      and (v_prof -> 'analytics' -> 'serve_series' -> 0 ->> 'r') = 'other', 'progress series';
+  -- the four players read the whole report of their match (they can count
+  -- its touches anyway)
+  declare r jsonb := public.match_report(v_id);
+  begin
+    assert (select bool_and(x -> 'hit' <> 'null'::jsonb and x -> 'own_serve' <> 'null'::jsonb)
+            from jsonb_array_elements(r -> 'players') x), 'a participant reads every line in full';
+    assert (select x -> 'hit' -> 'reception' = '{"n": 1, "kills": 1, "errors": 0}'::jsonb
+               and x -> 'own_serve' = '{"n": 1, "won": 1}'::jsonb
+               and (x -> 'avg' ->> 'matches')::int = 1
+            from jsonb_array_elements(r -> 'players') x where x ->> 'slot' = 'P1A'),
+      'Ari: reception attack 1/1, own serve 1/1, one OTHER published match to compare with';
+    assert (r -> 'serve_targets' -> 'A' -> 'to' ->> 'P1B')::int = 1
+       and (r -> 'serve_targets' -> 'B' -> 'to' ->> 'P1A')::int = 1, 'serve targets';
+  end;
   -- F3: per-point fantasy timeline for a participant
   assert (select jsonb_array_length(public.match_report(v_id) -> 'timeline')) = 4,
     'a participant reads the per-point fantasy';
@@ -346,18 +448,115 @@ begin
   assert (public.player_profile((select id from public.players where display_name = 'Check Ari'))
           ->> 'can_see_analytics')::boolean, 'opted-in analytics are visible to members';
   assert (select count(*) from public.actions) = 0, 'touches stay participant-only';
+  -- the report follows: Ari's own numbers open, her partner's stay closed, and
+  -- so does everything that would give the partner away by subtraction
+  declare r jsonb := public.match_report(current_setting('check.match_id')::bigint);
+  begin
+    assert (select x -> 'hit' <> 'null'::jsonb and (x -> 'avg' ->> 'matches')::int = 1
+            from jsonb_array_elements(r -> 'players') x where x ->> 'slot' = 'P1A'),
+      'a player who shares shows her attack split and average';
+    assert (select x -> 'hit' = 'null'::jsonb and x -> 'avg' = 'null'::jsonb
+            from jsonb_array_elements(r -> 'players') x where x ->> 'slot' = 'P2A'),
+      'her partner did not share';
+    assert (select bool_and(x -> 'own_serve' = 'null'::jsonb)
+            from jsonb_array_elements(r -> 'players') x),
+      'own-serve splits the team''s break-points: hidden while one teammate is private';
+    assert r -> 'serve_targets' = '{}'::jsonb,
+      'serve targets split the receiving pair: hidden while one of them is private';
+  end;
 end $$;
 reset role;
+
+-- both players of team A share: the team-split numbers of THAT team open
+update public.players set profile_public = true where display_name = 'Check Joan';
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b0', true);
+do $$
+declare r jsonb := public.match_report(current_setting('check.match_id')::bigint);
+begin
+  assert (select x -> 'own_serve' = '{"n": 1, "won": 1}'::jsonb
+          from jsonb_array_elements(r -> 'players') x where x ->> 'slot' = 'P1A')
+     and (select x -> 'own_serve' = 'null'::jsonb
+          from jsonb_array_elements(r -> 'players') x where x ->> 'slot' = 'P1B'),
+    'own serve: team A open, team B closed';
+  assert (r -> 'serve_targets' -> 'B' -> 'to' ->> 'P1A')::int = 1 and not r -> 'serve_targets' ? 'A',
+    'serve targets: who of team A received is open, who of team B received is not';
+  assert r ->> 'timeline' is null, 'sharing analytics never opens the play-by-play';
+end $$;
+reset role;
+update public.players set profile_public = false where display_name = 'Check Joan';
 
 -- admin: detail_public opens the play-by-play to everyone
 update public.matches set detail_public = true where match_key = '20260920_1830_check_court';
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b0', true);
 do $$
+declare r jsonb := public.match_report(current_setting('check.match_id')::bigint);
 begin
   assert (select count(*) from public.actions) = 8, 'detail_public opens the touches';
+  assert (select bool_and(x -> 'hit' <> 'null'::jsonb and x -> 'own_serve' <> 'null'::jsonb)
+          from jsonb_array_elements(r -> 'players') x)
+     and r -> 'serve_targets' ? 'A' and r -> 'serve_targets' ? 'B'
+     and jsonb_array_length(r -> 'timeline') = 4,
+    'an opened play-by-play opens the whole report with it';
 end $$;
 reset role;
+
+-- ── login codes: the gate behind the login function (20261007140000) ──────
+-- The function answers every address the same way; the gate decides whether a
+-- mail goes out, and only the service key reaches it.
+update auth.users set email_confirmed_at = now() where email = 'ari@check.test';   -- an accepted invite
+do $$
+begin
+  assert has_function_privilege('service_role', 'public.login_code_gate(text,text)', 'execute')
+     and not has_function_privilege('anon', 'public.login_code_gate(text,text)', 'execute')
+     and not has_function_privilege('authenticated', 'public.login_code_gate(text,text)', 'execute'),
+    'only the login function (service key) reaches the gate';
+  assert not has_table_privilege('authenticated', 'public.login_code_requests', 'select, insert, update, delete')
+     and not has_table_privilege('service_role', 'public.login_code_requests', 'select, insert, update, delete')
+     and (select relrowsecurity from pg_class where oid = 'public.login_code_requests'::regclass),
+    'the request log belongs to the gate alone';
+end $$;
+set local role service_role;
+do $$
+begin
+  assert public.login_code_gate('  Ari@Check.Test ', '203.0.113.7'),
+    'an accepted invite is forwarded (case and spaces ignored)';
+  assert not public.login_code_gate('ari@check.test', '203.0.113.8'), 'one request a minute per address';
+  assert not public.login_code_gate('bob@check.test', '203.0.113.7'),
+    'an invite that was never accepted is not forwarded';
+  assert not public.login_code_gate('nobody@check.test', '203.0.113.7'), 'an unknown address is not forwarded';
+  assert not public.login_code_gate('not-an-email', '203.0.113.7'), 'a malformed address is not forwarded';
+end $$;
+reset role;
+do $$
+begin
+  assert (select count(*) from public.login_code_requests where ip in ('203.0.113.7', '203.0.113.8')) = 3,
+    'a request that passed the limits is logged once (the repeat and the malformed one are not)';
+  assert not exists (select 1 from public.login_code_requests where email_sha256 !~ '^[0-9a-f]{64}$'),
+    'the log holds hashes, never addresses';
+
+  -- five an hour per address
+  update public.login_code_requests set requested_at = now() - interval '2 minutes' where ip = '203.0.113.7';
+  insert into public.login_code_requests (email_sha256, ip, requested_at)
+  select encode(sha256(convert_to('ari@check.test', 'UTF8')), 'hex'), '203.0.113.7', now() - interval '10 minutes'
+  from generate_series(1, 4);
+  assert not public.login_code_gate('ari@check.test', '203.0.113.7'), 'five requests an hour per address';
+
+  -- thirty an hour per IP, whoever they are for
+  update auth.users set email_confirmed_at = now() where email = 'admin@check.test';
+  insert into public.login_code_requests (email_sha256, ip, requested_at)
+  select encode(sha256(convert_to('flood' || g || '@check.test', 'UTF8')), 'hex'), '198.51.100.9', now() - interval '5 minutes'
+  from generate_series(1, 30) g;
+  assert not public.login_code_gate('admin@check.test', '198.51.100.9'), 'thirty requests an hour per IP';
+  assert public.login_code_gate('admin@check.test', '198.51.100.10'), 'another IP is not affected';
+
+  -- the log keeps a day
+  insert into public.login_code_requests (email_sha256, ip, requested_at)
+  values (repeat('0', 64), '192.0.2.1', now() - interval '2 days');
+  perform public.login_code_gate('nobody2@check.test', '192.0.2.2');
+  assert not exists (select 1 from public.login_code_requests where ip = '192.0.2.1'), 'requests older than a day are dropped';
+end $$;
 
 -- a match with history cannot be hard-deleted (hide it instead)
 do $$

@@ -158,7 +158,7 @@ input, select { font: inherit; color: var(--ink); background: var(--surface); bo
 input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 label.field { display: block; margin-bottom: 12px; }
 label.field > span { display: block; font-size: 0.85rem; color: var(--ink-2); margin-bottom: 4px; }
-.code-input { font-size: 1.6rem; letter-spacing: 0.4em; text-align: center; width: 12ch; font-variant-numeric: tabular-nums; }
+.code-input { font-size: 1.6rem; letter-spacing: 0.4em; text-align: center; width: 18ch; max-width: 100%; font-variant-numeric: tabular-nums; }
 .switch { display: flex; align-items: center; gap: 10px; cursor: pointer; }
 .switch input { width: 20px; height: 20px; min-height: 0; }
 

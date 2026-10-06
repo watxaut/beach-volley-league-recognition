@@ -18,10 +18,11 @@ update at the end of every session that changes anything and commit with the wor
 - New durable protocol rules go in `AGENTS.md`; new cross-session technical
   facts go one-line-each into *Learnings* below.
 
-Last updated: **2026-10-07 (92nd session) — the brainstorm's "Now" picks are BUILT
-(time windows, N1–N4, report card, H1–H3 page, `make republish-all`, V1/V2 scripts);
-V1 hard/touch and V2 ±0.2 m heights both FAIL their pre-registered bars.** #91 (landings) and
-#90 (web platform, owner deploys via `docs/deploy_web_platform.md`) are the state underneath.
+Last updated: **2026-10-06 (93rd session) — pre-launch security review of the web platform, fixes
+built: explicit table grants (new Supabase projects grant none), CSP + no-framing headers, 8-digit
+login code asked through a login function (one answer for every email), the report card follows the
+privacy tiers, `main` protected, repo hygiene.** #92 (stats "Now" picks),
+#91 (landings) and #90 (platform; owner deploys via `docs/deploy_web_platform.md`) lie underneath.
 
 ## North-star goals (set session 24)
 
@@ -74,7 +75,7 @@ in/out reads wrong (overridden by the next serve).
 `make inbox` (name, calibration wait, run-match, publish DRAFT) → one
 transactional Supabase RPC (applied/unchanged, admin rows untouched) → RLS +
 React SPA. Verified offline (scratch PG16, parity, CLI e2e, SPA screenshots);
-hosted Supabase/Cloudflare/Drive/launchd untested — owner deploys (#90 Log). #91: attack landings carry both axes, a per-axis error and a result (recon schema 2, migration `20261006180000_landing_confidence`); needs `make postrun` + re-publish per match. #92: stats windows + side-out/break + serve targets + reception outcome + hitting % + report card + `/measure` (migration `20261007100000`, no re-publish needed); `make republish-all` redoes post-run + publish for every published match (needs its diag dump).
+hosted Supabase/Cloudflare/Drive/launchd untested — owner deploys (#90 Log). #91: attack landings carry both axes, a per-axis error and a result (recon schema 2, migration `20261006180000_landing_confidence`); needs `make postrun` + re-publish per match. #92: stats windows + side-out/break + serve targets + reception outcome + hitting % + report card + `/measure` (migration `20261007100000`, no re-publish needed); `make republish-all` redoes post-run + publish for every published match (needs its diag dump). #93 security review (AGENTS §13): table privileges are explicit (`20261007120000`; `anon` holds none), `match_report` gates its per-player extras by tier (`20261007130000`), `webapp/public/_headers` (CSP), the publisher refuses a `.env.publish` others can read, login codes go through `supabase/functions/request-login-code` + `login_code_gate()` (`20261007140000`); verified on the local stack only.
 
 **Identity (#85):** `TeamIdentityResolver` (`player_identity_mode:"team"`,
 default) stamps P1A/P2A/P1B/P2B per frame; orientation = two-state LLR on
@@ -125,8 +126,8 @@ P31 serve f24543 is 128 f before its reception (owner to confirm ~f24630).
 
 ## Active next (ranked)
 
-0. **Owner: `supabase db push` (`20261007100000`), review the stats pages**
-   (`?w=n5`, report card, `/measure`); give `scripts/check_heights.py --heights P1A=…`
+0. **Owner: `supabase db push` (`20261007100000`, `…120000_explicit_grants`, `…130000_match_report_privacy`, `…140000_login_broker`)**, then deploy doc 2.4 (sign-ups OFF + its `curl` proof, OTP length 8), 2.9 (`supabase functions deploy request-login-code` + the Auth lock), 4 (headers check), 8 (2-step logins);
+   review the stats pages (`?w=n5`, report card, `/measure`); give `scripts/check_heights.py --heights P1A=…`
    the real heights. Next picks (§5): I3 → O3 (relative heights, V2), N10/O2, O1+I4, N7/N9, F1.
 1. **Deploy the product (owner):** `docs/deploy_web_platform.md` steps 0–7,
    then publish 20260920 with `MATCH_KEY=20260920_<HHMM>_…` (dry run first:
@@ -352,8 +353,12 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - V1 (#92, 20260920, 32 owner-labelled spikes): `SpikeAnalyzer` hard/touch is published for 16 and right on 10 (acc 0.625, cov 0.50; bars 0.85 / 0.80) → FAIL, the web does not show hard/touch; 25 of 63 post-run attacks have any causal record. `scripts/score_spike_type.py`.
 - V2 (#92): live net crossings with a well-conditioned timing clear the tape (33/33, median +0.61 m) but the far half reads people 5–12 % shorter and digs 0.29 m higher than near → no "±0.2 m". Dead-time balls rolling past the net read 2.3 m under the tape (on the sand) — always filter to rallies. `scripts/check_heights.py`.
 - SQL stats (#92): possession = running count of `touch_number = 1` per point (0 = serve, 1 = reception); a `bool_or` over a column that is NULL for most rows returns NULL, not false — `coalesce` it. New Supabase functions get EXECUTE for anon by default: revoke explicitly.
+- Supabase grants (#93, checked 2026-10-06): projects created since 2026-05-30 grant NO table/sequence privilege to `anon`/`authenticated`/`service_role` (changelog 45329); the local CLI stack (2.119) still grants ALL, so local runs hid it. Every table/view needs a `GRANT` in its migration; the test stub keeps the permissive default and `rls_smoke.sql` asserts `anon` holds nothing. `supabase/config.toml` configures ONLY the local stack — hosted Auth settings are dashboard switches, proven by `GET /auth/v1/settings`.
+- Supabase Auth (#93, measured on the local stack): with sign-ups off, an invited user who has not opened the invite link gets 422 `signup_disabled` on `/otp` — the link is the only way in and it dies with the email OTP expiry (1 h), so never shorten that. Code length (6–10) is the lever against guessing; the login form takes any. `/otp` answers unknown and known emails differently and cannot be told not to: the fix is the login function (same answer for all) plus CAPTCHA protection ON with a secret no page has a widget for — GoTrue v2.197 then refuses every public mail-sending route (`/otp`, `/signup`, `/recover`, `/magiclink`, `/resend`) identically, while requests with the service key skip the check (`verifyCaptcha`); `/verify` answers a wrong code and an unknown address alike.
+- Edge functions (#93): `EdgeRuntime.waitUntil` exists only in a USER worker (the platform's way of running a function), not when the file is the runtime's main service — guard it; a function added while the local stack runs is not served (404) until the stack restarts. `pg_net` was rejected for the broker: its tables and `net.http_post` are granted to `anon` and owned by `supabase_admin`, so a migration cannot revoke that.
 
 ## Session index (one line each)
+- #93 **Pre-launch security review + fixes: explicit grants (new Supabase projects grant none), CSP headers, login function (one answer per email) + Auth lock, 8-digit code, `.env.publish` 600, report card by tier, `main` protected**
 - #92 **Stats "Now" picks BUILT: windows, side-out/break, serve targets, reception outcome, hitting %, report card, /measure, republish-all; V1 hard/touch FAILS (10/16 right on 16 of 32), V2 ±0.2 m heights FAIL (net clearance passes)**
 - #91 **Web "Where they land": landings 17→57 of 63 attacks placed (touch x from the ball read), per-axis position error + `landing_result`; recon schema 2, new migration, map with uncertainty areas + out-of-court margin**
 - #91 **Stats/fantasy brainstorm (docs-only): measurement budget from the calibrations (left–right cm-precise, height ±0.15 m, far depth weak), owner ideas graded, new ideas + validation cards; owner picks**
@@ -453,8 +458,55 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-08-26 — e5 action layer fully resolved (gap-bridged bounce + 2.5 m net exemption); e2/e6 generality clean; e1's double-annotated GT deduped.
 - 2026-08-18 — e5 serve-zone squatter fixed (server vote + trial expiry + contested swap); e4/e5 GT checked.
 - 2026-08-17 — config-drift guard; config-default divergence FIXED (f539 block provenance); e3 GT serve frame fixed; live-debug frame counter; near-net flag closed by diagnosis — …(log archive 2026-10-06)
-- 2026-08-16 — team-aware contact attribution (team 0.69→0.92); server tracking fixed + ghost damping.
 ## Log (newest first)
+
+### 2026-10-06 (ninety-third session) — #93: pre-launch security review of the web platform, fixes built
+
+**Asked (owner):** act as a security engineer before the site goes live (the repo is public);
+then fix findings 1, 3, 4, 5, 6 and decide the privacy wording; then the repo hygiene and the
+email enumeration / email-quota burn on the login endpoint.
+
+**Reviewed:** all 420 commits on every branch for keys (none; the keys on disk are local-stack
+ones), every policy / view / definer function, the SPA, the publisher + inbox, CI, repo settings.
+Adversarial pass on the local stack (anon, a stranger, a player; rolled back): no read or write
+got through. RLS itself needed no change.
+
+**Found + fixed:** (1) the migrations had NO table grants and relied on Supabase's automatic
+ones, which projects created since 2026-05-30 no longer get: emulated, every table read fails
+42501 (so do the keep-alive and `make backup`) → `20261007120000_explicit_grants.sql` (`anon`
+nothing, `authenticated` SELECT + writes on admin-owned tables/COLUMNS only, `service_role` the
+backup tables; `ping()` definer); `rls_smoke.sql` pins it and passes under both defaults.
+(3) `webapp/public/_headers`: CSP (own bundle + `*.supabase.co` only), no framing; all routes
+load with 0 violations in headless Chrome, an injected inline script is refused. (4) login code
+8 digits (form takes 6–10); the planned 10-minute expiry was DROPPED — measured: the invite link
+dies with the OTP expiry and an invited user who missed it cannot ask for a code. (5) `main`
+protected on GitHub (PR required, admin bypass, no force-push/deletion), Dependabot on.
+(6) `.env.publish` → 600 and `SupabaseClient.from_env` refuses a file others can read.
+**Privacy (owner: "hide report extras"):** `20261007130000_match_report_privacy.sql` — attack
+split, own-serve, vs-average and serve targets follow the analytics tier (design D2); team-split
+counts need both teammates visible; Settings text, demo mode and the report card follow.
+
+**Login endpoint (enumeration + mail burning):** a Turnstile widget would only slow it (the
+answers still differ), so the code request moved off Auth: `supabase/functions/request-login-code`
+always answers `{"ok":true}`, `login_code_gate()` (`20261007140000_login_broker.sql`, service key
+only) rate-limits (1/min + 5/h per address, 30/h per IP; hashes, kept a day) and says whether the
+address is an accepted account, and the hosted Auth gets CAPTCHA ON with a secret no page has a
+widget for (deploy 2.9). Measured on a captcha-locked GoTrue v2.197 copy: anon `/otp` is refused
+identically for known and unknown, the function's request passes, the mailed code logs in. The
+form falls back to Auth's endpoint while the function is missing (nothing opens on a locked project).
+**Hygiene:** repo-local commit email set; `.pi/goals/*` + snapshot untracked (kept on disk);
+`/Users/…` paths out of 4 task briefs and 2 scripts.
+
+**Verified:** `make schema-check` 5/5; smoke test on fresh DBs with and without default grants,
+and failing without each new migration; REST as anon / admin / secret key; the built app behind
+the real headers as admin and as a non-participant viewer; the login page in headless Chrome
+through the function and through the fallback; `tsc`, `oxlint`, 32 vitest.
+
+**Not done / owed:** owner: `supabase db push` + deploy doc 2.4 / 2.9 / 4 / 8 (sign-ups OFF is a
+dashboard switch — the whole membership boundary); 2-step login on GitHub / Cloudflare /
+Supabase. Nothing ran against the hosted project. The 222 old commits still carry a work email
+(history not rewritten); `rls_smoke.sql` still assumes no published match (run deploy step 2.8
+before the first publish).
 
 ### 2026-10-07 (ninety-second session) — #92: the brainstorm's "Now" picks, built
 
@@ -524,27 +576,3 @@ is passed through untouched.
 **Not done / owed:** owner: `supabase db push`, then `make postrun` + publish
 per match (old rows show without error areas). `test_inbox`
 `test_calibrated_video_is_run_published_and_archived` fails at HEAD (not #91).
-
-### 2026-10-06 (ninety-first session) — #91: stats & fantasy feature brainstorm (docs only)
-
-**Asked (owner):** brainstorm stats/fantasy features (position heat maps by
-possession, attack start → end map with hard/touch and kill/dug/error, a
-net-view chart of attack heights, advertised matches with betting, time
-filters / seasons / progress), add new ideas, stay honest about what can be
-measured; the owner then picks what goes Now / Next.
-
-**Written:** `docs/stats_feature_brainstorm.md` — §1 measurement budget, §2
-owner ideas assessed (O1–O5), §3 new ideas (N1–N20), validation cards V1–V3,
-UI honesty rules H1–H4, §4 enablers I1–I6, §5 pick list with a suggested slicing.
-
-**Measured here (calibrations only, `src/postrun/geometry.py`; no run output
-in this container):** beach match: 3 px = 3–4 cm left–right at every depth;
-foot depth per 3 px 0.09 m near baseline / 0.34 m net / 0.76 m far baseline
-(practice e3: 0.29 m far); a 1.3 m ball-depth error moves a 2.8 m contact
-height ±0.15 m (beach) / ±0.01 m (practice); 1 px ball width = 0.64 m depth at
-the net, 1.23 m at the far baseline. Per player per match (ratified CSV):
-5–14 serves, 7–13 spikes, 13–17 digs, 10–15 sets. Found: the match GT holds 32
-owner-labelled hard/touch spikes (13/19) — `spike_type` never scored on the
-match (card V1).
-
-**Not done / owed:** owner's pick; nothing implemented.

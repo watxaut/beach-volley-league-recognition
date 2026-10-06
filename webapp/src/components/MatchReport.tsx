@@ -23,6 +23,10 @@ export function MatchReport({ report, nPoints, names, teamNames, myPlayerId }: {
   const best = mvps(report.players)
   const lead = report.players.filter((p) => best.includes(p.slot))
   const players = [...report.players].sort((a, b) => a.team.localeCompare(b.team) || a.slot.localeCompare(b.slot))
+  // Analytics-tier values come back null when the reader may not see them.
+  const someHidden = players.some((p) => p.hit === null || p.own_serve === null)
+  const served = (['A', 'B'] as Team[]).filter((team) => report.serve_targets[team])
+  const hidden = <span className="muted" title="Private: not shared with the league">–</span>
 
   const lines: Line[] = report.timeline
     ? (() => {
@@ -71,14 +75,14 @@ export function MatchReport({ report, nPoints, names, teamNames, myPlayerId }: {
                   <td className="strong">{signed(p.fantasy)}</td>
                   <td>{p.fantasy_per_21 === null ? '–' : signed(p.fantasy_per_21)}</td>
                   <td title={p.avg ? `average of ${p.avg.matches} other match${p.avg.matches === 1 ? '' : 'es'}: ${p.avg.fantasy ?? '–'}` : undefined}>
-                    {d === null ? <span className="muted">–</span>
+                    {p.hit === null ? hidden : d === null ? <span className="muted">–</span>
                       : <span className={d >= 0 ? 'delta-up' : 'delta-down'}>{signed(Math.round(d * 10) / 10)}</span>}
                   </td>
                   <td title={`${p.kills} kills, ${p.attack_errors} errors, ${p.attacks} attacks`}>
                     {p.kills}–{p.attack_errors} / {p.attacks}
                     {hitting(hitAll) !== null && <span className="muted"> ({hitText(hitting(hitAll))})</span>}
                   </td>
-                  <td><Ratio k={p.own_serve.won} n={p.own_serve.n} /></td>
+                  <td>{p.own_serve ? <Ratio k={p.own_serve.won} n={p.own_serve.n} /> : hidden}</td>
                 </tr>
               )
             })}
@@ -87,6 +91,7 @@ export function MatchReport({ report, nPoints, names, teamNames, myPlayerId }: {
       </div>
       <p className="muted small" style={{ margin: 0 }}>
         “vs avg” needs at least one other published match. Per-match samples are small, so rates are hidden below {MIN_N} attempts.
+        {someHidden && <> A dash can also mean private: detailed stats show to the player, the four players of the match and the admins, unless the player shares them.</>}
       </p>
 
       <div>
@@ -112,8 +117,13 @@ export function MatchReport({ report, nPoints, names, teamNames, myPlayerId }: {
 
       <div>
         <h3>Who took the serves <GradeBadge grade="A" /></h3>
+        {served.length === 0 && (
+          <p className="muted small" style={{ marginBottom: 0 }}>
+            Visible to the four players of the match, or once both receivers of a pair share their detailed stats.
+          </p>
+        )}
         <div className="split split-2">
-          {(['A', 'B'] as Team[]).map((team) => {
+          {served.map((team) => {
             const t = report.serve_targets[team]
             if (!t) return null
             const to = Object.entries(t.to) as [Slot, number][]

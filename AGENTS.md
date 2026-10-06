@@ -427,8 +427,25 @@ Pages). Rules that keep it correct:
   the web app never decides visibility. A schema change is a NEW file in
   `supabase/migrations/` (never edit an applied one) plus checks in
   `supabase/checks/rls_smoke.sql`; run `make schema-check`.
+* **Privileges are explicit (security review 2026-10-06).** A new table, view
+  or sequence gets NO API privilege until its migration grants it
+  (`20261007120000_explicit_grants.sql`; Supabase stopped auto-granting on new
+  projects on 2026-05-30): `anon` never gets one, `authenticated` gets SELECT
+  plus writes on admin-owned columns only, `service_role` what the laptop
+  reads. A new function still needs its `revoke ... from public, anon,
+  authenticated` + `grant`. A new third-party host needs
+  `webapp/public/_headers` (CSP).
+* **Login codes go through the login function (security review 2026-10-06).**
+  The web app asks `supabase/functions/request-login-code` for a code, never
+  Supabase Auth: one answer for every address, `login_code_gate()` (service
+  key only) holds the rate limits, and the hosted Auth endpoints are locked by
+  a CAPTCHA secret without a widget (deploy step 2.9). Never call
+  `signInWithOtp` / `signUp` / `resetPasswordForEmail` first from the browser,
+  never put a Turnstile widget for that secret on a page, and keep any new
+  auth email behind the function.
 * **Secrets.** The secret/service-role key exists only in `.env.publish` on
-  the processing laptop; `webapp/` only ever gets the publishable key.
+  the processing laptop (mode 600 -- the publisher refuses a file other users
+  can read); `webapp/` only ever gets the publishable key.
 * **Publish from the prod worktree** (§8): the publisher refuses a dirty tree
   unless `--allow-dirty`, which is recorded in the publication log.
 * **Rules change -> republish everything (#92).** A stat is comparable across
@@ -436,6 +453,16 @@ Pages). Rules that keep it correct:
   `src/postrun` change run `make republish-all` (`DRY=1` first); it needs each
   match's `diag.jsonl` (~50 MB), so **keep the diag dump of every published
   match** -- a run without one is reported as skipped and fails the command.
+* **Every stat has a tier (owner decision 2026-10-06, design doc §4 D2).**
+  League tier, every member: results, the box-score line and fantasy of each
+  slot, the leaderboard, a team's side-out / break-point. Analytics tier,
+  everything else about a player (zones, landings, splits, trends, and in
+  `match_report` the attack split, own-serve record, vs-average and serve
+  targets): the player, admins, players who share (`profile_public`), and
+  whoever can read that match's touches. A count that splits a team total the
+  league sees is shown only when BOTH teammates are visible (no subtraction).
+  A new stat is placed in a tier in SQL and pinned in `rls_smoke.sql`; demo
+  mode (`webapp/src/lib/demo.ts`) mirrors the rule.
 * **Stats are SQL, honest in the UI (#92).** Aggregate stats live in
   security-definer functions (`leaderboard`, `player_profile`, `match_report`;
   raw touches stay participant-only); `webapp/src/lib/analytics.ts` is the demo

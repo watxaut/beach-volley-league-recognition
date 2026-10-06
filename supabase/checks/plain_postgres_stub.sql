@@ -14,7 +14,8 @@ end $$;
 create schema if not exists auth;
 create table if not exists auth.users (
   id    uuid primary key default gen_random_uuid(),
-  email text
+  email text,
+  email_confirmed_at timestamptz        -- set when an invite is accepted
 );
 -- Same lookup order as Supabase's auth.uid().
 create or replace function auth.uid() returns uuid language sql stable as $$
@@ -45,6 +46,9 @@ grant usage on schema storage to anon, authenticated, service_role;
 grant select on storage.objects to authenticated;
 
 grant usage on schema public to anon, authenticated, service_role;
+-- The PERMISSIVE defaults (every project before 2026-05-30, the local CLI
+-- stack): the worst case for 20261007120000_explicit_grants.sql, which has to
+-- take all of it away again.
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;

@@ -3,7 +3,12 @@ import { useApp } from '../app/state'
 import { ErrorBox } from '../components/ui'
 import { explainError } from '../lib/api'
 
-/** Invite-only, password-less: we email a 6-digit code (and a link that
+// The code's length is a Supabase setting (6-10 digits; docs/deploy_web_platform.md
+// step 2.4), so the form takes any of them instead of pinning one.
+const CODE_MIN = 6
+const CODE_MAX = 10
+
+/** Invite-only, password-less: we email a login code (and a link that
  * logs in on the same device). Unknown emails are refused by Supabase
  * because sign-ups are off. */
 export function Login() {
@@ -62,21 +67,24 @@ export function Login() {
           <form onSubmit={verify}>
             <h1>Check your email</h1>
             <p className="muted">
-              We sent a 6-digit code to <strong>{email}</strong>. Type it below, or tap the link in the
-              email on this device.
+              If <strong>{email}</strong> has been invited, a login code is on its way. Type it below, or
+              tap the link in the email on this device.
             </p>
             <label className="field">
               <span>Code</span>
-              <input className="code-input" inputMode="numeric" autoComplete="one-time-code" maxLength={6}
+              <input className="code-input" inputMode="numeric" autoComplete="one-time-code" maxLength={CODE_MAX}
                      value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} autoFocus />
             </label>
             <ErrorBox error={error} />
             <div className="row">
-              <button className="primary" disabled={busy || code.length !== 6}>{busy ? 'Checking…' : 'Log in'}</button>
+              <button className="primary" disabled={busy || code.length < CODE_MIN}>{busy ? 'Checking…' : 'Log in'}</button>
               <button type="button" className="link" onClick={() => { setSent(false); setCode('') }}>
                 Use another email
               </button>
             </div>
+            <p className="muted small" style={{ marginBottom: 0 }}>
+              Nothing after a minute? Check the address, or ask a league admin to invite you.
+            </p>
           </form>
         )}
       </section>
