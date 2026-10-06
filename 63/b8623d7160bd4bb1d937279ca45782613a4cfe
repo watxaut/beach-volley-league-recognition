@@ -1,0 +1,21 @@
+webapp/src/components/Court.tsx
+  s_9ed08fada71d0a::t_a0b61d24733883 12-31,36-38,40-68,73,94-95,98-109,114,138,154-160
+webapp/src/styles.css
+  s_9ed08fada71d0a::t_7906fe6bb141a2 217-222
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "63b8623d7160bd4bb1d937279ca45782613a4cfe",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
