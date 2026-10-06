@@ -68,7 +68,13 @@ check: the two net-top clicks, never used to build the model, land at
 A missing action is fine, an invented one is not:
 
 * a touch is credited to a player only when that player is within 0.6 body
-  heights of the ball; otherwise it stays in the point, uncredited;
+  heights of the ball -- or when the rules pin it down: two players per half
+  who never touch twice in a row, so one reach-credited touch of a possession
+  names every other SEEN touch of it (dig P2A, then two touches out of
+  anyone's reach on the same half = set P1A, attack P2A). Needs an anchor, a
+  half with exactly two known players and credits that already agree with
+  alternation; marked `player_source: "alternation"` (`(by alternation)` in
+  the report). Otherwise it stays in the point, uncredited;
 * hidden touches (`evidence: "structure"`) are never credited and never
   decide a kill/ace/error;
 * an ambiguous possession-ending touch is an overpass, never a spike;
@@ -120,8 +126,8 @@ worst precision 0.965, recall 0.893, action 0.958, half 0.994.
   out-of-sample evidence is the practice clips and the sweep. The
   `vall_dhebron` lock is untouched.
 * 12 GT touches go unmatched: 4 are the coarse-frame pairs above, 5 are
-  placed as hidden touches (uncredited), 3 are absent. 11 observed touches
-  are credited to nobody. Blocks are not a label. Soft "rainbow" attacks
+  placed as hidden touches (uncredited), 3 are absent. 1 observed touch is
+  credited to nobody (10 more are credited by alternation). Blocks are not a label. Soft "rainbow" attacks
   below ~2.15 m read as overpasses (2 on the match).
 * Needs the `--diag-dump` sidecar (49 MB per match, held in memory until the
   run ends).

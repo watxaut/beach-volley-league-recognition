@@ -24,7 +24,7 @@ from .geometry import CourtGeometry
 from .match import SQUAD_LETTER, MatchAssembler, Point
 from .rallies import RallySegmenter
 from .stream import MatchStream, load_stream
-from .touches import Touch, TouchSolver
+from .touches import SOURCE_ALTERNATION, Touch, TouchSolver
 
 SCHEMA_VERSION = 1
 logger = logging.getLogger(__name__)
@@ -142,6 +142,8 @@ def format_report(result: Dict[str, Any]) -> str:
             + (f"  [{', '.join(pt['flags'])}]" if pt["flags"] else ""))
         for t in pt["touches"]:
             who = t["player"] or ("(not credited)" if t["observed"] else "(unseen)")
+            if t["player"] and t.get("player_source") == SOURCE_ALTERNATION:
+                who += " (by alternation)"
             tag = f" {t['outcome'].upper()}" if t.get("outcome") else ""
             lines.append(f"      f{t['frame']:<6} {t['team'] or '?'} {t['action']:<8} "
                          f"{who}{tag}")
@@ -188,6 +190,7 @@ def _touch_payload(pt: Point, t: Touch) -> Dict[str, Any]:
         "side": t.side,
         "team": _letter(pt.squad_on(t.side)),
         "player": t.player,
+        "player_source": t.player_source,
         "touch_number": int(t.touch_number),
         "observed": bool(t.observed),
         "evidence": _evidence(t),

@@ -33,6 +33,7 @@ from .touches import (
     ACTION_SPIKE,
     RallyRoster,
     Touch,
+    credit_by_alternation,
 )
 
 SQUAD_LETTER = {1: "A", 2: "B"}
@@ -148,6 +149,7 @@ class MatchAssembler:
         for pt in points:
             self._finish_labels(pt)
             self._outcomes(pt)
+            credit_by_alternation(pt.touches, pt.roster)
         rotation = self._service_order(points)
         checks = self._checks(points, score)
         checks["service_order"] = rotation

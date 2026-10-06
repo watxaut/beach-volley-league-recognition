@@ -16,7 +16,10 @@ time between two touches is. Trajectory vertices that fit nowhere are SKIPPED
 (not every vertex is a touch), and touches the stream never saw -- the ball
 was occluded or untracked -- are allowed as HIDDEN touches so the ones that
 were seen still get the right number. Hidden touches are never credited to a
-player (owner rule: a missing action is fine, an invented one is not).
+player (owner rule: a missing action is fine, an invented one is not). A SEEN
+touch nobody was within reach of is credited only when the rules pin it down:
+inside a possession the two players of that half alternate, so one credited
+touch names every other one (`credit_by_alternation`).
 """
 
 from __future__ import annotations
@@ -37,6 +40,10 @@ ACTION_DIG = "dig"
 ACTION_SET = "set"
 ACTION_SPIKE = "spike"
 ACTION_OVERPASS = "overpass"
+
+# Touch.player_source: how a touch got its player.
+SOURCE_REACH = "reach"              # the player's body was at the ball
+SOURCE_ALTERNATION = "alternation"  # the rules: two players alternate in a possession
 
 # -- timing priors (seconds between two consecutive touches) ----------------- #
 # Measured on the owner's 211-contact match GT: same-half 0.9-2.7 s (median
@@ -496,6 +503,7 @@ class TouchSolver:
             frame=e.frame, side=side, touch_number=k, action="", observed=True,
             player=credited, squad=roster.squad_on(side), reach=d,
             height_m=height, court_y=y,
+            player_source=SOURCE_REACH if credited else None,
             perception_action=e.candidate.action if e.candidate else None, event=e)
 
     def _label(self, touches: List[Touch]) -> None:
@@ -532,3 +540,60 @@ class TouchSolver:
                 t.action = ACTION_SET
             else:
                 t.action = ACTION_OVERPASS
+
+
+# --------------------------------------------------------------------------- #
+# Players the rules pin down
+# --------------------------------------------------------------------------- #
+
+def possessions(touches: Sequence[Touch]) -> List[List[Touch]]:
+    """Runs of consecutive touches by one half (touch numbers 1, 2, 3...).
+
+    The serve (touch 0) belongs to no run: its half's first body touch comes
+    after the ball has crossed."""
+    runs: List[List[Touch]] = []
+    prev: Optional[Touch] = None
+    for t in touches:
+        if t.touch_number == 0:
+            prev = None
+            continue
+        if prev is not None and prev.side == t.side and prev.touch_number + 1 == t.touch_number:
+            runs[-1].append(t)
+        else:
+            runs.append([t])
+        prev = t
+    return runs
+
+
+def credit_by_alternation(touches: Sequence[Touch], roster: RallyRoster) -> List[Touch]:
+    """Credit the SEEN touches nobody was within reach of when the rules decide.
+
+    Two players per half and nobody touches twice in a row: inside one
+    possession the touch numbers alternate between the pair, so a single
+    credited touch names every other touch of that possession (dig by P2B,
+    set by P1B -> the third is P2B's; a dig by P2A followed by two touches
+    out of anyone's reach on the same half is set P1A, attack P2A). Three
+    guards keep it honest: the half must have exactly two known players, the
+    possession needs a touch credited by reach to anchor it, and the credited
+    touches must already agree with alternation (otherwise the possession is
+    left as it is). A hidden touch counts in the parity but is never credited.
+    """
+    credited: List[Touch] = []
+    for run in possessions(touches):
+        pair = roster.by_side.get(run[0].side, [])
+        anchors = [t for t in run if t.player]
+        if len(pair) != 2 or not anchors:
+            continue
+        first = anchors[0]
+        if any(t.player not in pair
+               or (t.player == first.player) != ((t.touch_number - first.touch_number) % 2 == 0)
+               for t in anchors):
+            continue
+        partner = pair[0] if pair[1] == first.player else pair[1]
+        for t in run:
+            if t.player is None and t.observed:
+                same = (t.touch_number - first.touch_number) % 2 == 0
+                t.player = first.player if same else partner
+                t.player_source = SOURCE_ALTERNATION
+                credited.append(t)
+    return credited

@@ -59,7 +59,13 @@ from src.postrun.rallies import (  # noqa: E402
 )
 from src.postrun.reconstruct import reconstruct  # noqa: E402
 from src.postrun.stream import load_stream  # noqa: E402
-from src.postrun.touches import reach_in_body_heights  # noqa: E402
+from src.postrun.touches import (  # noqa: E402
+    SOURCE_ALTERNATION,
+    SOURCE_REACH,
+    Touch,
+    credit_by_alternation,
+    reach_in_body_heights,
+)
 
 
 def _actions(point):
@@ -357,14 +363,66 @@ def test_touch_hidden_in_a_short_gap_is_recovered_as_a_gap_vertex():
     assert abs(body[1]["frame"] - frames[2]) <= 8
 
 
-def test_touch_far_from_every_player_is_kept_but_not_credited():
+def test_touch_far_from_every_player_is_credited_by_alternation():
     b = sim.StreamBuilder(12.0)
     script = sim.standard_rally(2.0, "near", sim.NEAR_A)
     script.hits[1].xy = (0.3, 2.0)                    # nobody stands there
     b.rally(script)
     body = _reconstruct(b)["points"][0]["touches"][1:]
     assert [t["action"] for t in body] == ["dig", "set", "spike"]
-    assert body[1]["observed"] and body[1]["player"] is None
+    assert body[1]["observed"] and body[1]["reach_body_heights"] > 0.6
+    # dig and attack are P1B's by reach, so the set between them is P2B's
+    assert [(t["player"], t["player_source"]) for t in body] == [
+        ("P1B", SOURCE_REACH), ("P2B", SOURCE_ALTERNATION), ("P1B", SOURCE_REACH)]
+
+
+def _touch(n, player=None, observed=True, side="far"):
+    return Touch(frame=100 * n, side=side, touch_number=n, action="", observed=observed,
+                 player=player)
+
+
+class _Roster:
+    def __init__(self, **by_side):
+        self.by_side = by_side
+
+
+def test_alternation_names_two_touches_between_a_dig_and_the_other_half():
+    # P10 of the 20260920 match: dig P2A, then a set and an attack nobody was at.
+    roster = _Roster(far=["P1A", "P2A"], near=["P1B", "P2B"])
+    ts = [_touch(0, "P2B", side="near"), _touch(1, "P2A"), _touch(2), _touch(3),
+          _touch(1, "P2B", side="near")]
+    ts[0].touch_number = 0
+    assert credit_by_alternation(ts, roster) == [ts[2], ts[3]]
+    assert [t.player for t in ts] == ["P2B", "P2A", "P1A", "P2A", "P2B"]
+    assert ts[2].player_source == ts[3].player_source == SOURCE_ALTERNATION
+
+
+def test_alternation_names_the_first_touch_from_the_two_after_it():
+    # P7: dig nobody was at, then set P1B and the ball over by P2B -> the dig is P2B's.
+    roster = _Roster(far=["P1B", "P2B"], near=["P1A", "P2A"])
+    ts = [_touch(1), _touch(2, "P1B"), _touch(3, "P2B")]
+    credit_by_alternation(ts, roster)
+    assert [t.player for t in ts] == ["P2B", "P1B", "P2B"]
+
+
+def test_alternation_leaves_the_unsure_alone():
+    roster = _Roster(far=["P1B", "P2B"], near=["P1A"])
+    # no anchor in the possession
+    lone = [_touch(1), _touch(2)]
+    assert credit_by_alternation(lone, roster) == [] and not any(t.player for t in lone)
+    # the credited touches already break alternation: nothing is guessed
+    clash = [_touch(1, "P1B"), _touch(2, "P1B"), _touch(3)]
+    assert credit_by_alternation(clash, roster) == [] and clash[2].player is None
+    # a half with one known player: the partner is unknown
+    near = [_touch(1, "P1A", side="near"), _touch(2, side="near")]
+    assert credit_by_alternation(near, roster) == [] and near[1].player is None
+    # a hidden touch counts in the parity but is never credited
+    hidden = [_touch(1, "P1B"), _touch(2, observed=False), _touch(3)]
+    credit_by_alternation(hidden, roster)
+    assert [t.player for t in hidden] == ["P1B", None, "P1B"]
+    # the serve and the other half's possessions do not mix
+    serve = [_touch(0, "P1A", side="near"), _touch(1, side="far")]
+    assert credit_by_alternation(serve, roster) == [] and serve[1].player is None
 
 
 def test_perception_vertices_the_reach_gate_refused_are_touches_too():

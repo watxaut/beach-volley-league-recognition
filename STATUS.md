@@ -54,7 +54,7 @@ vertices, one robust depth line per flight) → points (serve = launch beside a
 baseline that clears the net and reaches the other half; far serve = track
 BIRTH; end = sand / net / air-time) → touches (one shortest path per rally
 over half × touch number × player: reception to the receivers, ≤3 touches,
-players alternate; hidden touches keep the count, never credited) → labels →
+players alternate; hidden touches keep the count, never credited; a seen touch out of reach is credited by alternation) → labels →
 match (winner = next server; ball death is the cross-check; score closes the
 last point; service order names every server). All constants are metres /
 seconds / costs through the calibration (net height reads 2.43 m beach,
@@ -220,8 +220,8 @@ archived under their session date in `docs/history/status_log_archive.md`.)*
     the gate; (b) built and tuned on ONE match — a second 21-point match
     is the real test; (c) needs the `--diag-dump` sidecar (49 MB, in memory
     until the run ends) — decide whether `make run` should always write a
-    compact one; (d) blocks are not a label; (e) 11 observed touches are
-    credited to nobody, 5 are placed as hidden touches. Next: (a), then (b).
+    compact one; (d) blocks are not a label; (e) 1 observed touch is
+    credited to nobody (10 more by alternation), 5 are placed as hidden touches. Next: (a), then (b).
 
 ### Parked / conditional
 
