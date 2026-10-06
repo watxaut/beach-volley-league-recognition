@@ -1,0 +1,26 @@
+ground_truth/README.md
+  s_89753db9795fd5::t_a8b1c09f4b4959 108-123
+STATUS.md
+  s_89753db9795fd5::t_92f99f99e51f9a 21-27,71-74,80-82,116,118-120,123,126-128,153-155,157-160,217-224,318,417-440
+  s_89753db9795fd5::t_c93b7022831b92 441
+ground_truth/20260920_match_reconstruction_player_review.csv
+  s_89753db9795fd5::t_891606d4600b41 1-209
+docs/history/status_log_archive.md
+  s_89753db9795fd5::t_a2a00d79e44a2d 6544-6557
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "78844e5a29b4b6d1eb896046f80c78cc4a3044b1",
+  "prompts": {},
+  "sessions": {
+    "s_89753db9795fd5": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a11013-47e3-72f4-a75a-dbef5796ec7d",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "Joan <joan.heredia@glovoapp.com>"
+    }
+  }
+}
