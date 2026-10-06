@@ -214,6 +214,12 @@ tr.clickable:hover td.sticky-col { background: var(--surface-2); }
 .tooltip strong { font-variant-numeric: tabular-nums; }
 .legend { display: flex; gap: 14px; font-size: 0.82rem; color: var(--ink-2); flex-wrap: wrap; margin-top: 6px; }
 
+/* hover / focus note beside a chart legend */
+.info { position: relative; margin-left: auto; display: inline-flex; }
+.info-btn { width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 1px solid var(--ring); background: var(--surface-2); color: var(--ink-2); font: italic 700 0.75rem/1 Georgia, serif; cursor: help; }
+.info-panel { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 5; width: min(300px, 80vw); background: var(--surface); border: 1px solid var(--ring); box-shadow: var(--shadow); border-radius: 8px; padding: 8px 10px; font-size: 0.82rem; line-height: 1.4; color: var(--ink-2); visibility: hidden; opacity: 0; transition: opacity 0.12s; pointer-events: none; }
+.info:hover .info-panel, .info:focus-within .info-panel { visibility: visible; opacity: 1; }
+
 /* ── admin slot assignment ─────────────────────────────────────────── */
 .slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .slot { border: 1px solid var(--ring); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center; background: var(--surface); }
