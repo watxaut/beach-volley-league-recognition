@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Weekly export of the admin-owned tables (Mondays 09:07): a JSON file
+     in backups/ plus a copy to gdrive:VolleyBackups (off the laptop).
+     Installed by ops/launchd/install.sh. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.volley.backup</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>cd "__REPO__" &amp;&amp; make backup PYTHON="__PYTHON__"</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key>
+    <integer>1</integer>
+    <key>Hour</key>
+    <integer>9</integer>
+    <key>Minute</key>
+    <integer>7</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>__REPO__/data/backup.log</string>
+  <key>StandardErrorPath</key>
+  <string>__REPO__/data/backup.log</string>
+</dict>
+</plist>

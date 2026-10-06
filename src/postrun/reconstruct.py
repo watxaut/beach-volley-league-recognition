@@ -60,8 +60,14 @@ def reconstruct(stream: MatchStream, geometry: CourtGeometry,
 
 
 #: Owner-ratified fantasy values (STATUS north-star G1). A block is not a
-#: post-run label yet; a ball-handling error is not perceptible.
+#: post-run label yet. Errors = service fault + attack error + ball handling
+#: (a set or dig the layer marks ``error``, e.g. P6 f3229 -- open point 32f).
+#: The web platform scores from its own rule table (supabase/migrations,
+#: ``fantasy_rules``); ``src/publish/fantasy.py`` mirrors this G1 set.
 FANTASY = {"kill": 1.0, "ace": 1.0, "dig": 1.0, "assist": 0.5, "error": -1.0}
+
+#: Actions whose ``error`` outcome is a ball-handling error.
+HANDLING_ACTIONS = ("set", "dig")
 
 
 def player_stats(points: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
@@ -77,7 +83,7 @@ def player_stats(points: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
     def row(player: str) -> Dict[str, Any]:
         return stats.setdefault(player, {k: 0 for k in (
             "serves", "aces", "serve_errors", "digs", "sets", "assists",
-            "spikes", "overpasses", "kills", "attack_errors")})
+            "spikes", "overpasses", "kills", "attack_errors", "handling_errors")})
 
     for pt in points:
         serve = pt["serve"]
@@ -101,6 +107,8 @@ def player_stats(points: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
             attack = t["action"] in ("spike", "overpass")
             r["kills"] += attack and t["outcome"] == "kill"
             r["attack_errors"] += attack and t["outcome"] == "error"
+            r["handling_errors"] += (t["action"] in HANDLING_ACTIONS
+                                     and t["outcome"] == "error")
             nxt = body[i + 1] if i + 1 < len(body) else None
             if (t["action"] == "set" and nxt is not None and nxt["observed"]
                     and nxt["side"] == t["side"] and nxt["outcome"] == "kill"):
@@ -109,7 +117,8 @@ def player_stats(points: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
         r["fantasy"] = round(
             FANTASY["kill"] * r["kills"] + FANTASY["ace"] * r["aces"]
             + FANTASY["dig"] * r["digs"] + FANTASY["assist"] * r["assists"]
-            + FANTASY["error"] * (r["attack_errors"] + r["serve_errors"]), 1)
+            + FANTASY["error"] * (r["attack_errors"] + r["serve_errors"]
+                                  + r["handling_errors"]), 1)
     out: Dict[str, Dict[str, Any]] = dict(sorted(stats.items()))
     out["_uncredited_observed_touches"] = {"count": uncredited}
     return out
@@ -149,14 +158,15 @@ def format_report(result: Dict[str, Any]) -> str:
                          f"{who}{tag}")
     lines.append("")
     lines.append(f"{'player':<8}{'srv':>4}{'ace':>4}{'sErr':>5}{'dig':>4}{'set':>4}"
-                 f"{'ast':>4}{'spk':>4}{'ovr':>4}{'kill':>5}{'aErr':>5}{'fantasy':>8}")
+                 f"{'ast':>4}{'spk':>4}{'ovr':>4}{'kill':>5}{'aErr':>5}{'hErr':>5}"
+                 f"{'fantasy':>8}")
     for player, r in result["player_stats"].items():
         if player.startswith("_"):
             continue
         lines.append(f"{player:<8}{r['serves']:>4}{r['aces']:>4}{r['serve_errors']:>5}"
                      f"{r['digs']:>4}{r['sets']:>4}{r['assists']:>4}{r['spikes']:>4}"
                      f"{r['overpasses']:>4}{r['kills']:>5}{r['attack_errors']:>5}"
-                     f"{r['fantasy']:>8}")
+                     f"{r['handling_errors']:>5}{r['fantasy']:>8}")
     lines.append(f"observed touches not credited to anyone: "
                  f"{result['player_stats']['_uncredited_observed_touches']['count']}")
     return "\n".join(lines) + "\n"

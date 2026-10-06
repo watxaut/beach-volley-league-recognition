@@ -22,7 +22,8 @@ OUTPUT_DIR := output/$(VIDEO_NAME)
 # Skip visualization unless VIZ is set.
 VIZ_FLAG := $(if $(VIZ),,--skip-visualization)
 
-.PHONY: run run-video run-live run-match postrun ingest ingest-all db-reset ui help
+.PHONY: run run-video run-live run-match postrun ingest ingest-all db-reset ui help \
+        calibrate process publish inbox backup schema-check
 
 run:
 ifeq ($(strip $(VIDEO)),)
@@ -88,6 +89,46 @@ db-reset:
 ui:
 	$(PYTHON) -m src.web.app --db "$(DB)"
 
+# --------------------------------------------------------------------------
+# Web platform (docs/web_platform_design.md; deployment: docs/deploy_web_platform.md)
+# Match key = video name: YYYYMMDD_HHMM_<venue>_<text> (make inbox names files for you).
+# --------------------------------------------------------------------------
+
+# One-time interactive court calibration (8 clicks) -> calibrations/<key>.json.
+calibrate:
+ifeq ($(strip $(VIDEO)),)
+	$(error VIDEO is not set. Usage: make calibrate VIDEO=resources/<key>.mp4)
+endif
+	$(PYTHON) scripts/test_court_calibration.py "$(VIDEO)"
+
+# Full match -> draft on the web: run + post-run reconstruction + publish.
+process: run-match publish
+
+# Publish output/<key>/ to Supabase (a new match lands as a DRAFT; re-running is
+# safe: identical content is logged as 'unchanged').
+#   DRY=1            build + diff against what is live, write nothing
+#   MATCH_KEY=...    key override for runs whose video lacks the HHMM part
+#   NOTE="..."       note stored in the publication log
+#   PUBLISH_FLAGS=   extra flags (--replace-video, --allow-dirty, --no-thumbs)
+publish:
+	$(PYTHON) -m src.publish "$(OUTPUT_DIR)" $(if $(DRY),--dry-run) \
+		$(if $(MATCH_KEY),--match-key "$(MATCH_KEY)") $(if $(NOTE),--note "$(NOTE)") $(PUBLISH_FLAGS)
+
+# One pass over the Drive inbox: download + name, wait for calibration, run,
+# publish as draft, archive on Drive (launchd runs this every 30 min).
+inbox:
+	$(PYTHON) -m src.publish.inbox
+
+# Export the admin-owned tables (players, accounts, assignments, rules).
+backup:
+	$(PYTHON) -m src.publish.backup $(if $(OUT),--out "$(OUT)") $(BACKUP_FLAGS)
+
+# Migrations + RLS smoke check against a Postgres you can create databases on
+# (local Supabase: PG_DSN=postgresql://postgres:postgres@127.0.0.1:54322/postgres).
+PG_DSN ?= postgresql://postgres:postgres@127.0.0.1:54322/postgres
+schema-check:
+	VOLLEY_TEST_PG_DSN="$(PG_DSN)" $(PYTHON) -m pytest tests/test_supabase_schema.py -o addopts="" -q
+
 help:
 	@echo "make run VIDEO=path/to/video.mp4        Analyze a video -> $(OUTPUT_DIR)/results.csv + pipeline_output.json"
 	@echo "make run-video VIDEO=path/to/video.mp4  Also save an annotated .mp4 (two-pass, contact-anchored labels)"
@@ -100,3 +141,9 @@ help:
 	@echo "make ingest-all                       Upsert every output/<stem>/pipeline_output.json"
 	@echo "make db-reset                         Delete the DB (DB=$(DB))"
 	@echo "make ui                               Local web UI at http://127.0.0.1:8000"
+	@echo "make calibrate VIDEO=resources/<key>.mp4  Court calibration (8 clicks, once per video)"
+	@echo "make process VIDEO=resources/<key>.mp4    run-match + publish as a draft"
+	@echo "make publish OUTPUT_DIR=output/<key>      Publish a finished run (DRY=1 to diff only)"
+	@echo "make inbox                                One pass over the Drive inbox"
+	@echo "make backup                               Export admin-owned tables to backups/"
+	@echo "make schema-check                         Migrations + RLS check on a local Postgres"

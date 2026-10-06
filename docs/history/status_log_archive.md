@@ -6649,3 +6649,19 @@ open point 31 (v1.5 raw-candidate extension, OWNER GATE).
 **Asked (owner):** STATUS and tests/ are both getting too long; summarize STATUS, make it structurally unable to regrow, audit tests and delete the unneeded ones — goal: LLMs put fewer tokens into reading at the same repo performance.
 
 **Done:** STATUS.md 2465 → ~530 lines (every removed line VERBATIM in `docs/history/status_log_archive.md` + `status_where_we_are_archive.md`; nothing deleted); hard budgets enforced by `tests/test_status_leanness.py` (≤600 lines total, per-section caps, one-line session index ≤240 chars, ≤3 Log sessions, no DONE task cards, canonical header order — a failed guard means archive-then-shrink); AGENTS.md lean-STATUS convention now names the guard. Deleted 21 test files (6,600 lines / 530 tests) whose ONLY subject is a DONE/REFUTED one-off diagnostic probe (TC1 touch rules, PG1/PG2 point maps, PM1, SR1*/SR4a probes, overpass levers, possession signal, reach/scale/looming diagnoses, near-serve misses, takeoff stance, entreno/serve buckets, dev-clip GT builder, insert path, label ceilings, set-dig swaps) — probe scripts stay as provenance, docstrings annotated; everything guarding `src/`, standing evaluators/scorers, pass-2 layers, GT tooling, config drift and the VFR seek guard KEPT. No `src/` change. Merged with the parallel identity sessions #83–#85 (PR #1); this lean pass renumbered #83 → #86; suite 1083 all green.
+
+## Archived 2026-10-06 (#90): Log entry moved out of STATUS.md verbatim (Log keeps 3 sessions)
+
+### 2026-10-05 (eighty-seventh session) — #87: post-run reconstruction layer — the match makes sense (points, serves, touches, winners, score)
+
+**Asked (owner):** start building a post-run logic after the match: reconstruct the action→player assignment so the whole match makes sense (no two touches in a row by the same player, no touch on the half the ball is not in, a dig is not followed by the same player's set, the match reaches 21); fix point start/end (serve, ball on the sand) with the near/far and ground signals; prefer missing actions over invented ones; generalise across videos; stop and say so if serve detection itself needs more work first.
+
+**Answer on serves:** no stop needed — every serve is recoverable post-hoc (33/33 on the match, 5/5 on the practice clips). The causal serve detector is no longer the source of point starts.
+
+**Built:** `src/postrun/` (geometry, stream, ball_flights, rallies, touches, match, reconstruct + CLI), `make run-match` / `make postrun`, `scripts/score_postrun.py` (+ causal baseline), `score_postrun_entreno.py`, `sweep_postrun.py`, `tests/test_postrun.py` + `tests/postrun_sim.py` (35 tests: synthetic rallies rendered through the pinhole model + the real match when on disk), `docs/postrun_reconstruction.md`, AGENTS §11. Only other `src/` change: diag dump schema 3 → 4 (`ball_track.bbox/velocity`, players' `player_label/squad/slot`), inert when the dump is off.
+
+**Measured:** see *Where we are* (match record, practice clips, 78-move sweep, second independent run of the match: 33/33 points, action 0.982). Runs: `output/postrun/20260920_match/` (fresh full run at HEAD, MPS, `--diag-dump --serve-events`), `output/postrun/entreno_1..7/`.
+
+**Honest limits:** per-player correctness is unscored (no identity GT; service-order agreement 84 % / 89 % is indirect); constants were set looking at the whole match, not P1–P8; the practice clips drove five bug fixes, so they are no longer blind; line calls 7/10; blocks unlabelled; `vall_dhebron` untouched.
+
+**Not done / owed:** owner pass on `match_reconstruction.txt` + per-player contact sheets; DB ingest of the reconstruction (points table, fantasy); a second match; GT P31 serve frame (f24543 → ~f24630?) for the owner to confirm.
