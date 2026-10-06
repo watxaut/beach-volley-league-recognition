@@ -3014,3 +3014,10 @@ calibration, reach-gate cascade (#72), touch-count rules (TC1).
 (allow-listed in `test_vfr_seek_guard.py`); stale comment at
 `src/utils/config.py:101` (`player_off_court_hold_frames`; comment-only fix
 deferred).
+
+## Archived 2026-10-06 (#90): the "Refuted/parked mechanisms" block of "Where we are", verbatim (Where-we-are budget)
+
+**Refuted/parked mechanisms** (harnesses in `scripts/`, never `src/`): T5
+tracker admission, R1 departure gate, S1 looming, scale-aware geometry, M1
+far-end crop, possession signal, overpass width-crossing, R2 confidence
+calibration, reach-gate cascade (#72), touch-count rules (TC1).

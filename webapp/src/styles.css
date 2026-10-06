@@ -1,0 +1,228 @@
+/* Beach League — tokens first; every rule below uses roles, never raw hex.
+   Team colours = categorical slots 1 (blue, squad A) and 2 (orange, squad B),
+   validated as a pair in both modes (dataviz validator: CVD ΔE 24.7 / 26.8). */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f3f2ee;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --ring: rgba(11, 11, 11, 0.1);
+  --accent: #256abf;
+  --accent-ink: #ffffff;
+  --team-a: #2a78d6;
+  --team-b: #eb6834;
+  --team-a-wash: rgba(42, 120, 214, 0.14);
+  --team-b-wash: rgba(235, 104, 52, 0.14);
+  --good: #0ca30c;
+  --good-ink: #006300;
+  --bad: #d03b3b;
+  --warn: #fab219;
+  --heat-0: #cde2fb;
+  --heat-1: #9ec5f4;
+  --heat-2: #5598e7;
+  --heat-3: #256abf;
+  --heat-4: #104281;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(11, 11, 11, 0.06), 0 2px 10px rgba(11, 11, 11, 0.04);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --ring: rgba(255, 255, 255, 0.1);
+    --accent: #3987e5;
+    --accent-ink: #0b0b0b;
+    --team-a: #3987e5;
+    --team-b: #d95926;
+    --team-a-wash: rgba(57, 135, 229, 0.22);
+    --team-b-wash: rgba(217, 89, 38, 0.22);
+    --good-ink: #0ca30c;
+    --heat-0: #184f95;
+    --heat-1: #1c5cab;
+    --heat-2: #2a78d6;
+    --heat-3: #5598e7;
+    --heat-4: #9ec5f4;
+    --shadow: none;
+  }
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232321;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --ring: rgba(255, 255, 255, 0.1);
+  --accent: #3987e5;
+  --accent-ink: #0b0b0b;
+  --team-a: #3987e5;
+  --team-b: #d95926;
+  --team-a-wash: rgba(57, 135, 229, 0.22);
+  --team-b-wash: rgba(217, 89, 38, 0.22);
+  --good-ink: #0ca30c;
+  --heat-0: #184f95;
+  --heat-1: #1c5cab;
+  --heat-2: #2a78d6;
+  --heat-3: #5598e7;
+  --heat-4: #9ec5f4;
+  --shadow: none;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--page); color: var(--ink); line-height: 1.45; -webkit-text-size-adjust: 100%; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1, h2, h3 { line-height: 1.2; margin: 0 0 0.5rem; }
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.15rem; }
+h3 { font-size: 1rem; color: var(--ink-2); font-weight: 600; }
+p { margin: 0 0 0.75rem; }
+.muted { color: var(--muted); }
+.small { font-size: 0.85rem; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ── shell ─────────────────────────────────────────────────────────── */
+.topbar { position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 1px solid var(--ring); }
+.topbar-inner { max-width: 1040px; margin: 0 auto; padding: 0 16px; display: flex; align-items: center; gap: 12px; height: 56px; }
+.brand { font-weight: 800; letter-spacing: -0.02em; color: var(--ink); white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+.brand:hover { text-decoration: none; }
+.brand-dot { width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, var(--warn), var(--team-b)); flex: none; }
+.nav { display: flex; gap: 4px; overflow-x: auto; flex: 1; scrollbar-width: none; }
+.nav::-webkit-scrollbar { display: none; }
+.nav a { padding: 8px 12px; border-radius: 999px; color: var(--ink-2); white-space: nowrap; font-weight: 500; }
+.nav a:hover { background: var(--surface-2); text-decoration: none; }
+.nav a.active { background: var(--ink); color: var(--surface); }
+.userchip { color: var(--ink-2); white-space: nowrap; font-size: 0.9rem; }
+@media (max-width: 640px) {
+  /* phones: brand + user on the first row, the full nav on its own row */
+  .topbar-inner { flex-wrap: wrap; height: auto; padding-top: 8px; padding-bottom: 6px; row-gap: 4px; }
+  .nav { order: 3; flex-basis: 100%; }
+  .userchip { margin-left: auto; }
+  .scoreboard .big { font-size: 2rem; }
+}
+main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 64px; }
+.demo-banner { background: var(--warn); color: #0b0b0b; text-align: center; font-size: 0.85rem; padding: 4px 16px; }
+
+/* ── building blocks ───────────────────────────────────────────────── */
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; margin-bottom: 16px; }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.card-head h2 { margin: 0; }
+.grid { display: grid; gap: 16px; }
+@media (min-width: 760px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+.tile { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+.tile-value { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+.tile-label { color: var(--ink-2); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.hero { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.hero-number { font-size: 3rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.badge { display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); vertical-align: middle; }
+.badge-draft { background: var(--warn); color: #0b0b0b; }
+.badge-hidden { background: var(--axis); color: var(--ink); }
+.badge-win { background: var(--good); color: #fff; }
+.team-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: baseline; }
+.team-a { background: var(--team-a); }
+.team-b { background: var(--team-b); }
+.notice { background: var(--surface-2); border-radius: 10px; padding: 12px 14px; color: var(--ink-2); margin-bottom: 16px; }
+.notice-warn { border-left: 4px solid var(--warn); }
+.error { background: rgba(208, 59, 59, 0.1); border-left: 4px solid var(--bad); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+.stack > * + * { margin-top: 8px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.spacer { flex: 1; }
+
+/* ── controls ──────────────────────────────────────────────────────── */
+button, .btn { font: inherit; border: 1px solid var(--ring); background: var(--surface); color: var(--ink); border-radius: 10px; padding: 8px 14px; cursor: pointer; font-weight: 600; min-height: 40px; }
+button:hover { background: var(--surface-2); }
+button:disabled { opacity: 0.5; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.primary:hover { filter: brightness(1.08); }
+button.danger { color: var(--bad); }
+button.link { border: none; background: none; color: var(--accent); padding: 0; min-height: 0; font-weight: 500; }
+input, select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--axis); border-radius: 10px; padding: 8px 12px; min-height: 40px; max-width: 100%; }
+input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+label.field { display: block; margin-bottom: 12px; }
+label.field > span { display: block; font-size: 0.85rem; color: var(--ink-2); margin-bottom: 4px; }
+.code-input { font-size: 1.6rem; letter-spacing: 0.4em; text-align: center; width: 12ch; font-variant-numeric: tabular-nums; }
+.switch { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.switch input { width: 20px; height: 20px; min-height: 0; }
+
+/* ── tables ────────────────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+th, td { padding: 8px 8px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; font-variant-numeric: tabular-nums; }
+th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sorted { color: var(--ink); }
+td.left, th.left { text-align: left; }
+td.strong { font-weight: 700; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: var(--surface-2); }
+tr.me td { background: var(--team-a-wash); }
+.sticky-col { position: sticky; left: 0; background: var(--surface); }
+tr.clickable:hover td.sticky-col { background: var(--surface-2); }
+
+/* ── match list ────────────────────────────────────────────────────── */
+.match-card { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--grid); color: var(--ink); }
+.match-card:last-child { border-bottom: none; }
+.match-card:hover { text-decoration: none; background: var(--surface-2); margin: 0 -16px; padding: 12px 16px; }
+.match-teams { font-weight: 600; }
+.match-teams .winner { font-weight: 800; }
+.match-score { font-size: 1.3rem; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+.match-meta { color: var(--muted); font-size: 0.85rem; }
+
+/* ── scoreboard ────────────────────────────────────────────────────── */
+.scoreboard { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; text-align: center; }
+.scoreboard .side { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.scoreboard .names { font-weight: 700; }
+.scoreboard .big { font-size: 2.6rem; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.scoreboard .bar { height: 4px; width: 48px; border-radius: 4px; }
+
+/* ── play-by-play ──────────────────────────────────────────────────── */
+.pbp-point { padding: 10px 0; border-bottom: 1px solid var(--grid); }
+.pbp-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.pbp-no { font-weight: 800; min-width: 2.2em; }
+.pbp-score { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; padding-left: 2.2em; }
+.chip { font-size: 0.8rem; padding: 3px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); border-left: 3px solid transparent; }
+.chip.team-A { border-left-color: var(--team-a); }
+.chip.team-B { border-left-color: var(--team-b); }
+.chip.unseen { opacity: 0.6; font-style: italic; }
+.tag-kill, .tag-ace { color: var(--good-ink); font-weight: 800; }
+.tag-error { color: var(--bad); font-weight: 800; }
+
+/* ── charts ────────────────────────────────────────────────────────── */
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--muted); font-size: 11px; }
+.tooltip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--ring); box-shadow: var(--shadow); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); }
+.tooltip strong { font-variant-numeric: tabular-nums; }
+.legend { display: flex; gap: 14px; font-size: 0.82rem; color: var(--ink-2); flex-wrap: wrap; margin-top: 6px; }
+
+/* ── admin slot assignment ─────────────────────────────────────────── */
+.slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.slot { border: 1px solid var(--ring); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center; background: var(--surface); }
+.slot.team-A { border-top: 4px solid var(--team-a); }
+.slot.team-B { border-top: 4px solid var(--team-b); }
+.slot img, .slot .noimg { width: 96px; height: 160px; object-fit: cover; border-radius: 8px; background: var(--surface-2); }
+.slot .noimg { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 0.8rem; }
+.slot select { width: 100%; }
+
+/* ── login ─────────────────────────────────────────────────────────── */
+.login { max-width: 420px; margin: 8vh auto 0; }
+.login .brand { font-size: 1.4rem; margin-bottom: 16px; }

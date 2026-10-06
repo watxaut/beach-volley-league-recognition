@@ -396,3 +396,38 @@ plus `cmp` on `diag.jsonl`. Two shipped mechanisms rest on invariants to keep:
 `prefetch_depth: 0` + `detector_fast_inference: False` is the pre-#89 path.
 The interactive `--debug-live` producer still reads inline (same
 `process_frame`, same `infer`); the consumer-side bound is MediaPipe pose.
+
+### 13. Web platform (owner-ratified 2026-10-06, #90)
+
+The video → web product (design: `docs/web_platform_design.md`; owner
+deployment: `docs/deploy_web_platform.md`). Drive `VolleyInbox` → `make inbox`
+on the laptop (names the file, waits for the manual calibration, `make
+run-match`, `make publish` as a DRAFT, archives on Drive) → an admin assigns
+the four slots and publishes on the web (Supabase + `webapp/` on Cloudflare
+Pages). Rules that keep it correct:
+
+* **Match identity = video name `YYYYMMDD_HHMM_<venue>_<text>`** (local start
+  time). The same key names `calibrations/`, `output/` and
+  `matches.match_key`; never re-key a published match (older runs publish
+  with `--match-key`).
+* **Ownership.** A publish writes ONLY pipeline-owned rows (points, actions,
+  match_sources, slot rows, the score columns). Admin-owned data (players,
+  accounts, slot → player, title/venue/season/status/detail_public, fantasy
+  rules) is never written by the publisher -- the `video_players` principle.
+  Re-publishing is always safe: identical content is logged `unchanged`.
+* **Credit parity.** An action carries a `slot` exactly when
+  `postrun.player_stats` credits it, and every SQL stat counts `slot IS NOT
+  NULL` only (precision first, §11). A change to the post-run stats rules
+  changes `src/publish/bundle.py` with it; `tests/test_publish.py` pins the
+  parity.
+* **Fantasy values live in the database** (`fantasy_rulesets` +
+  `fantasy_rules`, edited on the admin page). `src/publish/fantasy.py`
+  `G1_RULES` mirrors the migration seed (pinned) for previews only.
+* **Access rules live in the database** (RLS + security-definer functions);
+  the web app never decides visibility. A schema change is a NEW file in
+  `supabase/migrations/` (never edit an applied one) plus checks in
+  `supabase/checks/rls_smoke.sql`; run `make schema-check`.
+* **Secrets.** The secret/service-role key exists only in `.env.publish` on
+  the processing laptop; `webapp/` only ever gets the publishable key.
+* **Publish from the prod worktree** (§8): the publisher refuses a dirty tree
+  unless `--allow-dirty`, which is recorded in the publication log.

@@ -18,12 +18,12 @@ update at the end of every session that changes anything and commit with the wor
 - New durable protocol rules go in `AGENTS.md`; new cross-session technical
   facts go one-line-each into *Learnings* below.
 
-Last updated: **2026-10-06 (89th session) — the offline run is 2.3–2.5×
-faster with byte-identical results.** Decode + both YOLO detectors run ahead
-of the sequential loop on background threads, and detector post-processing
-left the GPU wherever that is provably exact: the 20260920 match 32.6 → 13
-min (75 → 30–32 ms/frame), the 7 practice clips 291 → 131 s; `diag.jsonl`,
-`pipeline_output.json`, every CSV and the reconstruction are identical.
+Last updated: **2026-10-06 (90th session) — video → web platform designed,
+owner-ratified (D1–D8) and BUILT; waiting on the owner's deployment**
+(`docs/deploy_web_platform.md`). Built: `supabase/` (schema + RLS + RPCs +
+fantasy rule tables), `src/publish/` (publisher, Drive inbox runner, backup),
+`webapp/` (React SPA), `ops/launchd/`, `.github/workflows/`, AGENTS §13.
+Open 32f fixed (set/dig error = ball handling −1). Speed: see #89 below.
 
 ## North-star goals (set session 24)
 
@@ -72,6 +72,12 @@ CSV — every player right, 0 corrections (incl. the 10 by-alternation and
 rotation-named servers); the CSV is the per-player GT. Line calls: 3 of 10
 in/out reads wrong (overridden by the next serve).
 
+**Product platform (#90, BUILT, not deployed — AGENTS §13).** Drive inbox →
+`make inbox` (name, calibration wait, run-match, publish DRAFT) → one
+transactional Supabase RPC (applied/unchanged, admin rows untouched) → RLS +
+React SPA. Verified offline (scratch PG16, parity, CLI e2e, SPA screenshots);
+hosted Supabase/Cloudflare/Drive/launchd untested — owner deploys (#90 Log).
+
 **Identity (#85):** `TeamIdentityResolver` (`player_identity_mode:"team"`,
 default) stamps P1A/P2A/P1B/P2B per frame; orientation = two-state LLR on
 fixed anchors (replay: 4/4 switches, 0 stray, 211/211 GT contacts). The #87
@@ -89,7 +95,7 @@ colours/labels. Pass-2 scripts (`relabel_serves`, `resolve_side_switches`,
 `resolve_point_winners` 18/33, `consume_serve_evidence`) are SUPERSEDED by
 `src/postrun` for points/serves/winners; kept as provenance. Entreno action
 gate (causal): e1 0.706, e2 0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933,
-e7 0.75 (same-session A/B only). Test suite **1139**.
+e7 0.75 (same-session A/B only). Test suite **1173** (#90 +34, 3 PG-gated).
 
 **Speed (#89, results-neutral — AGENTS §12).** `prefetch_depth: 8` reads
 decode + both detectors' `infer()` ahead on background threads
@@ -111,10 +117,8 @@ tuned on the 17 match far serves; no relabeling reception as serve; no
 vall_dhebron output looks. Serve START is now a post-run read — do not
 reopen causal serve detection for it.
 
-**Refuted/parked mechanisms** (harnesses in `scripts/`, never `src/`): T5
-tracker admission, R1 departure gate, S1 looming, scale-aware geometry, M1
-far-end crop, possession signal, overpass width-crossing, R2 confidence
-calibration, reach-gate cascade (#72), touch-count rules (TC1).
+**Refuted/parked mechanisms:** list moved to
+`docs/history/status_where_we_are_archive.md` (#90 block); never `src/`.
 
 **Known defects:** `annotate_player_gt.py` + `src/db/ingest.py` seek on VFR
 (allow-listed in `test_vfr_seek_guard.py`); stale comment at
@@ -123,10 +127,10 @@ P31 serve f24543 is 128 f before its reception (owner to confirm ~f24630).
 
 ## Active next (ranked)
 
-1. **Feed the product:** ingest `match_reconstruction.json` into the DB
-   (points table 14e, per-point views, fantasy G1) — the post-run touches
-   replace the causal actions as the stats source; per-player numbers are
-   owner-ratified (#88).
+1. **Deploy the product (owner):** `docs/deploy_web_platform.md` steps 0–7,
+   then publish 20260920 with `MATCH_KEY=20260920_<HHMM>_…` (dry run first:
+   fantasy must equal the txt footer). Then: action_overrides UI, in-app
+   invites, `own_x_m` heatmaps (design §8 "Next").
 2. **Second match / other venue through `make run-match`** — the only
    21-point match so far is the one the layer was built on; practice clips
    and the sweep are the out-of-sample evidence.
@@ -134,8 +138,7 @@ P31 serve f24543 is 128 f before its reception (owner to confirm ~f24630).
    and for kill-vs-out detail; a ground-plane read from raw detections of
    the resting ball is the candidate (open point 31).
 4. E2 observers (identity drift / side-switch, display only, owner gate).
-5. Deferred fixes: comment `src/utils/config.py:101`; postrun fantasy
-   set-error charge (P6 f3229, G1 ball-handling −1).
+5. Deferred fix: comment `src/utils/config.py:101` (32f set-error fixed #90).
 6. **Bugs found in #89 (results-changing → measure with a same-session
    A/B on e1–e7 + the match before fixing):** (a) `PlayerDetector` hands
    ultralytics an RGB frame it treats as BGR — the person model sees R/B
@@ -238,8 +241,8 @@ archived under their session date in `docs/history/status_log_archive.md`.)*
     (c) needs the `--diag-dump` sidecar (49 MB, in memory until the run
     ends) — decide whether `make run` should always write a compact one;
     (d) blocks are not a label; (e) 1 observed touch is credited to nobody
-    (10 more by alternation), 5 are placed as hidden touches; (f) fantasy
-    charges no set-error penalty (P6 f3229; G1: ball-handling −1). Next: (b).
+    (10 more by alternation), 5 are placed as hidden touches; (f) FIXED #90:
+    set/dig `error` = ball handling −1 (`handling_errors`). Next: (b).
 
 33. **Speed, results-neutral (#89).** Shipped: read-ahead + exact detector
     fast path. Left, in order: (a) pose on its own thread, call order kept
@@ -342,8 +345,11 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - VFR: `CAP_PROP_POS_FRAMES` lands −28..+30 f off — decode spans sequentially (`test_vfr_seek_guard.py`); two KNOWN-ISSUE allow-lists: `annotate_player_gt.py`, `src/db/ingest.py`.
 - Delegation: >1 KB prompt kills the child pi (EXIT 137) — few hundred bytes + the child reads a brief file.
 - Retraining: four-leg gate; fine-tune FROM `best.pt`; mine frames with NO pre-labels.
+- Web/infra facts (#90, checked 2026-10-06): Telegram bot `getFile` caps 20 MB (local Bot API server: 2000 MB), undelivered updates kept 24 h, "video" sends re-encode; Supabase free = 50 MB/file, 1 GB storage, 500 MB DB, pauses after 7 idle days; torch for Intel macOS ends at 2.2.x.
+- Postgres: `jsonb_populate_recordset` fills a MISSING key from its base record (NULL), never the column DEFAULT — pass a base row carrying the defaults (#90 smoke test).
 
 ## Session index (one line each)
+- #90 **Video→web platform designed, ratified + BUILT: supabase/ (RLS, RPCs, fantasy rule tables), src/publish (publisher, Drive inbox, backup), webapp/ SPA, launchd, CI; deploy guide; 32f fixed; owner deploys next**
 - #89 **Offline run 2.3–2.5× faster, byte-identical: read-ahead decode+detectors (`frame_prefetch.py`) + exact detector fast path (`yolo_inference.py`); match 1955→783 s, 7 clips 291→131 s; suite 1139**
 - #88 **Owner ratified post-run per-player attributions: 208-touch review CSV all correct, 0 corrections → per-player GT; found fantasy set-error gap (P6 f3229)**
 - #87 **POST-RUN RECONSTRUCTION (`src/postrun`): 20260920 points 33/33, serves 33/33, winners 33/33, score A 21–B 12 exact; touches P 0.976 / action 0.982 / half 1.000, 0 rule breaks; practice P 52/53; diag schema 4**
@@ -444,6 +450,38 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-08-14 — player identity phase 1 (1a+1b+1c) shipped.
 ## Log (newest first)
 
+### 2026-10-06 (ninetieth session) — #90: video → web platform designed, ratified and built (Supabase + publisher + Drive inbox + web app)
+
+**Asked (owner):** design the video → fantasy/stats web flow (video transfer,
+processing machine, idempotent upsert keyed by the video name with an upload
+log, login-only Supabase web with admins/viewers, data model); then, after
+ratifying D1–D8 (Drive, no Telegram; file name gets the time; scoring in its
+own table): "implement what you can here, leave me a detailed deploy plan".
+
+**Built:** `supabase/` (2 migrations: schema, RLS tiers, stats views,
+`fantasy_rulesets`/`fantasy_rules` + clone/activate RPCs, `ingest_match_bundle`,
+`publish_preview`, storage buckets; config + email templates; `checks/rls_smoke.sql`);
+`src/publish/` (naming, bundle, fantasy mirror, thumbs by sequential grab,
+stdlib REST client, CLI, Drive inbox runner, backup); `webapp/` (Vite React
+TS SPA, demo mode); `ops/launchd/`; `.github/workflows/` (keep-alive, web
+CI); Makefile targets; `docs/deploy_web_platform.md`; AGENTS §13; 32f fix in
+`postrun.player_stats` (+ txt `hErr` column). Tests +34 (`test_publish` 21,
+`test_inbox` 10, `test_supabase_schema` 3 — the latter need `VOLLEY_TEST_PG_DSN`).
+
+**Verified here:** scratch PG16 migrations + RLS smoke (also fails on a
+broken expectation); SQL fantasy == bundle == `player_stats` on a real
+reconstruction of the simulated match; publish CLI end-to-end through a
+stand-in gateway (applied/unchanged/video guard/bad key); SPA typecheck,
+lint, vitest, build, Chromium screenshots 1280/390 px (no console errors).
+The full pytest suite was NOT run (no torch in this container; the touched
+modules' tests ran with a scratch import shim).
+
+**Rebased on #89 (speed):** session renumbered #89→#90 and AGENTS §12→§13;
+processing-time figures updated to the #89 speed (~0.8× the video length).
+
+**Not done / owed:** owner deployment (guide steps 0–7) and the first real
+publish; nothing ran against hosted Supabase/Cloudflare/Drive yet.
+
 ### 2026-10-06 (eighty-ninth session) — #89: the offline run is 2.3–2.5× faster with byte-identical results (read-ahead + exact detector fast path)
 
 **Asked (owner):** on branch `opus-video-processing-fast`, make the offline evaluation (video + post-processing) faster while keeping the same results.
@@ -482,17 +520,3 @@ small fix owed in `src/postrun`, parked as open 32f.
 **Not done / owed:** entreno 0-flip identity run (open 2b); DB ingest +
 points table + fantasy (Active next 1); second match; GT P31 serve frame
 (~f24630) confirmation.
-
-### 2026-10-05 (eighty-seventh session) — #87: post-run reconstruction layer — the match makes sense (points, serves, touches, winners, score)
-
-**Asked (owner):** start building a post-run logic after the match: reconstruct the action→player assignment so the whole match makes sense (no two touches in a row by the same player, no touch on the half the ball is not in, a dig is not followed by the same player's set, the match reaches 21); fix point start/end (serve, ball on the sand) with the near/far and ground signals; prefer missing actions over invented ones; generalise across videos; stop and say so if serve detection itself needs more work first.
-
-**Answer on serves:** no stop needed — every serve is recoverable post-hoc (33/33 on the match, 5/5 on the practice clips). The causal serve detector is no longer the source of point starts.
-
-**Built:** `src/postrun/` (geometry, stream, ball_flights, rallies, touches, match, reconstruct + CLI), `make run-match` / `make postrun`, `scripts/score_postrun.py` (+ causal baseline), `score_postrun_entreno.py`, `sweep_postrun.py`, `tests/test_postrun.py` + `tests/postrun_sim.py` (35 tests: synthetic rallies rendered through the pinhole model + the real match when on disk), `docs/postrun_reconstruction.md`, AGENTS §11. Only other `src/` change: diag dump schema 3 → 4 (`ball_track.bbox/velocity`, players' `player_label/squad/slot`), inert when the dump is off.
-
-**Measured:** see *Where we are* (match record, practice clips, 78-move sweep, second independent run of the match: 33/33 points, action 0.982). Runs: `output/postrun/20260920_match/` (fresh full run at HEAD, MPS, `--diag-dump --serve-events`), `output/postrun/entreno_1..7/`.
-
-**Honest limits:** per-player correctness is unscored (no identity GT; service-order agreement 84 % / 89 % is indirect); constants were set looking at the whole match, not P1–P8; the practice clips drove five bug fixes, so they are no longer blind; line calls 7/10; blocks unlabelled; `vall_dhebron` untouched.
-
-**Not done / owed:** owner pass on `match_reconstruction.txt` + per-player contact sheets; DB ingest of the reconstruction (points table, fantasy); a second match; GT P31 serve frame (f24543 → ~f24630?) for the owner to confirm.

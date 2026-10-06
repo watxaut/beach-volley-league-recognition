@@ -245,3 +245,11 @@ resources/frames/
 
 .pi/goals
 .pi/.goals-pool-snapshot.json
+
+# Web platform
+.env.publish
+backups/
+node_modules/
+webapp/dist/
+# the Python-packaging `lib/` rule above must not swallow the web app's source
+!webapp/src/lib/

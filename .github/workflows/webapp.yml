@@ -1,0 +1,29 @@
+# Typecheck, lint, unit-test and build the web app on every change to it
+# (Cloudflare Pages builds it again on deploy; this catches breakage in PRs).
+name: webapp
+on:
+  push:
+    paths: ['webapp/**', '.github/workflows/webapp.yml']
+  pull_request:
+    paths: ['webapp/**', '.github/workflows/webapp.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: webapp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+      - run: npm ci
+      - run: npx tsc -b
+      - run: npx oxlint
+      - run: npx vitest run
+      - run: npx vite build
