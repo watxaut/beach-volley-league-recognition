@@ -1,0 +1,75 @@
+.pi/task_briefs/entreno_buckets.md
+  s_9ed08fada71d0a::t_3bb6bcb8af6313 4
+.pi/task_briefs/insert_path.md
+  s_9ed08fada71d0a::t_f5da172ebe1ff9 4
+.pi/task_briefs/reach_scale.md
+  s_9ed08fada71d0a::t_c598e7216f1ca4 4
+.pi/task_briefs/serve_bucket.md
+  s_9ed08fada71d0a::t_d0cdeeefa7984e 1
+AGENTS.md
+  s_9ed08fada71d0a::t_8e63c27619d222 430-445,447-448,456-465
+STATUS.md
+  s_9ed08fada71d0a::t_51b1322a07f773 21-25,78,129-130,356-358,361,463-510
+docs/deploy_web_platform.md
+  s_9ed08fada71d0a::t_579643dfcfec71 43-46,52-54,64-82,97,109-111,116-147,181-183,222-227,248-251,311-333,362-364,366,374-376
+docs/history/status_log_archive.md
+  s_9ed08fada71d0a::t_9673fb543ed42a 6748-6775
+docs/web_platform_design.md
+  s_9ed08fada71d0a::t_40d0d2ba3b0396 322,347-355,488-492,494-495,506-521,532,591
+scripts/run_task.sh
+  s_9ed08fada71d0a::t_ca2e58051ba33e 3
+scripts/run_task_openrouter.sh
+  s_9ed08fada71d0a::t_9844a61448ec6d 3
+src/publish/client.py
+  s_9ed08fada71d0a::t_7d4f267ad0a533 9-10,17,48-58,69
+supabase/checks/plain_postgres_stub.sql
+  s_9ed08fada71d0a::t_60c4a357f364bf 17-18,49-51
+supabase/checks/rls_smoke.sql
+  s_9ed08fada71d0a::t_8ffb47e29744ba 96-126,204-255,353-354,363-370,420-433,451-484,487,494,497-501,505-560
+supabase/config.toml
+  s_9ed08fada71d0a::t_a7b502d2fef063 216-219,238-243,256,403-408
+supabase/functions/request-login-code/index.ts
+  s_9ed08fada71d0a::t_73f16aced3c687 1-80
+supabase/migrations/20261007120000_explicit_grants.sql
+  s_9ed08fada71d0a::t_b5832b143b9f7e 1-68
+supabase/migrations/20261007130000_match_report_privacy.sql
+  s_9ed08fada71d0a::t_61bcf707854c2e 1-163
+supabase/migrations/20261007140000_login_broker.sql
+  s_9ed08fada71d0a::t_83b6c26f7b45c1 1-76
+supabase/templates/invite.html
+  s_9ed08fada71d0a::t_3d2ca57286ab02 4
+tests/test_publish.py
+  s_9ed08fada71d0a::t_4826f4ebb11074 8,26,324,332-353
+webapp/public/_headers
+  s_9ed08fada71d0a::t_290d692aa2b8fc 1-18
+webapp/src/components/MatchReport.tsx
+  s_9ed08fada71d0a::t_1e27e47a6d22b3 26-29,78,85,94,120-124,126
+webapp/src/lib/api.ts
+  s_9ed08fada71d0a::t_33e272810e6e16 70-71,77-78,103-112,116
+webapp/src/lib/demo.ts
+  s_9ed08fada71d0a::t_cd5e02f0edffc2 325-326,328-335,345-349,356-358
+webapp/src/lib/types.ts
+  s_9ed08fada71d0a::t_6797b79a4a953b 239-243,261-262,272-273
+webapp/src/pages/Login.tsx
+  s_9ed08fada71d0a::t_b79725c961b1e5 6-11,70-71,75,80,85-87
+webapp/src/pages/Settings.tsx
+  s_9ed08fada71d0a::t_4c4e83fc5d84b1 39-42
+webapp/src/styles.css
+  s_9ed08fada71d0a::t_b4d5d46056728a 161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "8eb7f8aa479624cd88397f4879d09ea6b200df69",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
