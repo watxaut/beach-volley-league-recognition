@@ -58,6 +58,10 @@ def to_own_frame(x: Optional[float], y: Optional[float],
 
 
 def _zone(z: Any) -> Optional[int]:
+    """1-9 zone number from ``{"side": "A", "zone": 2}`` (in-memory spike record)
+    or the ``"A2"`` label that ``pipeline_output.json`` stores."""
+    if isinstance(z, str) and len(z) == 2 and z[0] in "AB" and z[1].isdigit():
+        z = {"zone": int(z[1])}
     if isinstance(z, dict) and isinstance(z.get("zone"), int) and 1 <= z["zone"] <= 9:
         return z["zone"]
     return None

@@ -272,3 +272,11 @@ def test_env_file_and_key_headers(tmp_path, monkeypatch):
     c = SupabaseClient.from_env(env)
     assert "Authorization" not in c._headers() and c._headers()["apikey"] == "sb_secret_abc"
     assert SupabaseClient("https://x", "eyJabc")._headers()["Authorization"] == "Bearer eyJabc"
+
+
+def test_zone_accepts_pipeline_output_label_and_dict():
+    from src.publish.bundle import _zone
+    # pipeline_output.json stores "A4"; the in-memory spike record is a dict
+    assert _zone("A4") == 4 and _zone("B2") == 2
+    assert _zone({"side": "A", "zone": 7}) == 7
+    assert _zone(None) is None and _zone("?") is None and _zone("A0") is None
