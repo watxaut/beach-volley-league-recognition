@@ -202,6 +202,48 @@ The system generates these output files per video (in `output/<video_name>/`):
    including total action counts, per-player breakdown, activity over time,
    and action distribution.
 
+## Run by hand and publish to Supabase (no Google Drive)
+
+`make inbox` (Drive → run → publish, every 30 min) is optional. To process
+one video yourself and put it on the live site as a **draft**:
+
+One-time setup (full steps in [docs/deploy_web_platform.md](docs/deploy_web_platform.md) §3):
+a clean checkout of `main` (the publisher refuses a dirty tree, so numbers
+always come from committed code), the venv activated, and credentials:
+
+```bash
+cp .env.publish.example .env.publish && chmod 600 .env.publish   # SUPABASE_URL + SUPABASE_SECRET_KEY
+source venv/bin/activate
+```
+
+Then, per video:
+
+```bash
+# 1. Name the video <YYYYMMDD>_<HHMM>_<venue>_<text>.mp4 and put it in resources/
+#    e.g. resources/20261004_1030_bogatell_ari_joan.mp4  (this name is the match key)
+make calibrate VIDEO=resources/20261004_1030_bogatell_ari_joan.mp4   # 2. 8 clicks, once per video
+make run-match VIDEO=resources/20261004_1030_bogatell_ari_joan.mp4   # 3. run + post-run reconstruction (~0.8x video length)
+make publish OUTPUT_DIR=output/20261004_1030_bogatell_ari_joan DRY=1 # 4. dry run: builds the bundle, writes nothing
+make publish OUTPUT_DIR=output/20261004_1030_bogatell_ari_joan       # 5. publish -> "published: applied (revision 1)"
+```
+
+`make process VIDEO=...` does steps 3 and 5 in one go. Then open the site →
+Admin → Review queue: assign players to slots, check the score and publish.
+
+- **Check the dry run first:** the score and point count should match the video,
+  and the per-slot fantasy preview should equal the footer of
+  `output/<key>/match_reconstruction.txt`.
+- **Re-running is safe:** publishing the same key again updates that match in
+  place (identical content prints `unchanged`). To reprocess after a code fix,
+  rerun `make run-match` (or just `make postrun OUTPUT_DIR=...`) and publish again.
+- **Video without the `HHMM` part** (e.g. `20260920_match.mp4`): pass the full key,
+  `make publish OUTPUT_DIR=output/<dir> MATCH_KEY=YYYYMMDD_HHMM_<venue>_<text>`.
+- **Extra flags:** `NOTE="..."` (stored in the publication log) and
+  `PUBLISH_FLAGS="--replace-video | --no-thumbs | --allow-dirty"`. Use
+  `--allow-dirty` only for experiments: it marks the numbers as not
+  reproducible from `main`.
+- **Local only, no Supabase:** `make run` + `make ingest` + `make ui` (next section).
+
 ## Analysis Database & Local UI
 
 Extraction and database storage are **separate processes** by design:

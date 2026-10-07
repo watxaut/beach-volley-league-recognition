@@ -10,7 +10,7 @@ npm run dev                 # http://127.0.0.1:5173 -- demo data unless .env.loc
 VITE_DEMO=1 npm run dev     # force the synthetic demo league
 npm test                    # vitest
 npx tsc -b && npx oxlint    # typecheck + lint
-npm run build               # -> dist/ (what Cloudflare Pages serves)
+npm run build               # -> dist/ (what Cloudflare Workers serves)
 ```
 
 To develop against your Supabase project, copy `.env.example` to `.env.local`

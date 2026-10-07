@@ -1,5 +1,5 @@
 # Typecheck, lint, unit-test and build the web app on every change to it
-# (Cloudflare Pages builds it again on deploy; this catches breakage in PRs).
+# (Cloudflare Workers builds it again on deploy; this catches breakage in PRs).
 name: webapp
 on:
   push:

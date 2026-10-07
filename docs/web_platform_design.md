@@ -31,7 +31,7 @@ The canonical SQL is the migration itself. Appendix A now only points to it.
 | 1. Getting videos in | **Google Drive shared folder** (`VolleyInbox`), pulled by `rclone` on the laptop. Not Telegram: by default it re-encodes videos, a bot can download only 20 MB without self-hosting a Bot API server, and it keeps undelivered bot updates for only 24 h. (Owner: no Telegram at all for now; the laptop notifies through macOS.) |
 | 2. Processing | **The M3 laptop.** About 0.8× the video length (30–32 ms/frame since the #89 speed work; 68 before). The 2014 Mac mini can't run the locked stack: the last PyTorch for Intel macOS is 2.2.x and the repo locks 2.10. It would also be CPU-only and much slower. Don't use it. |
 | 3. Feeding the web | **`make publish`** builds one JSON *match bundle* from `output/<stem>/`, uploads it to Supabase Storage and calls one Postgres function, `ingest_match_bundle`, which applies it in **one transaction**. Keyed by `match_key` = the video's source stem. Re-publishing the same content changes nothing (`unchanged`). Changed content replaces only the pipeline-owned rows. Every call adds a row to `match_publications` (the log), which links the bundle and the video. |
-| 4. Web | **Supabase** (Postgres + Auth + row-level security + Storage) plus a **static React SPA on Cloudflare Pages**. No server of ours. Invite-only, with magic-link or one-time-code login. All access rules are enforced in the database by row-level security. Two roles: admin and viewer. New matches land as **drafts** that an admin reviews, assigns players to and publishes. |
+| 4. Web | **Supabase** (Postgres + Auth + row-level security + Storage) plus a **static React SPA on Cloudflare Workers (static assets)**. No server of ours. Invite-only, with magic-link or one-time-code login. All access rules are enforced in the database by row-level security. Two roles: admin and viewer. New matches land as **drafts** that an admin reviews, assigns players to and publishes. |
 | 5. Data model | Dimensions `players`, `profiles`. Facts at three grains: `matches` (one per video), `points` (one per rally), `actions` (one per touch, the lowest grain). Bridge table `match_participants` (slot P1A/P2A/P1B/P2B → player): **actions store the slot, never the person**, so assignments survive re-processing. Spike landing and dig detail go in the **same `actions` table** as nullable columns. Stats and fantasy points are **views** over actions, not stored totals. |
 | Cost | €0 on free tiers (Drive 15 GB ≈ 10 matches; Google One 100 GB ≈ €2/month). Supabase Pro ($25/month) only when you want uploads through the web, no pausing and managed backups. |
 
@@ -50,7 +50,7 @@ The canonical SQL is the migration itself. Appendix A now only points to it.
                                           │
                                           └─▶ notify: "draft ready: 21–17, 38 pts, 2 flags"
                                                                           ┌───────────────────────────┐
-                                    admin: review → assign slots → publish │ Web SPA (Cloudflare Pages)│
+                                    admin: review → assign slots → publish │ Web SPA (CF Workers)      │
                                     viewer: my stats, league, matches      │ supabase-js, RLS-guarded  │
                                                                           └───────────────────────────┘
 ```
@@ -305,9 +305,9 @@ admin-owned). The admin page shows a "changed since review: rev 3 → 4" badge.
   generated with `supabase gen types typescript`. It is a static build, so
   there are no server secrets. The only key in the browser is the publishable
   (anon) key, which is safe **because every table has RLS**.
-* **Hosting:** Cloudflare Pages (free, deploys on git push, preview URL per
-  branch, no non-commercial clause). Vercel Hobby works too but is for
-  non-commercial use.
+* **Hosting:** Cloudflare Workers with static assets (free, deploys on git push,
+  no non-commercial clause; Cloudflare's recommended successor to Pages).
+  Vercel Hobby works too but is for non-commercial use.
 * **Server-side code:** none in the MVP. Phase 3 adds one Supabase Edge
   Function (`invite-user`, which needs the secret key). It is managed, not
   infrastructure.
@@ -533,7 +533,7 @@ supabase/templates/                     # magic-link (with the login code) + inv
 src/publish/                            # naming, bundle (pure), fantasy, thumbs, client, cli,
                                         #   inbox (Drive runner), backup
 ops/launchd/                            # inbox every 30 min + weekly backup; install.sh
-webapp/                                 # Vite + React + TS SPA (Cloudflare Pages root)
+webapp/                                 # Vite + React + TS SPA (Cloudflare Workers root)
 .github/workflows/                      # supabase-keepalive (every 3 days), webapp CI
 Makefile                                # calibrate, process, publish, inbox, backup, schema-check
 tests/test_publish.py, test_inbox.py, test_supabase_schema.py
@@ -587,7 +587,7 @@ PTS in the diag dump for per-point video links, uploads through the web
 | D1 | Video intake | Google Drive inbox + rclone; **no Telegram** (macOS notifications) |
 | D2 | Privacy tiers (§4) | as proposed: league = results + box scores + fantasy; match detail = that match's players; analytics = self unless opted in |
 | D3 | File naming / `match_key` | **`YYYYMMDD_HHMM_<venue>_<text>`** (time added by the owner); the inbox auto-renames |
-| D4 | Frontend + hosting | React SPA on Cloudflare Pages |
+| D4 | Frontend + hosting | React SPA on Cloudflare Workers |
 | D5 | Login | magic link / 8-digit code |
 | D6 | Review gate | every new match lands as a draft; an admin publishes |
 | D7 | Repo layout | new top-level `supabase/` and `webapp/` |

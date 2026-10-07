@@ -1,4 +1,4 @@
-# Cloudflare Pages response headers (copied into dist/ by the build; the Vite
+# Cloudflare Workers (static assets) response headers (copied into dist/ by the build; the Vite
 # dev server ignores this file).
 #
 # The session token lives in localStorage, so a script injection would be an

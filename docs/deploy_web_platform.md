@@ -41,17 +41,17 @@ deploy `main`.
 1. **Create the project.** supabase.com → New project. Name
    `beach-volley-league`, region **EU (Frankfurt or Paris)**. Generate a
    strong database password and keep it in your password manager. If the
-   form offers *Automatically expose new tables* (Data API), leave it
-   **off**: `20261007120000_explicit_grants.sql` grants exactly what the
+   form offers *Automatically expose new tables* (Data API), leave it **off**: `20261007120000_explicit_grants.sql`
+   grants exactly what the
    site and the laptop need, and nothing to visitors who are not logged in.
 2. **Copy three values** from Project Settings → API Keys:
-   - Project URL: `https://<ref>.supabase.co`
-   - **Publishable** key (`sb_publishable_…`, or the legacy `anon` key). Goes
-     to the website.
-   - **Secret** key (`sb_secret_…`, or the legacy `service_role` key). Goes
-     to the laptop only. Create one just for it (*New secret key*, name it
-     `laptop-publisher`) instead of using the default: if the laptop is ever
-     lost you revoke that one key and nothing else changes.
+    - Project URL: `https://<ref>.supabase.co`
+    - **Publishable** key (`sb_publishable_…`, or the legacy `anon` key). Goes
+      to the website.
+    - **Secret** key (`sb_secret_…`, or the legacy `service_role` key). Goes
+      to the laptop only. Create one just for it (*New secret key*, name it
+      `laptop-publisher`) instead of using the default: if the laptop is ever
+      lost you revoke that one key and nothing else changes.
 3. **Create the schema.** In this repo:
    ```bash
    supabase login
@@ -62,16 +62,16 @@ deploy `main`.
    `fantasy_rules` (8 G1 rows), …; Storage shows two **private** buckets,
    `match-bundles` and `match-media`.
 4. **Lock the login down.** Authentication → Sign In / Providers:
-   - *Allow new users to sign up* = **OFF**. Keep the Email provider
-     enabled; every other provider and *Anonymous sign-ins* stay off. The
-     database treats every logged-in account as a league member, so this
-     switch IS the membership list.
-   - Email provider → *Email OTP Length* = **8**. The emailed code is the
-     only login factor; 8 digits are 100× harder to guess than 6 (the login
-     page takes either).
-   - Leave *Email OTP Expiration* at **3600** seconds. Do not shorten it: the
-     invite link expires with it, and with sign-ups off an invited player who
-     missed the link cannot ask for a code. You send the invite again.
+    - *Allow new users to sign up* = **OFF**. Keep the Email provider
+      enabled; every other provider and *Anonymous sign-ins* stay off. The
+      database treats every logged-in account as a league member, so this
+      switch IS the membership list.
+    - Email provider → *Email OTP Length* = **8**. The emailed code is the
+      only login factor; 8 digits are 100× harder to guess than 6 (the login
+      page takes either).
+    - Leave *Email OTP Expiration* at **3600** seconds. Do not shorten it: the
+      invite link expires with it, and with sign-ups off an invited player who
+      missed the link cannot ask for a code. You send the invite again.
 
    **Check** (`supabase/config.toml` only configures the LOCAL stack, so this
    is the proof for the real project):
@@ -83,22 +83,22 @@ deploy `main`.
 5. **Set up custom SMTP.** Supabase's built-in mailer is for testing and
    will not deliver invites to your players. Authentication → Emails →
    SMTP Settings → enable. Choose one:
-   - **Gmail** (no domain needed, ~500 mails/day): first enable 2-Step
-     Verification on the Google account, then create an *App password*
-     (myaccount.google.com → Security → App passwords). Host
-     `smtp.gmail.com`, port `587`, user = the Gmail address, password =
-     the app password, sender = the same address, sender name `Beach League`.
-   - **Resend / Brevo**, if you own a domain.
+    - **Gmail** (no domain needed, ~500 mails/day): first enable 2-Step
+      Verification on the Google account, then create an *App password*
+      (myaccount.google.com → Security → App passwords). Host
+      `smtp.gmail.com`, port `587`, user = the Gmail address, password =
+      the app password, sender = the same address, sender name `Beach League`.
+    - **Resend / Brevo**, if you own a domain.
 
    Then Authentication → Rate Limits: raise *emails per hour* to ~30.
 6. **Email templates.** Authentication → Emails → Templates.
-   - **Magic Link:** subject `Your beach volley login code`, body = the
-     contents of `supabase/templates/magic_link.html`. It must contain
-     `{{ .Token }}`, which is the code the login page asks for.
-   - **Invite user:** body = `supabase/templates/invite.html`.
+    - **Magic Link:** subject `Your beach volley login code`, body = the
+      contents of `supabase/templates/magic_link.html`. It must contain
+      `{{ .Token }}`, which is the code the login page asks for.
+    - **Invite user:** body = `supabase/templates/invite.html`.
 7. **URLs.** Authentication → URL Configuration. Leave it until step 4 gives
-   you the site URL, then set *Site URL* = `https://<your-site>.pages.dev`
-   and add these *Redirect URLs*: `https://<your-site>.pages.dev/**` and
+   you the site URL, then set *Site URL* = `https://<name>.<account>.workers.dev`
+   and add these *Redirect URLs*: `https://<name>.<account>.workers.dev/**` and
    `http://127.0.0.1:5173/**`.
 8. **(Optional) Behaviour check against the real project.** Dashboard →
    Connect → *Session pooler* URI, then:
@@ -117,20 +117,20 @@ deploy `main`.
    own "send me a code" endpoint tells an invited address from an unknown
    one, and lets anyone who knows a member's address keep the mailer busy.
    Two parts close that. Do both, the function first:
-   - **Deploy the login function.** It gives every address the same answer
-     and asks the database whether a mail really goes out (one request a
-     minute and five an hour per address, thirty an hour per IP):
-     ```bash
-     supabase functions deploy request-login-code
-     ```
-   - **Lock Auth's public endpoints.** Cloudflare dashboard → Turnstile →
-     *Add widget* (name `auth-lock`, hostname: your site's, mode *Managed*).
-     Copy its **secret key** into Supabase → Authentication → Attack
-     Protection → *Enable Captcha protection* (provider: Turnstile). Never
-     put the widget's *site key* on any page: with no widget anywhere nobody
-     can produce a valid token, so Auth refuses every public request that
-     could send a mail. The login function's requests carry the service key
-     and skip the check; so do the dashboard's (invites).
+    - **Deploy the login function.** It gives every address the same answer
+      and asks the database whether a mail really goes out (one request a
+      minute and five an hour per address, thirty an hour per IP):
+      ```bash
+      supabase functions deploy request-login-code
+      ```
+    - **Lock Auth's public endpoints.** Cloudflare dashboard → Turnstile → *Add widget* (name `auth-lock`, hostname:
+      your site's, mode *Managed*).
+      Copy its **secret key** into Supabase → Authentication → Attack
+      Protection → *Enable Captcha protection* (provider: Turnstile). Never
+      put the widget's *site key* on any page: with no widget anywhere nobody
+      can produce a valid token, so Auth refuses every public request that
+      could send a mail. The login function's requests carry the service key
+      and skip the check; so do the dashboard's (invites).
 
    **Check** (repeat after step 5, once your own account exists):
    ```bash
@@ -152,27 +152,27 @@ deploy `main`.
 1. **A clean "prod" checkout.** Published numbers must come from committed
    code (AGENTS.md §8). The publisher refuses a dirty tree.
    ```bash
-   cd ~/path/to/beach-volley-league-recognition          # your dev checkout
-   git fetch origin && git worktree add ~/volley-prod origin/main
-   cd ~/volley-prod
-   ln -s ~/path/to/beach-volley-league-recognition/models models
-   ln -s ~/path/to/beach-volley-league-recognition/output output
-   ln -s ~/path/to/beach-volley-league-recognition/data data
+   cd <path to repo>          # your dev checkout
+   git fetch origin && git worktree add <path to prod repo> origin/main
+   cd <path to prod repo>
+   ln -s <path to repo>/models models
+   ln -s <path to repo>/output output
+   ln -s <path to repo>/data data
    # resources/ is tracked in git (one script), so link the videos in, not the folder:
-   find ~/path/to/beach-volley-league-recognition/resources -maxdepth 1 \
+   find <path to repo>/resources -maxdepth 1 \
         \( -iname '*.mp4' -o -iname '*.mov' \) -exec ln -sf {} resources/ \;
    # Clone the EXACT packages of your working venv/: it has ultralytics 8.3.169,
    # the only release the detector fast path is verified on (AGENTS §12) and
    # the one every GT number was measured with. A fresh `pip install -e .`
    # would resolve a newer one (uv.lock says 8.4.x).
-   ~/path/to/beach-volley-league-recognition/venv/bin/pip freeze --exclude-editable > /tmp/volley-req.txt
-   "$(~/path/to/beach-volley-league-recognition/venv/bin/python -c 'import sys; print(sys.executable)')" -m venv venv
+   <path to repo>/venv/bin/pip freeze --exclude-editable > /tmp/volley-req.txt
+   "$(<path to repo>/venv/bin/python -c 'import sys; print(sys.executable)')" -m venv venv
    source venv/bin/activate
    pip install -r /tmp/volley-req.txt && pip install --no-deps -e .
    python -c "import ultralytics; print(ultralytics.__version__)"   # must print 8.3.169
    ```
-   Every command below assumes `cd ~/volley-prod && source venv/bin/activate`.
-   To update it later: `git -C ~/volley-prod pull --ff-only` (or
+   Every command below assumes `cd <path to prod repo> && source venv/bin/activate`.
+   To update it later: `git -C <path to prod repo> pull --ff-only` (or
    `git checkout origin/main` in a detached worktree).
 2. **Credentials.**
    ```bash
@@ -184,10 +184,10 @@ deploy `main`.
 3. **Publish the match you already have.** Its name lacks the time, so pass
    the full key once. Get the recording time from the video:
    ```bash
-   ffprobe -v quiet -show_entries format_tags=creation_time -of default=nw=1 resources/20260920_match_ari_joan_lost.mp4
-   make postrun OUTPUT_DIR=output/20260920_match_ari_joan_lost      # refresh (adds the handling-error column)
-   make publish OUTPUT_DIR=output/20260920_match_ari_joan_lost \
-        MATCH_KEY=20260920_<HHMM>_<venue>_ari_joan DRY=1
+   ffprobe -v quiet -show_entries format_tags=creation_time -of default=nw=1 resources/full_videos/20260920_match_ari_joan_lost.mp4
+   make postrun OUTPUT_DIR=output/postrun/20260920_match      # refresh (adds the handling-error column)
+   make publish OUTPUT_DIR=output/postrun/20260920_match \
+        MATCH_KEY=20260920_1000_castelldefels_ari_joan DRY=1
    ```
    (Use your match's folder under `output/` if it is named differently.)
    **Check the dry run:** score A 21 – B 12, 33 points. The per-slot fantasy
@@ -199,21 +199,22 @@ deploy `main`.
 
 ---
 
-## 4. The website on Cloudflare Pages (15 min)
+## 4. The website on Cloudflare Workers (15 min)
 
-1. dash.cloudflare.com → Workers & Pages → Create → **Pages** → Connect to
-   Git → choose this repository, production branch `main`.
+1. dash.cloudflare.com → Workers & Pages → Create → **Workers** → Import a
+   repository → choose this repository, production branch `main`. (This is a
+   Worker serving static assets, not a Pages project: `webapp/wrangler.jsonc`
+   holds its name and asset folder.)
 2. Build settings:
-   - Framework preset: **None**
-   - Root directory: **`webapp`**
-   - Build command: **`npm run build`**
-   - Build output directory: **`dist`**
-3. Environment variables (Production and Preview):
-   - `VITE_SUPABASE_URL` = the project URL
-   - `VITE_SUPABASE_PUBLISHABLE_KEY` = the **publishable** key (never the
-     secret one)
-   - `NODE_VERSION` = `22`
-4. Deploy. The site gets `https://<name>.pages.dev`. Put that URL into
+    - Root directory: **`webapp`**
+    - Build command: **`npm run build`**
+    - Deploy command: **`npx wrangler deploy`** (the default)
+3. Build variables (Settings → Variables and secrets → *Build*):
+    - `VITE_SUPABASE_URL` = the project URL
+    - `VITE_SUPABASE_PUBLISHABLE_KEY` = the **publishable** key (never the
+      secret one)
+    - `NODE_VERSION` = `22`
+4. Deploy. The site gets `https://<name>.<account>.workers.dev`. Put that URL into
    Supabase *Site URL* and *Redirect URLs* (step 2.7). `webapp/wrangler.jsonc`
    (`not_found_handling: single-page-application`) makes deep links like
    `/matches/…` work. Don't add a `/* /index.html 200` rule to `_redirects`:
@@ -223,9 +224,11 @@ deploy `main`.
 two `VITE_` variables are missing from the build: add them and redeploy.
 Then check the security headers (`webapp/public/_headers`: a content
 security policy, no framing by other sites):
+
 ```bash
-curl -sI https://<your-site>.pages.dev | grep -iE 'content-security-policy|x-frame-options'
+curl -sI https://<name>.<account>.workers.dev | grep -iE 'content-security-policy|x-frame-options'
 ```
+
 Both lines must print.
 
 To preview locally first: `cd webapp && npm install && npm run dev` runs
@@ -244,9 +247,9 @@ project.
    ```
    Reload the site. The **Admin** tab appears.
 3. Admin → Review queue → open the 20260920 match:
-   - **1 · Who is who:** for each slot thumbnail, pick or create the player.
-   - **2 · Check:** score, set complete, flagged points, the video link.
-   - **3 · Publish:** add venue and season, then **Publish**.
+    - **1 · Who is who:** for each slot thumbnail, pick or create the player.
+    - **2 · Check:** score, set complete, flagged points, the video link.
+    - **3 · Publish:** add venue and season, then **Publish**.
 4. Invite the other players from Supabase → Users → Invite. The link in
    the invite works for **one hour**; someone who opens it later is refused
    at login until you invite the same email again. Once someone has
@@ -277,7 +280,7 @@ played in it.
    `inbox empty`.
 4. **Schedule it:**
    ```bash
-   cd ~/volley-prod && ops/launchd/install.sh ~/volley-prod/venv/bin/python
+   cd <path to prod repo> && ops/launchd/install.sh <path to prod repo>/venv/bin/python
    ```
    This installs `com.volley.inbox` (a pass every 30 min while the Mac is
    awake) and `com.volley.backup` (Mondays 09:07: admin tables → JSON →
@@ -335,14 +338,15 @@ The site is only as safe as the three accounts that can change it.
 
 ## Day to day
 
-| You do | The system does |
-|---|---|
-| Record; upload to VolleyInbox | – |
-| Leave the Mac on, plugged in | `make inbox` downloads the video, names it `YYYYMMDD_HHMM_…` and notifies "needs calibration" |
-| `make calibrate VIDEO=resources/<key>.mp4` (8 clicks) | Next pass: `make run-match` (~0.8× the video length), publish as a **draft**, archive the file on Drive, notify "Draft ready" |
-| Website → Admin → assign the 4 slots, check, **Publish** | Players see results, box score, fantasy and the league table |
+| You do                                                   | The system does                                                                                                               |
+|----------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| Record; upload to VolleyInbox                            | –                                                                                                                             |
+| Leave the Mac on, plugged in                             | `make inbox` downloads the video, names it `YYYYMMDD_HHMM_…` and notifies "needs calibration"                                 |
+| `make calibrate VIDEO=resources/<key>.mp4` (8 clicks)    | Next pass: `make run-match` (~0.8× the video length), publish as a **draft**, archive the file on Drive, notify "Draft ready" |
+| Website → Admin → assign the 4 slots, check, **Publish** | Players see results, box score, fantasy and the league table                                                                  |
 
 **Corrections:**
+
 - **Pipeline or logic fix:** `make postrun` (or a re-run), then `make publish`.
   This creates a new revision, and the publication log keeps every earlier
   one.
@@ -359,20 +363,20 @@ The site is only as safe as the three accounts that can change it.
 
 ## Troubleshooting
 
-| Symptom | Cause / fix |
-|---|---|
-| Login says "cannot log in yet" | Never invited, or the invite link was not opened within the hour. Invite the email (again) from Supabase → Users. (Only shown while step 2.9 is not done) |
-| "A code is on its way" but none arrives | The site says that for EVERY address (2.9). Was the invite accepted? More than one request a minute or five an hour for that address? Then Supabase → Edge Functions → `request-login-code` → Logs: a line `auth /otp -> HTTP …` is Auth refusing (429 = its rate limit, 5xx = SMTP, step 2.5) |
-| Login says "the login function did not answer" | The lock is on (2.9) but the function is not deployed or fails: `supabase functions deploy request-login-code`, then its Logs. `login_code_gate -> HTTP 401` or "service key missing" there: give it a key with `supabase secrets set LOGIN_BROKER_SERVICE_KEY=<a secret key>` |
-| The login email never arrives | SMTP not set (2.5) or rate limit; check Authentication → Logs |
-| The email link opens `127.0.0.1` | *Site URL* still local (2.7). The code in the email works anyway |
-| The site says "Site not configured" | Missing `VITE_SUPABASE_*` variables in Cloudflare (4.3); redeploy |
-| `make publish`: "uncommitted changes" | Publish from `~/volley-prod`, or pass `PUBLISH_FLAGS=--allow-dirty` knowingly |
-| `make publish`: "already holds a different video" | Two different files with one name. Rename one, or `PUBLISH_FLAGS=--replace-video` if it is intentional |
-| `make publish`: "not a match key" | Pass `MATCH_KEY=YYYYMMDD_HHMM_<venue>_<text>` |
-| A player sees no play-by-play | By design: only that match's players see it (Admin → match → "Everyone can see the play-by-play" opens it) |
-| A slot thumbnail is missing | The decoded video or `diag.jsonl` was not on disk at publish time. Assign from the video link instead |
-| The project is paused | Supabase dashboard → Restore. Then check the keep-alive workflow runs |
-| The site or `make backup` says "permission denied for table" (42501) | A table or view without a `GRANT`. New ones get none by default: grant it in its migration (see `20261007120000_explicit_grants.sql`) |
-| `make publish`: "`.env.publish` is readable by other users" | `chmod 600 .env.publish` |
-| A new script, font or image host does not load (console: "Refused to load … Content Security Policy") | Add the host to `webapp/public/_headers` and redeploy |
+| Symptom                                                                                               | Cause / fix                                                                                                                                                                                                                                                                                    |
+|-------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Login says "cannot log in yet"                                                                        | Never invited, or the invite link was not opened within the hour. Invite the email (again) from Supabase → Users. (Only shown while step 2.9 is not done)                                                                                                                                      |
+| "A code is on its way" but none arrives                                                               | The site says that for EVERY address (2.9). Was the invite accepted? More than one request a minute or five an hour for that address? Then Supabase → Edge Functions → `request-login-code` → Logs: a line `auth /otp -> HTTP …` is Auth refusing (429 = its rate limit, 5xx = SMTP, step 2.5) |
+| Login says "the login function did not answer"                                                        | The lock is on (2.9) but the function is not deployed or fails: `supabase functions deploy request-login-code`, then its Logs. `login_code_gate -> HTTP 401` or "service key missing" there: give it a key with `supabase secrets set LOGIN_BROKER_SERVICE_KEY=<a secret key>`                 |
+| The login email never arrives                                                                         | SMTP not set (2.5) or rate limit; check Authentication → Logs                                                                                                                                                                                                                                  |
+| The email link opens `127.0.0.1`                                                                      | *Site URL* still local (2.7). The code in the email works anyway                                                                                                                                                                                                                               |
+| The site says "Site not configured"                                                                   | Missing `VITE_SUPABASE_*` variables in Cloudflare (4.3); redeploy                                                                                                                                                                                                                              |
+| `make publish`: "uncommitted changes"                                                                 | Publish from `<path to prod repo>`, or pass `PUBLISH_FLAGS=--allow-dirty` knowingly                                                                                                                                                                                                            |
+| `make publish`: "already holds a different video"                                                     | Two different files with one name. Rename one, or `PUBLISH_FLAGS=--replace-video` if it is intentional                                                                                                                                                                                         |
+| `make publish`: "not a match key"                                                                     | Pass `MATCH_KEY=YYYYMMDD_HHMM_<venue>_<text>`                                                                                                                                                                                                                                                  |
+| A player sees no play-by-play                                                                         | By design: only that match's players see it (Admin → match → "Everyone can see the play-by-play" opens it)                                                                                                                                                                                     |
+| A slot thumbnail is missing                                                                           | The decoded video or `diag.jsonl` was not on disk at publish time. Assign from the video link instead                                                                                                                                                                                          |
+| The project is paused                                                                                 | Supabase dashboard → Restore. Then check the keep-alive workflow runs                                                                                                                                                                                                                          |
+| The site or `make backup` says "permission denied for table" (42501)                                  | A table or view without a `GRANT`. New ones get none by default: grant it in its migration (see `20261007120000_explicit_grants.sql`)                                                                                                                                                          |
+| `make publish`: "`.env.publish` is readable by other users"                                           | `chmod 600 .env.publish`                                                                                                                                                                                                                                                                       |
+| A new script, font or image host does not load (console: "Refused to load … Content Security Policy") | Add the host to `webapp/public/_headers` and redeploy                                                                                                                                                                                                                                          |
