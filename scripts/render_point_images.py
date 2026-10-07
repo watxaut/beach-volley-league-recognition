@@ -37,18 +37,27 @@ def load_frames(path, wanted):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--run-dir", default="output/postrun/20260920_match")
-    ap.add_argument("--video", default="resources/full_videos/20260920_match_ari_joan_lost_up1080.mp4")
+    ap.add_argument("--video", required=True,
+                    help="the video the run was made from; images go to output/<video name>/point_images")
+    ap.add_argument("--run-dir", default=None,
+                    help="run directory holding match_reconstruction.json (default output/<video name>)")
     ap.add_argument("--points", default="", help="comma list, default all")
     a = ap.parse_args()
-    run = Path(a.run_dir)
-    d = json.load(open(run / "match_reconstruction.json"))
+    run = Path(a.run_dir) if a.run_dir else Path("output") / Path(a.video).stem
+    recon = run / "match_reconstruction.json"
+    if not recon.exists():
+        raise SystemExit(f"{recon} not found; run `make run-match` / `make postrun` first "
+                         f"(or pass --run-dir)")
+    d = json.load(open(recon))
     fps = d["fps"]
     out = run / "point_images"
-    out.mkdir(exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
     want = {int(x) for x in a.points.split(",") if x}
     pts = [p for p in d["points"] if not want or p["point"] in want]
-    needed = {t["frame"] for p in pts for t in p["touches"]} | {p["end"]["frame"] for p in pts}
+    if not pts:
+        raise SystemExit(f"no matching points in {run / 'match_reconstruction.json'}")
+    needed = ({t["frame"] for p in pts for t in p["touches"]}
+              | {p["end"]["frame"] for p in pts if p["end"]})
     frames = load_frames(a.video, needed)
     blank = np.zeros((TH, TW, 3), np.uint8)
 
@@ -69,11 +78,12 @@ def main():
                 put(img, "inferred", (8, TH - 10), 0.5, (0, 255, 255))
             tiles.append(img)
         e = p["end"]
-        img = grab(cap, e["frame"])
-        put(img, f'f{e["frame"]} END: {e["kind"]} {e["side"] or ""} '
-                 f'{"in" if e["in_court"] else "out" if e["in_court"] is False else ""}', (8, 24),
-            bg=(120, 60, 0))
-        tiles.append(img)
+        if e:
+            img = grab(cap, e["frame"])
+            put(img, f'f{e["frame"]} END: {e["kind"]} {e["side"] or ""} '
+                     f'{"in" if e["in_court"] else "out" if e["in_court"] is False else ""}', (8, 24),
+                bg=(120, 60, 0))
+            tiles.append(img)
         while len(tiles) % COLS:
             tiles.append(np.zeros((TH, TW, 3), np.uint8))
         rows = [np.hstack(tiles[i:i + COLS]) for i in range(0, len(tiles), COLS)]

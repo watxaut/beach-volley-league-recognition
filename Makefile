@@ -22,7 +22,7 @@ OUTPUT_DIR := output/$(VIDEO_NAME)
 # Skip visualization unless VIZ is set.
 VIZ_FLAG := $(if $(VIZ),,--skip-visualization)
 
-.PHONY: run run-video run-live run-match postrun ingest ingest-all db-reset ui help \
+.PHONY: run run-video run-live run-match postrun point-images ingest ingest-all db-reset ui help \
         calibrate process publish republish-all inbox backup schema-check
 
 run:
@@ -65,6 +65,16 @@ endif
 # (seconds, no video decode): make postrun VIDEO=... or OUTPUT_DIR=output/<dir>.
 postrun:
 	$(PYTHON) -m src.postrun "$(OUTPUT_DIR)"
+
+# One contact-sheet image per point (a tile per touch + the point end, header
+# with serve / winner / score) in $(OUTPUT_DIR)/point_images/, read straight
+# from match_reconstruction.json. Needs the video the run was made from (the
+# _up1080 file for the 20260920 match). POINTS=3,7 renders only those points.
+point-images:
+ifeq ($(strip $(VIDEO)),)
+	$(error VIDEO is not set. Usage: make point-images VIDEO=path/to/video.mp4 [POINTS=3,7])
+endif
+	$(PYTHON) scripts/render_point_images.py --run-dir "$(OUTPUT_DIR)" --video "$(VIDEO)" $(if $(POINTS),--points "$(POINTS)")
 
 # Upsert one video's extraction output into the analysis DB (separate process
 # from `run` by design: extraction writes output/<stem>/pipeline_output.json,
@@ -140,6 +150,7 @@ help:
 	@echo "make run-live VIDEO=path/to/video.mp4   Play the annotated video live (buffered ~3s so labels land on contact)"
 	@echo "make run-match VIDEO=path/to/video.mp4  Run + post-run reconstruction -> match_reconstruction.json/.txt"
 	@echo "make postrun VIDEO=path/to/video.mp4    Redo only the reconstruction over an existing run (no decode)"
+	@echo "make point-images VIDEO=path/to/video.mp4 One image per point (POINTS=3,7 to pick) -> $(OUTPUT_DIR)/point_images/"
 	@echo "  VIZ=1                                 Also generate summary_graphs.png (run / run-video)"
 	@echo "  PYTHON=...                            Override the python interpreter"
 	@echo "make ingest VIDEO=path/to/video.mp4   Upsert that video's output into the DB"

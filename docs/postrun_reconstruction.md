@@ -8,6 +8,7 @@ decoded again; a full match reconstructs in ~3 s.
 ```bash
 make run-match VIDEO=resources/full_videos/<match>.mp4   # run + diag sidecar + reconstruction
 make postrun OUTPUT_DIR=output/<dir>                     # reconstruction only (no decode)
+make point-images VIDEO=resources/full_videos/<match>.mp4  # one contact-sheet image per point -> output/<dir>/point_images/
 venv/bin/python scripts/score_postrun.py output/<dir>/match_reconstruction.json
 venv/bin/python scripts/score_postrun_entreno.py output/postrun   # practice clips
 venv/bin/python scripts/sweep_postrun.py output/postrun/20260920_match
