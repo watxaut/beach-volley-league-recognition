@@ -284,6 +284,15 @@ def default_match_key(run_dir: Path, pipeline: Optional[Dict[str, Any]]) -> str:
     return resolve_source_stem(key) if key else run_dir.name
 
 
+def checked_match_key(key: str):
+    """``parse_match_key`` with the publisher's hint; run it BEFORE any slow work."""
+    try:
+        return parse_match_key(key)
+    except MatchKeyError as exc:
+        raise BundleError(f"{exc}. Pass --match-key YYYYMMDD_HHMM_<venue>_<text> "
+                          f"(or rename the video before calibrating)") from exc
+
+
 def build_bundle(run_dir: Path, *, match_key: Optional[str] = None,
                  video_url: Optional[str] = None, video_sha256: Optional[str] = None,
                  video_filename: Optional[str] = None,
@@ -300,11 +309,7 @@ def build_bundle(run_dir: Path, *, match_key: Optional[str] = None,
     video = pipeline.get("video") or {}
 
     key = match_key or default_match_key(run_dir, pipeline)
-    try:
-        parsed = parse_match_key(key)
-    except MatchKeyError as exc:
-        raise BundleError(f"{exc}. Pass --match-key YYYYMMDD_HHMM_<venue>_<text> "
-                          f"(or rename the video before calibrating)") from exc
+    parsed = checked_match_key(key)
 
     points = recon.get("points") or []
     checks = recon.get("checks") or {}

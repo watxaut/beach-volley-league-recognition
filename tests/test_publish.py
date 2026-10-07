@@ -180,6 +180,16 @@ def test_legacy_name_needs_a_match_key(tmp_path, recon):
     assert build_bundle(run, match_key=KEY)["match"]["match_key"] == KEY
 
 
+def test_bad_name_is_refused_before_hashing_or_decoding(tmp_path, recon, monkeypatch):
+    def _no_slow_work(*a, **k):
+        raise AssertionError("slow work ran before the name was checked")
+
+    monkeypatch.setattr(cli, "sha256_file", _no_slow_work)
+    run = _run_dir(tmp_path, recon, video_key="2026_avp_Loreen_Quiggle__Harward_Hodel_set2")
+    with pytest.raises(BundleError, match="--match-key"):
+        cli.build_from_run(cli.build_parser().parse_args([str(run)]))
+
+
 def test_spike_join_and_attacker_frame_landing(tmp_path, recon):
     attacks = [t for p in recon["points"] for t in p["touches"]
                if t["action"] in ("spike", "overpass")]

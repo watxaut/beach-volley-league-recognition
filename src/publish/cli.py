@@ -26,8 +26,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from .bundle import (BundleError, build_bundle, content_sha256, default_match_key,
-                     validate_bundle)
+from .bundle import (BundleError, build_bundle, checked_match_key, content_sha256,
+                     default_match_key, validate_bundle)
 from .client import DEFAULT_ENV_FILE, SupabaseClient, SupabaseError
 from .fantasy import score_actions
 
@@ -74,6 +74,7 @@ def build_from_run(args: argparse.Namespace) -> Dict[str, Any]:
         raise BundleError(f"{recon_path} not found (run `make run-match` / `make postrun`)")
     recon = json.loads(recon_path.read_text())
     key = args.match_key or default_match_key(run_dir, pipeline)
+    checked_match_key(key)  # refuse a non-conforming name before hashing / decoding
     decoded = (pipeline.get("video") or {}).get("path")
 
     from .thumbs import find_source_video, make_slot_thumbnails
