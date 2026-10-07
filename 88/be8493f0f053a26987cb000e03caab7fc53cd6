@@ -1,0 +1,21 @@
+docs/deploy_web_platform.md
+  s_9ed08fada71d0a::t_9f660e23e7f247 217-220
+webapp/wrangler.jsonc
+  s_9ed08fada71d0a::t_3c425fa76b84bf 1-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "88be8493f0f053a26987cb000e03caab7fc53cd6",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
