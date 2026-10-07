@@ -171,7 +171,7 @@ def _player_detector():
     det.logger = logging.getLogger("test_frame_prefetch")
     det.confidence_threshold, det.max_players, det.imgsz = 0.5, 20, 1280
     det._person_class_ids, det.court_detector, det.off_area_detections = {0}, None, []
-    det._inference, det.fast_inference = None, True
+    det._inference, det.fast_inference, det.bgr_input = None, True, True
     det._model = _BoxesByFrame(lambda i: [
         [100.25 + i, 100.5, 180.75 + i, 380.125, 0.93, 0],     # a player
         [300.0, 200.0, 340.0, 300.0, 0.41, 0],                 # under-confident

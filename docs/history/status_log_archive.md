@@ -6773,3 +6773,34 @@ match (card V1).
 **Not done / owed:** owner's pick; nothing implemented.
 
 - 2026-08-16 — team-aware contact attribution (team 0.69→0.92); server tracking fixed + ghost damping.
+
+### 2026-10-06 (ninety-first session) — #91: "Where they land" gets real coverage and honest uncertainty
+
+**Asked (owner):** make the web's "Where they land" widget better through the
+events; then "start with this ... the camera is at 1.5 m, do a best effort and
+be honest with the confidence".
+
+**Measured first (20260920):** 17 of 63 attacks had a spot (touches carried
+depth only); 4 of those 17 were drawn outside the SVG (the out balls); 41 of
+63 had no outcome and were coloured "in play".
+
+**Built:** `src/postrun` — touches carry `court_x_m` (ball at the touch) +
+`court_err_m`, ground ends `court_xy_err_m` (schema 2; points/touches otherwise
+identical to the #87 run). `src/publish/bundle.py` — `own_x_m` filled,
+`landing_x_m` for dug balls, `landing_err_x_m/_y_m`, `landing_result`
+(kill/dug/out/net/error; out/net only when the run saw it). Migration
+`20261006180000_landing_confidence.sql` (3 columns + `player_profile`).
+`webapp` — `LandingMap` redrawn: 2.5 m out-of-court margin, glyph per result,
+shaded error area per ball, counts, plain-words caveat; tolerates old rows.
+
+**Result:** 57 of 63 attacks placed (39 dug, 10 kill, 3 out, 1 net, 8 error,
+2 unresolved). Error model: see Learnings (#91).
+
+**Honest limits:** no position GT — the error is calibrated against players'
+feet, itself a read; the ground-read error is a pixel-slip model, unvalidated;
+line calls stay as weak as before (3 of 10 wrong, open 31) and `landing_in`
+is passed through untouched.
+
+**Not done / owed:** owner: `supabase db push`, then `make postrun` + publish
+per match (old rows show without error areas). `test_inbox`
+`test_calibrated_video_is_run_published_and_archived` fails at HEAD (not #91).

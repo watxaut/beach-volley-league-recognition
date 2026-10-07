@@ -33,6 +33,11 @@ class Config:
                                   #   gestures flip in production/live-debug vs the script (f539 block).
         "player_confidence": 0.5,  # 0.35 lifts recall ~3pp on far-side players but adds false detections; kept at 0.5
         "player_imgsz": 1280,   # YOLO inference size; 640 default loses small far-side players
+        "player_bgr_input": True,  # pass the OpenCV BGR frame to ultralytics as-is (its convention). False = the
+                                   #   pre-2026-10-07 path that converted to RGB first, so the model saw red/blue
+                                   #   swapped. True lifts frames with 4 real tracked players on all 7 entrenos
+                                   #   (e1 26.8%->57.4%, e6 89.8%->98.5%), stream F1 pooled 0.824->0.839, post-run
+                                   #   identical; the golden runs in output/postrun are the False arm.
         "max_players": 4,       # exactly 4 for match identity (gallery/bootstrap assume a 4-roster).
                                 #   NOTE: training drills with >4 on court need a separate profile.
         "max_detections": 20,   # detector safety cap (must exceed people on court)

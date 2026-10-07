@@ -18,11 +18,10 @@ update at the end of every session that changes anything and commit with the wor
 - New durable protocol rules go in `AGENTS.md`; new cross-session technical
   facts go one-line-each into *Learnings* below.
 
-Last updated: **2026-10-06 (93rd session) — pre-launch security review of the web platform, fixes
-built: explicit table grants (new Supabase projects grant none), CSP + no-framing headers, 8-digit
-login code asked through a login function (one answer for every email), the report card follows the
-privacy tiers, `main` protected, repo hygiene.** #92 (stats "Now" picks),
-#91 (landings) and #90 (platform; owner deploys via `docs/deploy_web_platform.md`) lie underneath.
+Last updated: **2026-10-07 (94th session) — the player detector now gets the BGR frame ultralytics expects
+(was red/blue swapped): `player_bgr_input: true` by default, `false` = the old path.** #93 (security
+review), #92 (stats "Now" picks), #91 (landings) and #90 (platform; owner deploys via
+`docs/deploy_web_platform.md`) lie underneath.
 
 ## North-star goals (set session 24)
 
@@ -94,18 +93,18 @@ colours/labels. Pass-2 scripts (`relabel_serves`, `resolve_side_switches`,
 `resolve_point_winners` 18/33, `consume_serve_evidence`) are SUPERSEDED by
 `src/postrun` for points/serves/winners; kept as provenance. Entreno action
 gate (causal): e1 0.706, e2 0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933,
-e7 0.75 (same-session A/B only). Test suite **1178** (#91 +4; 3 PG-gated; `test_inbox` run-match order fails at HEAD, not #91).
+e7 0.75 (same-session A/B only). Test suite **1211** (1205 pass, 5 skipped; `test_inbox` run-match order fails at HEAD, not #94).
 
-**Speed (#89, results-neutral — AGENTS §12).** `prefetch_depth: 8` reads
-decode + both detectors' `infer()` ahead on background threads
-(`frame_prefetch.py`); `detector_fast_inference` runs ultralytics' own
-predictor stages and post-processes on the CPU only where an IoU-margin /
-tie certificate proves it exact (`yolo_inference.py`; the device path took
-310 of 26181 player frames on the match). Match 1955 → 783–836 s, practice
-clips 291 → 131 s, every artifact byte-identical to `output/postrun/`
-(`--device cpu` and `--save-video` identical to a true-HEAD worktree too).
-Per lever on e5: 81 → 67 (fast path) / 50 (read-ahead) / 31–35 ms/frame
-(both). The bound is now MediaPipe pose on the loop thread (open point 33).
+**Player detector input (#94, default ON).** It converted BGR→RGB and ultralytics read that as BGR (red/blue
+swapped). `player_bgr_input: true` passes the frame as-is; **`false` = the old path** (how to compare: Learnings).
+Frames with 4 real tracks, e1–e7: 26.8→57.4 %, 43.7→61.7, 65.0→72.5, 63.8→78.4, 73.4→80.5, 89.8→98.5, 60.3→67.0;
+stream F1 pooled 0.824→0.839; post-run IDENTICAL (clips; match 33/33, A 21–B 12, P 0.976). Cost: match stream
+action labels 81/145→74/146 (rally cascades in P9/P19/P22/P25); e3 moves 2 spikes between players (contact sheet owed).
+
+**Speed (#89, results-neutral — AGENTS §12).** `prefetch_depth: 8` (read-ahead, `frame_prefetch.py`) +
+`detector_fast_inference` (`yolo_inference.py`): match 1955 → 783–836 s, clips 291 → 131 s, byte-identical to the
+pre-#94 `output/postrun/` goldens (= `player_bgr_input: false`). Bound: MediaPipe pose (open point 33). Full text:
+`docs/history/status_where_we_are_archive.md` (#94).
 
 **Held-out lock:** `ground_truth/20290928_entreno_vall_dhebron_serve_anchors.json`
 = 19 serves; the video has NEVER been run; use only via a card "score
@@ -126,13 +125,11 @@ P31 serve f24543 is 128 f before its reception (owner to confirm ~f24630).
 
 ## Active next (ranked)
 
-0. **Owner: `supabase db push` (`20261007100000`, `…120000_explicit_grants`, `…130000_match_report_privacy`, `…140000_login_broker`)**, then deploy doc 2.4 (sign-ups OFF + its `curl` proof, OTP length 8), 2.9 (`supabase functions deploy request-login-code` + the Auth lock), 4 (headers check), 8 (2-step logins);
-   review the stats pages (`?w=n5`, report card, `/measure`); give `scripts/check_heights.py --heights P1A=…`
-   the real heights. Next picks (§5): I3 → O3 (relative heights, V2), N10/O2, O1+I4, N7/N9, F1.
-1. **Deploy the product (owner):** `docs/deploy_web_platform.md` steps 0–7,
-   then publish 20260920 with `MATCH_KEY=20260920_<HHMM>_…` (dry run first:
-   fantasy must equal the txt footer). Then: action_overrides UI, in-app
-   invites, `own_x_m` heatmaps (design §8 "Next").
+0. ✅ **Owner security follow-through DONE (2026-10-07):** `supabase db push` (4 migrations), deploy doc 2.4/2.9/4/8, stats pages reviewed.
+   Heights check done with the real heights: not good (V2 ±0.2 m stays FAIL; O3 would show relative heights only).
+   Next picks (§5): I3 → O3 (relative heights, V2), N10/O2, O1+I4, N7/N9, F1.
+1. ✅ **Product deployed (owner, DONE 2026-10-07):** `docs/deploy_web_platform.md` steps 0–7. Still open: publish 20260920 check
+   (fantasy = txt footer), then action_overrides UI, in-app invites, `own_x_m` heatmaps (design §8 "Next").
 2. **Second match / other venue through `make run-match`** — the only
    21-point match so far is the one the layer was built on; practice clips
    and the sweep are the out-of-sample evidence.
@@ -343,7 +340,8 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - MPS (M3 Pro, #89): run-to-run deterministic (HEAD reproduces `output/postrun` byte for byte); batch>1 is bit-identical to batch-1 but NOT faster (compute-bound); two models driven from two threads stay bit-identical.
 - CPU NMS ≠ MPS NMS in general: ~1 frame per 1000 has a box pair with IoU within 1e-5 of the 0.7 threshold, hence the certificate + device fallback in `yolo_inference.py`. Dead speed levers: batching, a detection cache (the loop is pose-bound), lazy pose (MediaPipe video-mode state → not exact).
 - Byte-identical gate for results-neutral changes: `scripts/compare_runs.py` + `cmp diag.jsonl` against `output/postrun/*` (AGENTS §12); `scripts/` already had the tool — check before writing one.
-- Found while profiling, NOT touched (results-changing, impact unmeasured): `PlayerDetector.preprocess_frame` hands ultralytics an RGB frame it treats as BGR (the person model sees R/B swapped); one MediaPipe `Pose(static_image_mode=False)` is shared by all players (A's landmarks seed B's ROI/smoothing).
+- Found while profiling, NOT touched (results-changing, impact unmeasured): one MediaPipe `Pose(static_image_mode=False)` is shared by all players (A's landmarks seed B's ROI/smoothing). Its sibling, `PlayerDetector.preprocess_frame` handing ultralytics RGB it reads as BGR, was fixed in #94.
+- #94 `player_bgr_input` (default `true`): `false` reproduces every pre-#94 artifact byte for byte (`output/postrun/*` are that arm; only `processed_at` differs). Compare: `venv/bin/python -m src.main <video> --output-dir <dir> --config <json with {"player_bgr_input": false}> --diag-dump <dir>/diag.jsonl`. The old A/B hack (`ab_wrap.py`) is no longer needed. `evaluate.py` on `src.main` output needs the `frame_number`→`frame` adapter and a `{"actions": [...]}` file.
 - VFR: `CAP_PROP_POS_FRAMES` lands −28..+30 f off — decode spans sequentially (`test_vfr_seek_guard.py`); two KNOWN-ISSUE allow-lists: `annotate_player_gt.py`, `src/db/ingest.py`.
 - Delegation: >1 KB prompt kills the child pi (EXIT 137) — few hundred bytes + the child reads a brief file.
 - Retraining: four-leg gate; fine-tune FROM `best.pt`; mine frames with NO pre-labels.
@@ -358,6 +356,7 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Edge functions (#93): `EdgeRuntime.waitUntil` exists only in a USER worker (the platform's way of running a function), not when the file is the runtime's main service — guard it; a function added while the local stack runs is not served (404) until the stack restarts. `pg_net` was rejected for the broker: its tables and `net.http_post` are granted to `anon` and owned by `supabase_admin`, so a migration cannot revoke that.
 
 ## Session index (one line each)
+- #94 **Player detector got RGB frames ultralytics reads as BGR: now passes BGR (`player_bgr_input`, default ON; `false` = old path); 4-track frames up on all 7 clips, stream F1 0.824→0.839, post-run identical; match stream labels −7**
 - #93 **Pre-launch security review + fixes: explicit grants (new Supabase projects grant none), CSP headers, login function (one answer per email) + Auth lock, 8-digit code, `.env.publish` 600, report card by tier, `main` protected**
 - #92 **Stats "Now" picks BUILT: windows, side-out/break, serve targets, reception outcome, hitting %, report card, /measure, republish-all; V1 hard/touch FAILS (10/16 right on 16 of 32), V2 ±0.2 m heights FAIL (net clearance passes)**
 - #91 **Web "Where they land": landings 17→57 of 63 attacks placed (touch x from the ball read), per-axis position error + `landing_result`; recon schema 2, new migration, map with uncertainty areas + out-of-court margin**
@@ -456,9 +455,30 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-08-29 — off-court hold horizon (=90f) recovers e2's roster slot.
 - 2026-08-27 — short-gap bridge ships e2/e6's missed digs; GT honesty rounds.
 - 2026-08-26 — e5 action layer fully resolved (gap-bridged bounce + 2.5 m net exemption); e2/e6 generality clean; e1's double-annotated GT deduped.
-- 2026-08-18 — e5 serve-zone squatter fixed (server vote + trial expiry + contested swap); e4/e5 GT checked.
 - 2026-08-17 — config-drift guard; config-default divergence FIXED (f539 block provenance); e3 GT serve frame fixed; live-debug frame counter; near-net flag closed by diagnosis — …(log archive 2026-10-06)
 ## Log (newest first)
+
+### 2026-10-07 (ninety-fourth session) — #94: the player detector stops getting red/blue-swapped frames
+
+**Asked (owner):** continue the previous session's A/B of bug (a) (`PlayerDetector.preprocess_frame` gave
+ultralytics RGB it reads as BGR), run it on the match and the practice clips, then default the fix ON and say how to compare.
+
+**Measured (arms = `FIX_RGB` hack vs HEAD; base reproduced the `output/postrun` goldens byte for byte):**
+- Match: post-run identical (33/33, 0 false, winners 33/33, A 21–B 12, touches P 0.976, 0 rule breaks);
+  credited-to-player 165→164. Causal stream: 212→211 actions, action label 81/145→74/146 — 8 GT touches
+  right only in HEAD (P9 f5530, P19 f13467/13505, P22 f15955/15998/16037, P25 f19360/19380) vs 1 only in the
+  fix (P19 f13158); the diffs are rally cascades (touch-count relabelling after one added/dropped action).
+- Entrenos: post-run identical in all 7 (serves 5/5, P 52/53, action 52/52); frames with 4 real tracks up on
+  every clip (table in Where we are); stream `evaluate --ignore-player` F1 pooled 0.824→0.839 (TP 49→52, FP 7→9, FN 14→11).
+
+**Built:** `PlayerDetector(bgr_input=True)` + config `player_bgr_input: true` (wired in `FrameProcessor`), drift-guard
+row, 2 unit tests, `test_frame_prefetch` fixture. Verified on e1: default run == fix arm, `--config {"player_bgr_input": false}`
+== base arm (`diag.jsonl`, CSVs identical; `pipeline_output.json` differs in `processed_at` only).
+
+**Not done / owed:** owner contact-sheet check of e3's two spikes that moved player (no per-player GT); why the
+match stream loses labels (suspect: the fix adds a `serve` at f15926 that starts the P22 cascade; unchecked);
+regenerate `output/postrun` goldens only if the owner wants the new arm as the A/B reference (AGENTS §12 note).
+`test_inbox::test_calibrated_video_is_run_published_and_archived` fails at HEAD (unrelated).
 
 ### 2026-10-06 (ninety-third session) — #93: pre-launch security review of the web platform, fixes built
 
@@ -544,35 +564,3 @@ agree; digs 1.37 near vs 1.66 far (0.29 — FAIL).
 **Not done / owed:** owner: `supabase db push` (new migration, no re-publish needed), give
 the four real heights to `check_heights.py --heights`; O3 (net view) stays "Next" and, per V2,
 would show relative heights only. Next-list: I3 → O3, N10/O2, O1+I4, N7/N9, F1.
-
-
-### 2026-10-06 (ninety-first session) — #91: "Where they land" gets real coverage and honest uncertainty
-
-**Asked (owner):** make the web's "Where they land" widget better through the
-events; then "start with this ... the camera is at 1.5 m, do a best effort and
-be honest with the confidence".
-
-**Measured first (20260920):** 17 of 63 attacks had a spot (touches carried
-depth only); 4 of those 17 were drawn outside the SVG (the out balls); 41 of
-63 had no outcome and were coloured "in play".
-
-**Built:** `src/postrun` — touches carry `court_x_m` (ball at the touch) +
-`court_err_m`, ground ends `court_xy_err_m` (schema 2; points/touches otherwise
-identical to the #87 run). `src/publish/bundle.py` — `own_x_m` filled,
-`landing_x_m` for dug balls, `landing_err_x_m/_y_m`, `landing_result`
-(kill/dug/out/net/error; out/net only when the run saw it). Migration
-`20261006180000_landing_confidence.sql` (3 columns + `player_profile`).
-`webapp` — `LandingMap` redrawn: 2.5 m out-of-court margin, glyph per result,
-shaded error area per ball, counts, plain-words caveat; tolerates old rows.
-
-**Result:** 57 of 63 attacks placed (39 dug, 10 kill, 3 out, 1 net, 8 error,
-2 unresolved). Error model: see Learnings (#91).
-
-**Honest limits:** no position GT — the error is calibrated against players'
-feet, itself a read; the ground-read error is a pixel-slip model, unvalidated;
-line calls stay as weak as before (3 of 10 wrong, open 31) and `landing_in`
-is passed through untouched.
-
-**Not done / owed:** owner: `supabase db push`, then `make postrun` + publish
-per match (old rows show without error areas). `test_inbox`
-`test_calibrated_video_is_run_published_and_archived` fails at HEAD (not #91).

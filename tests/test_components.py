@@ -68,6 +68,22 @@ class TestPlayerDetector(unittest.TestCase):
         valid_frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
         self.assertTrue(self.detector.validate_frame(valid_frame))
 
+    def test_bgr_input_passes_frame_unchanged(self):
+        """Default: ultralytics gets the OpenCV BGR frame as-is."""
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+        frame[..., 0] = 200  # blue channel in BGR
+        self.assertTrue(self.detector.bgr_input)
+        self.assertIs(self.detector.preprocess_frame(frame), frame)
+
+    def test_bgr_input_false_restores_rgb_swap(self):
+        """Legacy arm (player_bgr_input: false) swaps red/blue before the model."""
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+        frame[..., 0] = 200
+        self.detector.bgr_input = False
+        out = self.detector.preprocess_frame(frame)
+        self.assertEqual(int(out[0, 0, 2]), 200)
+        self.assertEqual(int(out[0, 0, 0]), 0)
+
 
 class TestPlayerTracker(unittest.TestCase):
     """Test cases for player tracker."""

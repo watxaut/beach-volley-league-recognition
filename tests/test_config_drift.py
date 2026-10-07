@@ -83,6 +83,7 @@ CTOR_PARITY = [
     # PlayerDetector
     ("player_confidence", PlayerDetector, "confidence_threshold"),
     ("player_imgsz", PlayerDetector, "imgsz"),
+    ("player_bgr_input", PlayerDetector, "bgr_input"),
     ("max_detections", PlayerDetector, "max_players"),
     # PoseEstimator (pose_complexity deliberately differs -- module docstring)
     ("pose_confidence", PoseEstimator, "min_detection_confidence"),
@@ -185,6 +186,7 @@ SCRIPT_KWARGS = {
     "PlayerDetector": {
         "confidence_threshold": "player_confidence",
         "imgsz": "player_imgsz",
+        "bgr_input": "player_bgr_input",
         "max_players": "max_detections",
     },
     "BallTracker": {

@@ -141,6 +141,7 @@ class FrameProcessor:
                 max_players=self.config.get("max_detections", 20),
                 imgsz=self.config.get("player_imgsz", 1280),
                 fast_inference=self.config.get("detector_fast_inference", True),
+                bgr_input=self.config.get("player_bgr_input", True),
             )
 
             # Connect court calibration to player detector for filtering

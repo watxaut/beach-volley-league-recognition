@@ -28,6 +28,7 @@ class PlayerDetector(BaseDetector):
         max_players: int = 20,
         imgsz: int = 1280,
         fast_inference: bool = True,
+        bgr_input: bool = True,
     ):
         """Initialize the player detector.
 
@@ -43,8 +44,13 @@ class PlayerDetector(BaseDetector):
                 near the camera outscore distant players). Downstream stages
                 (court filter, tracker, ball proximity) do the real selection.
             fast_inference: Bit-identical fast model execution (BaseDetector).
+            bgr_input: Hand the OpenCV (BGR) frame to ultralytics unchanged,
+                which is the convention it expects for numpy input (it does the
+                BGR->RGB itself). False restores the pre-2026-10-07 behaviour
+                of converting to RGB first, so the model saw red/blue swapped.
         """
         super().__init__(confidence_threshold, device, fast_inference)
+        self.bgr_input = bgr_input
         self.model_path = model_path or "yolov8n.pt"
         self.max_players = max_players
         # Inference resolution. Video is 1920x1080; YOLO's default 640 shrinks the
@@ -79,6 +85,13 @@ class PlayerDetector(BaseDetector):
         except Exception as e:
             self.logger.error(f"Failed to load YOLO model: {e}")
             raise
+
+    def preprocess_frame(self, frame: np.ndarray) -> np.ndarray:
+        """The frame as the model should receive it (constant per detector, so
+        ``infer`` stays a pure function of the frame)."""
+        if self.bgr_input:
+            return frame
+        return super().preprocess_frame(frame)
 
     def infer(self, frame: np.ndarray) -> np.ndarray:
         """Model half of ``detect()``: the YOLO boxes of one frame, as (N, 6)

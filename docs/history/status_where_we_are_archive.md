@@ -3021,3 +3021,20 @@ deferred).
 tracker admission, R1 departure gate, S1 looming, scale-aware geometry, M1
 far-end crop, possession signal, overpass width-crossing, R2 confidence
 calibration, reach-gate cascade (#72), touch-count rules (TC1).
+
+## Archived 2026-10-07 (#94): the "Speed (#89)" block of "Where we are" + one Session-index line, verbatim (Where-we-are / Session-index budgets)
+
+**Speed (#89, results-neutral — AGENTS §12).** `prefetch_depth: 8` reads
+decode + both detectors' `infer()` ahead on background threads
+(`frame_prefetch.py`); `detector_fast_inference` runs ultralytics' own
+predictor stages and post-processes on the CPU only where an IoU-margin /
+tie certificate proves it exact (`yolo_inference.py`; the device path took
+310 of 26181 player frames on the match). Match 1955 → 783–836 s, practice
+clips 291 → 131 s, every artifact byte-identical to `output/postrun/`
+(`--device cpu` and `--save-video` identical to a true-HEAD worktree too).
+Per lever on e5: 81 → 67 (fast path) / 50 (read-ahead) / 31–35 ms/frame
+(both). The bound is now MediaPipe pose on the loop thread (open point 33).
+
+**Session-index line (2026-08-18), verbatim:**
+
+- 2026-08-18 — e5 serve-zone squatter fixed (server vote + trial expiry + contested swap); e4/e5 GT checked.

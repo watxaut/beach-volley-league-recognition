@@ -397,6 +397,11 @@ plus `cmp` on `diag.jsonl`. Two shipped mechanisms rest on invariants to keep:
 The interactive `--debug-live` producer still reads inline (same
 `process_frame`, same `infer`); the consumer-side bound is MediaPipe pose.
 
+Since #94 (2026-10-07) the player detector gets the BGR frame by default
+(`player_bgr_input: true`); the golden runs in `output/postrun/` pre-date it
+and are the `player_bgr_input: false` arm. For a byte-identical speed A/B
+against them run the new arm with `--config` `{"player_bgr_input": false}`.
+
 ### 13. Web platform (owner-ratified 2026-10-06, #90)
 
 The video → web product (design: `docs/web_platform_design.md`; owner
