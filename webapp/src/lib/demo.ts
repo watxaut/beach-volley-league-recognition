@@ -232,11 +232,12 @@ export function demoApi(): Api {
     points: (id) => delay(byId(id) && canDetail(byId(id)!) ? byId(id)!.points : []),
     actions: (id) => delay(byId(id) && canDetail(byId(id)!) ? byId(id)!.actions : []),
     leaderboard(w) {
-      const rows = new Map<number, LeaderRow>()
+      const rows = new Map<number, Required<LeaderRow>>()
       for (const m of windowed(matches.filter((x) => x.match.status === 'published'), w)) {
         for (const b of box(m)) {
           if (!b.player_id) continue
-          const r = rows.get(b.player_id) ?? { player_id: b.player_id, display_name: b.display_name ?? '?', matches: 0, wins: 0, fantasy: 0, kills: 0, aces: 0, digs: 0, assists: 0, blocks: 0, errors: 0, attacks: 0, attack_errors: 0, serves: 0, points_played: 0, fantasy_per_21: null }
+          const r: Required<LeaderRow> = rows.get(b.player_id) ?? { player_id: b.player_id, display_name: b.display_name ?? '?', matches: 0, wins: 0, fantasy: 0, kills: 0, aces: 0, digs: 0, assists: 0, blocks: 0, errors: 0, attacks: 0, attack_errors: 0, serves: 0, points_played: 0, fantasy_per_21: null, serve_errors: 0, recv_points: 0, recv_won: 0, serve_points: 0, serve_won: 0 }
+          const rally = teamRally(m.points)[b.team]
           r.matches++
           r.wins += b.team === m.match.winner_team ? 1 : 0
           r.fantasy = Math.round((r.fantasy + b.fantasy) * 10) / 10
@@ -249,6 +250,11 @@ export function demoApi(): Api {
           r.attack_errors += b.attack_errors
           r.serves += b.serves
           r.points_played += m.match.n_points ?? 0
+          r.serve_errors += b.serve_errors
+          r.recv_points += rally?.recv_n ?? 0
+          r.recv_won += rally?.recv_won ?? 0
+          r.serve_points += rally?.serve_n ?? 0
+          r.serve_won += rally?.serve_won ?? 0
           rows.set(b.player_id, r)
         }
       }
@@ -303,15 +309,21 @@ export function demoApi(): Api {
         analytics: allowed ? {
           ...playerAnalytics(seats),
           attack_zones: { '1': 4, '2': 7, '3': 2, '5': 3, '6': 1 },
-          landings: Array.from({ length: 22 }, () => {
+          landings: Array.from({ length: 22 }, (_, i) => {
             const k = r()
             const y = 8.6 + r() * 7
-            const spot = { x: 0.5 + r() * 7, y, zone: 2, type: 'hard' }
+            const free = r() < 0.2
+            // where the ball was hit: a spike near the net, a free ball from deeper
+            const start = {
+              sx: 0.8 + r() * 6.4, sy: free ? 2 + r() * 4 : 5.2 + r() * 2.2, sex: 0.4, sey: 0.7,
+              a: free ? 'overpass' : 'spike', p: r() < 0.6 ? 1 : 2, d: seats.length ? seats[i % seats.length].date : null,
+            }
+            const spot = { ...start, x: 0.5 + r() * 7, y, zone: 2, type: 'hard' }
             // depth is the weak axis, and worse far from the camera
             if (k < 0.55) return { ...spot, ex: 0.4, ey: 0.7, in: null, outcome: null, result: 'dug' as const, source: 'next_touch' }
             if (k < 0.8) return { ...spot, ex: 0.3, ey: 0.3 + (y - 8) * 0.1, in: true, outcome: 'kill', result: 'kill' as const, source: 'ball_death' }
             if (k < 0.92) return { ...spot, x: r() > 0.5 ? 9.4 : -1.2, ex: 0.3, ey: 0.3 + (y - 8) * 0.1, in: false, outcome: 'error', result: 'out' as const, source: 'ball_death' }
-            return { x: null, y: null, in: null, outcome: 'error', result: 'net' as const, source: null }
+            return { ...start, x: null, y: null, in: null, outcome: 'error', result: 'net' as const, source: null }
           }),
           touch_depths: [],
         } : null,

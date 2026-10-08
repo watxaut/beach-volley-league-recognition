@@ -481,8 +481,21 @@ Pages). Rules that keep it correct:
   raw touches stay participant-only); `webapp/src/lib/analytics.ts` is the demo
   mode's copy of the same definitions, and both are pinned by the same fixture
   (`supabase/checks/rls_smoke.sql`, `lib/analytics.test.ts`) plus a Python
-  recount (`tests/test_supabase_schema.py`). Every rate shows its `k/n`, a
-  percentage only from `MIN_N` (10) attempts, with a 95 % Wilson range; an
-  unmeasured stat (blocks) reads "not measured", never 0; each stat carries its
-  A/B/C grade (`/measure`). A validation card (V1/V2) fixes its PASS bars
-  BEFORE the first run and reports both what was run and any filter added after.
+  recount (`tests/test_supabase_schema.py`). Every rate shows its `k/n` on the
+  page and a percentage only from `MIN_N` (10) attempts (below that the count
+  is the value); an unmeasured stat (blocks) reads "not measured", never 0. A
+  validation card (V1/V2) fixes its PASS bars BEFORE the first run and reports
+  both what was run and any filter added after.
+* **Explanations are hints, grades are exceptions (owner, 2026-10-08, #96).**
+  What a number means, how it is measured, its 95 % range and its A/B/C grade
+  live in the stat's "i" hint (`webapp/src/lib/glossary.ts`, one text per stat;
+  the long form is `/measure`). Only a B or C stat is also tagged on the page
+  ("approximate"); a letter on every tile is noise. The hint is a real button
+  (tap, click, keyboard): phones have no hover, so never a `title`-only
+  explanation, and nothing a reader needs to act on goes inside one.
+* **Comparing players (#96).** A comparison uses league-tier numbers only (what
+  the league table already shows: `leaderboard` rows, a profile's match
+  history), never another player's analytics tier. The reference is the pooled
+  rate of everyone else, from 3 other players, and a gap is called only when
+  the two 95 % ranges do not overlap. A stat view holds at most ~5 tiles plus
+  its charts; more goes behind a tab.

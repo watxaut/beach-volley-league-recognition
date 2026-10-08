@@ -58,7 +58,8 @@ returns jsonb language sql as $$
                          'attack_zone', 2, 'landing_x_m', 3.1, 'landing_y_m', 12.0,
                          'landing_in', true, 'landing_source', 'ball_death',
                          'landing_err_x_m', 0.3, 'landing_err_y_m', 0.9,
-                         'landing_result', 'kill'),
+                         'landing_result', 'kill', 'own_x_m', 6.3, 'own_y_m', 5.4,
+                         'extra', jsonb_build_object('court_err_m', jsonb_build_array(0.4, 0.7))),
       jsonb_build_object('point_no', 1, 'seq', 4, 'frame', 360, 'slot', null, 'team', 'B',
                          'action', 'dig', 'touch_number', 1, 'observed', false),
       jsonb_build_object('point_no', 2, 'seq', 0, 'frame', 811, 'slot', 'P1A', 'team', 'A',
@@ -82,6 +83,8 @@ begin
     'authenticated must NOT be able to publish';
   assert not has_function_privilege('anon', 'public.leaderboard(text,date,date,int)', 'execute'),
     'anon must not read the leaderboard';
+  assert has_function_privilege('authenticated', 'public.leaderboard(text,date,date,int)', 'execute'),
+    'members read the leaderboard (recreated in player_page_v2)';
   assert not has_function_privilege('anon', 'public.player_profile(bigint,text,date,date,int)', 'execute'),
     'anon must not read profiles';
   assert not has_function_privilege('anon', 'public.match_report(bigint)', 'execute'),
@@ -340,6 +343,17 @@ begin
   assert (select points_played from public.leaderboard() where display_name = 'Check Ari') = 22,
     'points played = the points of every match in the window';
   assert (select attacks from public.leaderboard() where display_name = 'Check Ari') = 1, 'attack denominator';
+  -- the league comparison (player_page_v2): serve errors, and the TEAM's
+  -- side-out / break-point over the player's matches -- league tier, so a
+  -- member who did not play reads them
+  assert (select serve_errors = 0 and recv_points = 1 and recv_won = 1 and serve_points = 1 and serve_won = 1
+          from public.leaderboard() where display_name = 'Check Ari'),
+    'team A received 1 point and won it, served 1 and won it';
+  assert (select recv_points = 1 and recv_won = 0 and serve_points = 1 and serve_won = 0
+          from public.leaderboard() where display_name = 'Check Opp1'),
+    'team B received 1 and served 1, lost both';
+  assert (select recv_points + serve_points from public.leaderboard(p_last_n => 1)) = 0,
+    'a match without points adds none';
   assert (public.player_profile((select id from public.players where display_name = 'Check Ari'),
                                 p_last_n => 1) -> 'totals' ->> 'matches')::int = 1, 'profile last 1';
   assert (public.player_profile((select id from public.players where display_name = 'Check Ari'),
@@ -394,6 +408,11 @@ begin
   assert (v_prof -> 'analytics' -> 'landings' -> 0 ->> 'result') = 'kill'
      and (v_prof -> 'analytics' -> 'landings' -> 0 ->> 'ey')::numeric = 0.9,
          'landings carry their result and position error';
+  -- the attack map (player_page_v2): where the ball was hit, how far off
+  -- that may be, spike or free ball, the possession, the match day
+  assert (v_prof -> 'analytics' -> 'landings' -> 0) @>
+         '{"sx": 6.3, "sy": 5.4, "sex": 0.4, "sey": 0.7, "a": "spike", "p": 1, "d": "2026-09-20"}'::jsonb,
+         'landings carry the start of the attack';
   -- the analytics a window of one match gives: counts with denominators ...
   assert (v_prof -> 'analytics' ->> 'n_attacks')::int = 1
      and (v_prof -> 'analytics' ->> 'n_kills')::int = 1

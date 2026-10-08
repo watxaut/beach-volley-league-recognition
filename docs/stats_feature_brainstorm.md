@@ -7,6 +7,13 @@ be honest about what the camera can really measure. **The owner picks Now /
 Next / Never per ID**; picked items then go to STATUS (Active next, open points
 or task cards).
 
+**Status (2026-10-08, session #96): player page v2.** O2 is built as the *Attack map*: a line per
+attack from the contact point (`own_x_m` / `own_y_m`, on every touch since #91, so I3 was already
+half done) to where the ball came down or was dug, colour = outcome, dashed = free ball; hard / touch
+stays off (V1 below). New, not in the lists: **"you vs the league" and "you vs your earlier matches"**
+(strips per stat from league-tier counts, a verdict only when the 95 % ranges do not overlap), and
+grades moved from a letter per tile into each stat's hint. Still open from O2: kill / error ends (I6).
+
 **Status (2026-10-07, session #92): the "Now" picks are built** (see the table below);
 V1 and V2 were run and both **fail** their pre-registered bars, which changes the
 "Next" list (O3 shows relative heights only; hard/touch is not shown).

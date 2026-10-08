@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hitText, hitting, MIN_N, pct, rangeText, rate, rolling, wilson } from './stats'
+import { hitText, hitting, hittingRange, MIN_N, pct, poissonRange, rangeText, rate, rolling, wilson } from './stats'
 
 describe('wilson', () => {
   it('matches the intervals quoted in the brainstorm (4/10, 20/50, 40/100)', () => {
@@ -33,6 +33,25 @@ describe('rates', () => {
     expect(hitText(null)).toBe('–')
     expect(pct(0.4)).toBe('40%')
     expect(rangeText(wilson(4, 10))).toBe('17–69%')
+  })
+})
+
+describe('ranges of the other kinds of number', () => {
+  it('a count: Byar matches the exact Poisson interval of 10 (4.8 to 18.4)', () => {
+    const r = poissonRange(10)
+    expect(r.lo).toBeCloseTo(4.8, 1)
+    expect(r.hi).toBeCloseTo(18.4, 1)
+    expect(poissonRange(0).lo).toBe(0)
+    expect(poissonRange(0).hi).toBeGreaterThan(3)
+  })
+  it('hitting %: centred on the value, never zero wide, inside -1..1', () => {
+    const r = hittingRange({ n: 20, kills: 8, errors: 3 })!
+    expect((r.lo + r.hi) / 2).toBeCloseTo(0.25)
+    expect(r.hi - r.lo).toBeGreaterThan(0.4)
+    const all = hittingRange({ n: 10, kills: 10, errors: 0 })!
+    expect(all.hi).toBe(1)
+    expect(all.lo).toBeLessThan(0.9)
+    expect(hittingRange({ n: 0, kills: 0, errors: 0 })).toBeNull()
   })
 })
 

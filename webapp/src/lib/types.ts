@@ -134,6 +134,14 @@ export interface LeaderRow {
   serves: number
   points_played: number
   fantasy_per_21: number | null
+  /** The four below and `serve_errors` are missing on a database older than
+   * the player_page_v2 migration. recv = points the player's TEAM received,
+   * serve = points it served, over the matches of the window. */
+  serve_errors?: number
+  recv_points?: number
+  recv_won?: number
+  serve_points?: number
+  serve_won?: number
 }
 
 export interface HistoryRow {
@@ -289,10 +297,11 @@ export interface WindowParams {
 }
 
 /** One attack and where it came down, in the attacker's frame: x 0..8 from
- * their left sideline, y 8 (net) .. 16 (the opponents' baseline). `ex` / `ey`
- * are how far off the spot may be, in metres across / along the court (about
- * one sigma, best effort). The fields after `source` are missing on a
- * database that has not run the landing_confidence migration. */
+ * their left sideline, y 0 (own baseline) .. 8 (net) .. 16 (the opponents'
+ * baseline). `ex` / `ey` are how far off the spot may be, in metres across /
+ * along the court (about one sigma, best effort). The fields after `source`
+ * are missing on a database that has not run the landing_confidence
+ * migration; those from `sx` on, before player_page_v2. */
 export interface Landing {
   x: number | null
   y: number | null
@@ -304,6 +313,17 @@ export interface Landing {
   result?: 'kill' | 'dug' | 'out' | 'net' | 'error' | null
   zone?: number | null
   type?: string | null
+  /** Where the ball was hit (same frame), and how far off that may be. */
+  sx?: number | null
+  sy?: number | null
+  sex?: number | null
+  sey?: number | null
+  /** spike, or overpass = a free ball. */
+  a?: string | null
+  /** Possession of the rally: 1 = off the reception, 2+ = in transition. */
+  p?: number | null
+  /** Match date. */
+  d?: string | null
 }
 
 export interface MatchSource {

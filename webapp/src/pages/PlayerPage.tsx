@@ -1,21 +1,37 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useApp, useLoad } from '../app/state'
-import { useWindowKey } from '../app/window'
+import { useTabKey, useWindowKey } from '../app/window'
 import { RollingChart, Sparkline, StackBar, type Segment } from '../components/Charts'
-import { LandingMap, ZoneGrid } from '../components/Court'
-import { RateTile } from '../components/Rate'
-import { Card, ErrorBox, GradeBadge, Loading, Tile } from '../components/ui'
+import { Compare, type CompareMode } from '../components/Compare'
+import { AttackMap } from '../components/Court'
+import { HittingTile, RateTile } from '../components/Rate'
+import { Approx, Card, ErrorBox, Loading, Segmented, StatInfo, Tabs, Tile } from '../components/ui'
 import { WindowPicker } from '../components/WindowPicker'
+import { compare, MIN_PEERS, RECENT, splitEarlier, sumHistory, type CompareRow } from '../lib/compare'
 import { formatDate, matchLabel, signed } from '../lib/format'
-import { hitText, hitting, MIN_N, pct, ROLLING_WINDOW, rolling } from '../lib/stats'
-import type { PlayerAnalytics, PlayerProfile } from '../lib/types'
-import { windowLabel, windowParams } from '../lib/window'
+import { hitText, hitting, ROLLING_WINDOW, rolling } from '../lib/stats'
+import type { HistoryRow, LeaderRow, PlayerAnalytics, PlayerProfile } from '../lib/types'
+import { ALL_TIME, windowLabel, windowParams } from '../lib/window'
+
+// Overview and Matches are league tier (every member); Attack and Serve &
+// receive are the player's analytics tier.
+const TABS = ['overview', 'attack', 'serve', 'matches'] as const
+type TabKey = typeof TABS[number]
+const TAB_LABEL: Record<TabKey, string> = { overview: 'Overview', attack: 'Attack', serve: 'Serve & receive', matches: 'Matches' }
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
 export function PlayerPage() {
   const { id = '' } = useParams()
   const { api } = useApp()
   const [key, setKey] = useWindowKey()
+  const [tab, setTab] = useTabKey(TABS)
   const data = useLoad(() => api.playerProfile(Number(id), windowParams(key)), [id, key])
+  const board = useLoad(() => api.leaderboard(windowParams(key)), [key])
+  // every match of the player, for "against your earlier matches"; under "all
+  // time" the profile above already is that
+  const whole = useLoad(() => (key === 'all' ? Promise.resolve(null) : api.playerProfile(Number(id), ALL_TIME)), [id, key === 'all'])
   const seasons = useLoad(() => api.seasons(), [])
 
   if (data.loading && !data.data) return <Loading />
@@ -23,17 +39,24 @@ export function PlayerPage() {
   if (!data.data) return <p>Player not found. <Link to="/league">League</Link></p>
   const { player, totals: t, history, analytics, can_see_analytics, form } = data.data
   const delta = form.avg5 !== null && form.avg_all !== null ? form.avg5 - form.avg_all : null
+  const lost = history.filter((h) => h.won === false).length
+  const rows = board.data ?? []
+  const rank = rows.findIndex((r) => r.player_id === player.id) + 1
+  const who = player.is_me ? 'You' : player.display_name
+  const privateNote = <div className="notice">{player.display_name} keeps detailed analytics private.</div>
 
   return (
     <>
       <div className="filter-row">
         <WindowPicker value={key} onChange={setKey} seasons={seasons.data ?? []} />
-        <span className="muted small">{t.matches} match{t.matches === 1 ? '' : 'es'}, {windowLabel(key)}</span>
       </div>
       <div className="hero" style={{ marginBottom: 16, opacity: data.loading ? 0.6 : 1 }}>
         <div>
           <h1>{player.display_name}{player.is_me && <span className="badge" style={{ marginLeft: 8 }}>you</span>}</h1>
-          <p className="muted" style={{ margin: 0 }}>{t.matches} matches · {t.wins} won</p>
+          <p className="muted" style={{ margin: 0 }}>
+            {plural(t.matches, 'match', 'matches')} · <span title="Won – lost">{t.wins}–{lost}</span>
+            {rank > 0 && <> · <span title={`By fantasy points among ${rows.length} players in this view, as on the league table`}><strong>#{rank}</strong> in the league</span></>}
+          </p>
           {form.n >= 2 && (
             <div className="row small" style={{ marginTop: 6 }} title="The newest five matches, whatever the time filter">
               <span className="muted">Form</span>
@@ -47,165 +70,170 @@ export function PlayerPage() {
             </div>
           )}
         </div>
-        <div style={{ textAlign: 'right' }}>
+        <div className="hero-side">
           <div className="hero-number">{signed(t.fantasy)}</div>
-          <div className="tile-label">fantasy points</div>
-          {t.fantasy_per_21 !== null && (
-            <div className="muted small" title="Fantasy points per 21 points played: long and short matches compare">
-              {signed(t.fantasy_per_21)} per 21 points
-            </div>
-          )}
+          <div className="tile-label">fantasy points<StatInfo term="fantasy" /></div>
+          {t.fantasy_per_21 !== null && <div className="muted small">{signed(t.fantasy_per_21)} per 21 points</div>}
         </div>
       </div>
 
+      <Tabs tabs={TABS.map((k) => ({ key: k, label: TAB_LABEL[k] }))} value={tab} onChange={setTab} label="Player statistics" />
+
+      <div role="tabpanel" aria-label={TAB_LABEL[tab]} style={{ opacity: data.loading ? 0.6 : 1 }}>
+        {tab === 'overview' && (
+          <Overview data={data.data} board={rows} boardError={board.error} windowKey={key} who={who}
+                    allHistory={key === 'all' ? history : whole.data?.history ?? null} />
+        )}
+        {tab === 'attack' && (can_see_analytics && analytics ? <Attack a={analytics} /> : privateNote)}
+        {tab === 'serve' && (can_see_analytics && analytics ? <Serve a={analytics} who={who} /> : privateNote)}
+        {tab === 'matches' && <Matches history={history} />}
+      </div>
+
+      <p className="muted small" style={{ marginBottom: 0 }}>
+        {tab !== 'overview' && tab !== 'matches' && player.is_me && !player.profile_public
+          && <>Only you and admins see this tab · <Link to="/settings">share</Link> · </>}
+        <Link to="/measure">How we measure</Link>
+      </p>
+    </>
+  )
+}
+
+/** The reference a league comparison is counted over, in words. */
+function leagueScope(key: string): string {
+  if (key === 'all') return 'all time'
+  if (/^n\d+$/.test(key)) return `over the league's ${windowLabel(key)}`
+  return key.startsWith('s:') ? `in ${windowLabel(key)}` : `over the ${windowLabel(key)}`
+}
+
+function Overview({ data, board, boardError, windowKey, who, allHistory }: {
+  data: PlayerProfile; board: LeaderRow[]; boardError: string | null; windowKey: string; who: string
+  allHistory: HistoryRow[] | null
+}) {
+  const [mode, setMode] = useState<CompareMode>('league')
+  const { player, totals: t, history } = data
+  const mine = board.find((r) => r.player_id === player.id)
+  const others = board.filter((r) => r.player_id !== player.id)
+    .map((r) => ({ id: r.player_id, name: r.display_name, sample: r }))
+  const { now, before } = splitEarlier(allHistory ?? [], windowKey === 'all' ? null : history.map((h) => h.match_id))
+  const hasEarlier = now.length > 0 && before.length > 0
+  const shown: CompareMode = mode === 'earlier' && !hasEarlier ? 'league' : mode
+
+  const rows: CompareRow[] = shown === 'league'
+    ? (mine ? compare(mine, others) : [])
+    : compare(sumHistory(now), [{ id: 0, name: 'Before', sample: sumHistory(before) }], 1)
+  const noReference = rows.length > 0 && rows.every((r) => r.ref === null)
+  const whose = player.is_me ? 'your' : 'their'
+
+  return (
+    <>
       <Card>
-        <div className="tiles">
-          <Tile label="Kills" value={t.kills} grade="A" />
-          <Tile label="Aces" value={t.aces} grade="A" />
-          <Tile label="Digs" value={t.digs} grade="A" hint="A lower bound: about 1 touch in 15 is never credited" />
-          <Tile label="Assists" value={t.assists} grade="A" />
-          <Tile label="Serves" value={t.serves} grade="A" />
-          <Tile label="Attacks" value={t.attacks} grade="A" />
-          <Tile label="Errors" value={t.errors} grade="A" hint="Service + attack errors, and a set or dig that ended the rally" />
-          <Tile label="Blocks" value="–" sub="not measured" hint="The camera cannot see blocks, so none are counted" />
+        <div className="tiles tiles-5">
+          <Tile label="Kills" value={t.kills} info={<StatInfo term="kills" />} />
+          <Tile label="Aces" value={t.aces} info={<StatInfo term="aces" />} />
+          <Tile label="Digs" value={t.digs} info={<StatInfo term="digs" />} />
+          <Tile label="Assists" value={t.assists} info={<StatInfo term="assists" />} />
+          <Tile label="Errors" value={t.errors} info={<StatInfo term="errors" />} />
         </div>
       </Card>
 
-      {can_see_analytics && analytics ? (
-        <Analytics a={analytics} data={data.data} playerIsMe={player.is_me} publicProfile={player.profile_public} />
-      ) : (
-        <div className="notice">{player.display_name} keeps detailed analytics private.</div>
-      )}
-
-      <Card title="Matches">
-        {history.length === 0 ? <p className="muted">No published matches in this view.</p> : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th className="left">Date</th>
-                  <th className="left">Match</th>
-                  <th>Score</th>
-                  <th>Pts</th>
-                  <th>K</th>
-                  <th>Ace</th>
-                  <th>Dig</th>
-                  <th>Err</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((h) => (
-                  <tr key={h.match_id}>
-                    <td className="left">{formatDate(h.match_date)}</td>
-                    <td className="left">
-                      <Link to={`/matches/${h.match_key}`}>{matchLabel(h)}</Link>{' '}
-                      {h.won !== null && <span className={`badge${h.won ? ' badge-win' : ''}`}>{h.won ? 'W' : 'L'}</span>}
-                    </td>
-                    <td>{h.team === 'A' ? `${h.score_a}–${h.score_b}` : `${h.score_b}–${h.score_a}`}</td>
-                    <td className="strong">{signed(h.fantasy)}</td>
-                    <td>{h.kills}</td>
-                    <td>{h.aces}</td>
-                    <td>{h.digs}</td>
-                    <td>{h.errors}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <Card
+        title={<>{who} vs {shown === 'league' ? 'the league' : `${whose} earlier matches`}<StatInfo term="compare" /></>}
+        action={(
+          <Segmented<CompareMode> label="Compare with" value={shown} onChange={setMode} options={[
+            { key: 'league', label: 'League' },
+            { key: 'earlier', label: 'Earlier matches', disabled: !hasEarlier,
+              title: hasEarlier ? undefined : windowKey === 'all'
+                ? `Needs matches before ${whose} newest ${RECENT}` : `Needs matches before this period`,
+            },
+          ]} />
+        )}>
+        <ErrorBox error={boardError} />
+        {rows.length === 0 ? <p className="muted" style={{ margin: 0 }}>No published matches in this view.</p> : (
+          <>
+            <p className="muted small">
+              {shown === 'league'
+                ? <>Against everyone else, {leagueScope(windowKey)}.</>
+                : <>{windowKey === 'all' ? `The newest ${plural(now.length, 'match', 'matches')}` : `The ${plural(now.length, 'match', 'matches')} of this period`} against
+                  the {before.length} before.</>}
+              {noReference && shown === 'league' && <> The league reference appears once {MIN_PEERS} other players have played in this view.</>}
+            </p>
+            <Compare rows={rows} mode={shown} who={who} refName={shown === 'league' ? 'League' : 'Before'} />
+          </>
         )}
       </Card>
     </>
   )
 }
 
-function Analytics({ a, data, playerIsMe, publicProfile }: {
-  a: PlayerAnalytics; data: PlayerProfile; playerIsMe: boolean; publicProfile: boolean
-}) {
-  const hitAll = { n: a.hit.reception.n + a.hit.transition.n, kills: a.n_kills, errors: a.n_attack_errors }
-  const hitRate = hitting(hitAll)
+function Attack({ a }: { a: PlayerAnalytics }) {
+  const hitAll = { n: a.n_attacks, kills: a.n_kills, errors: a.n_attack_errors }
   return (
-    <Card title="Analytics" action={playerIsMe && !publicProfile
-      ? <span className="muted small">Only you and admins see this · <Link to="/settings">share</Link></span>
-      : undefined}>
-      <div className="tiles" style={{ marginBottom: 16 }}>
-        <RateTile label="Kill rate" k={a.n_kills} n={a.n_attacks} grade="A" hint="Kills / attacks" />
-        <Tile label="Hitting %" grade="A" value={hitText(hitRate)} hint="(kills − errors) / attacks"
-              sub={hitRate === null ? <>{a.n_kills}−{a.n_attack_errors}/{a.n_attacks} · from {MIN_N}+</> : <>({a.n_kills}−{a.n_attack_errors})/{a.n_attacks}</>} />
-        <RateTile label="Attack errors" k={a.n_attack_errors} n={a.n_attacks} grade="A" />
-        <RateTile label="Ace rate" k={a.n_aces} n={a.n_serves} grade="A" hint="Aces / serves" />
-        <RateTile label="Serve errors" k={a.n_serve_errors} n={a.n_serves} grade="A" />
-      </div>
-
-      <div className="split split-2">
-        <div>
-          <h3>Attack efficiency <GradeBadge grade="A" /></h3>
-          <table>
-            <thead><tr><th className="left" /><th>Att</th><th>K</th><th>E</th><th title="(kills − errors) / attacks">Hit %</th></tr></thead>
-            <tbody>
-              {([['Off the reception', a.hit.reception], ['In transition', a.hit.transition]] as const).map(([label, h]) => (
-                <tr key={label}>
-                  <td className="left">{label}</td><td>{h.n}</td><td>{h.kills}</td><td>{h.errors}</td>
-                  <td className="strong">{hitText(hitting(h))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="muted small">Off the reception = the first attack of a rally you received; transition = after a dig of their attack.
-            Hitting % shows from {MIN_N} attacks.</p>
+    <>
+      <Card>
+        <div className="tiles tiles-3">
+          <HittingTile t={hitAll} />
+          <RateTile label="Kill %" k={a.n_kills} n={a.n_attacks} term="kill_rate" unit="attacks" />
+          <RateTile label="Attack errors" k={a.n_attack_errors} n={a.n_attacks} term="attack_errors" unit="attacks" />
         </div>
+      </Card>
+
+      <div className="grid grid-2">
+        <Card title={<>Attack map<StatInfo term="attack_map" /> <Approx grade="B" /></>}>
+          {a.landings.length
+            ? <AttackMap landings={a.landings} />
+            : <p className="muted" style={{ margin: 0 }}>No attack positions recorded yet.</p>}
+        </Card>
         <div>
-          <h3>Side-out &amp; break-point <GradeBadge grade="A" /></h3>
-          <div className="tiles">
-            <RateTile label="Your serve won" k={a.rally.own_serve.won} n={a.rally.own_serve.n} hint="Points you served that your team won" />
-            <RateTile label="Team break %" k={a.rally.team_serving.won} n={a.rally.team_serving.n} hint="Points won while your team served" />
-            <RateTile label="Team side-out %" k={a.rally.team_receiving.won} n={a.rally.team_receiving.n} hint="Points won while your team received" />
-          </div>
-        </div>
-      </div>
-
-      <div className="split split-2" style={{ marginTop: 16 }}>
-        <ServeTargeting a={a} />
-        <ReceptionOutcome a={a} />
-      </div>
-
-      <div style={{ marginTop: 16 }}>
-        <h3>Progress <GradeBadge grade="A" /></h3>
-        <div className="split split-2">
+          <Card title={<>By situation<StatInfo term="hit_split" /></>}>
+            <table>
+              <thead><tr><th className="left" /><th>Att</th><th>K</th><th>E</th><th>Hit %</th></tr></thead>
+              <tbody>
+                {([['Off the reception', a.hit.reception], ['In transition', a.hit.transition]] as const).map(([label, h]) => (
+                  <tr key={label}>
+                    <td className="left">{label}</td><td>{h.n}</td><td>{h.kills}</td><td>{h.errors}</td>
+                    <td className="strong">{hitText(hitting(h))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
           <Trend title="Kill rate" unit="attack" hits={a.attack_series.map((s) => s.r === 'kill')}
                  dates={a.attack_series.map((s) => s.d)} />
-          <Trend title="Serves in play" unit="serve" hits={a.serve_series.map((s) => s.r !== 'error')}
-                 dates={a.serve_series.map((s) => s.d)} />
         </div>
       </div>
-
-      <div className="grid grid-2" style={{ marginTop: 16 }}>
-        <div>
-          <h3>Where the attacks start <GradeBadge grade="B" /></h3>
-          {Object.keys(a.attack_zones).length
-            ? <ZoneGrid counts={a.attack_zones} />
-            : <p className="muted">No attack zones recorded yet.</p>}
-        </div>
-        <div>
-          <h3>Where they land <GradeBadge grade="C" /></h3>
-          {a.landings.length
-            ? <LandingMap landings={a.landings} />
-            : <p className="muted">No landings recorded yet.</p>}
-        </div>
-      </div>
-      <p className="muted small" style={{ marginBottom: 0 }}>
-        {data.totals.matches} match{data.totals.matches === 1 ? '' : 'es'} in view. Counts are lower bounds:
-        about 1 touch in 15 is never credited. <Link to="/measure">How we measure</Link>
-      </p>
-    </Card>
+    </>
   )
 }
 
-function ServeTargeting({ a }: { a: PlayerAnalytics }) {
+function Serve({ a, who }: { a: PlayerAnalytics; who: string }) {
+  const { own_serve: own, team_serving: serving, team_receiving: receiving } = a.rally
+  return (
+    <>
+      <Card>
+        <div className="tiles">
+          <RateTile label="Ace %" k={a.n_aces} n={a.n_serves} term="ace_rate" unit="serves" />
+          <RateTile label="Serve errors" k={a.n_serve_errors} n={a.n_serves} term="serve_errors" unit="serves" />
+          <RateTile label={who === 'You' ? 'Your serve won' : 'Serve won'} k={own.won} n={own.n} term="own_serve" unit="serves"
+                    note={`The team won ${serving.won} of ${serving.n} points while serving.`} />
+          <RateTile label="Side-out %" k={receiving.won} n={receiving.n} term="side_out" unit="points" />
+        </div>
+      </Card>
+      <div className="grid grid-2">
+        <ServeTargeting a={a} who={who} />
+        <ReceptionOutcome a={a} />
+      </div>
+      <Trend title="Serves in play" unit="serve" hits={a.serve_series.map((s) => s.r !== 'error')}
+             dates={a.serve_series.map((s) => s.d)} />
+    </>
+  )
+}
+
+function ServeTargeting({ a, who }: { a: PlayerAnalytics; who: string }) {
   const { serve_in: i, serve_out: o } = a
   const partner = Math.max(0, i.team_credited - i.mine)
   const unseen = Math.max(0, i.opp_serves - i.team_credited)
   const inSegments: Segment[] = [
-    { label: 'you', n: i.mine, color: 'var(--accent)' },
+    { label: who.toLowerCase() === 'you' ? 'you' : who, n: i.mine, color: 'var(--accent)' },
     { label: 'partner', n: partner, color: 'var(--heat-1)' },
     { label: 'not seen', n: unseen, color: 'var(--axis)', hint: 'an ace, or nobody credited with the first touch' },
   ]
@@ -215,28 +243,24 @@ function ServeTargeting({ a }: { a: PlayerAnalytics }) {
     { label: 'not seen', n: o.unseen, color: 'var(--axis)' },
   ]
   return (
-    <div>
-      <h3>Serve targeting <GradeBadge grade="A" /></h3>
-      {i.opp_serves + o.serves === 0 ? <p className="muted">No serves yet.</p> : (
+    <Card title={<>Serve targeting<StatInfo term="serve_in" /></>}>
+      {i.opp_serves + o.serves === 0 ? <p className="muted" style={{ margin: 0 }}>No serves yet.</p> : (
         <div className="stack">
           {i.opp_serves > 0 && (
             <div>
-              <p className="small" style={{ marginBottom: 4 }}>
-                Their serves to your team: <strong>you took {i.mine} of {i.team_credited}</strong> credited
-                {i.team_credited >= MIN_N ? ` (${pct(i.mine / i.team_credited)}; an even split is 50%)` : ` (a share shows from ${MIN_N})`}
-              </p>
-              <StackBar segments={inSegments} label="Serves aimed at your team" />
+              <h3>Who they serve</h3>
+              <StackBar segments={inSegments} label="Serves aimed at the team, by who took them" />
             </div>
           )}
           {o.serves > 0 && (
-            <div>
-              <p className="small" style={{ marginBottom: 4 }}>Your {o.serves} serves went to:</p>
-              <StackBar segments={outSegments} label="Who received your serves" />
+            <div style={{ marginTop: 16 }}>
+              <h3>Who took {who === 'You' ? 'your' : 'their'} serves</h3>
+              <StackBar segments={outSegments} label="Who received the serves" />
             </div>
           )}
         </div>
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -249,35 +273,78 @@ function ReceptionOutcome({ a }: { a: PlayerAnalytics }) {
     { label: 'no attack', n: r.none, color: 'var(--axis)', hint: 'the ball died or the next touch was not seen' },
   ]
   return (
-    <div>
-      <h3>After your reception <GradeBadge grade="A" /></h3>
-      {r.n === 0 ? <p className="muted">No receptions credited yet.</p> : (
+    <Card title={<>After the reception<StatInfo term="reception" /></>}>
+      {r.n === 0 ? <p className="muted" style={{ margin: 0 }}>No receptions credited yet.</p> : (
         <>
-          <p className="small" style={{ marginBottom: 4 }}>
-            Of <strong>{r.n}</strong> receptions: <strong>{r.spike}</strong> became a spike
-            {r.n >= MIN_N && <> ({pct(r.spike / r.n)})</>}, <strong>{r.first_ball_kills}</strong> won the point on the first attack.
+          <h3>What {plural(r.n, 'reception')} became</h3>
+          <StackBar segments={segments} label="What the receptions became" />
+          <p className="small" style={{ margin: '12px 0 0' }}>
+            <strong>{r.first_ball_kills}</strong> <span className="muted">won the point on the first attack.</span>
           </p>
-          <StackBar segments={segments} label="What your receptions became" />
-          <p className="muted small" style={{ marginBottom: 0 }}>A pass-quality proxy: nobody grades the pass itself.</p>
         </>
       )}
-    </div>
+    </Card>
   )
 }
 
+/** A rate over rolling windows of attempts, once there are enough of them;
+ * until then one line saying when it starts. */
 function Trend({ title, unit, hits, dates }: { title: string; unit: string; hits: boolean[]; dates: string[] }) {
   const points = rolling(hits)
+  if (points.length === 0) {
+    return (
+      <p className="muted small trend-wait">
+        {title} trend from {ROLLING_WINDOW} {unit}s · {hits.length} so far<StatInfo term="trend" />
+      </p>
+    )
+  }
   return (
-    <div>
-      <h3>{title}</h3>
-      {points.length === 0 ? (
-        <p className="muted small">
-          A trend needs {ROLLING_WINDOW} {unit}s; {hits.length} so far. It is drawn over the last {ROLLING_WINDOW}, with a band for how
-          much a rate can move by chance.
-        </p>
-      ) : (
+    <Card title={<>{title} over time<StatInfo term="trend" /></>}>
+      <div style={{ maxWidth: 620 }}>
         <RollingChart points={points} dates={dates} unit={unit} window={ROLLING_WINDOW} label={`${title} over the last ${ROLLING_WINDOW} ${unit}s`} />
+      </div>
+    </Card>
+  )
+}
+
+function Matches({ history }: { history: HistoryRow[] }) {
+  return (
+    <Card>
+      {history.length === 0 ? <p className="muted" style={{ margin: 0 }}>No published matches in this view.</p> : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th className="left">Date</th>
+                <th className="left">Match</th>
+                <th>Score</th>
+                <th title="Fantasy points">Pts</th>
+                <th title="Kills">K</th>
+                <th title="Aces">Ace</th>
+                <th title="Digs">Dig</th>
+                <th title="Errors: service + attack + ball handling">Err</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((h) => (
+                <tr key={h.match_id}>
+                  <td className="left">{formatDate(h.match_date)}</td>
+                  <td className="left">
+                    <Link to={`/matches/${h.match_key}`}>{matchLabel(h)}</Link>{' '}
+                    {h.won !== null && <span className={`badge${h.won ? ' badge-win' : ''}`}>{h.won ? 'W' : 'L'}</span>}
+                  </td>
+                  <td>{h.team === 'A' ? `${h.score_a}–${h.score_b}` : `${h.score_b}–${h.score_a}`}</td>
+                  <td className="strong">{signed(h.fantasy)}</td>
+                  <td>{h.kills}</td>
+                  <td>{h.aces}</td>
+                  <td>{h.digs}</td>
+                  <td>{h.errors}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
-    </div>
+    </Card>
   )
 }

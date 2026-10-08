@@ -8,3 +8,7 @@ export const GRADE_HINT: Record<Grade, string> = {
   B: 'Grade B: measured, with some error',
   C: 'Grade C: a best effort, read with care',
 }
+
+/** The grade in one word, as a stat's hint says it. Only B and C are also
+ * tagged on the page itself: a reliable number is the normal case. */
+export const GRADE_WORD: Record<Grade, string> = { A: 'Reliable', B: 'Approximate', C: 'Best effort' }
