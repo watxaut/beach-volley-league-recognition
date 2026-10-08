@@ -5,8 +5,8 @@ import { MatchReport } from '../components/MatchReport'
 import { PlayByPlay } from '../components/PlayByPlay'
 import { ScoreWorm } from '../components/ScoreWorm'
 import { Card, ErrorBox, Loading, StatusBadge } from '../components/ui'
-import { formatDate, matchLabel, minutes, teamName } from '../lib/format'
-import type { Slot, Team } from '../lib/types'
+import { formatDate, matchLabel, minutes, slotNames, teamName } from '../lib/format'
+import type { Team } from '../lib/types'
 
 export function MatchPage() {
   const { key = '' } = useParams()
@@ -26,11 +26,7 @@ export function MatchPage() {
   const { match: m, participants, players, box, points, actions, report } = data.data
   const teamNames: Record<Team, string> = {
     A: teamName('A', participants, players), B: teamName('B', participants, players)}
-  const names: Partial<Record<Slot, string>> = {}
-  for (const p of participants) {
-    const pl = players.find((x) => x.id === p.player_id)
-    if (pl) names[p.slot] = pl.display_name
-  }
+  const names = slotNames(participants, players)
 
   return (
     <>
@@ -71,7 +67,7 @@ export function MatchPage() {
       </Card>
 
       <Card title="Box score">
-        <BoxScore rows={box} myPlayerId={me?.id ?? null} />
+        <BoxScore rows={box} names={names} myPlayerId={me?.id ?? null} />
       </Card>
 
       {report && (

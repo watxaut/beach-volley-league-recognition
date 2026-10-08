@@ -218,7 +218,9 @@ deploy `main`.
    Supabase *Site URL* and *Redirect URLs* (step 2.7). `webapp/wrangler.jsonc`
    (`not_found_handling: single-page-application`) makes deep links like
    `/matches/…` work. Don't add a `/* /index.html 200` rule to `_redirects`:
-   Workers rejects it as an infinite loop.
+   Workers rejects it as an infinite loop. The empty `"previews": {}` block is
+   what lets the pull-request build (`wrangler preview`) run; without it that
+   build fails with "missing a `previews` block".
 
 **Check:** the site shows the login page. "Site not configured" means the
 two `VITE_` variables are missing from the build: add them and redeploy.

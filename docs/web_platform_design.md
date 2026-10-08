@@ -373,7 +373,11 @@ subtraction.
    thumbnails with a player dropdown each (a player can't take two slots, enforced by the DB),
    the Drive video link, then **Publish**. This is the STATUS "rollout gate =
    fast human review".
-7. **Players:** create, edit, link to an account, invite.
+7. **Players:** create, edit, link to an account, invite. **Unknown players:** a slot
+   can be marked *Unknown player* instead of assigned (an opponent or guest the league
+   does not know): the slot keeps its stats inside that match but is in no ranking or
+   profile; this page lists every unknown slot with a "re-tag as" dropdown, so a person
+   who joins later takes their matches over (`20261008100000_unknown_players.sql`).
 8. **Publication log:** revisions per match with result, hash, pipeline
    version, bundle download and video link.
 
@@ -438,7 +442,7 @@ Your three tables are the right core. Four refinements:
 | `players` | real person | admin (+ own `profile_public`) | `id`, `display_name`, `user_id` unique null, `handedness`, `preferred_side`, `photo_path`, `profile_public`, `active` |
 | `matches` | one video = one match | admin cols + pipeline cols | `id`, **`match_key` unique**, admin: `title`, `venue`, `season`, `status` (draft/published/hidden), `detail_public`; pipeline: `match_date`, `score_a/b`, `winner_team`, `n_points`, `set_complete`, `duration_s`, `checks`, `current_publication_id` |
 | `match_sources` | 1:1 match, **admin-only** | pipeline | `video_filename`, `video_url`, `video_sha256`, `fps`, `width`, `height` |
-| `match_participants` | match × slot | slot rows: pipeline; `player_id`: admin | PK (`match_id`, `slot`), `team` generated from slot, `player_id`, `thumb_path`, unique (`match_id`, `player_id`) |
+| `match_participants` | match × slot | slot rows: pipeline; `player_id`, `is_unknown`: admin | PK (`match_id`, `slot`), `team` generated from slot, `player_id`, `is_unknown` (no player, stats kept in the match, never in a ranking; check: unknown ⇒ `player_id` null), `thumb_path`, unique (`match_id`, `player_id`) |
 | `points` | rally | pipeline | PK (`match_id`, `point_no`), `set_no`, `start/end_frame`, `serving_team`, `server_slot`, `near_team`, `winner_team`, `winner_source`, `end_kind`, `end_x_m/end_y_m/end_in_court`, `score_a/b_after`, `flags[]` |
 | `actions` | **touch (lowest grain)** | pipeline | PK (`match_id`, `point_no`, `seq`), `frame`, `slot` (null = not credited), `team`, `side`, `action`, `touch_number`, `outcome`, `is_assist`, `observed`, `evidence`, `player_source`, `height_m`, `own_x_m/own_y_m`, attack detail: `attack_zone`, `spike_type`, `landing_x_m/landing_y_m/landing_in/landing_source`, `landing_err_x_m/landing_err_y_m` (± metres across/along, ~1σ best effort), `landing_result` (kill/dug/out/net/error), dig detail: `dug_zone`, `extra` |
 | `match_publications` | publish call (**the log**) | pipeline (append-only) | `match_id`, `revision`, `result` (applied/unchanged), `content_sha256`, `pipeline_version`, `bundle_path`, `video_url`, counts, `score`, `published_by/at`, `notes` |

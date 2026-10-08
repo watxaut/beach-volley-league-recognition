@@ -420,6 +420,14 @@ Pages). Rules that keep it correct:
   accounts, slot → player, title/venue/season/status/detail_public, fantasy
   rules) is never written by the publisher -- the `video_players` principle.
   Re-publishing is always safe: identical content is logged `unchanged`.
+* **Unknown slots (owner, 2026-10-08).** An opponent the league does not know is a
+  state of the SLOT, `match_participants.is_unknown` (admin-owned like `player_id`;
+  `player_id` stays NULL), never a placeholder `players` row. In-match views key on the
+  slot and keep its stats; every cross-match view (`leaderboard`, `player_profile`,
+  averages, windows) joins `players` by `player_id`, so an unknown cannot reach a
+  ranking. Keep it that way: never aggregate by slot across matches. Re-tag = give
+  the slot a player (admin -> Players -> Unknown players); the publisher never touches
+  the flag.
 * **Credit parity.** An action carries a `slot` exactly when
   `postrun.player_stats` credits it, and every SQL stat counts `slot IS NOT
   NULL` only (precision first, §11). A change to the post-run stats rules

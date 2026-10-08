@@ -59,6 +59,9 @@ export interface Participant {
   slot: Slot
   team: Team
   player_id: number | null
+  /** Admin decided this slot is not someone in the league: its stats stay in
+   * the match but never reach a ranking or a profile (`player_id` is null). */
+  is_unknown: boolean
   thumb_path: string | null
 }
 

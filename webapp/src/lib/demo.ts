@@ -37,6 +37,8 @@ type DemoAction = ActionRow & { touch_number: number }
 interface DemoMatch {
   match: Match
   slots: Record<Slot, number | null>
+  /** Slots the admin marked unknown (no player, stats kept in the match). */
+  unknown: Slot[]
   points: PointRow[]
   actions: DemoAction[]
   publications: Publication[]
@@ -133,18 +135,18 @@ export function demoApi(): Api {
   ]
   const rulesets: Ruleset[] = [{ id: 1, name: 'G1', description: 'Owner-ratified 2026-09-27', is_active: true }]
   let rules: FantasyRule[] = G1.map((r) => ({ ...r, ruleset_id: 1 }))
-  const defs: [string, string, Match['status'], number, number, Record<Slot, number | null>][] = [
+  const defs: [string, string, Match['status'], number, number, Record<Slot, number | null>, Slot[]?][] = [
     ['20260920_1830_bogatell_ari_joan', 'Bogatell', 'published', 21, 12, { P1A: 1, P2A: 2, P1B: 3, P2B: 4 }],
     ['20260927_1900_bogatell_laia_nil', 'Bogatell', 'published', 19, 21, { P1A: 5, P2A: 6, P1B: 1, P2B: 2 }],
     ['20261004_1805_vall_dhebron', "Vall d'Hebron", 'draft', 21, 17, { P1A: null, P2A: null, P1B: null, P2B: null }],
     ['20260906_1000_bogatell_ari_marc', 'Bogatell', 'published', 21, 15, { P1A: 1, P2A: 3, P1B: 2, P2B: 4 }],
-    ['20260913_1730_bogatell_joan_pau', 'Bogatell', 'published', 17, 21, { P1A: 2, P2A: 4, P1B: 1, P2B: 5 }],
+    ['20260913_1730_bogatell_joan_pau', 'Bogatell', 'published', 17, 21, { P1A: 2, P2A: 4, P1B: 1, P2B: null }, ['P2B']],
   ]
-  const matches: DemoMatch[] = defs.map(([key, venue, status, a, b, slots], i) => {
+  const matches: DemoMatch[] = defs.map(([key, venue, status, a, b, slots, unknown = []], i) => {
     const id = i + 1
     const sim = simulate(id, 7 + i * 13, a, b)
     return {
-      match: makeMatch(id, key, venue, status, a, b), slots, ...sim,
+      match: makeMatch(id, key, venue, status, a, b), slots, unknown, ...sim,
       publications: [{
         id: id * 10, match_id: id, revision: 1, result: 'applied', content_sha256: `${key.length}f3a9c2e81b7d`.padEnd(64, '0'),
         pipeline_version: '78844e5', git_dirty: false, bundle_path: `match-bundles/${key}/demo.json`,
@@ -225,7 +227,7 @@ export function demoApi(): Api {
     matches: () => delay(matches.filter(visible).map((m) => m.match)),
     match: (key) => delay(matches.find((m) => m.match.match_key === key && visible(m))?.match ?? null),
     participants: (ids) => delay(matches.filter((m) => ids.includes(m.match.id) && visible(m)).flatMap((m) =>
-      SLOTS.map((slot): Participant => ({ match_id: m.match.id, slot, team: slot.slice(2) as Team, player_id: m.slots[slot], thumb_path: m.match.status === 'draft' ? `thumbs/${m.match.match_key}/${slot}.jpg` : null })))),
+      SLOTS.map((slot): Participant => ({ match_id: m.match.id, slot, team: slot.slice(2) as Team, player_id: m.slots[slot], is_unknown: m.unknown.includes(slot), thumb_path: m.match.status === 'draft' ? `thumbs/${m.match.match_key}/${slot}.jpg` : null })))),
     boxScore: (id) => delay(byId(id) && visible(byId(id)!) ? box(byId(id)!) : []),
     points: (id) => delay(byId(id) && canDetail(byId(id)!) ? byId(id)!.points : []),
     actions: (id) => delay(byId(id) && canDetail(byId(id)!) ? byId(id)!.actions : []),
@@ -360,11 +362,12 @@ export function demoApi(): Api {
     async updateMatch(id, patch) {
       Object.assign(byId(id)!.match, patch)
     },
-    async assignSlot(id, slot, playerId) {
+    async assignSlot(id, slot, playerId, unknown = false) {
       const m = byId(id)!
-      if (playerId !== null && SLOTS.some((s) => s !== slot && m.slots[s] === playerId))
+      if (!unknown && playerId !== null && SLOTS.some((s) => s !== slot && m.slots[s] === playerId))
         throw new Error('duplicate key value violates unique constraint "match_participants_match_id_player_id_key"')
-      m.slots[slot] = playerId
+      m.slots[slot] = unknown ? null : playerId
+      m.unknown = m.unknown.filter((s) => s !== slot).concat(unknown ? [slot] : [])
     },
     async createPlayer(name) {
       const p: Player = { id: players.length + 1, display_name: name, user_id: null, handedness: null, preferred_side: null, profile_public: false, active: true }

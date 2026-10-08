@@ -6804,3 +6804,44 @@ is passed through untouched.
 **Not done / owed:** owner: `supabase db push`, then `make postrun` + publish
 per match (old rows show without error areas). `test_inbox`
 `test_calibrated_video_is_run_published_and_archived` fails at HEAD (not #91).
+
+## Archived 2026-10-08 (#95): the oldest Log session and the oldest Session index line moved out of STATUS.md verbatim (Log ≤3 sessions, index budget 100)
+
+- 2026-08-17 — config-drift guard; config-default divergence FIXED (f539 block provenance); e3 GT serve frame fixed; live-debug frame counter; near-net flag closed by diagnosis — …(log archive 2026-10-06)
+
+### 2026-10-07 (ninety-second session) — #92: the brainstorm's "Now" picks, built
+
+**Asked (owner):** implement the suggested "Now" ideas of `docs/stats_feature_brainstorm.md`
+(O4+I1, H1–H3, N1, N2, N3+N4, N8+F3, V1+V2, I2).
+
+**Built (no new perception, so no re-publish is needed for any of it):** migration
+`20261007100000_stats_windows_and_analytics.sql` — `window_matches` (season / from / to /
+last N), `leaderboard(…)` and `player_profile(…)` take the window and return denominators,
+fantasy per 21 points, form; `player_profile.analytics` adds attack split (reception vs
+transition), side-out / break-point, serve targeting, reception outcome, progress series;
+new `match_report(match)` (per-player line vs their own average, team side-out / break, who
+took the serves, per-point fantasy where the play-by-play is visible); view `touch_context`
+(possession numbers). `webapp` — `?w=` time filter, Wilson ranges + minimum 10 attempts +
+`k/n` on every rate (H1), "not measured" blocks (H2), `/measure` page + A/B/C badges (H3),
+rolling-rate chart with band, fantasy race, form sparkline, report card on the match page,
+demo mode mirrors it (`lib/analytics.ts`). `make republish-all` (`src/publish/republish.py`):
+postrun + publish for every run that has a `match_bundle.json`, skips (and fails on) runs
+whose diag dump was deleted. `scripts/score_spike_type.py` (V1), `scripts/check_heights.py` (V2).
+
+**Verified:** schema check 5/5 (smoke extended; SQL N1–N4 == a plain-Python recount on the
+simulated match AND the real 20260920 bundle — that recount caught a NULL `bool_or` bug);
+vitest 32; full suite 1201 pass (3 fail: `test_inbox` already at HEAD + 2 STATUS-guard
+budgets already over at HEAD, fixed here by archiving); `npm run build`; SPA screenshots.
+
+**V1 (bars fixed first: accuracy ≥ 0.85, coverage ≥ 0.80):** **FAIL.** 32 owner-labelled
+spikes: a type is published for 16 (0.50), right on 10 (0.625). Hard/touch is not shown.
+**V2 (bars fixed first):** **FAIL** overall, so "±0.2 m" is not claimed. Net clearance PASS
+(live + well-conditioned: 33 crossings, 100 % at/above −0.15 m, median +0.61 m; the first run
+scored dead-time balls and timing-noisy crossings and failed — both filters added after
+seeing it, bars unchanged, unfiltered numbers still printed). Stature: far half reads 5–6 %
+shorter (P2A 12 % — FAIL); no real heights given. Contacts: spike 2.52/2.51 m, set, overpass
+agree; digs 1.37 near vs 1.66 far (0.29 — FAIL).
+
+**Not done / owed:** owner: `supabase db push` (new migration, no re-publish needed), give
+the four real heights to `check_heights.py --heights`; O3 (net view) stays "Next" and, per V2,
+would show relative heights only. Next-list: I3 → O3, N10/O2, O1+I4, N7/N9, F1.

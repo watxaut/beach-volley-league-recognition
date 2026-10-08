@@ -4,10 +4,12 @@ import { useApp, useLoad } from '../../app/state'
 import { PlayByPlay } from '../../components/PlayByPlay'
 import { Card, ErrorBox, Loading, StatusBadge } from '../../components/ui'
 import { explainError } from '../../lib/api'
-import { formatDate, matchLabel, teamName } from '../../lib/format'
+import { formatDate, matchLabel, slotNames, teamName } from '../../lib/format'
 import type { Match, MatchPatch, MatchStatus, Slot, Team } from '../../lib/types'
 
 const SLOTS: Slot[] = ['P1A', 'P2A', 'P1B', 'P2B']
+/** The select value for "someone outside the league" (player ids are numbers). */
+const UNKNOWN = 'unknown'
 
 export function AdminMatch() {
   const { key = '' } = useParams()
@@ -37,7 +39,9 @@ export function AdminMatch() {
       setError(explainError(err))
     }
   }
-  const assign = (slot: Slot, value: string) => run(() => api.assignSlot(m.id, slot, value ? Number(value) : null))
+  const assign = (slot: Slot, value: string) => run(() => value === UNKNOWN
+    ? api.assignSlot(m.id, slot, null, true)
+    : api.assignSlot(m.id, slot, value ? Number(value) : null))
   const setStatus = (status: MatchStatus) => run(() => api.updateMatch(m.id, { status }))
   const addPlayer = () => run(async () => {
     if (newName.trim()) await api.createPlayer(newName.trim())
@@ -48,14 +52,11 @@ export function AdminMatch() {
     if (url) window.open(url, '_blank', 'noopener')
   }
 
-  const unassigned = participants.filter((p) => !p.player_id).length
+  // A slot is decided once it has a player or was marked unknown.
+  const unassigned = participants.filter((p) => !p.player_id && !p.is_unknown).length
   const teamNames: Record<Team, string> = {
     A: teamName('A', participants, players), B: teamName('B', participants, players)}
-  const names: Partial<Record<Slot, string>> = {}
-  for (const p of participants) {
-    const pl = players.find((x) => x.id === p.player_id)
-    names[p.slot] = pl?.display_name ?? p.slot
-  }
+  const names = slotNames(participants, players)
   const checks = m.checks ?? {}
   const flagged = Object.entries(checks.flagged_points ?? {})
 
@@ -79,8 +80,9 @@ export function AdminMatch() {
               <div key={slot} className={`slot team-${slot.slice(2)}`}>
                 <strong>{slot}</strong>
                 {url ? <img src={url} alt={`${slot} at a touch`} /> : <div className="noimg">no thumbnail</div>}
-                <select value={p?.player_id ?? ''} onChange={(e) => assign(slot, e.target.value)} aria-label={`Player for ${slot}`}>
+                <select value={p?.is_unknown ? UNKNOWN : p?.player_id ?? ''} onChange={(e) => assign(slot, e.target.value)} aria-label={`Player for ${slot}`}>
                   <option value="">— choose —</option>
+                  <option value={UNKNOWN}>Unknown player</option>
                   {players.filter((pl) => pl.active).map((pl) => <option key={pl.id} value={pl.id}>{pl.display_name}</option>)}
                 </select>
               </div>
@@ -91,6 +93,11 @@ export function AdminMatch() {
           <input placeholder="New player name" value={newName} onChange={(e) => setNewName(e.target.value)} />
           <button onClick={addPlayer} disabled={!newName.trim()}>Add player</button>
         </div>
+        <p className="muted small" style={{ marginBottom: 0 }}>
+          <strong>Unknown player</strong> keeps that slot&apos;s stats in this match but leaves it out of the
+          ranking and profiles. If they join later, re-tag them under{' '}
+          <Link to="/admin/players">Players &amp; accounts</Link> → Unknown players.
+        </p>
       </Card>
 
       <Card title="2 · Check the reconstruction">

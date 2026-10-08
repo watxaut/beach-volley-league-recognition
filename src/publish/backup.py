@@ -27,7 +27,7 @@ ADMIN_TABLES = {
     "profiles": "user_id,email,role,display_name,created_at",
     "players": "*",
     "matches": "id,match_key,title,venue,season,status,detail_public",
-    "match_participants": "match_id,slot,player_id,assigned_by,assigned_at",
+    "match_participants": "match_id,slot,player_id,is_unknown,assigned_by,assigned_at",
     "fantasy_rulesets": "*",
     "fantasy_rules": "*",
 }

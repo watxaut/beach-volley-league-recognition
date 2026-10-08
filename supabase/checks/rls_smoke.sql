@@ -558,6 +558,99 @@ begin
   assert not exists (select 1 from public.login_code_requests where ip = '192.0.2.1'), 'requests older than a day are dropped';
 end $$;
 
+-- ── unknown players (20261008100000) ──────────────────────────────────────
+-- A slot the admin marks unknown keeps its stats INSIDE the match and never
+-- reaches a cross-match view; re-tagging it hands the match to the player.
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', true);
+do $$
+declare v_id bigint := current_setting('check.match_id')::bigint;
+begin
+  assert has_column_privilege('authenticated', 'public.match_participants', 'is_unknown', 'update'),
+    'the admin pages write the flag through the API role';
+  begin
+    update public.match_participants set is_unknown = true where match_id = v_id and slot = 'P2B';
+    assert false, 'a slot cannot be unknown and keep its player';
+  exception when check_violation then
+    null;
+  end;
+  update public.match_participants set player_id = null, is_unknown = true
+  where match_id = v_id and slot = 'P2B';
+  assert (select is_unknown and player_id is null and assigned_by = '00000000-0000-0000-0000-00000000000a'
+          from public.match_participants where match_id = v_id and slot = 'P2B'),
+    'marking a slot unknown is stamped with the admin';
+end $$;
+reset role;
+
+-- a republish with changed content must keep the flag (admin-owned)
+do $$
+declare r jsonb;
+begin
+  r := public.ingest_match_bundle(pg_temp.bundle('h-unknown', 'vid1', true), 'b/hu.json', 'check');
+  assert r ->> 'result' = 'applied', 'changed bundle applies: ' || r::text;
+  assert (select is_unknown from public.match_participants
+          where match_id = current_setting('check.match_id')::bigint and slot = 'P2B'),
+    'a re-publish keeps the unknown flag';
+end $$;
+
+-- the league: the slot keeps its line in the match, no row anywhere else
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b0', true);
+do $$
+declare v_id bigint := current_setting('check.match_id')::bigint;
+begin
+  assert (select count(*) from public.match_box_score(v_id)) = 4, 'the box score keeps all four slots';
+  assert (select player_id is null and display_name is null and fantasy = -1.0
+          from public.match_box_score(v_id) where slot = 'P2B'),
+    'the unknown slot keeps its stats in the match';
+  assert (select count(*) from public.leaderboard()) = 3
+     and not exists (select 1 from public.leaderboard() where display_name = 'Check Opp2'),
+    'an unknown is not in the ranking';
+  assert (select fantasy from public.leaderboard() where display_name = 'Check Ari') = 2.0,
+    'the other players are untouched';
+  assert (public.player_profile((select id from public.players where display_name = 'Check Opp2'))
+          -> 'totals' ->> 'matches')::int = 0, 'the match left the old player''s history';
+  update public.match_participants set is_unknown = true where match_id = v_id and slot = 'P1B';
+  assert (select count(*) from public.match_participants where match_id = v_id and is_unknown) = 1,
+    'a viewer cannot mark a slot unknown';
+end $$;
+reset role;
+
+-- the admin's report of the match: four lines, the unknown one has no average
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', true);
+do $$
+declare r jsonb := public.match_report(current_setting('check.match_id')::bigint);
+begin
+  assert jsonb_array_length(r -> 'players') = 4, 'the report keeps all four slots';
+  assert (select (x ->> 'fantasy')::numeric = -1.0 and x -> 'avg' = 'null'::jsonb and x -> 'player_id' = 'null'::jsonb
+          from jsonb_array_elements(r -> 'players') x where x ->> 'slot' = 'P2B'),
+    'the unknown slot has its line and nobody''s average';
+end $$;
+
+-- re-tag: the slot goes to a real player and the match flows into their totals
+do $$
+declare
+  v_id   bigint := current_setting('check.match_id')::bigint;
+  v_opp2 bigint := (select id from public.players where display_name = 'Check Opp2');
+begin
+  update public.match_participants set player_id = v_opp2, is_unknown = false
+  where match_id = v_id and slot = 'P2B';
+  assert (select player_id = v_opp2 and not is_unknown from public.match_participants
+          where match_id = v_id and slot = 'P2B'), 're-tagged';
+end $$;
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b0', true);
+do $$
+begin
+  assert (select count(*) from public.leaderboard()) = 4
+     and (select fantasy from public.leaderboard() where display_name = 'Check Opp2') = -1.0
+     and (select matches from public.leaderboard() where display_name = 'Check Opp2') = 1,
+    'after the re-tag the player carries the match';
+end $$;
+reset role;
+
 -- a match with history cannot be hard-deleted (hide it instead)
 do $$
 begin

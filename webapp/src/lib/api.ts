@@ -37,7 +37,8 @@ export interface Api {
   matchReport(matchId: number): Promise<MatchReport | null>
   // admin
   updateMatch(matchId: number, patch: MatchPatch): Promise<void>
-  assignSlot(matchId: number, slot: Slot, playerId: number | null): Promise<void>
+  /** A real player, `null` to clear the slot, or `unknown: true` for someone outside the league. */
+  assignSlot(matchId: number, slot: Slot, playerId: number | null, unknown?: boolean): Promise<void>
   createPlayer(name: string): Promise<Player>
   updatePlayer(playerId: number, patch: PlayerPatch): Promise<void>
   profiles(): Promise<Profile[]>
@@ -147,7 +148,7 @@ export function supabaseApi(url: string, publishableKey: string): Api {
     async participants(matchIds) {
       if (!matchIds.length) return []
       return must(await sb.from('match_participants')
-        .select('match_id,slot,team,player_id,thumb_path').in('match_id', matchIds))
+        .select('match_id,slot,team,player_id,is_unknown,thumb_path').in('match_id', matchIds))
     },
     async boxScore(matchId) {
       return must(await sb.rpc('match_box_score', { p_match_id: matchId }))
@@ -180,8 +181,9 @@ export function supabaseApi(url: string, publishableKey: string): Api {
     async updateMatch(matchId, patch) {
       must(await sb.from('matches').update(patch).eq('id', matchId))
     },
-    async assignSlot(matchId, slot, playerId) {
-      must(await sb.from('match_participants').update({ player_id: playerId })
+    async assignSlot(matchId, slot, playerId, unknown = false) {
+      must(await sb.from('match_participants')
+        .update({ player_id: unknown ? null : playerId, is_unknown: unknown })
         .eq('match_id', matchId).eq('slot', slot))
     },
     async createPlayer(name) {
