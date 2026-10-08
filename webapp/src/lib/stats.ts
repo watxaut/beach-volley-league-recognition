@@ -37,6 +37,27 @@ export function hitting(t: Tally, min = MIN_N): number | null {
   return t.n >= min && t.n > 0 ? (t.kills - t.errors) / t.n : null
 }
 
+/** Approximate 95 % range of a hitting percentage. Each attack scores +1, 0
+ * or -1, so the mean has a standard error; the spread is taken from smoothed
+ * shares so that a run of nothing but kills still has a width. */
+export function hittingRange(t: Tally, z = 1.96): Range | null {
+  if (t.n <= 0) return null
+  const mean = (t.kills - t.errors) / t.n
+  const pk = (t.kills + 1) / (t.n + 3)
+  const pe = (t.errors + 1) / (t.n + 3)
+  const half = z * Math.sqrt(Math.max(0, pk + pe - (pk - pe) ** 2) / t.n)
+  return { lo: Math.max(-1, mean - half), hi: Math.min(1, mean + half) }
+}
+
+/** 95 % range of a count of chance events (Byar's approximation to the exact
+ * Poisson interval): 10 digs could as well have been 5 or 18. */
+export function poissonRange(k: number, z = 1.96): Range {
+  const lo = k <= 0 ? 0 : k * (1 - 1 / (9 * k) - z / (3 * Math.sqrt(k))) ** 3
+  const k1 = k + 1
+  const hi = k1 * (1 - 1 / (9 * k1) + z / (3 * Math.sqrt(k1))) ** 3
+  return { lo: Math.max(0, lo), hi }
+}
+
 export function pct(x: number | null | undefined, digits = 0): string {
   return x == null ? '–' : `${(x * 100).toFixed(digits)}%`
 }

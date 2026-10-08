@@ -18,10 +18,9 @@ update at the end of every session that changes anything and commit with the wor
 - New durable protocol rules go in `AGENTS.md`; new cross-session technical
   facts go one-line-each into *Learnings* below.
 
-Last updated: **2026-10-08 (95th session) — admin can mark a slot "Unknown player" (stats stay in the match, out of every
-ranking; re-tag later); wrangler `previews` block for the PR build.** #94 (player detector BGR input), #93 (security
-review), #92 (stats "Now" picks), #91 (landings) and #90 (platform; owner deploys via
-`docs/deploy_web_platform.md`) lie underneath.
+Last updated: **2026-10-08 (96th session) — player page v2: four tabs, a league comparison, an attack map with lines,
+hints instead of grade letters (web + migration `20261009100000`, owner pushes it).** #95 (unknown-player slots), #94
+(player detector BGR input; login study), #93 (security review), #92 (stats "Now" picks) and #90 (platform) lie underneath.
 
 ## North-star goals (set session 24)
 
@@ -74,7 +73,7 @@ in/out reads wrong (overridden by the next serve).
 `make inbox` (name, calibration wait, run-match, publish DRAFT) → one
 transactional Supabase RPC (applied/unchanged, admin rows untouched) → RLS +
 React SPA. Verified offline (scratch PG16, parity, CLI e2e, SPA screenshots);
-hosted Supabase/Cloudflare/Drive/launchd untested — owner deploys (#90 Log). #91: attack landings carry both axes, a per-axis error and a result (recon schema 2, migration `20261006180000_landing_confidence`); needs `make postrun` + re-publish per match. #92: stats windows + side-out/break + serve targets + reception outcome + hitting % + report card + `/measure` (migration `20261007100000`, no re-publish needed); `make republish-all` redoes post-run + publish for every published match (needs its diag dump). #93 security review (AGENTS §13): table privileges are explicit (`20261007120000`; `anon` holds none), `match_report` gates its per-player extras by tier (`20261007130000`), `webapp/public/_headers` (CSP), the publisher refuses a `.env.publish` others can read, login codes go through `supabase/functions/request-login-code` + `login_code_gate()` (`20261007140000`); verified on the local stack only. #95: `match_participants.is_unknown` (`20261008100000`) = a slot outside the league (AGENTS §13); migration pushed by the owner (2026-10-08). #94 login study (`docs/web_login_study.md`): sessions persist (refresh token, no limit); fixes + passkeys/Google options await owner decisions (open point 34).
+hosted Supabase/Cloudflare/Drive/launchd untested — owner deploys (#90 Log). #91: attack landings carry both axes, a per-axis error and a result (recon schema 2, migration `20261006180000_landing_confidence`); needs `make postrun` + re-publish per match. #92: stats windows + side-out/break + serve targets + reception outcome + hitting % + report card + `/measure` (migration `20261007100000`, no re-publish needed); `make republish-all` redoes post-run + publish for every published match (needs its diag dump). #93 security review (AGENTS §13): table privileges are explicit (`20261007120000`; `anon` holds none), `match_report` gates its per-player extras by tier (`20261007130000`), `webapp/public/_headers` (CSP), the publisher refuses a `.env.publish` others can read, login codes go through `supabase/functions/request-login-code` + `login_code_gate()` (`20261007140000`); verified on the local stack only. #95: `match_participants.is_unknown` (`20261008100000`) = a slot outside the league (AGENTS §13); migration pushed by the owner (2026-10-08). #94 login study (`docs/web_login_study.md`): sessions persist (refresh token, no limit); fixes + passkeys/Google options await owner decisions (open point 34). #96 player page v2: tabs (Overview / Attack / Serve & receive / Matches), "you vs the league / vs your earlier matches" strips counted from league-tier data, attack map start → end from `own_x_m/own_y_m` (already published, no re-publish), grades in the "i" hint (AGENTS §13); migration `20261009100000_player_page_v2` NOT pushed yet.
 
 **Identity (#85):** `TeamIdentityResolver` (`player_identity_mode:"team"`,
 default) stamps P1A/P2A/P1B/P2B per frame; orientation = two-state LLR on
@@ -129,7 +128,7 @@ P31 serve f24543 is 128 f before its reception (owner to confirm ~f24630).
    Heights check done with the real heights: not good (V2 ±0.2 m stays FAIL; O3 would show relative heights only).
    Next picks (§5): I3 → O3 (relative heights, V2), N10/O2, O1+I4, N7/N9, F1.
 1. ✅ **Product deployed (owner, DONE 2026-10-07):** `docs/deploy_web_platform.md` steps 0–7. Still open: publish 20260920 check
-   (fantasy = txt footer), then action_overrides UI, in-app invites, `own_x_m` heatmaps (design §8 "Next").
+   (fantasy = txt footer), then action_overrides UI, in-app invites, `own_x_m` heatmaps (design §8 "Next"). **Owed (#96): `supabase db push` (`20261009100000`), then look at the Attack tab on the real match.**
 2. **Second match / other venue through `make run-match`** — the only
    21-point match so far is the one the layer was built on; practice clips
    and the sweep are the out-of-sample evidence.
@@ -336,6 +335,7 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Layer 1 is degenerate on the match (157/185 contacts = `bump_set`); every dig/set/overpass/serve label is `ActionContextResolver._decide` keyed on `_poss_touch` — touch-count errors are downstream of MISSING contacts (starved 33/43, not mis-reset).
 
 **Perf / infra**
+- **Schema check without the local Supabase stack (#96):** `colima start`, then `docker run -d --name volley_pg_check -e POSTGRES_PASSWORD=postgres -v "$PWD":"$PWD":ro public.ecr.aws/supabase/postgres:17.11.0.002`, a `psql` shim on PATH (`exec docker exec -i volley_pg_check psql "$@"`) and `PG_DSN=postgresql://postgres:postgres@127.0.0.1:5432/postgres make schema-check`; remove the container after.
 - Pose gating shipped: 84.8 → 68.0 ms/f byte-identical. #89: the "detector floor ~48 ms/f" was half overhead — a YOLO forward is ~11 ms; ultralytics' NMS + rescale on MPS cost 10–20 ms/f in GPU syncs (3 ms on CPU).
 - MPS (M3 Pro, #89): run-to-run deterministic (HEAD reproduces `output/postrun` byte for byte); batch>1 is bit-identical to batch-1 but NOT faster (compute-bound); two models driven from two threads stay bit-identical.
 - CPU NMS ≠ MPS NMS in general: ~1 frame per 1000 has a box pair with IoU within 1e-5 of the 0.7 threshold, hence the certificate + device fallback in `yolo_inference.py`. Dead speed levers: batching, a detection cache (the loop is pose-bound), lazy pose (MediaPipe video-mode state → not exact).
@@ -357,6 +357,7 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Edge functions (#93): `EdgeRuntime.waitUntil` exists only in a USER worker (the platform's way of running a function), not when the file is the runtime's main service — guard it; a function added while the local stack runs is not served (404) until the stack restarts. `pg_net` was rejected for the broker: its tables and `net.http_post` are granted to `anon` and owned by `supabase_admin`, so a migration cannot revoke that.
 
 ## Session index (one line each)
+- #96 **Player page v2: 4 tabs, 5 count tiles, "you vs league / vs earlier" strips (verdict only when 95% ranges do not overlap), attack map with lines (kill blue, dug grey, error red; dashed = free ball), "i" hints replace grade letters**
 - #95 **Admin can mark a slot "Unknown player": its stats stay in the match, never in a ranking or profile; re-tag later from Players → Unknown players; also `previews` block in wrangler.jsonc (PR build)**
 - #94 **Player detector got RGB frames ultralytics reads as BGR: now passes BGR (`player_bgr_input`, default ON; `false` = old path); 4-track frames up on all 7 clips, stream F1 0.824→0.839, post-run identical; match stream labels −7**
 - #94b **Web login study (docs only): sessions already persist without limit; 10-07 re-logins = other URLs / global logout / link in another browser; options A–E incl. passkeys + Google vs the Auth lock; owner picks**
@@ -456,8 +457,45 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-08-31 — outcome semantics completed: kill = direct fall OR dug-and-dies-without-a-set.
 - 2026-08-30 — spike analytics: trail, touch/hard, 9-zone grid, kill/dug outcomes; f297 GT corrected.
 - 2026-08-29 — off-court hold horizon (=90f) recovers e2's roster slot.
-- 2026-08-27 — short-gap bridge ships e2/e6's missed digs; GT honesty rounds.
 ## Log (newest first)
+
+### 2026-10-08 (ninety-sixth session) — #96: player page v2 (less noise, a league comparison, an attack map with lines)
+
+**Asked (owner):** the player page shows too much (about 60 numbers, 18 grade badges, green letters); research
+player-stats UX and what AVP / Beach Pro Tour publish; fewer tiles, tabs if needed, explanations as hints; a
+"you vs the other players" section; an attack map with a line from where the ball was hit to where it landed,
+coloured per touch / hard hit.
+
+**Research → decisions (owner, plan mode):** 3–5 headline numbers per view is a rule of thumb, hierarchy is the
+principle; hover does not exist on phones, so hints are a tap-to-open "i" and `k/n` stays on the page; a number
+needs a reference (linear strips, no radar). Owner picked: 4 tabs with the comparison on the default one; line
+colour = outcome and dashed = free ball (hard/touch stays off: V1 FAIL, read on 25 of 62 attacks); grade in the
+hint, only B/C tagged on the page; compare with the rest of the league and with the player's own earlier matches.
+
+**Built (web):** `PlayerPage` = header + `Tabs` (`?tab=`, Back works). Overview (league tier): 5 count tiles +
+`Compare` strips from `leaderboard` rows (you excluded, pooled Σk/Σn; from 3 other players; a verdict only when
+the two 95 % ranges do not overlap; fantasy is ranked, not judged) or from the profile's history (window vs
+everything before; all time = newest 5 vs before). Attack: 3 rate tiles + `AttackMap` (replaces the zone grid and
+the landing map; filters by outcome and rally phase; tap / hover one attack for its error areas) + reception vs
+transition. Serve & receive: 4 rate tiles + targeting + reception outcome. New: `lib/compare.ts`,
+`lib/glossary.ts` (one text per stat), `Info` / `StatInfo` / `Segmented` in `ui.tsx`, `poissonRange` (Byar) and
+`hittingRange` in `lib/stats.ts`. A rate under `MIN_N` shows its count as the value ("1/8 · needs 10 serves").
+Kill = accent blue on the map: green vs red measured 4.1 colour-blind separation (floor 8), blue vs red 20+.
+
+**Built (SQL, `20261009100000_player_page_v2`):** `leaderboard` + `serve_errors`, `recv_points/won`,
+`serve_points/won` (team side-out / break over the player's matches; league tier); `player_profile` landings +
+`sx, sy, sex, sey, a, p, d`, and attacks with a start but no end. Privileges re-stated for the recreated function.
+
+**Verified:** vitest 49, typecheck, oxlint; `tests/test_supabase_schema.py` 5/5 on a throwaway
+`supabase/postgres:17` container (new smoke assertions; SQL == Python recount on the simulated and the real
+match); real-match render through a stubbed backend: the owner's page reads +10, 2 K, 1 ace, 14 digs, 2 assists,
+8 errors, hitting −.125 (2−4)/16, side-out 7/20 as before, 16 attacks on the map (14 lines, 2 one-ended);
+a private profile shows Overview + Matches and the notice on the two analytics tabs; screenshots at 400 / 460 /
+1100 px, light and dark, no horizontal overflow.
+
+**Not done / owed:** owner `supabase db push` (until then the map draws ends only and the comparison has no
+serve-error / side-out rows; either deploy order is safe). Later: hard vs touch (new validation), pick-a-player highlight, video
+link per attack (I5), line vs cross (N10).
 
 ### 2026-10-08 (ninety-fifth session) — #95: "Unknown player" slots (stats kept in the match, out of every ranking)
 
@@ -478,28 +516,6 @@ re-tag, viewer cannot flip it) — schema check 5/5 on a scratch Supabase PG17 (
 migration (negative control); vitest 33, typecheck, oxlint; headless-Chrome screenshots of the demo pages. `wrangler preview` not run (needs Cloudflare).
 
 **Not done / owed:** owner pushed the migration (2026-10-08); check the PR preview build; no per-person identity across matches (re-tag is per slot).
-
-### 2026-10-07 (ninety-fourth session) — #94: the player detector stops getting red/blue-swapped frames
-
-**Asked (owner):** continue the previous session's A/B of bug (a) (`PlayerDetector.preprocess_frame` gave
-ultralytics RGB it reads as BGR), run it on the match and the practice clips, then default the fix ON and say how to compare.
-
-**Measured (arms = `FIX_RGB` hack vs HEAD; base reproduced the `output/postrun` goldens byte for byte):**
-- Match: post-run identical (33/33, 0 false, winners 33/33, A 21–B 12, touches P 0.976, 0 rule breaks);
-  credited-to-player 165→164. Causal stream: 212→211 actions, action label 81/145→74/146 — 8 GT touches
-  right only in HEAD (P9 f5530, P19 f13467/13505, P22 f15955/15998/16037, P25 f19360/19380) vs 1 only in the
-  fix (P19 f13158); the diffs are rally cascades (touch-count relabelling after one added/dropped action).
-- Entrenos: post-run identical in all 7 (serves 5/5, P 52/53, action 52/52); frames with 4 real tracks up on
-  every clip (table in Where we are); stream `evaluate --ignore-player` F1 pooled 0.824→0.839 (TP 49→52, FP 7→9, FN 14→11).
-
-**Built:** `PlayerDetector(bgr_input=True)` + config `player_bgr_input: true` (wired in `FrameProcessor`), drift-guard
-row, 2 unit tests, `test_frame_prefetch` fixture. Verified on e1: default run == fix arm, `--config {"player_bgr_input": false}`
-== base arm (`diag.jsonl`, CSVs identical; `pipeline_output.json` differs in `processed_at` only).
-
-**Not done / owed:** owner contact-sheet check of e3's two spikes that moved player (no per-player GT); why the
-match stream loses labels (suspect: the fix adds a `serve` at f15926 that starts the P22 cascade; unchecked);
-regenerate `output/postrun` goldens only if the owner wants the new arm as the A/B reference (AGENTS §12 note).
-`test_inbox::test_calibrated_video_is_run_published_and_archived` fails at HEAD (unrelated).
 
 ### 2026-10-08 (ninety-fourth session) — #94: web login study — fewer code mails, how long a login lasts
 

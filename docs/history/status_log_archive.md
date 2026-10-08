@@ -6898,3 +6898,29 @@ before the first publish).
 
 - (index line, archived with the above)
 - 2026-08-26 — e5 action layer fully resolved (gap-bridged bounce + 2.5 m net exemption); e2/e6 generality clean; e1's double-annotated GT deduped.
+
+## Archived 2026-10-08 (#96): the oldest Log session and the oldest Session index line moved out of STATUS.md verbatim (Log ≤3 sessions, index budget 100)
+
+- 2026-08-27 — short-gap bridge ships e2/e6's missed digs; GT honesty rounds.
+
+### 2026-10-07 (ninety-fourth session) — #94: the player detector stops getting red/blue-swapped frames
+
+**Asked (owner):** continue the previous session's A/B of bug (a) (`PlayerDetector.preprocess_frame` gave
+ultralytics RGB it reads as BGR), run it on the match and the practice clips, then default the fix ON and say how to compare.
+
+**Measured (arms = `FIX_RGB` hack vs HEAD; base reproduced the `output/postrun` goldens byte for byte):**
+- Match: post-run identical (33/33, 0 false, winners 33/33, A 21–B 12, touches P 0.976, 0 rule breaks);
+  credited-to-player 165→164. Causal stream: 212→211 actions, action label 81/145→74/146 — 8 GT touches
+  right only in HEAD (P9 f5530, P19 f13467/13505, P22 f15955/15998/16037, P25 f19360/19380) vs 1 only in the
+  fix (P19 f13158); the diffs are rally cascades (touch-count relabelling after one added/dropped action).
+- Entrenos: post-run identical in all 7 (serves 5/5, P 52/53, action 52/52); frames with 4 real tracks up on
+  every clip (table in Where we are); stream `evaluate --ignore-player` F1 pooled 0.824→0.839 (TP 49→52, FP 7→9, FN 14→11).
+
+**Built:** `PlayerDetector(bgr_input=True)` + config `player_bgr_input: true` (wired in `FrameProcessor`), drift-guard
+row, 2 unit tests, `test_frame_prefetch` fixture. Verified on e1: default run == fix arm, `--config {"player_bgr_input": false}`
+== base arm (`diag.jsonl`, CSVs identical; `pipeline_output.json` differs in `processed_at` only).
+
+**Not done / owed:** owner contact-sheet check of e3's two spikes that moved player (no per-player GT); why the
+match stream loses labels (suspect: the fix adds a `serve` at f15926 that starts the P22 cascade; unchecked);
+regenerate `output/postrun` goldens only if the owner wants the new arm as the A/B reference (AGENTS §12 note).
+`test_inbox::test_calibrated_video_is_run_published_and_archived` fails at HEAD (unrelated).

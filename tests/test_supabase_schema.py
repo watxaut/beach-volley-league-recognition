@@ -225,15 +225,20 @@ select 'P1A|' || (public.player_profile(1) -> 'analytics')::text
 union all select 'P2A|' || (public.player_profile(2) -> 'analytics')::text
 union all select 'P1B|' || (public.player_profile(3) -> 'analytics')::text
 union all select 'P2B|' || (public.player_profile(4) -> 'analytics')::text;
+select 'LB|' || display_name || '|' || serve_errors || '|' || recv_points || '|' || recv_won
+       || '|' || serve_points || '|' || serve_won from public.leaderboard();
 rollback;
 """
     res = subprocess.run(["psql", fresh_db, "-v", "ON_ERROR_STOP=1", "-X", "-q", "-tA"],
                          input=script, capture_output=True, text=True)
     assert res.returncode == 0, res.stderr
-    sql = {}
+    sql, board = {}, {}
     for line in res.stdout.splitlines():
         if line[:4] in ("P1A|", "P2A|", "P1B|", "P2B|"):
             sql[line[:3]] = json.loads(line[4:])
+        elif line.startswith("LB|"):
+            name, *nums = line[3:].split("|")
+            board[name] = [int(n) for n in nums]
     assert set(sql) == {"P1A", "P2A", "P1B", "P2B"}, res.stdout[-500:]
 
     names = {"P1A": "Ari", "P2A": "Joan", "P1B": "Marc", "P2B": "Pau"}
@@ -246,3 +251,21 @@ rollback;
         assert {t["display_name"]: t["n"] for t in got["serve_out"]["to"]} == \
             {names[s]: n for s, n in ref["serve_to"].items()}, slot
         assert got["serve_out"]["unseen"] == ref["serve_unseen"], slot
+        # player_page_v2: the leaderboard's league-tier comparison columns ...
+        serve_errors = sum(a["slot"] == slot and a["action"] == "serve" and a["outcome"] == "error"
+                           for a in bundle["actions"])
+        assert board[names[slot]] == [serve_errors, ref["team_receiving"]["n"], ref["team_receiving"]["won"],
+                                      ref["team_serving"]["n"], ref["team_serving"]["won"]], slot
+        # ... and the attack map: every credited attack that has a position
+        # says where the ball was hit, as the publisher stored it
+        attacks = [a for a in bundle["actions"] if a["slot"] == slot and a["action"] in ("spike", "overpass")
+                   and (a.get("landing_y_m") is not None or a.get("landing_result") is not None
+                        or a.get("own_y_m") is not None)]
+        assert len(got["landings"]) == len(attacks), slot
+
+        def spot(x, y):
+            return (None if x is None else round(x, 2), None if y is None else round(y, 2))
+
+        assert sorted((spot(l["sx"], l["sy"]) for l in got["landings"]), key=str) == \
+            sorted((spot(a.get("own_x_m"), a.get("own_y_m")) for a in attacks), key=str), slot
+        assert {l["a"] for l in got["landings"]} <= {"spike", "overpass"}, slot

@@ -364,7 +364,13 @@ subtraction.
 3. **Matches:** list with scores, then a match page with score header,
    team names and photos, score progression chart, box score, and
    play-by-play (tier rules above).
-4. **Player:** totals, match history, analytics if allowed.
+4. **Player (v2, #96):** a header (record, league rank, form, fantasy) and four tabs, `?tab=` in the
+   URL. *Overview* (league tier): five count tiles and "you vs the league / vs your earlier matches",
+   one strip per stat with better to the right, counted from `leaderboard` rows and the profile's match
+   history. *Attack* and *Serve & receive* (analytics tier, "private" notice otherwise): rate tiles, the
+   attack map (a line per attack from where the ball was hit to where it came down; colour = outcome,
+   dashed = free ball), reception vs transition, serve targeting, reception outcome, trends. *Matches*:
+   the history table. Every stat explains itself in an "i" hint (`lib/glossary.ts`).
 5. **Settings:** display name, "share my detailed stats with the league".
 
 **Admin** (extra menu)

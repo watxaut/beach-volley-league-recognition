@@ -15,20 +15,47 @@ export function landingKind(l: Landing): LandingKind {
   return 'unresolved'
 }
 
-/** Counts per kind (in display order, zeros dropped) and how many have no
- * spot on the map. */
-export function landingSummary(landings: Landing[]): { counts: [LandingKind, number][]; unplaced: number } {
-  const order: LandingKind[] = ['kill', 'dug', 'out', 'net', 'error', 'unresolved']
-  const n = new Map<LandingKind, number>()
-  for (const l of landings) n.set(landingKind(l), (n.get(landingKind(l)) ?? 0) + 1)
-  return {
-    counts: order.filter((k) => n.has(k)).map((k) => [k, n.get(k) as number]),
-    unplaced: landings.filter((l) => l.x == null || l.y == null).length,
-  }
-}
-
 /** "±0.4 m across, ±0.7 m along", or null when the error was not recorded. */
 export function landingError(l: Landing): string | null {
   if (l.ex == null || l.ey == null) return null
   return `±${l.ex.toFixed(1)} m across, ±${l.ey.toFixed(1)} m along`
+}
+
+const NET_Y = 8
+
+export type ShotGroup = 'kill' | 'dug' | 'error' | 'other'
+export type Phase = 'reception' | 'transition'
+
+/** One attack as the map draws it: from where the ball was hit to where it
+ * came down. Either end can be missing. */
+export interface Shot {
+  l: Landing
+  kind: LandingKind
+  /** The three outcomes a filter offers; out / net / error are all errors. */
+  group: ShotGroup
+  /** A free ball (overpass), not a spike. */
+  free: boolean
+  phase: Phase | null
+  start: { x: number; y: number } | null
+  /** `short`: estimated on the attacker's side of the net, drawn at the net. */
+  end: { x: number; y: number; short: boolean } | null
+}
+
+const GROUP: Record<LandingKind, ShotGroup> = {
+  kill: 'kill', dug: 'dug', out: 'error', net: 'error', error: 'error', unresolved: 'other',
+}
+
+/** Depth is the weak axis, so a hit can read just past the net and a landing
+ * just short of it. Neither is possible: both are drawn at the net. */
+export function shots(landings: Landing[]): Shot[] {
+  return landings.map((l) => {
+    const kind = landingKind(l)
+    const short = l.y != null && kind !== 'net' && l.y < NET_Y
+    return {
+      l, kind, group: GROUP[kind], free: l.a === 'overpass',
+      phase: l.p == null ? null : l.p <= 1 ? 'reception' : 'transition',
+      start: l.sx == null || l.sy == null ? null : { x: l.sx, y: Math.min(l.sy, NET_Y) },
+      end: l.x == null || l.y == null ? null : { x: l.x, y: short ? NET_Y : l.y, short },
+    }
+  })
 }

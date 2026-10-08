@@ -5,7 +5,7 @@ import { hitText, hitting, MIN_N } from '../lib/stats'
 import type { MatchReport as Report, ReportPlayer, Slot, Team } from '../lib/types'
 import { FantasyTimeline, StackBar, type Line, type Segment } from './Charts'
 import { Ratio } from './Rate'
-import { GradeBadge, TeamDot } from './ui'
+import { StatInfo, TeamDot } from './ui'
 
 const SHADES = ['var(--heat-3)', 'var(--heat-1)']
 
@@ -95,7 +95,7 @@ export function MatchReport({ report, nPoints, names, teamNames, myPlayerId }: {
       </p>
 
       <div>
-        <h3>Side-out &amp; break-point <GradeBadge grade="A" /></h3>
+        <h3>Side-out &amp; break-point<StatInfo term="side_out" /></h3>
         <div className="table-wrap">
           <table>
             <thead><tr><th className="left">Team</th><th title="Points won when receiving">Side-out</th><th title="Points won when serving">Break-point</th></tr></thead>
@@ -116,7 +116,7 @@ export function MatchReport({ report, nPoints, names, teamNames, myPlayerId }: {
       </div>
 
       <div>
-        <h3>Who took the serves <GradeBadge grade="A" /></h3>
+        <h3>Who took the serves<StatInfo term="serve_in" /></h3>
         {served.length === 0 && (
           <p className="muted small" style={{ marginBottom: 0 }}>
             Visible to the four players of the match, or once both receivers of a pair share their detailed stats.
@@ -145,7 +145,7 @@ export function MatchReport({ report, nPoints, names, teamNames, myPlayerId }: {
       {report.timeline ? (
         report.timeline.length > 0 && nPoints > 0 && (
           <div>
-            <h3>Fantasy race, point by point <GradeBadge grade="A" /></h3>
+            <h3>Fantasy race, point by point<StatInfo term="fantasy" /></h3>
             <FantasyTimeline lines={lines} label="Running fantasy points of the four players through the match" />
             <p className="small" style={{ marginBottom: 0 }}>
               {players.map((p) => {
