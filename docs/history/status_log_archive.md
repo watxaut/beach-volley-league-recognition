@@ -7010,6 +7010,44 @@ a private profile shows Overview + Matches and the notice on the two analytics t
 serve-error / side-out rows; either deploy order is safe). Later: hard vs touch (new validation), pick-a-player highlight, video
 link per attack (I5), line vs cross (N10).
 
+### 2026-10-08 (ninety-seventh session) — #97: hard / touch attacks, read post-run from the flight in metres
+
+**Asked (owner):** new branch from main; on the 20260920 match and the practice clips, get spike touch vs hard /
+accelerated; the net-in-front camera hides speed along its own axis, so try upward movement, the ball's pixel-size
+change, or anything else.
+
+**Diagnosed first (no code):** the causal rule (`SpikeAnalyzer.TOUCH_RISE_PX = 57` px of image ascent) types 16 of
+the 32 owner-typed match spikes, 10 right. It is a pixel rule fitted at the practice venue (2.3× the beach scale) and
+depth-blind: a ball above the lens climbs in the picture just by flying toward it. Per-spike flights in metres (depth
+from ball width): the vertical launch speed is stable across three depth reads (±0.2 m/s); the horizontal speed is
+not (width trend vs attack → dig ends vs a gravity-as-ruler fit differ by up to 30 % for balls flying away). Amateur
+"hard" is flat-ish and fast, not downward (13 of 15 leave at −4…+24°); "touch" is a lob or a slow drop. The classes
+overlap at 19–31° under every read (hard up to 30.6°, touch down to 19.4°). Box elongation (blur) is flat in sunlight (1.04).
+
+**Built:** `src/postrun/attack_shape.py` — hit frame = largest image-velocity step near the vertex; ballistic fit of
+the flight up to the next touch / the sand; elevation = atan(vertical / horizontal); touch = ≥ 25° or < 5 m/s, hard =
+the rest; the horizontal speed is read twice (width trend; attack → next touch) and a type is given only when both
+agree. Stamped on every observed spike / overpass (`spike_type`, `launch`; recon schema 3; `(hard)` / `(touch)` in
+the play-by-play). `src/publish/bundle.py` publishes that type (never the causal one once the recon carries the key;
+the causal type stays in `extra.causal_spike`). `score_spike_type.py` scores both reads (`--clips`, `--rows`);
+`sweep_postrun.py` +5 constants and a `type` column.
+
+**Measured:** match 26/29 right, 29 of 32 typed (accuracy 0.897, 95 % range 0.74–0.96; coverage 0.906) vs causal
+10/16 on 16 → the V1 bars (0.85 / 0.80) are met, IN-SAMPLE (both constants sit in the measured gap). Practice 6/6 on
+6 of 8, same as causal (e6 f310 joust: 2 flight frames; e7 f300: no post-run attack). All 22 typed overpasses read
+touch. Sweep: split 24–26° identical, 18–32° gives 0.82–0.90; speed floor 3–6 m/s identical; without the hit-frame
+search 23/29. Everything else unchanged: the match recon differs from the old one only by the new keys (33/33 points,
+winners 33/33, A 21 – B 12, P 0.976); practice P 52/53, action 52/52; 88 sweep rows lose no point or winner.
+Suite 1227 (1221 pass, 5 skipped, `test_inbox` fails as before).
+
+**Wrong / not typed (sheet: `output/spike_type_review/disputed_spikes.jpg`):** P10 f6320 touch → hard (22.8°,
+6.2 m/s); P30 f23341 hard → touch (27.5°); P33 f25928 hard → touch (30.6°, cross-court, out). No type: P19 f13397
+and P22 f16037 (the two reads disagree), P18 f12295 (no post-run attack there).
+
+**Not done / owed:** owner look at the sheet (the labels may follow the swing, which the ball flight cannot see);
+`make republish-all` (a post-run rule changed); web: Attack map and `/measure` still say hard / touch is off; a
+second match is the first out-of-sample test; swing vs poke needs pose in the diag dump.
+
 ### Session index lines moved out of STATUS.md (verbatim, oldest first)
 
 > The index is capped at 100 lines (`tests/test_status_leanness.py`); from 2026-10-08 (#98) the oldest
@@ -7017,3 +7055,4 @@ link per attack (I5), line vs cross (N10).
 
 - 2026-08-30 — spike analytics: trail, touch/hard, 9-zone grid, kill/dug outcomes; f297 GT corrected.
 - 2026-08-31 — outcome semantics completed: kill = direct fall OR dug-and-dies-without-a-set.
+- 2026-09-01 — trail render fix (masked blend, black boxes gone).
