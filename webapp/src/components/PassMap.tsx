@@ -34,13 +34,31 @@ function Mark({ kind, x, y, hollow = false, r = 4.5 }: { kind: PassKind; x: numb
   return <path d={`M${x} ${y - d}L${x + d} ${y}L${x} ${y + d}L${x - d} ${y}Z`} {...common} />
 }
 
+/** Where the ball went next: a small arrowhead at the end of the line, a dot
+ * when there is no start to point from. */
+function Arrow({ kind, from, to }: { kind: PassKind; from: Point | null; to: Point }) {
+  const c = KIND_COLOR[kind]
+  const x = px(to.x)
+  const y = py(to.y)
+  const dx = from ? x - px(from.x) : 0
+  const dy = from ? y - py(from.y) : 0
+  const len = Math.hypot(dx, dy)
+  const ring = { fill: c, stroke: 'var(--surface)', strokeWidth: 1, opacity: 0.9 }
+  if (len < 8) return <circle cx={x} cy={y} r={3} {...ring} />
+  const ux = dx / len
+  const uy = dy / len
+  const bx = x - ux * 9
+  const by = y - uy * 9
+  return <path d={`M${x} ${y}L${bx - uy * 4.5} ${by + ux * 4.5}L${bx + uy * 4.5} ${by - ux * 4.5}Z`} strokeLinejoin="round" {...ring} />
+}
+
 const EDGE = 'var(--axis)'
 
-/** Every reception and defense as a line from where the ball was played to
- * where it was at the next touch. There is no target on the court: if the
- * balls land in one spot the dots pile up there, and the dashed ring (half of
- * the balls fall inside it) closes around them; if they are scattered the
- * ring is wide. Positions are best effort from one low camera, so the pass
+/** Every reception and defense: the big mark is where it was played, the
+ * arrowhead where the ball was at the next touch. There is no target on the
+ * court: if the balls go to one spot the arrowheads pile up there, and the
+ * dashed ring (half of the balls end inside it) closes around them; if they
+ * are scattered the ring is wide. Positions are best effort from one low camera, so the pass
  * under the pointer (or the tapped one) shows the area its end may be in. */
 export function PassMap({ passes }: { passes: Pass[] }) {
   const [kind, setKind] = useState<PassKind | 'all'>('all')
@@ -72,7 +90,7 @@ export function PassMap({ passes }: { passes: Pass[] }) {
     e.preventDefault()
     setPicked(((picked ?? (step > 0 ? -1 : 0)) + step + shown.length) % shown.length)
   }
-  const anchor = (q: PassPoint) => q.end ?? q.start!
+  const anchor = (q: PassPoint) => q.start ?? q.end!
   const hit = (i: number) => ({
     onPointerEnter: (e: PointerEvent) => e.pointerType === 'mouse' && setHover(i),
     onPointerLeave: () => setHover(null),
@@ -108,6 +126,9 @@ export function PassMap({ passes }: { passes: Pass[] }) {
               </g>
             )
           })}
+          {tip && tip.start && tip.p.sex != null && tip.p.sey != null && (
+            <ellipse cx={px(tip.start.x)} cy={py(tip.start.y)} rx={tip.p.sex * S} ry={tip.p.sey * S} fill={KIND_COLOR[tip.kind]} opacity={0.18} />
+          )}
           {tip && tip.end && tip.p.ex != null && tip.p.ey != null && (
             <ellipse cx={px(tip.end.x)} cy={py(tip.end.y)} rx={tip.p.ex * S} ry={tip.p.ey * S} fill={KIND_COLOR[tip.kind]} opacity={0.18} />
           )}
@@ -120,8 +141,8 @@ export function PassMap({ passes }: { passes: Pass[] }) {
                   <line x1={px(q.start.x)} y1={py(q.start.y)} x2={px(q.end.x)} y2={py(q.end.y)} stroke={KIND_COLOR[q.kind]}
                         strokeWidth={on ? 2.5 : 1.5} strokeLinecap="round" opacity={on ? 0.9 : 0.3} />
                 )}
-                {q.start && q.end && <circle cx={px(q.start.x)} cy={py(q.start.y)} r={2} fill="var(--ink-2)" opacity={0.6} />}
-                <Mark kind={q.kind} x={px(anchor(q).x)} y={py(anchor(q).y)} hollow={!q.end} />
+                {q.end && <Arrow kind={q.kind} from={q.start} to={q.end} />}
+                {q.start && <Mark kind={q.kind} x={px(q.start.x)} y={py(q.start.y)} r={5} hollow={!q.end} />}
               </g>
             )
           })}
@@ -131,6 +152,7 @@ export function PassMap({ passes }: { passes: Pass[] }) {
                 <line x1={px(q.start.x)} y1={py(q.start.y)} x2={px(q.end.x)} y2={py(q.end.y)} stroke="transparent" strokeWidth={12} />
               )}
               <circle cx={px(anchor(q).x)} cy={py(anchor(q).y)} r={12} fill="transparent" />
+              {q.end && q.start && <circle cx={px(q.end.x)} cy={py(q.end.y)} r={9} fill="transparent" />}
             </g>
           ))}
         </svg>
@@ -142,7 +164,7 @@ export function PassMap({ passes }: { passes: Pass[] }) {
             {tip.p.d && <> · {formatDate(tip.p.d)}</>}
             <br />
             <span className="muted">
-              {tip.end ? <>went to {tip.p.to ? NEXT_LABEL[tip.p.to] : 'the next touch'}</>
+              {tip.end ? <>the ball went to {tip.p.to ? NEXT_LABEL[tip.p.to] : 'the next touch'}{!tip.start && ' · where it was played was not recorded'}</>
                 : 'no next touch seen on this side: marked where it was played'}
               {tip.end?.atNet && ' · read past the net, drawn at it'}
               {tip.end && tip.p.ex != null && tip.p.ey != null && (
@@ -156,19 +178,20 @@ export function PassMap({ passes }: { passes: Pass[] }) {
         {kinds.map((k) => (
           <span key={k}>
             <svg width={14} height={14} viewBox="0 0 14 14" style={{ marginRight: 5, verticalAlign: -2 }} aria-hidden="true">
-              <Mark kind={k} x={7} y={7} />
-            </svg>{PASS_LABEL[k]}: where the ball went next
+              <Mark kind={k} x={7} y={7} r={5} />
+            </svg>{PASS_LABEL[k]}: where it was played
           </span>
         ))}
         <span>
-          <svg width={14} height={14} viewBox="0 0 14 14" style={{ marginRight: 5, verticalAlign: -2 }} aria-hidden="true">
-            <circle cx={7} cy={7} r={2.5} fill="var(--ink-2)" opacity={0.6} />
-          </svg>where it was played
+          <svg width={20} height={14} viewBox="0 0 20 14" style={{ marginRight: 5, verticalAlign: -2 }} aria-hidden="true">
+            <line x1={1} y1={7} x2={12} y2={7} stroke="var(--ink-2)" strokeWidth={1.5} opacity={0.5} />
+            <path d="M19 7L11 3.5V10.5Z" fill="var(--ink-2)" />
+          </svg>where the ball went next
         </span>
         <span>
           <svg width={18} height={14} viewBox="0 0 18 14" style={{ marginRight: 5, verticalAlign: -2 }} aria-hidden="true">
             <circle cx={9} cy={7} r={6} fill="none" stroke="var(--ink-2)" strokeWidth={1.5} strokeDasharray="4 3" />
-          </svg>half of them fall inside
+          </svg>half of the balls end inside
         </span>
         {shown.some((q) => !q.end) && (
           <span>

@@ -477,8 +477,8 @@ and the destination (= the same team's NEXT touch) need no post-run change and n
 receptions + 34 defenses, 54 with a seen next touch on the same half (hidden / unseen touches never give a position).
 
 **Built.** SQL `20261009120000_pass_map` (NOT pushed): `player_profile.analytics.passes` = one row per credited reception /
-defense `{k, sx, sy, sex, sey, x, y, ex, ey, to, d}` (analytics tier, same signature). Web: `PassMap` (own half, line = played →
-next touch, blue dot = reception, grey diamond = defense, hollow = next touch not seen, dashed ring = half the balls fall inside it
+defense `{k, sx, sy, sex, sey, x, y, ex, ey, to, d}` (analytics tier, same signature). Web: `PassMap` (own half; the big blue dot
+(reception) / grey diamond (defense) is where it was played, a small arrowhead where the ball went next, hollow = next touch not seen, dashed ring = half the balls fall inside it
 around the MEDIAN destination, from 10 seen) + four tiles (counts, spread in m) + "usually X m off the net, Y m from the left
 sideline"; `lib/passes.ts` (+ vitest), hints `pass_map` / `pass_spread` (grade B: depth ±0.7 m, a spread under 1 m is inside the camera's
 noise), two `/measure` rows, demo data. The card hides until the database has the migration.
