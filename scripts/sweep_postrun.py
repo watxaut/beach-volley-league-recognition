@@ -6,7 +6,9 @@
 Every constant of ``src.postrun`` is a physical quantity (metres, seconds) or
 a likelihood cost. This moves each one well away from its shipped value and
 re-scores the reconstruction against the owner GT, so a result that only
-holds on a knife edge shows up as a row that falls apart.
+holds on a knife edge shows up as a row that falls apart. The last column is
+the hard / touch read of ``attack_shape`` (right / typed of the 32 owner-typed
+spikes, ``scripts/score_spike_type.py``).
 """
 
 from __future__ import annotations
@@ -20,7 +22,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from score_postrun import GT_CONTACTS, GT_POINTS, load_gt, score_reconstruction  # noqa: E402
-from src.postrun import ball_flights, match, rallies, touches  # noqa: E402
+from score_spike_type import READ_POSTRUN, gt_spikes  # noqa: E402
+from score_spike_type import score as score_types  # noqa: E402
+from src.postrun import attack_shape, ball_flights, match, rallies, touches  # noqa: E402
 from src.postrun.geometry import CourtGeometry  # noqa: E402
 from src.postrun.reconstruct import reconstruct  # noqa: E402
 from src.postrun.stream import load_stream  # noqa: E402
@@ -66,6 +70,11 @@ SWEEP = [
     (touches, "ATTACK_BELOW_TAPE_M", (0.15, 0.45)),
     (touches, "REACH_CREDIT_MAX", (0.4, 0.9)),
     (match, "ARC_SLACK_S", (0.2, 0.6)),
+    (attack_shape, "LOFT_ANGLE_DEG", (20.0, 30.0)),
+    (attack_shape, "PLACED_SPEED_MS", (3.0, 6.5)),
+    (attack_shape, "CONTACT_SEARCH_S", ((0.04, 0.12), (0.2, 0.4))),
+    (attack_shape, "MIN_FLIGHT_SAMPLES", (3, 8)),
+    (attack_shape, "MIN_FLIGHT_S", (0.1, 0.3)),
 ]
 
 
@@ -76,7 +85,8 @@ def summarise(score):
             f"serve-half {sv['side_ok']:>2}/{sv['n']}  win {w['ok']:>2}/{w['n']}  "
             f"P {matched / max(t.get('pred', 0), 1):.3f}  R {matched / max(t.get('gt', 0), 1):.3f}  "
             f"action {t.get('action_ok', 0) / max(t.get('action_n', 0), 1):.3f}  "
-            f"half {t.get('side_ok', 0) / max(matched, 1):.3f}  final {score['final_score']}")
+            f"half {t.get('side_ok', 0) / max(matched, 1):.3f}  final {score['final_score']}"
+            f"  type {score['types']['correct']}/{score['types']['covered']}")
 
 
 def main() -> int:
@@ -88,10 +98,13 @@ def main() -> int:
     stream = load_stream(str(Path(args.run_dir) / "diag.jsonl"))
     geometry = CourtGeometry.from_file(args.calibration)
     gt = load_gt(GT_CONTACTS, GT_POINTS)
+    typed = gt_spikes(json.loads(Path(GT_CONTACTS).read_text()))
 
     def run():
-        return score_reconstruction(json.loads(json.dumps(
-            reconstruct(stream, geometry))), gt)
+        recon = json.loads(json.dumps(reconstruct(stream, geometry)))
+        score = score_reconstruction(recon, gt)
+        score["types"] = score_types(recon, [], typed, read=READ_POSTRUN)
+        return score
 
     print(f"{'shipped':<34} {summarise(run())}")
     for module, name, values in SWEEP:

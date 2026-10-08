@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
+from .attack_shape import type_attacks
 from .ball_flights import SOURCE_GAP, BallTimeline
 from .geometry import CourtGeometry
 from .match import SQUAD_LETTER, MatchAssembler, Point
@@ -27,7 +28,8 @@ from .stream import MatchStream, load_stream
 from .touches import SOURCE_ALTERNATION, Touch, TouchSolver
 
 #: 2 = touches carry ``court_x_m`` + ``court_err_m``, ground ends ``court_xy_err_m``.
-SCHEMA_VERSION = 2
+#: 3 = attacks carry ``spike_type`` + ``launch`` (attack_shape).
+SCHEMA_VERSION = 3
 logger = logging.getLogger(__name__)
 
 
@@ -43,6 +45,8 @@ def reconstruct(stream: MatchStream, geometry: CourtGeometry,
         points.append(Point(rally=rally, touches=touches, roster=roster))
     checks = MatchAssembler(points_to_win=points_to_win,
                             switch_every=switch_every).assemble(points)
+    for pt in points:                     # after the match layer: labels are final
+        type_attacks(timeline, pt.touches)
     payload = [_point_payload(i + 1, pt) for i, pt in enumerate(points)]
     return {
         "schema_version": SCHEMA_VERSION,
@@ -155,6 +159,8 @@ def format_report(result: Dict[str, Any]) -> str:
             if t["player"] and t.get("player_source") == SOURCE_ALTERNATION:
                 who += " (by alternation)"
             tag = f" {t['outcome'].upper()}" if t.get("outcome") else ""
+            if t.get("spike_type"):
+                tag += f"  ({t['spike_type']})"
             lines.append(f"      f{t['frame']:<6} {t['team'] or '?'} {t['action']:<8} "
                          f"{who}{tag}")
     lines.append("")
@@ -220,6 +226,21 @@ def _touch_payload(pt: Point, t: Touch) -> Dict[str, Any]:
         "court_err_m": _err(t.court_err),
         "reach_body_heights": _round(t.reach, 2),
         "perception_action": t.perception_action,
+        "spike_type": t.spike_type,
+        "launch": _launch_payload(t),
+    }
+
+
+def _launch_payload(t: Touch) -> Optional[Dict[str, Any]]:
+    if t.launch is None:
+        return None
+    return {
+        "frame": int(t.launch.frame),
+        "samples": int(t.launch.samples),
+        "speed_ms": _round(t.launch.speed_ms, 1),
+        "rise_ms": _round(t.launch.rise_ms, 1),
+        "elevation_deg": _round(t.launch.elevation_deg, 1),
+        "elevation_ends_deg": _round(t.launch.elevation_ends_deg, 1),
     }
 
 

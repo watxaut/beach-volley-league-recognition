@@ -222,7 +222,14 @@ def build_actions(points: List[Dict[str, Any]],
                         "frame": spike.get("frame"), "outcome": spike.get("outcome"),
                         "landing_zone": spike.get("landing_zone"),
                         "dug_zone": spike.get("dug_zone"),
+                        "spike_type": spike.get("spike_type"),
                     }
+                if "spike_type" in t:
+                    # Reconstruction schema >= 3 types the attack itself
+                    # (postrun.attack_shape). No type there means "not read":
+                    # never fall back to the causal one (V1: 10 of 16 right).
+                    row["spike_type"] = t["spike_type"]
+                    row["extra"]["launch"] = t.get("launch")
             rows.append(row)
     return rows
 

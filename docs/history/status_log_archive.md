@@ -6924,3 +6924,30 @@ row, 2 unit tests, `test_frame_prefetch` fixture. Verified on e1: default run ==
 match stream loses labels (suspect: the fix adds a `serve` at f15926 that starts the P22 cascade; unchecked);
 regenerate `output/postrun` goldens only if the owner wants the new arm as the A/B reference (AGENTS §12 note).
 `test_inbox::test_calibrated_video_is_run_published_and_archived` fails at HEAD (unrelated).
+
+## Archived 2026-10-08 (#97): the oldest Log session and the oldest Session index line moved out of STATUS.md verbatim (Log ≤3 sessions, index budget 100)
+
+- 2026-08-29 — off-court hold horizon (=90f) recovers e2's roster slot.
+
+### 2026-10-08 (ninety-fourth session) — #94: web login study — fewer code mails, how long a login lasts
+
+**Asked (owner):** the 8-digit code works, but 10-07 took three logins (three mails) and code
+mails fill the inbox; study simple ways to stay logged in for 2–7 days or more (cookies?) and
+their caveats. Mid-session the owner reported the site opened without a code ~20 h later.
+
+**Found (`docs/web_login_study.md`, no code changed):** the client already persists the session
+(`persistSession` + `autoRefreshToken`; refresh tokens never expire), so a login today has NO
+limit; the 10-07 re-logins come from separate addresses (localhost / workers.dev / preview URLs),
+email links opened in another browser, or `signOut()`'s default GLOBAL scope (Settings' Log out
+ends every device). Supabase Auth source: the hosted CAPTCHA lock (deploy 2.9) also blocks
+password sign-in and the passkey options step (broker needed), not OAuth or refresh; with sign-ups
+off an OAuth identity links to the invited account. NIST 800-63B-4 AAL1: overall reauthentication
+SHOULD be ≤30 days. iPhone Safari wipes `localStorage` after 7 days of use without visiting.
+
+**Recommended:** A now (local logout + "all devices", one URL, 30-day limit via `pg_cron` on the
+free plan), then passkeys once the domain is final (Google if zero server code matters more).
+Passwords and an own HttpOnly-cookie server: no.
+
+**Not done / owed:** owner decisions (a) limit, (b) domain, (c) second method (open point 34);
+`pg_cron` session cap untested; Supabase plan gating of time-box/inactivity not confirmed on
+supabase.com (blocked from this container); nothing ran against the hosted project.

@@ -60,7 +60,8 @@ reference for any action A/B), `dump_player_tracks.py` +
 (points / serves / winners / touches vs the owner match GT, with the causal
 stream as baseline), `score_postrun_entreno.py output/postrun` (practice
 clips), `sweep_postrun.py <run_dir>` (one-at-a-time sensitivity of every
-constant).
+constant), `score_spike_type.py --clips output/postrun --rows` (hard / touch
+vs the owner-typed spikes, post-run read and causal baseline).
 
 > **Warning (measured #61): `evaluate.py --predictions <dir>` grades ZERO
 > predictions on `src.main` output.** It expects an entry named `actions` in a
@@ -110,7 +111,8 @@ Component invariants that bite if ignored:
   (dig/set/spike/serve/overpass from touch count). Pose gated on ball
   staleness/near-ball radius (shipped 09-27, byte-identical).
 - **SpikeAnalyzer**: pure observer; `spike_type` by POST-CONTACT ASCENT
-  (exit speed cannot separate touch/hard); `attack_zone` from the
+  (exit speed cannot separate touch/hard) — a px rule that fails on the
+  match (10/16); the type the product uses is the post-run one (§11); `attack_zone` from the
   pre-contact takeoff stance (airborne contact feet project deep);
   outcome with loft-gated kill→dug retro-conversion (sand cannot rebound
   a dig's 2-3 m rise).
@@ -362,6 +364,13 @@ causal and untouched. Owner rules it encodes — keep them when changing it:
 * **Generalise:** every constant is metres, seconds or a likelihood cost,
   derived through the per-video calibration (ball width = depth). Never add a
   pixel threshold there (§7: px constants are venue-coupled).
+* **Hard / touch is a post-run read (#97, `src/postrun/attack_shape.py`):**
+  launch elevation and speed of the flight after the attack, the horizontal
+  speed read twice, no type when the reads disagree. The publisher sends
+  that type and never falls back to the causal `SpikeAnalyzer` one. Its two
+  constants were chosen on the 32 owner-typed match spikes: do not re-tune
+  them on those labels — a change needs new typed spikes (another match) and
+  `score_spike_type.py --clips output/postrun` on both venues.
 
 Validation protocol for any change: `score_postrun.py` on the 20260920 match
 (the bar: 33/33 points, 0 false, winners 33/33, score A 21 – B 12, touch

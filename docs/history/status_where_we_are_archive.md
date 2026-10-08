@@ -3038,3 +3038,16 @@ Per lever on e5: 81 → 67 (fast path) / 50 (read-ahead) / 31–35 ms/frame
 **Session-index line (2026-08-18), verbatim:**
 
 - 2026-08-18 — e5 serve-zone squatter fixed (server vote + trial expiry + contested swap); e4/e5 GT checked.
+
+## Archived 2026-10-08 (#97): the "Player detector input (#94)" and "Speed (#89)" blocks of "Where we are", verbatim (Where-we-are budget)
+
+**Player detector input (#94, default ON).** It converted BGR→RGB and ultralytics read that as BGR (red/blue
+swapped). `player_bgr_input: true` passes the frame as-is; **`false` = the old path** (how to compare: Learnings).
+Frames with 4 real tracks, e1–e7: 26.8→57.4 %, 43.7→61.7, 65.0→72.5, 63.8→78.4, 73.4→80.5, 89.8→98.5, 60.3→67.0;
+stream F1 pooled 0.824→0.839; post-run IDENTICAL (clips; match 33/33, A 21–B 12, P 0.976). Cost: match stream
+action labels 81/145→74/146 (rally cascades in P9/P19/P22/P25); e3 moves 2 spikes between players (contact sheet owed).
+
+**Speed (#89, results-neutral — AGENTS §12).** `prefetch_depth: 8` (read-ahead, `frame_prefetch.py`) +
+`detector_fast_inference` (`yolo_inference.py`): match 1955 → 783–836 s, clips 291 → 131 s, byte-identical to the
+pre-#94 `output/postrun/` goldens (= `player_bgr_input: false`). Bound: MediaPipe pose (open point 33). Full text:
+`docs/history/status_where_we_are_archive.md` (#94).

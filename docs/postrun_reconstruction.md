@@ -64,6 +64,17 @@ check: the two net-top clicks, never used to build the model, land at
    the rally where the near half changes squad. Service order (teammates
    alternate on each side-out) names the server of every point.
 
+6. **Attack type** (`attack_shape.py`, #97). Every observed spike / overpass
+   gets `spike_type` (`hard` / `touch`) from the flight that follows it, in
+   metres: the hit is the largest image-velocity step near the vertex (the
+   classifier dates a vertex 1–3 frames early); the flight up to the next
+   touch or the sand is ballistic, so its heights give the VERTICAL launch
+   speed; the HORIZONTAL speed is read twice — the width trend over the
+   flight, and attack position → next-touch position. `touch` = launch
+   elevation ≥ 25° (a lob) or leaving under 5 m/s (a drop); `hard` = the
+   rest; no type when the two speed reads fall on different sides. The
+   numbers behind it are kept in `launch` (speed, rise, both elevations).
+
 ## Precision first (owner rule)
 
 A missing action is fine, an invented one is not:
@@ -80,6 +91,8 @@ A missing action is fine, an invented one is not:
   decide a kill/ace/error;
 * an ambiguous possession-ending touch is an overpass, never a spike;
 * a kill needs the ball seen coming down;
+* an attack is typed hard / touch only when both horizontal-speed reads
+  agree; a flight under 5 tracked frames reads nothing;
 * a touch after which the next serve contradicts the ball's death is dropped.
 
 ## Measured (2026-10-05)
@@ -111,6 +124,38 @@ have no serve in the clip and are found through the serve-less path.
 Sensitivity (`sweep_postrun.py`, 78 one-at-a-time moves of every constant by
 roughly ×0.6…×1.6): every row keeps 33/33 points, 0 false, winners 33/33;
 worst precision 0.965, recall 0.893, action 0.958, half 0.994.
+
+## Attack type, measured (2026-10-08, #97)
+
+`scripts/score_spike_type.py --clips output/postrun --rows`, owner-typed
+spikes, GT spike → post-run attack within ±15 f:
+
+| | post-run `attack_shape` | causal `SpikeAnalyzer` (px ascent) |
+|---|---|---|
+| match: typed / right (32 spikes) | 29 / 26 (0.906 / 0.897) | 16 / 10 (0.50 / 0.625) |
+| practice: typed / right (8 spikes) | 6 / 6 | 6 / 6 |
+| all 63 match attacks typed | 58 | 25 |
+
+The V1 bars (accuracy 0.85, coverage 0.80, fixed in #92) are met, but the
+two constants were chosen ON these labels, so the match score is in-sample.
+Sensitivity: any split in 24–26° scores the same; 18–32° gives 0.82–0.90;
+the speed floor 3–6 m/s changes nothing; without the hit-frame search 23/29.
+All 22 typed match overpasses read `touch`. Wrong: P10 f6320 (touch read
+hard, 22.8°), P30 f23341 and P33 f25928 (hard read touch, 27.5° / 30.6°);
+untyped: P19 f13397, P22 f16037 (reads disagree), P18 f12295 (no post-run
+attack), e6 f310 (joust, 2 flight frames), e7 f300 (no post-run attack).
+Everything else is unchanged by #97 (the reconstruction differs only by the
+new keys). The sweep is now 88 moves; no row loses a point or a winner.
+
+Why the pixel rule fails here: on a long-axis camera a ball above the lens
+climbs in the picture just by flying toward it, and 57 px was fitted at the
+practice venue (2.3× the beach scale). What limits the new read: depth speed
+(ball width) is the weak axis — the width trend over-reads a ball flying
+away by up to 30 % (seen through the net its box shrinks) — and the two
+classes overlap for real between ~19° and ~31° (a width-free fit that uses
+gravity as the ruler keeps the same attacks there). Amateur "hard" spikes
+are flat and fast (6–15 m/s, −4…+24°), not downward; telling a swing from a
+poke inside the overlap needs the arm (pose), not the ball.
 
 ## Known limits
 
