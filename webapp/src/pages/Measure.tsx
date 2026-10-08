@@ -34,8 +34,9 @@ const ROWS: Row[] = [
     quality: 'Zone, not a spot', grade: 'B' },
   { what: 'Where an attack lands', how: 'Where the defender played it, or where the ball died',
     quality: 'Seen on about half of the points; in / out line calls were right 7 of 10 times', grade: 'C' },
-  { what: 'Hard or touch spike', how: 'How the ball climbs right after the hit',
-    quality: 'Tested on a full match: read for only 16 of 32 spikes and right on 10 of those 16, so it is not shown', grade: 'C' },
+  { what: 'Hard or touch spike', how: 'The flight after the hit, in metres: a ball that leaves steeply upward or slowly was placed (touch), the rest were driven (hard)',
+    quality: 'Typed 29 of the 32 owner-labelled spikes of the reference match and right on 26 of those 29; the two thresholds were chosen on that same match, so a second match is the real test. A flat poke can read as hard. A spike whose two speed reads disagree gets no type',
+    grade: 'B' },
   { what: 'Ball depth and speed', how: 'Ball size in pixels',
     quality: 'The depth of a single ball is coarse; speed is not reported', grade: 'C' },
 ]

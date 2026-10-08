@@ -32,7 +32,7 @@ const G1: Omit<FantasyRule, 'ruleset_id'>[] = [
   { rule_key: 'handling_error', label: 'Ball handling', actions: ['set', 'dig', 'ball_handling'], outcome: 'error', assist_only: false, points: -1, sort_order: 80 },
 ]
 
-type DemoAction = ActionRow & { touch_number: number }
+type DemoAction = ActionRow & { touch_number: number; spike_type?: 'hard' | 'touch' | null }
 
 interface DemoMatch {
   match: Match
@@ -95,6 +95,13 @@ function simulate(id: number, seed: number, finalA: number, finalB: number): { p
         push(digger, side, r() < 0.12 ? 'overpass' : 'spike', 3, kill ? 'kill' : err ? 'error' : null)
         side = side === 'A' ? 'B' : 'A'
       }
+    }
+    // every attack gets the type a flight read would give it: a free ball
+    // reads touch, and about one spike in ten is not read (no extra draw
+    // from the generator, so the simulated matches stay what they were)
+    for (const t of touches) {
+      if (t.action === 'overpass') t.spike_type = 'touch'
+      if (t.action === 'spike') t.spike_type = t.frame % 10 === 0 ? null : t.frame % 10 < 5 ? 'hard' : 'touch'
     }
     touches.forEach((t, seq) => actions.push({ ...t, match_id: id, point_no: pointNo, seq }))
     if (winner === 'A') sa++
@@ -318,12 +325,13 @@ export function demoApi(): Api {
               sx: 0.8 + r() * 6.4, sy: free ? 2 + r() * 4 : 5.2 + r() * 2.2, sex: 0.4, sey: 0.7,
               a: free ? 'overpass' : 'spike', p: r() < 0.6 ? 1 : 2, d: seats.length ? seats[i % seats.length].date : null,
             }
-            const spot = { ...start, x: 0.5 + r() * 7, y, zone: 2, type: 'hard' }
+            const type = free ? 'touch' : i % 7 === 6 ? null : i % 2 ? 'touch' : 'hard'
+            const spot = { ...start, x: 0.5 + r() * 7, y, zone: 2, type }
             // depth is the weak axis, and worse far from the camera
             if (k < 0.55) return { ...spot, ex: 0.4, ey: 0.7, in: null, outcome: null, result: 'dug' as const, source: 'next_touch' }
             if (k < 0.8) return { ...spot, ex: 0.3, ey: 0.3 + (y - 8) * 0.1, in: true, outcome: 'kill', result: 'kill' as const, source: 'ball_death' }
             if (k < 0.92) return { ...spot, x: r() > 0.5 ? 9.4 : -1.2, ex: 0.3, ey: 0.3 + (y - 8) * 0.1, in: false, outcome: 'error', result: 'out' as const, source: 'ball_death' }
-            return { ...start, x: null, y: null, in: null, outcome: 'error', result: 'net' as const, source: null }
+            return { ...start, type, x: null, y: null, in: null, outcome: 'error', result: 'net' as const, source: null }
           }),
           touch_depths: [],
         } : null,

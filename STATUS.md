@@ -18,9 +18,9 @@ update at the end of every session that changes anything and commit with the wor
 - New durable protocol rules go in `AGENTS.md`; new cross-session technical
   facts go one-line-each into *Learnings* below.
 
-Last updated: **2026-10-08 (96th session) — player page v2: four tabs, a league comparison, an attack map with lines,
-hints instead of grade letters (web + migration `20261009100000`, owner pushes it).** #95 (unknown-player slots), #94
-(player detector BGR input; login study), #93 (security review), #92 (stats "Now" picks) and #90 (platform) lie underneath.
+Last updated: **2026-10-08 (98th session) — the web shows hard / touch: the attack map draws the shot as the line
+(heavy = hard, dotted = touch, dashed = free ball) and a "By shot" card gives share, kills, errors and hitting % per shot.**
+#97 (hard / touch read post-run), #96 (player page v2), #95 (unknown-player slots), #94 (BGR input; login study) and #90 (platform) lie underneath.
 
 ## North-star goals (set session 24)
 
@@ -69,6 +69,12 @@ CSV — every player right, 0 corrections (incl. the 10 by-alternation and
 rotation-named servers); the CSV is the per-player GT. Line calls: 3 of 10
 in/out reads wrong (overridden by the next serve).
 
+**Attack type (#97, `attack_shape.py`): hard / touch is a POST-RUN read.** The flight after the attack in metres:
+vertical launch speed (ballistic fit) + horizontal speed read twice (ball-width trend; attack → next touch). Touch =
+launch elevation ≥ 25° or leaving under 5 m/s, hard = the rest, NO type when the two reads disagree. Match, 32
+owner-typed spikes: 26/29 right, 29 typed (causal `SpikeAnalyzer`: 10/16 on 16) — V1 bars met, IN-SAMPLE; practice
+6/6 on 6 of 8. Recon schema 3 (`spike_type`, `launch`); the bundle publishes it. **Web (#98):** `player_profile` → `analytics.shots` (hard / touch / free / unread × n, kills, errors; adds up to `n_attacks`) + guarded `landings[].type` (migration `20261009110000_attack_shots`, NOT pushed): only a row with `extra.launch` has a type, so a pre-#97 publish reads "not read". Attack map: line = shot, `Shot` filter; "By shot" card; grade B.
+
 **Product platform (#90, BUILT, not deployed — AGENTS §13).** Drive inbox →
 `make inbox` (name, calibration wait, run-match, publish DRAFT) → one
 transactional Supabase RPC (applied/unchanged, admin rows untouched) → RLS +
@@ -92,18 +98,11 @@ colours/labels. Pass-2 scripts (`relabel_serves`, `resolve_side_switches`,
 `resolve_point_winners` 18/33, `consume_serve_evidence`) are SUPERSEDED by
 `src/postrun` for points/serves/winners; kept as provenance. Entreno action
 gate (causal): e1 0.706, e2 0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933,
-e7 0.75 (same-session A/B only). Test suite **1211** (1205 pass, 5 skipped; `test_inbox` run-match order fails at HEAD, not #94).
+e7 0.75 (same-session A/B only). Test suite **1228** (1222 pass, 5 skipped; `test_inbox` run-match order fails at HEAD, not #94 / #97 / #98).
 
-**Player detector input (#94, default ON).** It converted BGR→RGB and ultralytics read that as BGR (red/blue
-swapped). `player_bgr_input: true` passes the frame as-is; **`false` = the old path** (how to compare: Learnings).
-Frames with 4 real tracks, e1–e7: 26.8→57.4 %, 43.7→61.7, 65.0→72.5, 63.8→78.4, 73.4→80.5, 89.8→98.5, 60.3→67.0;
-stream F1 pooled 0.824→0.839; post-run IDENTICAL (clips; match 33/33, A 21–B 12, P 0.976). Cost: match stream
-action labels 81/145→74/146 (rally cascades in P9/P19/P22/P25); e3 moves 2 spikes between players (contact sheet owed).
+**Player detector input (#94, default ON):** `player_bgr_input: true` passes BGR as-is (`false` = the old path; how to compare: Learnings). 4-track frames up on all 7 clips, stream F1 0.824→0.839, post-run identical; match stream labels 81/145→74/146; e3 contact sheet owed. Full text: `docs/history/status_where_we_are_archive.md` (#97).
 
-**Speed (#89, results-neutral — AGENTS §12).** `prefetch_depth: 8` (read-ahead, `frame_prefetch.py`) +
-`detector_fast_inference` (`yolo_inference.py`): match 1955 → 783–836 s, clips 291 → 131 s, byte-identical to the
-pre-#94 `output/postrun/` goldens (= `player_bgr_input: false`). Bound: MediaPipe pose (open point 33). Full text:
-`docs/history/status_where_we_are_archive.md` (#94).
+**Speed (#89, results-neutral — AGENTS §12):** `prefetch_depth: 8` + `detector_fast_inference`: match 1955 → 783–836 s, clips 291 → 131 s, byte-identical to the pre-#94 goldens (= `player_bgr_input: false`). Bound: MediaPipe pose (open point 33). Full text: same archive (#94, #97).
 
 **Held-out lock:** `ground_truth/20290928_entreno_vall_dhebron_serve_anchors.json`
 = 19 serves; the video has NEVER been run; use only via a card "score
@@ -128,8 +127,8 @@ P31 serve f24543 is 128 f before its reception (owner to confirm ~f24630).
    Heights check done with the real heights: not good (V2 ±0.2 m stays FAIL; O3 would show relative heights only).
    Next picks (§5): I3 → O3 (relative heights, V2), N10/O2, O1+I4, N7/N9, F1.
 1. ✅ **Product deployed (owner, DONE 2026-10-07):** `docs/deploy_web_platform.md` steps 0–7. Still open: publish 20260920 check
-   (fantasy = txt footer), then action_overrides UI, in-app invites, `own_x_m` heatmaps (design §8 "Next"). **Owed (#96): `supabase db push` (`20261009100000`), then look at the Attack tab on the real match.**
-2. **Second match / other venue through `make run-match`** — the only
+   (fantasy = txt footer), then action_overrides UI, in-app invites, `own_x_m` heatmaps (design §8 "Next"). **Owed (#98), in any order — each step is safe alone:** merge `spike-type-touch-vs-hard`; `supabase db push` (`20261009100000` + `20261009110000`); move `~/volley-prod` to that commit and run `make republish-all` THERE (this checkout's `.env.publish` is the local stack; an older prod checkout would rewrite the shared `output/` with the old rules); then look at the Attack tab on the real match.
+2. **Second match / other venue through `make run-match`** (also the first out-of-sample test of #97 hard / touch) — the only
    21-point match so far is the one the layer was built on; practice clips
    and the sweep are the out-of-sample evidence.
 3. **Landing line calls** (3 of 10 wrong): needed only for the last point
@@ -240,7 +239,7 @@ archived under their session date in `docs/history/status_log_archive.md`.)*
     ends) — decide whether `make run` should always write a compact one;
     (d) blocks are not a label; (e) 1 observed touch is credited to nobody
     (10 more by alternation), 5 are placed as hidden touches; (f) FIXED #90:
-    set/dig `error` = ball handling −1 (`handling_errors`). Next: (b).
+    set/dig `error` = ball handling −1 (`handling_errors`); (g) #97 hard / touch: split fitted on this match's 32 labels (same score for 24–26°), owner looked at the sheet (#98): P10 f6320 = a second-touch poke that left flat from mid-court and P22 f16037 = a touch to the side that barely rose — both labels stand (TOUCH; read hard / untyped), nothing re-tuned; P30, P33, P19 not commented; swing vs poke needs pose in the dump. Next: (b).
 33. **Speed, results-neutral (#89).** Shipped: read-ahead + exact detector
     fast path. Left, in order: (a) pose on its own thread, call order kept
     (~30 → ~26 ms/f; touches `ActionClassifier`); (b) read-ahead for the
@@ -323,6 +322,10 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Image-plane speed cannot tell a toss apex from a serve flying straight at the lens; an image-plane velocity step is perspective once the ball has left its toss depth.
 - A tracking gap is the same flight only if the ball reappears where gravity puts it; a short gap it leaves on another trajectory hides a touch (gap vertex), but only if the ball was flying on both sides — a resting ball that "moves" is a re-lock onto another ball.
 - Spike vs overpass on a possession-ending touch = contact height against the tape (net − 0.28 m); pokes and bump passes overlap only around 2.05 m, and the safe label there is overpass.
+- Hard vs touch (#97): image ascent in px is depth-blind on a long-axis camera (a ball above the lens climbs in the picture by flying toward it; 57 px was fitted at 2.3× the beach scale). Vertical launch speed is the robust number (three depth reads agree within 0.2 m/s); horizontal speed is not — the width trend over-reads a ball flying AWAY by up to 30 % (seen through the net its box shrinks) → read it twice (trend; attack → next touch), type only on agreement.
+- Amateur "hard" is not downward (#97): 13 of 15 owner-typed drives leave at −4…+24° and 6–15 m/s and stay up 0.3–1.1 s; "touch" is a lob (≥ 26°) or a slow drop (1.8 m/s). The classes overlap for real at ~19–31° (hard up to 30.6°, touch down to 19.4°; width trend, attack → dig ends and a gravity-as-ruler fit all keep them there): swing vs poke needs pose, not ball flight — do not re-tune the split on the same labels.
+- The classifier dates a vertex 1–3 frames BEFORE the picture shows the turn; a launch fit that starts at the vertex swallows the set's descent (type score 23/29 vs 26/29) → `attack_shape.hit_frame` (largest image-velocity step within −0.08…+0.25 s).
+- Hard / touch is asymmetric (owner, #98): a ball that RISES after the attack is almost always a touch, but a touch need not rise (a flat second-touch poke, a touch to the side) → `hard` is the weaker read; the flight cannot see the swing.
 - Practice clips exposed five mechanism bugs the match never hit (re-lock gap vertex, net-fault timing, serve-into-net read, toss-hit search, serve-less rally): run `score_postrun_entreno.py` on every change.
 
 **GT / scoring semantics**
@@ -335,6 +338,7 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Layer 1 is degenerate on the match (157/185 contacts = `bump_set`); every dig/set/overpass/serve label is `ActionContextResolver._decide` keyed on `_poss_touch` — touch-count errors are downstream of MISSING contacts (starved 33/43, not mis-reset).
 
 **Perf / infra**
+- **`make republish-all` → `Connection refused` (#98):** this checkout's `.env.publish` is the LOCAL stack (`127.0.0.1:54321`); the hosted URL is only in `~/volley-prod/.env.publish`. `~/volley-prod/output` is a symlink to this checkout's `output/`, so republish from prod only once prod has the current `src/postrun`.
 - **Schema check without the local Supabase stack (#96):** `colima start`, then `docker run -d --name volley_pg_check -e POSTGRES_PASSWORD=postgres -v "$PWD":"$PWD":ro public.ecr.aws/supabase/postgres:17.11.0.002`, a `psql` shim on PATH (`exec docker exec -i volley_pg_check psql "$@"`) and `PG_DSN=postgresql://postgres:postgres@127.0.0.1:5432/postgres make schema-check`; remove the container after.
 - Pose gating shipped: 84.8 → 68.0 ms/f byte-identical. #89: the "detector floor ~48 ms/f" was half overhead — a YOLO forward is ~11 ms; ultralytics' NMS + rescale on MPS cost 10–20 ms/f in GPU syncs (3 ms on CPU).
 - MPS (M3 Pro, #89): run-to-run deterministic (HEAD reproduces `output/postrun` byte for byte); batch>1 is bit-identical to batch-1 but NOT faster (compute-bound); two models driven from two threads stay bit-identical.
@@ -348,7 +352,7 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Web/infra facts (#90, checked 2026-10-06): Telegram bot `getFile` caps 20 MB (local Bot API server: 2000 MB), undelivered updates kept 24 h, "video" sends re-encode; Supabase free = 50 MB/file, 1 GB storage, 500 MB DB, pauses after 7 idle days; torch for Intel macOS ends at 2.2.x.
 - Court positions (#91, 20260920, 136 credited touches, ball at the touch vs the toucher's feet — a noisy reference, NOT GT): agree ~0.4 m across / ~0.7 m along at 1σ, 83–96 % within 2×; flight fits have 54+ width samples so the floor is systematic, not noise. Ground reads at ±4 px: ±0.1 m depth at the near baseline, ±1.1 m at the far one (lens 1.5 m up). `geometry.ground_read_error_m` / `ball_read_error_m` (the ground one shrinks by itself with a higher tripod).
 - Postgres: `jsonb_populate_recordset` fills a MISSING key from its base record (NULL), never the column DEFAULT — pass a base row carrying the defaults (#90 smoke test).
-- V1 (#92, 20260920, 32 owner-labelled spikes): `SpikeAnalyzer` hard/touch is published for 16 and right on 10 (acc 0.625, cov 0.50; bars 0.85 / 0.80) → FAIL, the web does not show hard/touch; 25 of 63 post-run attacks have any causal record. `scripts/score_spike_type.py`.
+- V1 (#92 → #97, 20260920, 32 owner-typed spikes; bars 0.85 / 0.80): causal `SpikeAnalyzer` types 16, 10 right → FAIL; post-run `attack_shape` types 29, 26 right (0.897 / 0.906) → bars met IN-SAMPLE; practice 6/6 on 6 of 8; split 18–32° gives 0.82–0.90. `scripts/score_spike_type.py --clips output/postrun --rows`.
 - V2 (#92): live net crossings with a well-conditioned timing clear the tape (33/33, median +0.61 m) but the far half reads people 5–12 % shorter and digs 0.29 m higher than near → no "±0.2 m". Dead-time balls rolling past the net read 2.3 m under the tape (on the sand) — always filter to rallies. `scripts/check_heights.py`.
 - SQL stats (#92): possession = running count of `touch_number = 1` per point (0 = serve, 1 = reception); a `bool_or` over a column that is NULL for most rows returns NULL, not false — `coalesce` it. New Supabase functions get EXECUTE for anon by default: revoke explicitly.
 - Supabase grants (#93, checked 2026-10-06): projects created since 2026-05-30 grant NO table/sequence privilege to `anon`/`authenticated`/`service_role` (changelog 45329); the local CLI stack (2.119) still grants ALL, so local runs hid it. Every table/view needs a `GRANT` in its migration; the test stub keeps the permissive default and `rls_smoke.sql` asserts `anon` holds nothing. `supabase/config.toml` configures ONLY the local stack — hosted Auth settings are dashboard switches, proven by `GET /auth/v1/settings`.
@@ -357,6 +361,8 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Edge functions (#93): `EdgeRuntime.waitUntil` exists only in a USER worker (the platform's way of running a function), not when the file is the runtime's main service — guard it; a function added while the local stack runs is not served (404) until the stack restarts. `pg_net` was rejected for the broker: its tables and `net.http_post` are granted to `anon` and owned by `supabase_admin`, so a migration cannot revoke that.
 
 ## Session index (one line each)
+- #98 **Web shows hard / touch: map line = shot (heavy hard, dotted touch, dashed free ball) + Shot filter; "By shot" card from SQL `analytics.shots` (`20261009110000`); pre-#97 publish = "not read"; publish error = local-stack env**
+- #97 **Hard / touch attacks read POST-RUN (`attack_shape.py`): launch elevation ≥25° or <5 m/s = touch, two speed reads must agree; match 26/29 on 29 of 32 (causal 10/16 on 16), practice 6/6; recon schema 3**
 - #96 **Player page v2: 4 tabs, 5 count tiles, "you vs league / vs earlier" strips (verdict only when 95% ranges do not overlap), attack map with lines (kill blue, dug grey, error red; dashed = free ball), "i" hints replace grade letters**
 - #95 **Admin can mark a slot "Unknown player": its stats stay in the match, never in a ranking or profile; re-tag later from Players → Unknown players; also `previews` block in wrangler.jsonc (PR build)**
 - #94 **Player detector got RGB frames ultralytics reads as BGR: now passes BGR (`player_bgr_input`, default ON; `false` = old path); 4-track frames up on all 7 clips, stream F1 0.824→0.839, post-run identical; match stream labels −7**
@@ -455,9 +461,76 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-09-04 **#3** — e1 GT re-verified (three mixed id conventions unified; queue empty); joust-split adjudicated; reentry contact shipped (e6 f308).
 - 2026-09-01 — trail render fix (masked blend, black boxes gone).
 - 2026-08-31 — outcome semantics completed: kill = direct fall OR dug-and-dies-without-a-set.
-- 2026-08-30 — spike analytics: trail, touch/hard, 9-zone grid, kill/dug outcomes; f297 GT corrected.
-- 2026-08-29 — off-court hold horizon (=90f) recovers e2's roster slot.
 ## Log (newest first)
+
+### 2026-10-08 (ninety-eighth session) — #98: hard / touch on the web (attack map + "By shot"), and why `make republish-all` was refused
+
+**Asked (owner):** (1) `make republish-all` fails with `Connection refused` on the thumbnail upload; (2) see hard
+("accelerated") spikes vs touch on the court view, and the % of each. Sheet feedback: P10 was a poke on the second
+touch that left flat from mid-court; P22 a touch to the side that barely rose — a touch need not rise, a rising ball
+is mostly a touch.
+
+**Publish (diagnosed, not a code bug):** this checkout's `.env.publish` has `SUPABASE_URL=http://127.0.0.1:54321`
+(local stack, colima stopped); the hosted URL is only in `~/volley-prod/.env.publish`, and that worktree sat at
+`b051478` (before #97) with `output` symlinked here. Fix shipped: the client error names the host it could not reach
+(`cannot reach http://127.0.0.1:54321 (...); check SUPABASE_URL`, test added). Owner chose: publish after the merge,
+from prod. Nothing was published this session.
+
+**Built (owner picked: line style + filter; all attacks in 4 rows).** SQL `20261009110000_attack_shots`:
+`player_profile.analytics.shots` = hard / touch / free / unread, each `{n, kills, errors}`, every attack in exactly
+one row; `landings[].type` and the split take a type ONLY from a row with `extra.launch` (the post-run read ran), so
+the causal guess of a pre-#97 publish is never shown. Web: `AttackMap` draws the shot as the line (heavy solid =
+hard, dotted = touch, dashed = free ball, thin solid = spike not read; colour stays the outcome), a `Shot` filter
+(counts follow the other filters), type in the tooltip, legend and table; Attack tab "By shot" card (share bar +
+Att / Share / K / E / Hit %), hint `shot_type`, grade B ("approximate"); `/measure` row rewritten (was "not shown").
+The page hides both until the database has the migration (`shots` missing → no card, no types).
+
+**Verified:** schema check 5/5 on a throwaway `supabase/postgres:17` (smoke: typed spike → hard 1/1; `extra.launch`
+removed → unread, map type null; SQL == Python recount on the simulated and the real match, rows add up to
+`n_attacks`); vitest 52, typecheck, oxlint, build; Python suite 1228 (1227 pass with the schema check on; `test_inbox` fails as before); bar colours pass the dataviz separation check in both themes (ΔE ≥ 15);
+demo screenshots light / dark / phone width, no overflow. Real match on disk: 16 hard, 20 touch, 3 not read, 23 free balls.
+
+**Not done / owed:** merge, `supabase db push`, prod worktree to the merged commit, `make republish-all` there, then
+the owner's look at the real Attack tab. Not rendered against the real match (demo data only). Hard / touch is still
+in-sample (one match); a flat poke reads hard (P10) — pose in the dump is the lever, not a re-tune.
+
+### 2026-10-08 (ninety-seventh session) — #97: hard / touch attacks, read post-run from the flight in metres
+
+**Asked (owner):** new branch from main; on the 20260920 match and the practice clips, get spike touch vs hard /
+accelerated; the net-in-front camera hides speed along its own axis, so try upward movement, the ball's pixel-size
+change, or anything else.
+
+**Diagnosed first (no code):** the causal rule (`SpikeAnalyzer.TOUCH_RISE_PX = 57` px of image ascent) types 16 of
+the 32 owner-typed match spikes, 10 right. It is a pixel rule fitted at the practice venue (2.3× the beach scale) and
+depth-blind: a ball above the lens climbs in the picture just by flying toward it. Per-spike flights in metres (depth
+from ball width): the vertical launch speed is stable across three depth reads (±0.2 m/s); the horizontal speed is
+not (width trend vs attack → dig ends vs a gravity-as-ruler fit differ by up to 30 % for balls flying away). Amateur
+"hard" is flat-ish and fast, not downward (13 of 15 leave at −4…+24°); "touch" is a lob or a slow drop. The classes
+overlap at 19–31° under every read (hard up to 30.6°, touch down to 19.4°). Box elongation (blur) is flat in sunlight (1.04).
+
+**Built:** `src/postrun/attack_shape.py` — hit frame = largest image-velocity step near the vertex; ballistic fit of
+the flight up to the next touch / the sand; elevation = atan(vertical / horizontal); touch = ≥ 25° or < 5 m/s, hard =
+the rest; the horizontal speed is read twice (width trend; attack → next touch) and a type is given only when both
+agree. Stamped on every observed spike / overpass (`spike_type`, `launch`; recon schema 3; `(hard)` / `(touch)` in
+the play-by-play). `src/publish/bundle.py` publishes that type (never the causal one once the recon carries the key;
+the causal type stays in `extra.causal_spike`). `score_spike_type.py` scores both reads (`--clips`, `--rows`);
+`sweep_postrun.py` +5 constants and a `type` column.
+
+**Measured:** match 26/29 right, 29 of 32 typed (accuracy 0.897, 95 % range 0.74–0.96; coverage 0.906) vs causal
+10/16 on 16 → the V1 bars (0.85 / 0.80) are met, IN-SAMPLE (both constants sit in the measured gap). Practice 6/6 on
+6 of 8, same as causal (e6 f310 joust: 2 flight frames; e7 f300: no post-run attack). All 22 typed overpasses read
+touch. Sweep: split 24–26° identical, 18–32° gives 0.82–0.90; speed floor 3–6 m/s identical; without the hit-frame
+search 23/29. Everything else unchanged: the match recon differs from the old one only by the new keys (33/33 points,
+winners 33/33, A 21 – B 12, P 0.976); practice P 52/53, action 52/52; 88 sweep rows lose no point or winner.
+Suite 1227 (1221 pass, 5 skipped, `test_inbox` fails as before).
+
+**Wrong / not typed (sheet: `output/spike_type_review/disputed_spikes.jpg`):** P10 f6320 touch → hard (22.8°,
+6.2 m/s); P30 f23341 hard → touch (27.5°); P33 f25928 hard → touch (30.6°, cross-court, out). No type: P19 f13397
+and P22 f16037 (the two reads disagree), P18 f12295 (no post-run attack there).
+
+**Not done / owed:** owner look at the sheet (the labels may follow the swing, which the ball flight cannot see);
+`make republish-all` (a post-run rule changed); web: Attack map and `/measure` still say hard / touch is off; a
+second match is the first out-of-sample test; swing vs poke needs pose in the diag dump.
 
 ### 2026-10-08 (ninety-sixth session) — #96: player page v2 (less noise, a league comparison, an attack map with lines)
 
@@ -496,47 +569,3 @@ a private profile shows Overview + Matches and the notice on the two analytics t
 **Not done / owed:** owner `supabase db push` (until then the map draws ends only and the comparison has no
 serve-error / side-out rows; either deploy order is safe). Later: hard vs touch (new validation), pick-a-player highlight, video
 link per attack (I5), line vs cross (N10).
-
-### 2026-10-08 (ninety-fifth session) — #95: "Unknown player" slots (stats kept in the match, out of every ranking)
-
-**Asked (owner):** opponents the league does not know need an *unknown* tag in the admin match review: their stats stay
-inside that game but they are not in the total ranking; later the admin can re-tag them if they join the site.
-
-**Decision (plan approved):** unknown is a state of the SLOT (`match_participants.is_unknown`, `player_id` NULL), not a placeholder
-`players` row — `unique (match_id, player_id)` would forbid two unknowns in a match and every aggregate would need a guest filter.
-Cross-match functions already join `players` by `player_id`, so an unknown is excluded by construction (AGENTS §13 rule added).
-
-**Built:** `20261008100000_unknown_players.sql` (column + check unknown ⇒ no player, stamp trigger on either change, column grant);
-`backup.py` exports the flag; webapp: "Unknown player" in the slot dropdown (counts as decided for the publish gate), `slotLabel`/`slotNames`
-(`Unknown (P1B)` in box score, report, play-by-play, team names), Admin → Players → **Unknown players** card (every unknown slot, thumbnail,
-"re-tag as" → the match flows into that player's totals), demo mode mirrors it. Cloudflare PR build: `"previews": {}` in `webapp/wrangler.jsonc`.
-
-**Verified:** `rls_smoke.sql` block (check, stamp, republish keeps the flag, box score/report keep the slot, leaderboard 3 rows then 4 after the
-re-tag, viewer cannot flip it) — schema check 5/5 on a scratch Supabase PG17 (psql shim over `docker exec`); the block FAILS on a DB without the
-migration (negative control); vitest 33, typecheck, oxlint; headless-Chrome screenshots of the demo pages. `wrangler preview` not run (needs Cloudflare).
-
-**Not done / owed:** owner pushed the migration (2026-10-08); check the PR preview build; no per-person identity across matches (re-tag is per slot).
-
-### 2026-10-08 (ninety-fourth session) — #94: web login study — fewer code mails, how long a login lasts
-
-**Asked (owner):** the 8-digit code works, but 10-07 took three logins (three mails) and code
-mails fill the inbox; study simple ways to stay logged in for 2–7 days or more (cookies?) and
-their caveats. Mid-session the owner reported the site opened without a code ~20 h later.
-
-**Found (`docs/web_login_study.md`, no code changed):** the client already persists the session
-(`persistSession` + `autoRefreshToken`; refresh tokens never expire), so a login today has NO
-limit; the 10-07 re-logins come from separate addresses (localhost / workers.dev / preview URLs),
-email links opened in another browser, or `signOut()`'s default GLOBAL scope (Settings' Log out
-ends every device). Supabase Auth source: the hosted CAPTCHA lock (deploy 2.9) also blocks
-password sign-in and the passkey options step (broker needed), not OAuth or refresh; with sign-ups
-off an OAuth identity links to the invited account. NIST 800-63B-4 AAL1: overall reauthentication
-SHOULD be ≤30 days. iPhone Safari wipes `localStorage` after 7 days of use without visiting.
-
-**Recommended:** A now (local logout + "all devices", one URL, 30-day limit via `pg_cron` on the
-free plan), then passkeys once the domain is final (Google if zero server code matters more).
-Passwords and an own HttpOnly-cookie server: no.
-
-**Not done / owed:** owner decisions (a) limit, (b) domain, (c) second method (open point 34);
-`pg_cron` session cap untested; Supabase plan gating of time-box/inactivity not confirmed on
-supabase.com (blocked from this container); nothing ran against the hosted project.
-

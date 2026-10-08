@@ -6924,3 +6924,57 @@ row, 2 unit tests, `test_frame_prefetch` fixture. Verified on e1: default run ==
 match stream loses labels (suspect: the fix adds a `serve` at f15926 that starts the P22 cascade; unchecked);
 regenerate `output/postrun` goldens only if the owner wants the new arm as the A/B reference (AGENTS §12 note).
 `test_inbox::test_calibrated_video_is_run_published_and_archived` fails at HEAD (unrelated).
+
+## Archived 2026-10-08 (#97): the oldest Log session and the oldest Session index line moved out of STATUS.md verbatim (Log ≤3 sessions, index budget 100)
+
+- 2026-08-29 — off-court hold horizon (=90f) recovers e2's roster slot.
+
+### 2026-10-08 (ninety-fourth session) — #94: web login study — fewer code mails, how long a login lasts
+
+**Asked (owner):** the 8-digit code works, but 10-07 took three logins (three mails) and code
+mails fill the inbox; study simple ways to stay logged in for 2–7 days or more (cookies?) and
+their caveats. Mid-session the owner reported the site opened without a code ~20 h later.
+
+**Found (`docs/web_login_study.md`, no code changed):** the client already persists the session
+(`persistSession` + `autoRefreshToken`; refresh tokens never expire), so a login today has NO
+limit; the 10-07 re-logins come from separate addresses (localhost / workers.dev / preview URLs),
+email links opened in another browser, or `signOut()`'s default GLOBAL scope (Settings' Log out
+ends every device). Supabase Auth source: the hosted CAPTCHA lock (deploy 2.9) also blocks
+password sign-in and the passkey options step (broker needed), not OAuth or refresh; with sign-ups
+off an OAuth identity links to the invited account. NIST 800-63B-4 AAL1: overall reauthentication
+SHOULD be ≤30 days. iPhone Safari wipes `localStorage` after 7 days of use without visiting.
+
+**Recommended:** A now (local logout + "all devices", one URL, 30-day limit via `pg_cron` on the
+free plan), then passkeys once the domain is final (Google if zero server code matters more).
+Passwords and an own HttpOnly-cookie server: no.
+
+**Not done / owed:** owner decisions (a) limit, (b) domain, (c) second method (open point 34);
+`pg_cron` session cap untested; Supabase plan gating of time-box/inactivity not confirmed on
+supabase.com (blocked from this container); nothing ran against the hosted project.
+
+### 2026-10-08 (ninety-fifth session) — #95: "Unknown player" slots (stats kept in the match, out of every ranking)
+
+**Asked (owner):** opponents the league does not know need an *unknown* tag in the admin match review: their stats stay
+inside that game but they are not in the total ranking; later the admin can re-tag them if they join the site.
+
+**Decision (plan approved):** unknown is a state of the SLOT (`match_participants.is_unknown`, `player_id` NULL), not a placeholder
+`players` row — `unique (match_id, player_id)` would forbid two unknowns in a match and every aggregate would need a guest filter.
+Cross-match functions already join `players` by `player_id`, so an unknown is excluded by construction (AGENTS §13 rule added).
+
+**Built:** `20261008100000_unknown_players.sql` (column + check unknown ⇒ no player, stamp trigger on either change, column grant);
+`backup.py` exports the flag; webapp: "Unknown player" in the slot dropdown (counts as decided for the publish gate), `slotLabel`/`slotNames`
+(`Unknown (P1B)` in box score, report, play-by-play, team names), Admin → Players → **Unknown players** card (every unknown slot, thumbnail,
+"re-tag as" → the match flows into that player's totals), demo mode mirrors it. Cloudflare PR build: `"previews": {}` in `webapp/wrangler.jsonc`.
+
+**Verified:** `rls_smoke.sql` block (check, stamp, republish keeps the flag, box score/report keep the slot, leaderboard 3 rows then 4 after the
+re-tag, viewer cannot flip it) — schema check 5/5 on a scratch Supabase PG17 (psql shim over `docker exec`); the block FAILS on a DB without the
+migration (negative control); vitest 33, typecheck, oxlint; headless-Chrome screenshots of the demo pages. `wrangler preview` not run (needs Cloudflare).
+
+**Not done / owed:** owner pushed the migration (2026-10-08); check the PR preview build; no per-person identity across matches (re-tag is per slot).
+
+### Session index lines moved out of STATUS.md (verbatim, oldest first)
+
+> The index is capped at 100 lines (`tests/test_status_leanness.py`); from 2026-10-08 (#98) the oldest
+> line moves here when a new session is added.
+
+- 2026-08-30 — spike analytics: trail, touch/hard, 9-zone grid, kill/dug outcomes; f297 GT corrected.

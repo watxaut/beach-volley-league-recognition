@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -34,6 +34,9 @@ from .ball_flights import EVENT_DEATH, SOURCE_GAP, BallEvent, BallTimeline
 from .geometry import NET_Y_M, SIDE_FAR, SIDE_NEAR, other_side
 from .rallies import Rally
 from .stream import MatchStream, PlayerObs
+
+if TYPE_CHECKING:
+    from .attack_shape import AttackLaunch
 
 ACTION_SERVE = "serve"
 ACTION_DIG = "dig"
@@ -130,6 +133,8 @@ class Touch:
     outcome: Optional[str] = None     # ace | kill | error (match layer)
     player_source: Optional[str] = None   # how the player was decided
     perception_action: Optional[str] = None
+    spike_type: Optional[str] = None      # attacks: hard | touch (attack_shape)
+    launch: Optional["AttackLaunch"] = field(default=None, repr=False)
     event: Optional[BallEvent] = field(default=None, repr=False)
 
 

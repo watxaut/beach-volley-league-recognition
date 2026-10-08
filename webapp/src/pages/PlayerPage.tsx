@@ -10,8 +10,8 @@ import { Approx, Card, ErrorBox, Loading, Segmented, StatInfo, Tabs, Tile } from
 import { WindowPicker } from '../components/WindowPicker'
 import { compare, MIN_PEERS, RECENT, splitEarlier, sumHistory, type CompareRow } from '../lib/compare'
 import { formatDate, matchLabel, signed } from '../lib/format'
-import { hitText, hitting, ROLLING_WINDOW, rolling } from '../lib/stats'
-import type { HistoryRow, LeaderRow, PlayerAnalytics, PlayerProfile } from '../lib/types'
+import { hitText, hitting, pct, rate, ROLLING_WINDOW, rolling } from '../lib/stats'
+import type { HistoryRow, LeaderRow, PlayerAnalytics, PlayerProfile, ShotKey } from '../lib/types'
 import { ALL_TIME, windowLabel, windowParams } from '../lib/window'
 
 // Overview and Matches are league tier (every member); Attack and Serve &
@@ -167,6 +167,9 @@ function Overview({ data, board, boardError, windowKey, who, allHistory }: {
 
 function Attack({ a }: { a: PlayerAnalytics }) {
   const hitAll = { n: a.n_attacks, kills: a.n_kills, errors: a.n_attack_errors }
+  // Before migration 20261009110000 the database has no `shots`, and the type
+  // on a landing is still the causal guess: draw no type at all until then.
+  const landings = a.shots ? a.landings : a.landings.map((l) => ({ ...l, type: null }))
   return (
     <>
       <Card>
@@ -180,7 +183,7 @@ function Attack({ a }: { a: PlayerAnalytics }) {
       <div className="grid grid-2">
         <Card title={<>Attack map<StatInfo term="attack_map" /> <Approx grade="B" /></>}>
           {a.landings.length
-            ? <AttackMap landings={a.landings} />
+            ? <AttackMap landings={landings} />
             : <p className="muted" style={{ margin: 0 }}>No attack positions recorded yet.</p>}
         </Card>
         <div>
@@ -197,11 +200,53 @@ function Attack({ a }: { a: PlayerAnalytics }) {
               </tbody>
             </table>
           </Card>
+          {a.shots && <ByShot shots={a.shots} />}
           <Trend title="Kill rate" unit="attack" hits={a.attack_series.map((s) => s.r === 'kill')}
                  dates={a.attack_series.map((s) => s.d)} />
         </div>
       </div>
     </>
+  )
+}
+
+const SHOT_ROWS: { key: ShotKey; label: string; color: string; hint?: string }[] = [
+  { key: 'hard', label: 'Hard', color: 'var(--shot-hard)', hint: 'a driven spike' },
+  { key: 'touch', label: 'Touch', color: 'var(--shot-touch)', hint: 'a placed spike: a lob, a poke, a slow drop' },
+  { key: 'free', label: 'Free ball', color: 'var(--shot-free)', hint: 'sent back over without an attack' },
+  { key: 'unread', label: 'Not read', color: 'var(--axis)', hint: 'a spike whose flight could not be typed' },
+]
+
+/** How the player's attacks split into hard spikes, touch shots and free
+ * balls, and what each kind earned. Every attack is in exactly one row. */
+function ByShot({ shots }: { shots: NonNullable<PlayerAnalytics['shots']> }) {
+  const total = SHOT_ROWS.reduce((n, r) => n + shots[r.key].n, 0)
+  const rows = SHOT_ROWS.filter((r) => r.key !== 'unread' || shots.unread.n > 0)
+  return (
+    <Card title={<>By shot<StatInfo term="shot_type" /> <Approx grade="B" /></>}>
+      {total === 0 ? <p className="muted" style={{ margin: 0 }}>No attacks credited yet.</p> : (
+        <>
+          <StackBar label="Attacks by shot"
+                    segments={rows.map((r) => ({ label: r.label.toLowerCase(), n: shots[r.key].n, color: r.color, hint: r.hint }))} />
+          <table style={{ marginTop: 10 }}>
+            <thead>
+              <tr><th className="left" /><th>Att</th><th title="Share of all attacks">Share</th><th>K</th><th>E</th><th>Hit %</th></tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const h = shots[r.key]
+                return (
+                  <tr key={r.key}>
+                    <td className="left" title={r.hint}>{r.label}</td><td>{h.n}</td>
+                    <td>{pct(rate(h.n, total))}</td><td>{h.kills}</td><td>{h.errors}</td>
+                    <td className="strong">{hitText(hitting(h))}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </>
+      )}
+    </Card>
   )
 }
 

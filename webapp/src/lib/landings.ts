@@ -1,4 +1,4 @@
-import type { Landing } from './types'
+import type { Landing, ShotKey } from './types'
 
 export type LandingKind = 'kill' | 'dug' | 'out' | 'net' | 'error' | 'unresolved'
 
@@ -33,8 +33,9 @@ export interface Shot {
   kind: LandingKind
   /** The three outcomes a filter offers; out / net / error are all errors. */
   group: ShotGroup
-  /** A free ball (overpass), not a spike. */
-  free: boolean
+  /** A hard or a touch spike, a free ball (overpass), or a spike the flight
+   * read could not type. */
+  shot: ShotKey
   phase: Phase | null
   start: { x: number; y: number } | null
   /** `short`: estimated on the attacker's side of the net, drawn at the net. */
@@ -52,7 +53,8 @@ export function shots(landings: Landing[]): Shot[] {
     const kind = landingKind(l)
     const short = l.y != null && kind !== 'net' && l.y < NET_Y
     return {
-      l, kind, group: GROUP[kind], free: l.a === 'overpass',
+      l, kind, group: GROUP[kind],
+      shot: l.a === 'overpass' ? 'free' : l.type === 'hard' || l.type === 'touch' ? l.type : 'unread',
       phase: l.p == null ? null : l.p <= 1 ? 'reception' : 'transition',
       start: l.sx == null || l.sy == null ? null : { x: l.sx, y: Math.min(l.sy, NET_Y) },
       end: l.x == null || l.y == null ? null : { x: l.x, y: short ? NET_Y : l.y, short },

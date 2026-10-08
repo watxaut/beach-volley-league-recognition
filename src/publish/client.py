@@ -91,7 +91,10 @@ class SupabaseClient:
             detail = exc.read().decode(errors="replace")
             raise SupabaseError(f"{method} {path} -> HTTP {exc.code}: {detail}") from exc
         except urllib.error.URLError as exc:
-            raise SupabaseError(f"{method} {path} -> {exc.reason}") from exc
+            # Name the host: "connection refused" alone does not say that this
+            # checkout's env file points at a local stack that is not running.
+            raise SupabaseError(f"{method} {path} -> cannot reach {self.url} ({exc.reason}); "
+                                f"check SUPABASE_URL") from exc
         if not raw:
             return None
         try:

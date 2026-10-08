@@ -9,7 +9,14 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "scripts"))
 
-from score_spike_type import ACCURACY_BAR, COVERAGE_BAR, gt_spikes, score  # noqa: E402
+from score_spike_type import (  # noqa: E402
+    ACCURACY_BAR,
+    COVERAGE_BAR,
+    READ_POSTRUN,
+    clip_gt_spikes,
+    gt_spikes,
+    score,
+)
 
 
 def _recon(frames, action="spike"):
@@ -55,3 +62,20 @@ def test_gt_spikes_reads_the_contacts_file_shape():
 
 def test_the_bars_are_the_pre_registered_ones():
     assert (ACCURACY_BAR, COVERAGE_BAR) == (0.85, 0.80)
+
+
+def test_the_post_run_read_scores_the_type_the_touch_carries():
+    recon = {"points": [{"touches": [
+        {"frame": 100, "action": "spike", "spike_type": "hard"},
+        {"frame": 200, "action": "overpass", "spike_type": "touch"},
+        {"frame": 300, "action": "spike", "spike_type": None}]}]}
+    causal = [{"frame": 100, "spike_type": "touch"}]            # ignored by this read
+    r = score(recon, causal, _gt([(100, "hard"), (200, "touch"), (300, "touch")]), read=READ_POSTRUN)
+    assert (r["covered"], r["correct"], r["n_labelled"]) == (2, 2, 3)
+    assert r["confusion"]["touch"]["none"] == 1 and r["attacks"] == {"n": 3, "with_record": 2}
+
+
+def test_practice_gt_reads_a_type_from_the_event_or_its_overrides():
+    types = {g["frame"]: g["type"] for g in clip_gt_spikes(3)}
+    assert types[178] == "touch" and types[541] == "hard"
+    assert {g["frame"]: g["type"] for g in clip_gt_spikes(5)}[300] == "touch"   # overrides

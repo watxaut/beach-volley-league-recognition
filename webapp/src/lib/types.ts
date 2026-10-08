@@ -184,6 +184,10 @@ export interface WonOf {
   won: number
 }
 
+/** How an attack was sent over: a spike the flight read typed as driven
+ * (`hard`) or placed (`touch`), a free ball, or a spike it could not type. */
+export type ShotKey = 'hard' | 'touch' | 'free' | 'unread'
+
 export interface PlayerAnalytics {
   n_attacks: number
   n_kills: number
@@ -197,6 +201,10 @@ export interface PlayerAnalytics {
   serve_error_rate: number | null
   /** N4: attacks off the reception (first possession) vs in transition. */
   hit: { reception: Tally; transition: Tally }
+  /** Attacks by shot; the four add up to `n_attacks`. Missing until the
+   * database has migration 20261009110000 (then `landings[].type` is also
+   * the post-run read, never the causal guess). */
+  shots?: Record<ShotKey, Tally>
   /** N1: side-out / break-point. `own_serve` = points served by the player;
    * `team_*` = the player's team in the matches of the window. */
   rally: { own_serve: WonOf; team_serving: WonOf; team_receiving: WonOf }
@@ -312,6 +320,7 @@ export interface Landing {
   ey?: number | null
   result?: 'kill' | 'dug' | 'out' | 'net' | 'error' | null
   zone?: number | null
+  /** hard / touch as the post-run flight read typed it; null = not read. */
   type?: string | null
   /** Where the ball was hit (same frame), and how far off that may be. */
   sx?: number | null

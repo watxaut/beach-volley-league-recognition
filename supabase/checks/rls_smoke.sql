@@ -59,7 +59,10 @@ returns jsonb language sql as $$
                          'landing_in', true, 'landing_source', 'ball_death',
                          'landing_err_x_m', 0.3, 'landing_err_y_m', 0.9,
                          'landing_result', 'kill', 'own_x_m', 6.3, 'own_y_m', 5.4,
-                         'extra', jsonb_build_object('court_err_m', jsonb_build_array(0.4, 0.7))),
+                         'spike_type', 'hard',
+                         'extra', jsonb_build_object(
+                           'court_err_m', jsonb_build_array(0.4, 0.7),
+                           'launch', jsonb_build_object('speed_ms', 11.2, 'elevation_deg', 4.0))),
       jsonb_build_object('point_no', 1, 'seq', 4, 'frame', 360, 'slot', null, 'team', 'B',
                          'action', 'dig', 'touch_number', 1, 'observed', false),
       jsonb_build_object('point_no', 2, 'seq', 0, 'frame', 811, 'slot', 'P1A', 'team', 'A',
@@ -421,6 +424,13 @@ begin
   assert (v_prof -> 'analytics' -> 'hit' -> 'reception' ->> 'n')::int = 1
      and (v_prof -> 'analytics' -> 'hit' -> 'reception' ->> 'kills')::int = 1
      and (v_prof -> 'analytics' -> 'hit' -> 'transition' ->> 'n')::int = 0, 'attack split';
+  -- hard / touch (attack_shots): her one attack is a spike the post-run
+  -- read typed hard; the four rows add up to n_attacks
+  assert (v_prof -> 'analytics' -> 'shots') =
+    '{"hard": {"n": 1, "kills": 1, "errors": 0}, "touch": {"n": 0, "kills": 0, "errors": 0},
+      "free": {"n": 0, "kills": 0, "errors": 0}, "unread": {"n": 0, "kills": 0, "errors": 0}}'::jsonb,
+    'attacks by shot';
+  assert (v_prof -> 'analytics' -> 'landings' -> 0 ->> 'type') = 'hard', 'the map knows the shot';
   -- N1: she served point 2 (won); her team received point 1 (won) and served point 2 (won)
   assert (v_prof -> 'analytics' -> 'rally' -> 'own_serve') = '{"n": 1, "won": 1}'::jsonb, 'break % as server';
   assert (v_prof -> 'analytics' -> 'rally' -> 'team_receiving') = '{"n": 1, "won": 1}'::jsonb, 'side-out %';
@@ -458,6 +468,26 @@ begin
   assert public.set_my_privacy(true), 'ari flips her privacy';
 end $$;
 reset role;
+
+-- A match published before the post-run flight read holds the causal guess in
+-- spike_type and no extra.launch: it reads "not read", never a type.
+update public.actions set extra = extra - 'launch' where action = 'spike';
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+do $$
+declare v_prof jsonb;
+begin
+  v_prof := public.player_profile((select id from public.players where display_name = 'Check Ari'));
+  assert (v_prof -> 'analytics' -> 'shots' -> 'unread') = '{"n": 1, "kills": 1, "errors": 0}'::jsonb
+     and (v_prof -> 'analytics' -> 'shots' -> 'hard' ->> 'n')::int = 0,
+    'a causal type is never counted as hard / touch';
+  assert (v_prof -> 'analytics' -> 'landings' -> 0 -> 'type') = 'null'::jsonb,
+    'a causal type is never drawn on the map';
+end $$;
+reset role;
+update public.actions
+   set extra = extra || '{"launch": {"speed_ms": 11.2, "elevation_deg": 4.0}}'::jsonb
+ where action = 'spike';
 
 -- bob again: ari's analytics are now public; the touches are still not
 set local role authenticated;

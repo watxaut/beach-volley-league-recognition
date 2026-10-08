@@ -198,11 +198,38 @@ def test_spike_join_and_attacker_frame_landing(tmp_path, recon):
                "spike_type": "hard", "outcome": "dug", "landing_zone": None, "dug_zone": None}]
     bundle = build_bundle(_run_dir(tmp_path, recon, spikes=spikes))
     row = next(a for a in bundle["actions"] if a["frame"] == first["frame"])
-    assert row["attack_zone"] == 2 and row["spike_type"] == "hard"
+    # the zone still comes from the causal record; the type is the attack's own
+    # post-run read (never the causal one), with its launch kept for audit
+    assert row["attack_zone"] == 2 and row["spike_type"] == first["spike_type"]
+    assert row["extra"]["launch"] == first["launch"]
+    assert row["extra"]["causal_spike"]["spike_type"] == "hard"
     # any landing is on the OTHER half in the attacker's own frame (> 8 m from own baseline)
     for a in bundle["actions"]:
         if a["landing_y_m"] is not None:
             assert a["landing_y_m"] > 8.0, a
+
+
+def test_spike_type_of_an_older_reconstruction_is_the_causal_join(tmp_path, recon):
+    old = json.loads(json.dumps(recon))
+    for p in old["points"]:
+        for t in p["touches"]:
+            t.pop("spike_type", None)
+            t.pop("launch", None)
+    first = next(t for p in old["points"] for t in p["touches"] if t["action"] in ("spike", "overpass"))
+    spikes = [{"frame": first["frame"], "attack_zone": None, "spike_type": "touch"}]
+    row = next(a for a in build_bundle(_run_dir(tmp_path, old, spikes=spikes))["actions"]
+               if a["frame"] == first["frame"])
+    assert row["spike_type"] == "touch" and "launch" not in row["extra"]
+
+
+def test_an_attack_the_reconstruction_could_not_type_stays_untyped(tmp_path, recon):
+    blank = json.loads(json.dumps(recon))
+    first = next(t for p in blank["points"] for t in p["touches"] if t["action"] in ("spike", "overpass"))
+    first["spike_type"] = None
+    spikes = [{"frame": first["frame"], "attack_zone": None, "spike_type": "hard"}]
+    row = next(a for a in build_bundle(_run_dir(tmp_path, blank, spikes=spikes))["actions"]
+               if a["frame"] == first["frame"])
+    assert row["spike_type"] is None
 
 
 def test_landings_carry_position_error_and_result(tmp_path, recon):
@@ -359,6 +386,20 @@ def test_credentials_from_the_environment_need_no_file(tmp_path, monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "https://x.supabase.co")
     monkeypatch.setenv("SUPABASE_SECRET_KEY", "sb_secret_env")
     assert SupabaseClient.from_env(tmp_path / "missing.env").key == "sb_secret_env"
+
+
+def test_an_unreachable_host_is_named_in_the_error(monkeypatch):
+    """`make republish-all` from a checkout whose env file points at a local
+    stack that is not running: the error says which host refused."""
+    import urllib.error
+    import urllib.request
+
+    def refuse(*_a, **_k):
+        raise urllib.error.URLError(ConnectionRefusedError(61, "Connection refused"))
+
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+    with pytest.raises(SupabaseError, match=r"cannot reach http://127\.0\.0\.1:54321 .*Connection refused"):
+        SupabaseClient("http://127.0.0.1:54321", "sb_secret_abc").upload("match-media", "a.jpg", b"x", "image/jpeg")
 
 
 def test_zone_accepts_pipeline_output_label_and_dict():
