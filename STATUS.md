@@ -18,8 +18,8 @@ update at the end of every session that changes anything and commit with the wor
 - New durable protocol rules go in `AGENTS.md`; new cross-session technical
   facts go one-line-each into *Learnings* below.
 
-Last updated: **2026-10-07 (94th session) — the player detector now gets the BGR frame ultralytics expects
-(was red/blue swapped): `player_bgr_input: true` by default, `false` = the old path.** #93 (security
+Last updated: **2026-10-08 (95th session) — admin can mark a slot "Unknown player" (stats stay in the match, out of every
+ranking; re-tag later); wrangler `previews` block for the PR build.** #94 (player detector BGR input), #93 (security
 review), #92 (stats "Now" picks), #91 (landings) and #90 (platform; owner deploys via
 `docs/deploy_web_platform.md`) lie underneath.
 
@@ -74,7 +74,7 @@ in/out reads wrong (overridden by the next serve).
 `make inbox` (name, calibration wait, run-match, publish DRAFT) → one
 transactional Supabase RPC (applied/unchanged, admin rows untouched) → RLS +
 React SPA. Verified offline (scratch PG16, parity, CLI e2e, SPA screenshots);
-hosted Supabase/Cloudflare/Drive/launchd untested — owner deploys (#90 Log). #91: attack landings carry both axes, a per-axis error and a result (recon schema 2, migration `20261006180000_landing_confidence`); needs `make postrun` + re-publish per match. #92: stats windows + side-out/break + serve targets + reception outcome + hitting % + report card + `/measure` (migration `20261007100000`, no re-publish needed); `make republish-all` redoes post-run + publish for every published match (needs its diag dump). #93 security review (AGENTS §13): table privileges are explicit (`20261007120000`; `anon` holds none), `match_report` gates its per-player extras by tier (`20261007130000`), `webapp/public/_headers` (CSP), the publisher refuses a `.env.publish` others can read, login codes go through `supabase/functions/request-login-code` + `login_code_gate()` (`20261007140000`); verified on the local stack only.
+hosted Supabase/Cloudflare/Drive/launchd untested — owner deploys (#90 Log). #91: attack landings carry both axes, a per-axis error and a result (recon schema 2, migration `20261006180000_landing_confidence`); needs `make postrun` + re-publish per match. #92: stats windows + side-out/break + serve targets + reception outcome + hitting % + report card + `/measure` (migration `20261007100000`, no re-publish needed); `make republish-all` redoes post-run + publish for every published match (needs its diag dump). #93 security review (AGENTS §13): table privileges are explicit (`20261007120000`; `anon` holds none), `match_report` gates its per-player extras by tier (`20261007130000`), `webapp/public/_headers` (CSP), the publisher refuses a `.env.publish` others can read, login codes go through `supabase/functions/request-login-code` + `login_code_gate()` (`20261007140000`); verified on the local stack only. #95: `match_participants.is_unknown` (`20261008100000`) = a slot outside the league (AGENTS §13); migration pushed by the owner (2026-10-08).
 
 **Identity (#85):** `TeamIdentityResolver` (`player_identity_mode:"team"`,
 default) stamps P1A/P2A/P1B/P2B per frame; orientation = two-state LLR on
@@ -356,6 +356,7 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Edge functions (#93): `EdgeRuntime.waitUntil` exists only in a USER worker (the platform's way of running a function), not when the file is the runtime's main service — guard it; a function added while the local stack runs is not served (404) until the stack restarts. `pg_net` was rejected for the broker: its tables and `net.http_post` are granted to `anon` and owned by `supabase_admin`, so a migration cannot revoke that.
 
 ## Session index (one line each)
+- #95 **Admin can mark a slot "Unknown player": its stats stay in the match, never in a ranking or profile; re-tag later from Players → Unknown players; also `previews` block in wrangler.jsonc (PR build)**
 - #94 **Player detector got RGB frames ultralytics reads as BGR: now passes BGR (`player_bgr_input`, default ON; `false` = old path); 4-track frames up on all 7 clips, stream F1 0.824→0.839, post-run identical; match stream labels −7**
 - #93 **Pre-launch security review + fixes: explicit grants (new Supabase projects grant none), CSP headers, login function (one answer per email) + Auth lock, 8-digit code, `.env.publish` 600, report card by tier, `main` protected**
 - #92 **Stats "Now" picks BUILT: windows, side-out/break, serve targets, reception outcome, hitting %, report card, /measure, republish-all; V1 hard/touch FAILS (10/16 right on 16 of 32), V2 ±0.2 m heights FAIL (net clearance passes)**
@@ -455,8 +456,27 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-08-29 — off-court hold horizon (=90f) recovers e2's roster slot.
 - 2026-08-27 — short-gap bridge ships e2/e6's missed digs; GT honesty rounds.
 - 2026-08-26 — e5 action layer fully resolved (gap-bridged bounce + 2.5 m net exemption); e2/e6 generality clean; e1's double-annotated GT deduped.
-- 2026-08-17 — config-drift guard; config-default divergence FIXED (f539 block provenance); e3 GT serve frame fixed; live-debug frame counter; near-net flag closed by diagnosis — …(log archive 2026-10-06)
 ## Log (newest first)
+
+### 2026-10-08 (ninety-fifth session) — #95: "Unknown player" slots (stats kept in the match, out of every ranking)
+
+**Asked (owner):** opponents the league does not know need an *unknown* tag in the admin match review: their stats stay
+inside that game but they are not in the total ranking; later the admin can re-tag them if they join the site.
+
+**Decision (plan approved):** unknown is a state of the SLOT (`match_participants.is_unknown`, `player_id` NULL), not a placeholder
+`players` row — `unique (match_id, player_id)` would forbid two unknowns in a match and every aggregate would need a guest filter.
+Cross-match functions already join `players` by `player_id`, so an unknown is excluded by construction (AGENTS §13 rule added).
+
+**Built:** `20261008100000_unknown_players.sql` (column + check unknown ⇒ no player, stamp trigger on either change, column grant);
+`backup.py` exports the flag; webapp: "Unknown player" in the slot dropdown (counts as decided for the publish gate), `slotLabel`/`slotNames`
+(`Unknown (P1B)` in box score, report, play-by-play, team names), Admin → Players → **Unknown players** card (every unknown slot, thumbnail,
+"re-tag as" → the match flows into that player's totals), demo mode mirrors it. Cloudflare PR build: `"previews": {}` in `webapp/wrangler.jsonc`.
+
+**Verified:** `rls_smoke.sql` block (check, stamp, republish keeps the flag, box score/report keep the slot, leaderboard 3 rows then 4 after the
+re-tag, viewer cannot flip it) — schema check 5/5 on a scratch Supabase PG17 (psql shim over `docker exec`); the block FAILS on a DB without the
+migration (negative control); vitest 33, typecheck, oxlint; headless-Chrome screenshots of the demo pages. `wrangler preview` not run (needs Cloudflare).
+
+**Not done / owed:** owner pushed the migration (2026-10-08); check the PR preview build; no per-person identity across matches (re-tag is per slot).
 
 ### 2026-10-07 (ninety-fourth session) — #94: the player detector stops getting red/blue-swapped frames
 
@@ -527,40 +547,3 @@ dashboard switch — the whole membership boundary); 2-step login on GitHub / Cl
 Supabase. Nothing ran against the hosted project. The 222 old commits still carry a work email
 (history not rewritten); `rls_smoke.sql` still assumes no published match (run deploy step 2.8
 before the first publish).
-
-### 2026-10-07 (ninety-second session) — #92: the brainstorm's "Now" picks, built
-
-**Asked (owner):** implement the suggested "Now" ideas of `docs/stats_feature_brainstorm.md`
-(O4+I1, H1–H3, N1, N2, N3+N4, N8+F3, V1+V2, I2).
-
-**Built (no new perception, so no re-publish is needed for any of it):** migration
-`20261007100000_stats_windows_and_analytics.sql` — `window_matches` (season / from / to /
-last N), `leaderboard(…)` and `player_profile(…)` take the window and return denominators,
-fantasy per 21 points, form; `player_profile.analytics` adds attack split (reception vs
-transition), side-out / break-point, serve targeting, reception outcome, progress series;
-new `match_report(match)` (per-player line vs their own average, team side-out / break, who
-took the serves, per-point fantasy where the play-by-play is visible); view `touch_context`
-(possession numbers). `webapp` — `?w=` time filter, Wilson ranges + minimum 10 attempts +
-`k/n` on every rate (H1), "not measured" blocks (H2), `/measure` page + A/B/C badges (H3),
-rolling-rate chart with band, fantasy race, form sparkline, report card on the match page,
-demo mode mirrors it (`lib/analytics.ts`). `make republish-all` (`src/publish/republish.py`):
-postrun + publish for every run that has a `match_bundle.json`, skips (and fails on) runs
-whose diag dump was deleted. `scripts/score_spike_type.py` (V1), `scripts/check_heights.py` (V2).
-
-**Verified:** schema check 5/5 (smoke extended; SQL N1–N4 == a plain-Python recount on the
-simulated match AND the real 20260920 bundle — that recount caught a NULL `bool_or` bug);
-vitest 32; full suite 1201 pass (3 fail: `test_inbox` already at HEAD + 2 STATUS-guard
-budgets already over at HEAD, fixed here by archiving); `npm run build`; SPA screenshots.
-
-**V1 (bars fixed first: accuracy ≥ 0.85, coverage ≥ 0.80):** **FAIL.** 32 owner-labelled
-spikes: a type is published for 16 (0.50), right on 10 (0.625). Hard/touch is not shown.
-**V2 (bars fixed first):** **FAIL** overall, so "±0.2 m" is not claimed. Net clearance PASS
-(live + well-conditioned: 33 crossings, 100 % at/above −0.15 m, median +0.61 m; the first run
-scored dead-time balls and timing-noisy crossings and failed — both filters added after
-seeing it, bars unchanged, unfiltered numbers still printed). Stature: far half reads 5–6 %
-shorter (P2A 12 % — FAIL); no real heights given. Contacts: spike 2.52/2.51 m, set, overpass
-agree; digs 1.37 near vs 1.66 far (0.29 — FAIL).
-
-**Not done / owed:** owner: `supabase db push` (new migration, no re-publish needed), give
-the four real heights to `check_heights.py --heights`; O3 (net view) stays "Next" and, per V2,
-would show relative heights only. Next-list: I3 → O3, N10/O2, O1+I4, N7/N9, F1.

@@ -1,11 +1,15 @@
 import { Fragment, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { signed } from '../lib/format'
-import type { BoxRow } from '../lib/types'
+import type { BoxRow, Slot } from '../lib/types'
 import { TeamDot } from './ui'
 
-/** Per-player line of one match. Tap a row for its fantasy breakdown. */
-export function BoxScore({ rows, myPlayerId }: { rows: BoxRow[]; myPlayerId: number | null }) {
+/** Per-player line of one match. Tap a row for its fantasy breakdown. A slot
+ * without a player (unknown to the league, or not assigned yet) has no profile
+ * to link to; `names` says which of the two it is. */
+export function BoxScore({ rows, names, myPlayerId }: {
+  rows: BoxRow[]; names: Partial<Record<Slot, string>>; myPlayerId: number | null
+}) {
   const [open, setOpen] = useState<string | null>(null)
   return (
     <div className="table-wrap">
@@ -33,7 +37,7 @@ export function BoxScore({ rows, myPlayerId }: { rows: BoxRow[]; myPlayerId: num
                   {r.player_id ? (
                     <Link to={`/players/${r.player_id}`} onClick={(e) => e.stopPropagation()}>{r.display_name}</Link>
                   ) : (
-                    <span className="muted">{r.slot} (unassigned)</span>
+                    <span className="muted">{names[r.slot] ?? `${r.slot} (unassigned)`}</span>
                   )}
                 </td>
                 <td className="strong">{signed(r.fantasy)}</td>

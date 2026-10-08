@@ -19,7 +19,7 @@ export function MatchReport({ report, nPoints, names, teamNames, myPlayerId }: {
   teamNames: Record<Team, string>
   myPlayerId: number | null
 }) {
-  const label = (p: ReportPlayer) => p.display_name ?? `${p.slot} (unassigned)`
+  const label = (p: ReportPlayer) => p.display_name ?? names[p.slot] ?? `${p.slot} (unassigned)`
   const best = mvps(report.players)
   const lead = report.players.filter((p) => best.includes(p.slot))
   const players = [...report.players].sort((a, b) => a.team.localeCompare(b.team) || a.slot.localeCompare(b.slot))

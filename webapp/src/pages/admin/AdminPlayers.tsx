@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useApp, useLoad } from '../../app/state'
 import { Card, ErrorBox, Loading } from '../../components/ui'
 import { explainError } from '../../lib/api'
+import { formatDate, matchLabel } from '../../lib/format'
 import type { Role } from '../../lib/types'
 
 export function AdminPlayers() {
@@ -10,8 +11,11 @@ export function AdminPlayers() {
   const [error, setError] = useState<string | null>(null)
   const [name, setName] = useState('')
   const data = useLoad(async () => {
-    const [players, profiles] = await Promise.all([api.players(), api.profiles()])
-    return { players, profiles }
+    const [players, profiles, matches] = await Promise.all([api.players(), api.profiles(), api.matches()])
+    const participants = await api.participants(matches.map((m) => m.id))
+    const unknown = participants.filter((p) => p.is_unknown)
+    const thumbs = await api.thumbUrls(unknown.map((p) => p.thumb_path).filter((p): p is string => !!p))
+    return { players, profiles, matches, participants, unknown, thumbs }
   }, [])
 
   async function run(fn: () => Promise<unknown>) {
@@ -25,8 +29,14 @@ export function AdminPlayers() {
   }
 
   if (data.loading || !data.data) return <><ErrorBox error={data.error} /><Loading /></>
-  const { players, profiles } = data.data
+  const { players, profiles, matches, participants, unknown, thumbs } = data.data
   const linked = new Set(players.map((p) => p.user_id).filter(Boolean))
+  const unknownRows = unknown
+    .flatMap((p) => {
+      const m = matches.find((x) => x.id === p.match_id)
+      return m ? [{ p, m }] : []
+    })
+    .sort((a, b) => b.m.match_date.localeCompare(a.m.match_date) || a.p.slot.localeCompare(b.p.slot))
 
   return (
     <>
@@ -72,6 +82,48 @@ export function AdminPlayers() {
             </tbody>
           </table>
         </div>
+      </Card>
+
+      <Card title="Unknown players" action={<span className="muted small">Slots marked unknown in a match</span>}>
+        <p className="muted small">
+          Their stats stay inside their match, but they are not in the ranking or on any profile. When one of them
+          joins, create the player above and re-tag the slot: the match then counts for that player.
+        </p>
+        {unknownRows.length === 0 ? <p className="muted">No unknown players.</p> : (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th className="left">Match</th><th className="left">Slot</th><th className="left">Re-tag as</th></tr></thead>
+              <tbody>
+                {unknownRows.map(({ p, m }) => {
+                  const taken = new Set(participants.filter((x) => x.match_id === m.id).map((x) => x.player_id))
+                  const thumb = p.thumb_path ? thumbs[p.thumb_path] : undefined
+                  return (
+                    <tr key={`${m.id}:${p.slot}`}>
+                      <td className="left">
+                        <Link to={`/admin/matches/${m.match_key}`}>{matchLabel(m)}</Link>{' '}
+                        <span className="muted small">{formatDate(m.match_date, m.start_time)}</span>
+                      </td>
+                      <td className="left">
+                        {thumb && <img src={thumb} alt={`${p.slot} at a touch`}
+                                       style={{ height: 56, width: 34, objectFit: 'cover', borderRadius: 6, verticalAlign: 'middle', marginRight: 8 }} />}
+                        {p.slot}
+                      </td>
+                      <td className="left">
+                        <select value="" aria-label={`Re-tag ${p.slot} of ${matchLabel(m)}`}
+                                onChange={(e) => e.target.value && run(() => api.assignSlot(m.id, p.slot, Number(e.target.value)))}>
+                          <option value="">— choose a player —</option>
+                          {players.filter((pl) => pl.active && !taken.has(pl.id)).map((pl) => (
+                            <option key={pl.id} value={pl.id}>{pl.display_name}</option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
       <Card title="Accounts" action={<span className="muted small">People who can log in</span>}>
