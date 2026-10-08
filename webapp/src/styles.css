@@ -327,5 +327,8 @@ tr.clickable:hover td.sticky-col { background: var(--surface-2); }
 .tile-value-quiet { font-size: 1.15rem; line-height: 2.32rem; color: var(--ink-2); white-space: nowrap; }
 
 .attack-map .court { max-width: 340px; margin: 0 auto; }
+.pass-map .court { max-width: 520px; margin: 0 auto; }
+.tiles-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 640px) { .tiles-4 { grid-template-columns: repeat(2, 1fr); } }
 .trend-wait { margin: 0 0 16px; }
 .card-head h2 .info, h3 .info { vertical-align: 2px; }

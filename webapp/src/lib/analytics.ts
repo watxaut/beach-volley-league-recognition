@@ -128,7 +128,7 @@ export function pointFantasy(touches: Touch[], pointsFor: (t: Touch, assist: boo
 const ratio = (k: number, n: number) => (n ? Math.round((k / n) * 1000) / 1000 : null)
 
 /** N1-N4 and the progress series of one player over the seats in a window. */
-export function playerAnalytics(seats: Seat[]): Omit<PlayerAnalytics, 'attack_zones' | 'landings' | 'touch_depths'> {
+export function playerAnalytics(seats: Seat[]): Omit<PlayerAnalytics, 'attack_zones' | 'landings' | 'touch_depths' | 'passes'> {
   const out = {
     n_attacks: 0, n_kills: 0, n_attack_errors: 0, n_serves: 0, n_aces: 0, n_serve_errors: 0,
     hit: { reception: tally(), transition: tally() },

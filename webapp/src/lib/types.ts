@@ -219,6 +219,9 @@ export interface PlayerAnalytics {
   attack_zones: Record<string, number>
   landings: Landing[]
   touch_depths: { action: string; y: number }[]
+  /** Receptions and defenses with where the ball went next. Missing until the
+   * database has migration 20261009120000. */
+  passes?: Pass[]
 }
 
 export interface PlayerProfile {
@@ -302,6 +305,26 @@ export interface WindowParams {
   from: string | null
   to: string | null
   lastN: number | null
+}
+
+/** One reception (a dig after a serve) or defense (a dig after a spike or a
+ * free ball) credited to the player, in their own frame (x 0..8 from their
+ * left sideline, y 0 = own baseline .. 8 = net). `sx`/`sy` is where it was
+ * played; `x`/`y` is where the ball was at the next touch on the same half
+ * (`to`), null when the ball went over, died or that touch was not seen.
+ * `sex`..`ey` are about one sigma in metres across / along. */
+export interface Pass {
+  k: 'reception' | 'defense'
+  sx: number | null
+  sy: number | null
+  sex?: number | null
+  sey?: number | null
+  x: number | null
+  y: number | null
+  ex?: number | null
+  ey?: number | null
+  to: 'set' | 'spike' | 'overpass' | null
+  d: string | null
 }
 
 /** One attack and where it came down, in the attacker's frame: x 0..8 from
