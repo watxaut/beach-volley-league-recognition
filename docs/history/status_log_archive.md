@@ -6972,9 +6972,48 @@ migration (negative control); vitest 33, typecheck, oxlint; headless-Chrome scre
 
 **Not done / owed:** owner pushed the migration (2026-10-08); check the PR preview build; no per-person identity across matches (re-tag is per slot).
 
+### 2026-10-08 (ninety-sixth session) — #96: player page v2 (less noise, a league comparison, an attack map with lines)
+
+**Asked (owner):** the player page shows too much (about 60 numbers, 18 grade badges, green letters); research
+player-stats UX and what AVP / Beach Pro Tour publish; fewer tiles, tabs if needed, explanations as hints; a
+"you vs the other players" section; an attack map with a line from where the ball was hit to where it landed,
+coloured per touch / hard hit.
+
+**Research → decisions (owner, plan mode):** 3–5 headline numbers per view is a rule of thumb, hierarchy is the
+principle; hover does not exist on phones, so hints are a tap-to-open "i" and `k/n` stays on the page; a number
+needs a reference (linear strips, no radar). Owner picked: 4 tabs with the comparison on the default one; line
+colour = outcome and dashed = free ball (hard/touch stays off: V1 FAIL, read on 25 of 62 attacks); grade in the
+hint, only B/C tagged on the page; compare with the rest of the league and with the player's own earlier matches.
+
+**Built (web):** `PlayerPage` = header + `Tabs` (`?tab=`, Back works). Overview (league tier): 5 count tiles +
+`Compare` strips from `leaderboard` rows (you excluded, pooled Σk/Σn; from 3 other players; a verdict only when
+the two 95 % ranges do not overlap; fantasy is ranked, not judged) or from the profile's history (window vs
+everything before; all time = newest 5 vs before). Attack: 3 rate tiles + `AttackMap` (replaces the zone grid and
+the landing map; filters by outcome and rally phase; tap / hover one attack for its error areas) + reception vs
+transition. Serve & receive: 4 rate tiles + targeting + reception outcome. New: `lib/compare.ts`,
+`lib/glossary.ts` (one text per stat), `Info` / `StatInfo` / `Segmented` in `ui.tsx`, `poissonRange` (Byar) and
+`hittingRange` in `lib/stats.ts`. A rate under `MIN_N` shows its count as the value ("1/8 · needs 10 serves").
+Kill = accent blue on the map: green vs red measured 4.1 colour-blind separation (floor 8), blue vs red 20+.
+
+**Built (SQL, `20261009100000_player_page_v2`):** `leaderboard` + `serve_errors`, `recv_points/won`,
+`serve_points/won` (team side-out / break over the player's matches; league tier); `player_profile` landings +
+`sx, sy, sex, sey, a, p, d`, and attacks with a start but no end. Privileges re-stated for the recreated function.
+
+**Verified:** vitest 49, typecheck, oxlint; `tests/test_supabase_schema.py` 5/5 on a throwaway
+`supabase/postgres:17` container (new smoke assertions; SQL == Python recount on the simulated and the real
+match); real-match render through a stubbed backend: the owner's page reads +10, 2 K, 1 ace, 14 digs, 2 assists,
+8 errors, hitting −.125 (2−4)/16, side-out 7/20 as before, 16 attacks on the map (14 lines, 2 one-ended);
+a private profile shows Overview + Matches and the notice on the two analytics tabs; screenshots at 400 / 460 /
+1100 px, light and dark, no horizontal overflow.
+
+**Not done / owed:** owner `supabase db push` (until then the map draws ends only and the comparison has no
+serve-error / side-out rows; either deploy order is safe). Later: hard vs touch (new validation), pick-a-player highlight, video
+link per attack (I5), line vs cross (N10).
+
 ### Session index lines moved out of STATUS.md (verbatim, oldest first)
 
 > The index is capped at 100 lines (`tests/test_status_leanness.py`); from 2026-10-08 (#98) the oldest
 > line moves here when a new session is added.
 
 - 2026-08-30 — spike analytics: trail, touch/hard, 9-zone grid, kill/dug outcomes; f297 GT corrected.
+- 2026-08-31 — outcome semantics completed: kill = direct fall OR dug-and-dies-without-a-set.

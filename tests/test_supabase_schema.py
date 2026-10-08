@@ -127,6 +127,10 @@ def _shot(a):
     return "free" if a["action"] == "overpass" else _shot_type(a) or "unread"
 
 
+def _spot(x, y):
+    return (None if x is None else round(x, 2), None if y is None else round(y, 2))
+
+
 def _recount(bundle):
     """The N1-N4 stats, counted in plain Python straight from a bundle: the
     reference the SQL (`player_profile`) has to equal."""
@@ -144,7 +148,8 @@ def _recount(bundle):
                "serve_in": {"opp_serves": 0, "team_credited": 0, "mine": 0},
                "serve_to": defaultdict(int), "serve_unseen": 0,
                "shots": {k: {"n": 0, "kills": 0, "errors": 0}
-                         for k in ("hard", "touch", "free", "unread")}} for s in team_of}
+                         for k in ("hard", "touch", "free", "unread")},
+               "passes": []} for s in team_of}
     for pt in bundle["points"]:
         acts = sorted(by_point[pt["point_no"]], key=lambda a: a["seq"])
         possession, poss_of = 0, {}
@@ -183,6 +188,21 @@ def _recount(bundle):
                 sh["n"] += 1
                 sh["kills"] += a["outcome"] == "kill"
                 sh["errors"] += a["outcome"] == "error"
+        # pass_map: a credited dig is a reception after a serve, a defense after
+        # an attack; where it went = the next touch if that is the same team's
+        # and seen with a position
+        for i, a in enumerate(acts):
+            prev = acts[i - 1] if i else None
+            nxt = acts[i + 1] if i + 1 < len(acts) else None
+            if (a["slot"] and a["action"] == "dig" and a["touch_number"] == 1 and prev is not None
+                    and prev["action"] in ("serve", "spike", "overpass") and prev["team"] != a["team"]):
+                went = (nxt is not None and nxt["team"] == a["team"] and nxt["observed"]
+                        and nxt.get("own_x_m") is not None and nxt.get("own_y_m") is not None)
+                out[a["slot"]]["passes"].append((
+                    "reception" if prev["action"] == "serve" else "defense",
+                    _spot(a.get("own_x_m"), a.get("own_y_m")),
+                    _spot(nxt["own_x_m"], nxt["own_y_m"]) if went else (None, None),
+                    nxt["action"] if went else None))
         if receiver is not None:
             first = [a for a in acts if poss_of[a["seq"]] == 1]
             spike = any(a["action"] == "spike" for a in first)
@@ -291,3 +311,6 @@ rollback;
         assert {l["a"] for l in got["landings"]} <= {"spike", "overpass"}, slot
         assert sorted((l["type"] for l in got["landings"]), key=str) == \
             sorted((_shot_type(a) for a in attacks), key=str), slot
+        # pass_map: every credited reception / defense, with where it went next
+        assert sorted(((p["k"], _spot(p["sx"], p["sy"]), _spot(p["x"], p["y"]), p["to"])
+                       for p in got["passes"]), key=str) == sorted(ref["passes"], key=str), slot

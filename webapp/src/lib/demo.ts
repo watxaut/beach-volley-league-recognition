@@ -6,7 +6,7 @@ import type { Api } from './api'
 import { hitSplit, playerAnalytics, pointFantasy, serveTargets, teamRally, type Seat, type Touch } from './analytics'
 import type {
   ActionName, ActionRow, BoxRow, FantasyRule, LeaderRow, Match, PointRow, Participant,
-  Player, PlayerProfile, Profile, Publication, ReportPlayer, Ruleset, Session, Slot, Team, WindowParams,
+  Pass, Player, PlayerProfile, Profile, Publication, ReportPlayer, Ruleset, Session, Slot, Team, WindowParams,
 } from './types'
 
 
@@ -334,6 +334,21 @@ export function demoApi(): Api {
             return { ...start, type, x: null, y: null, in: null, outcome: 'error', result: 'net' as const, source: null }
           }),
           touch_depths: [],
+          // receptions land close together, defenses are scattered; a few went straight over
+          passes: Array.from({ length: 34 }, (_, i): Pass => {
+            const recv = i % 2 === 0
+            const jitter = (sd: number) => (r() + r() + r() - 1.5) * 2 * sd
+            const went = r() > 0.12
+            return {
+              k: recv ? 'reception' : 'defense',
+              sx: Math.min(8, Math.max(0, 4 + jitter(2.2))), sy: recv ? 1.5 + r() * 3.5 : 2 + r() * 4, sex: 0.4, sey: 0.7,
+              x: went ? Math.min(8, Math.max(0, 4.3 + jitter(recv ? 0.6 : 1.5))) : null,
+              y: went ? Math.min(8.4, Math.max(2, 6.6 + jitter(recv ? 0.5 : 1.2))) : null,
+              ex: went ? 0.4 : null, ey: went ? 0.7 : null,
+              to: went ? (r() > 0.85 ? 'spike' : 'set') : null,
+              d: seats.length ? seats[i % seats.length].date : null,
+            }
+          }),
         } : null,
       }
       return delay(prof)

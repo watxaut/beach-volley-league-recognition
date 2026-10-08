@@ -50,9 +50,11 @@ returns jsonb language sql as $$
       jsonb_build_object('point_no', 1, 'seq', 0, 'frame', 211, 'slot', 'P1B', 'team', 'B',
                          'action', 'serve', 'touch_number', 0, 'observed', true),
       jsonb_build_object('point_no', 1, 'seq', 1, 'frame', 247, 'slot', 'P1A', 'team', 'A',
-                         'action', 'dig', 'touch_number', 1, 'observed', true, 'own_y_m', 3.5),
+                         'action', 'dig', 'touch_number', 1, 'observed', true, 'own_x_m', 2.0, 'own_y_m', 3.5),
       jsonb_build_object('point_no', 1, 'seq', 2, 'frame', 304, 'slot', 'P2A', 'team', 'A',
-                         'action', 'set', 'touch_number', 2, 'observed', true, 'is_assist', true),
+                         'action', 'set', 'touch_number', 2, 'observed', true, 'is_assist', true,
+                         'own_x_m', 4.5, 'own_y_m', 6.0,
+                         'extra', jsonb_build_object('court_err_m', jsonb_build_array(0.4, 0.7))),
       jsonb_build_object('point_no', 1, 'seq', 3, 'frame', 345, 'slot', 'P1A', 'team', 'A',
                          'action', 'spike', 'touch_number', 3, 'outcome', 'kill', 'observed', true,
                          'attack_zone', 2, 'landing_x_m', 3.1, 'landing_y_m', 12.0,
@@ -444,6 +446,12 @@ begin
   assert (v_prof -> 'analytics' -> 'reception') =
     '{"n": 1, "none": 0, "error": 0, "spike": 1, "overpass": 0, "first_ball_kills": 1}'::jsonb,
     'reception outcome';
+  -- pass_map: her one dig followed the serve (a reception); the set after it
+  -- was seen at (4.5, 6.0) on her own half, so that is where the ball went
+  assert (v_prof -> 'analytics' -> 'passes') =
+    '[{"k": "reception", "sx": 2.0, "sy": 3.5, "sex": null, "sey": null,
+       "x": 4.5, "y": 6.0, "ex": 0.4, "ey": 0.7, "to": "set", "d": "2026-09-20"}]'::jsonb,
+    'her reception, and where it went';
   assert (v_prof -> 'analytics' -> 'attack_series' -> 0 ->> 'r') = 'kill'
      and (v_prof -> 'analytics' -> 'serve_series' -> 0 ->> 'r') = 'other', 'progress series';
   -- the four players read the whole report of their match (they can count
@@ -488,6 +496,35 @@ reset role;
 update public.actions
    set extra = extra || '{"launch": {"speed_ms": 11.2, "elevation_deg": 4.0}}'::jsonb
  where action = 'spike';
+
+-- reception vs defense (pass_map): Opp1's dig after Ari's spike is a DEFENSE,
+-- the one after Ari's serve in point 2 a RECEPTION. A set is added after the
+-- defense so it has somewhere to go; the reception's set has no position.
+update public.actions set slot = 'P1B', observed = true, own_x_m = 3.0, own_y_m = 3.0
+ where point_no = 1 and seq = 4;
+insert into public.actions (match_id, point_no, seq, frame, slot, team, side, action, touch_number,
+                            observed, own_x_m, own_y_m)
+  select match_id, 1, 5, 375, 'P2B', 'B', side, 'set', 2, true, 5.0, 6.2
+  from public.actions where point_no = 1 and seq = 4;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', true);
+do $$
+declare v_prof jsonb;
+begin
+  v_prof := public.player_profile((select id from public.players where display_name = 'Check Opp1'));
+  assert jsonb_array_length(v_prof -> 'analytics' -> 'passes') = 2, 'Opp1 has a defense and a reception';
+  assert (v_prof -> 'analytics' -> 'passes' -> 0) @>
+    '{"k": "defense", "sx": 3.0, "sy": 3.0, "x": 5.0, "y": 6.2, "to": "set", "d": "2026-09-20"}'::jsonb,
+    'the dig after an attack is a defense, and it went to the set';
+  assert (v_prof -> 'analytics' -> 'passes' -> 1) =
+    '{"k": "reception", "sx": null, "sy": null, "sex": null, "sey": null, "x": null, "y": null,
+      "ex": null, "ey": null, "to": null, "d": "2026-09-20"}'::jsonb,
+    'a reception whose next touch has no position keeps its place with no destination';
+end $$;
+reset role;
+delete from public.actions where point_no = 1 and seq = 5;
+update public.actions set slot = null, observed = false, own_x_m = null, own_y_m = null
+ where point_no = 1 and seq = 4;
 
 -- bob again: ari's analytics are now public; the touches are still not
 set local role authenticated;
