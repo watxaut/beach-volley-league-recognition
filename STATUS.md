@@ -74,7 +74,7 @@ in/out reads wrong (overridden by the next serve).
 `make inbox` (name, calibration wait, run-match, publish DRAFT) → one
 transactional Supabase RPC (applied/unchanged, admin rows untouched) → RLS +
 React SPA. Verified offline (scratch PG16, parity, CLI e2e, SPA screenshots);
-hosted Supabase/Cloudflare/Drive/launchd untested — owner deploys (#90 Log). #91: attack landings carry both axes, a per-axis error and a result (recon schema 2, migration `20261006180000_landing_confidence`); needs `make postrun` + re-publish per match. #92: stats windows + side-out/break + serve targets + reception outcome + hitting % + report card + `/measure` (migration `20261007100000`, no re-publish needed); `make republish-all` redoes post-run + publish for every published match (needs its diag dump). #93 security review (AGENTS §13): table privileges are explicit (`20261007120000`; `anon` holds none), `match_report` gates its per-player extras by tier (`20261007130000`), `webapp/public/_headers` (CSP), the publisher refuses a `.env.publish` others can read, login codes go through `supabase/functions/request-login-code` + `login_code_gate()` (`20261007140000`); verified on the local stack only. #95: `match_participants.is_unknown` (`20261008100000`) = a slot outside the league (AGENTS §13); migration pushed by the owner (2026-10-08).
+hosted Supabase/Cloudflare/Drive/launchd untested — owner deploys (#90 Log). #91: attack landings carry both axes, a per-axis error and a result (recon schema 2, migration `20261006180000_landing_confidence`); needs `make postrun` + re-publish per match. #92: stats windows + side-out/break + serve targets + reception outcome + hitting % + report card + `/measure` (migration `20261007100000`, no re-publish needed); `make republish-all` redoes post-run + publish for every published match (needs its diag dump). #93 security review (AGENTS §13): table privileges are explicit (`20261007120000`; `anon` holds none), `match_report` gates its per-player extras by tier (`20261007130000`), `webapp/public/_headers` (CSP), the publisher refuses a `.env.publish` others can read, login codes go through `supabase/functions/request-login-code` + `login_code_gate()` (`20261007140000`); verified on the local stack only. #95: `match_participants.is_unknown` (`20261008100000`) = a slot outside the league (AGENTS §13); migration pushed by the owner (2026-10-08). #94 login study (`docs/web_login_study.md`): sessions persist (refresh token, no limit); fixes + passkeys/Google options await owner decisions (open point 34).
 
 **Identity (#85):** `TeamIdentityResolver` (`player_identity_mode:"team"`,
 default) stamps P1A/P2A/P1B/P2B per frame; orientation = two-state LLR on
@@ -242,13 +242,13 @@ archived under their session date in `docs/history/status_log_archive.md`.)*
     (d) blocks are not a label; (e) 1 observed touch is credited to nobody
     (10 more by alternation), 5 are placed as hidden touches; (f) FIXED #90:
     set/dig `error` = ball handling −1 (`handling_errors`). Next: (b).
-
 33. **Speed, results-neutral (#89).** Shipped: read-ahead + exact detector
     fast path. Left, in order: (a) pose on its own thread, call order kept
     (~30 → ~26 ms/f; touches `ActionClassifier`); (b) read-ahead for the
     `--debug-live` producer and the enrollment pre-pass (5 s per clip);
     (c) re-verify the fast path before any ultralytics upgrade (it turns
     itself off on an unverified release; `venv/` is the only env).
+34. **Web login: fewer code mails (#94, study only, `docs/web_login_study.md`).** Sessions already last until logout (no limit). Owner decides: (a) limit — 30 d (NIST AAL1) via `pg_cron` on free plan; (b) final domain (before passkeys); (c) second method — passkeys (beta, needs an options broker: the Auth lock blocks it) or Google (passes the lock). Then build A: local logout + "all devices", one URL.
 
 ### Parked / conditional
 
@@ -353,11 +353,13 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - SQL stats (#92): possession = running count of `touch_number = 1` per point (0 = serve, 1 = reception); a `bool_or` over a column that is NULL for most rows returns NULL, not false — `coalesce` it. New Supabase functions get EXECUTE for anon by default: revoke explicitly.
 - Supabase grants (#93, checked 2026-10-06): projects created since 2026-05-30 grant NO table/sequence privilege to `anon`/`authenticated`/`service_role` (changelog 45329); the local CLI stack (2.119) still grants ALL, so local runs hid it. Every table/view needs a `GRANT` in its migration; the test stub keeps the permissive default and `rls_smoke.sql` asserts `anon` holds nothing. `supabase/config.toml` configures ONLY the local stack — hosted Auth settings are dashboard switches, proven by `GET /auth/v1/settings`.
 - Supabase Auth (#93, measured on the local stack): with sign-ups off, an invited user who has not opened the invite link gets 422 `signup_disabled` on `/otp` — the link is the only way in and it dies with the email OTP expiry (1 h), so never shorten that. Code length (6–10) is the lever against guessing; the login form takes any. `/otp` answers unknown and known emails differently and cannot be told not to: the fix is the login function (same answer for all) plus CAPTCHA protection ON with a secret no page has a widget for — GoTrue v2.197 then refuses every public mail-sending route (`/otp`, `/signup`, `/recover`, `/magiclink`, `/resend`) identically, while requests with the service key skip the check (`verifyCaptcha`); `/verify` answers a wrong code and an unknown address alike.
+- Supabase Auth lock (#94, read in `supabase/auth` master 2026-10-08): CAPTCHA guards `/otp` `/magiclink` `/recover` `/resend` `/signup` `/sso`, `/token` except `refresh_token`/`pkce`/`id_token` grants, and `/passkeys/authentication/options` — password + passkey sign-in need a broker, OAuth and refresh pass; with sign-ups off an OAuth identity links to the invited account with the same verified email. `supabase-js` `signOut()` defaults to scope `global` (logs out every device).
 - Edge functions (#93): `EdgeRuntime.waitUntil` exists only in a USER worker (the platform's way of running a function), not when the file is the runtime's main service — guard it; a function added while the local stack runs is not served (404) until the stack restarts. `pg_net` was rejected for the broker: its tables and `net.http_post` are granted to `anon` and owned by `supabase_admin`, so a migration cannot revoke that.
 
 ## Session index (one line each)
 - #95 **Admin can mark a slot "Unknown player": its stats stay in the match, never in a ranking or profile; re-tag later from Players → Unknown players; also `previews` block in wrangler.jsonc (PR build)**
 - #94 **Player detector got RGB frames ultralytics reads as BGR: now passes BGR (`player_bgr_input`, default ON; `false` = old path); 4-track frames up on all 7 clips, stream F1 0.824→0.839, post-run identical; match stream labels −7**
+- #94b **Web login study (docs only): sessions already persist without limit; 10-07 re-logins = other URLs / global logout / link in another browser; options A–E incl. passkeys + Google vs the Auth lock; owner picks**
 - #93 **Pre-launch security review + fixes: explicit grants (new Supabase projects grant none), CSP headers, login function (one answer per email) + Auth lock, 8-digit code, `.env.publish` 600, report card by tier, `main` protected**
 - #92 **Stats "Now" picks BUILT: windows, side-out/break, serve targets, reception outcome, hitting %, report card, /measure, republish-all; V1 hard/touch FAILS (10/16 right on 16 of 32), V2 ±0.2 m heights FAIL (net clearance passes)**
 - #91 **Web "Where they land": landings 17→57 of 63 attacks placed (touch x from the ball read), per-axis position error + `landing_result`; recon schema 2, new migration, map with uncertainty areas + out-of-court margin**
@@ -455,7 +457,6 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-08-30 — spike analytics: trail, touch/hard, 9-zone grid, kill/dug outcomes; f297 GT corrected.
 - 2026-08-29 — off-court hold horizon (=90f) recovers e2's roster slot.
 - 2026-08-27 — short-gap bridge ships e2/e6's missed digs; GT honesty rounds.
-- 2026-08-26 — e5 action layer fully resolved (gap-bridged bounce + 2.5 m net exemption); e2/e6 generality clean; e1's double-annotated GT deduped.
 ## Log (newest first)
 
 ### 2026-10-08 (ninety-fifth session) — #95: "Unknown player" slots (stats kept in the match, out of every ranking)
@@ -500,50 +501,26 @@ match stream loses labels (suspect: the fix adds a `serve` at f15926 that starts
 regenerate `output/postrun` goldens only if the owner wants the new arm as the A/B reference (AGENTS §12 note).
 `test_inbox::test_calibrated_video_is_run_published_and_archived` fails at HEAD (unrelated).
 
-### 2026-10-06 (ninety-third session) — #93: pre-launch security review of the web platform, fixes built
+### 2026-10-08 (ninety-fourth session) — #94: web login study — fewer code mails, how long a login lasts
 
-**Asked (owner):** act as a security engineer before the site goes live (the repo is public);
-then fix findings 1, 3, 4, 5, 6 and decide the privacy wording; then the repo hygiene and the
-email enumeration / email-quota burn on the login endpoint.
+**Asked (owner):** the 8-digit code works, but 10-07 took three logins (three mails) and code
+mails fill the inbox; study simple ways to stay logged in for 2–7 days or more (cookies?) and
+their caveats. Mid-session the owner reported the site opened without a code ~20 h later.
 
-**Reviewed:** all 420 commits on every branch for keys (none; the keys on disk are local-stack
-ones), every policy / view / definer function, the SPA, the publisher + inbox, CI, repo settings.
-Adversarial pass on the local stack (anon, a stranger, a player; rolled back): no read or write
-got through. RLS itself needed no change.
+**Found (`docs/web_login_study.md`, no code changed):** the client already persists the session
+(`persistSession` + `autoRefreshToken`; refresh tokens never expire), so a login today has NO
+limit; the 10-07 re-logins come from separate addresses (localhost / workers.dev / preview URLs),
+email links opened in another browser, or `signOut()`'s default GLOBAL scope (Settings' Log out
+ends every device). Supabase Auth source: the hosted CAPTCHA lock (deploy 2.9) also blocks
+password sign-in and the passkey options step (broker needed), not OAuth or refresh; with sign-ups
+off an OAuth identity links to the invited account. NIST 800-63B-4 AAL1: overall reauthentication
+SHOULD be ≤30 days. iPhone Safari wipes `localStorage` after 7 days of use without visiting.
 
-**Found + fixed:** (1) the migrations had NO table grants and relied on Supabase's automatic
-ones, which projects created since 2026-05-30 no longer get: emulated, every table read fails
-42501 (so do the keep-alive and `make backup`) → `20261007120000_explicit_grants.sql` (`anon`
-nothing, `authenticated` SELECT + writes on admin-owned tables/COLUMNS only, `service_role` the
-backup tables; `ping()` definer); `rls_smoke.sql` pins it and passes under both defaults.
-(3) `webapp/public/_headers`: CSP (own bundle + `*.supabase.co` only), no framing; all routes
-load with 0 violations in headless Chrome, an injected inline script is refused. (4) login code
-8 digits (form takes 6–10); the planned 10-minute expiry was DROPPED — measured: the invite link
-dies with the OTP expiry and an invited user who missed it cannot ask for a code. (5) `main`
-protected on GitHub (PR required, admin bypass, no force-push/deletion), Dependabot on.
-(6) `.env.publish` → 600 and `SupabaseClient.from_env` refuses a file others can read.
-**Privacy (owner: "hide report extras"):** `20261007130000_match_report_privacy.sql` — attack
-split, own-serve, vs-average and serve targets follow the analytics tier (design D2); team-split
-counts need both teammates visible; Settings text, demo mode and the report card follow.
+**Recommended:** A now (local logout + "all devices", one URL, 30-day limit via `pg_cron` on the
+free plan), then passkeys once the domain is final (Google if zero server code matters more).
+Passwords and an own HttpOnly-cookie server: no.
 
-**Login endpoint (enumeration + mail burning):** a Turnstile widget would only slow it (the
-answers still differ), so the code request moved off Auth: `supabase/functions/request-login-code`
-always answers `{"ok":true}`, `login_code_gate()` (`20261007140000_login_broker.sql`, service key
-only) rate-limits (1/min + 5/h per address, 30/h per IP; hashes, kept a day) and says whether the
-address is an accepted account, and the hosted Auth gets CAPTCHA ON with a secret no page has a
-widget for (deploy 2.9). Measured on a captcha-locked GoTrue v2.197 copy: anon `/otp` is refused
-identically for known and unknown, the function's request passes, the mailed code logs in. The
-form falls back to Auth's endpoint while the function is missing (nothing opens on a locked project).
-**Hygiene:** repo-local commit email set; `.pi/goals/*` + snapshot untracked (kept on disk);
-`/Users/…` paths out of 4 task briefs and 2 scripts.
+**Not done / owed:** owner decisions (a) limit, (b) domain, (c) second method (open point 34);
+`pg_cron` session cap untested; Supabase plan gating of time-box/inactivity not confirmed on
+supabase.com (blocked from this container); nothing ran against the hosted project.
 
-**Verified:** `make schema-check` 5/5; smoke test on fresh DBs with and without default grants,
-and failing without each new migration; REST as anon / admin / secret key; the built app behind
-the real headers as admin and as a non-participant viewer; the login page in headless Chrome
-through the function and through the fallback; `tsc`, `oxlint`, 32 vitest.
-
-**Not done / owed:** owner: `supabase db push` + deploy doc 2.4 / 2.9 / 4 / 8 (sign-ups OFF is a
-dashboard switch — the whole membership boundary); 2-step login on GitHub / Cloudflare /
-Supabase. Nothing ran against the hosted project. The 222 old commits still carry a work email
-(history not rewritten); `rls_smoke.sql` still assumes no published match (run deploy step 2.8
-before the first publish).

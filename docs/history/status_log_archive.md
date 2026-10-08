@@ -6845,3 +6845,56 @@ agree; digs 1.37 near vs 1.66 far (0.29 — FAIL).
 **Not done / owed:** owner: `supabase db push` (new migration, no re-publish needed), give
 the four real heights to `check_heights.py --heights`; O3 (net view) stays "Next" and, per V2,
 would show relative heights only. Next-list: I3 → O3, N10/O2, O1+I4, N7/N9, F1.
+
+## Archived 2026-10-08 (#94 login study, rebase onto #95): the oldest Log session moved out of STATUS.md verbatim (Log ≤3 sessions)
+
+### 2026-10-06 (ninety-third session) — #93: pre-launch security review of the web platform, fixes built
+
+**Asked (owner):** act as a security engineer before the site goes live (the repo is public);
+then fix findings 1, 3, 4, 5, 6 and decide the privacy wording; then the repo hygiene and the
+email enumeration / email-quota burn on the login endpoint.
+
+**Reviewed:** all 420 commits on every branch for keys (none; the keys on disk are local-stack
+ones), every policy / view / definer function, the SPA, the publisher + inbox, CI, repo settings.
+Adversarial pass on the local stack (anon, a stranger, a player; rolled back): no read or write
+got through. RLS itself needed no change.
+
+**Found + fixed:** (1) the migrations had NO table grants and relied on Supabase's automatic
+ones, which projects created since 2026-05-30 no longer get: emulated, every table read fails
+42501 (so do the keep-alive and `make backup`) → `20261007120000_explicit_grants.sql` (`anon`
+nothing, `authenticated` SELECT + writes on admin-owned tables/COLUMNS only, `service_role` the
+backup tables; `ping()` definer); `rls_smoke.sql` pins it and passes under both defaults.
+(3) `webapp/public/_headers`: CSP (own bundle + `*.supabase.co` only), no framing; all routes
+load with 0 violations in headless Chrome, an injected inline script is refused. (4) login code
+8 digits (form takes 6–10); the planned 10-minute expiry was DROPPED — measured: the invite link
+dies with the OTP expiry and an invited user who missed it cannot ask for a code. (5) `main`
+protected on GitHub (PR required, admin bypass, no force-push/deletion), Dependabot on.
+(6) `.env.publish` → 600 and `SupabaseClient.from_env` refuses a file others can read.
+**Privacy (owner: "hide report extras"):** `20261007130000_match_report_privacy.sql` — attack
+split, own-serve, vs-average and serve targets follow the analytics tier (design D2); team-split
+counts need both teammates visible; Settings text, demo mode and the report card follow.
+
+**Login endpoint (enumeration + mail burning):** a Turnstile widget would only slow it (the
+answers still differ), so the code request moved off Auth: `supabase/functions/request-login-code`
+always answers `{"ok":true}`, `login_code_gate()` (`20261007140000_login_broker.sql`, service key
+only) rate-limits (1/min + 5/h per address, 30/h per IP; hashes, kept a day) and says whether the
+address is an accepted account, and the hosted Auth gets CAPTCHA ON with a secret no page has a
+widget for (deploy 2.9). Measured on a captcha-locked GoTrue v2.197 copy: anon `/otp` is refused
+identically for known and unknown, the function's request passes, the mailed code logs in. The
+form falls back to Auth's endpoint while the function is missing (nothing opens on a locked project).
+**Hygiene:** repo-local commit email set; `.pi/goals/*` + snapshot untracked (kept on disk);
+`/Users/…` paths out of 4 task briefs and 2 scripts.
+
+**Verified:** `make schema-check` 5/5; smoke test on fresh DBs with and without default grants,
+and failing without each new migration; REST as anon / admin / secret key; the built app behind
+the real headers as admin and as a non-participant viewer; the login page in headless Chrome
+through the function and through the fallback; `tsc`, `oxlint`, 32 vitest.
+
+**Not done / owed:** owner: `supabase db push` + deploy doc 2.4 / 2.9 / 4 / 8 (sign-ups OFF is a
+dashboard switch — the whole membership boundary); 2-step login on GitHub / Cloudflare /
+Supabase. Nothing ran against the hosted project. The 222 old commits still carry a work email
+(history not rewritten); `rls_smoke.sql` still assumes no published match (run deploy step 2.8
+before the first publish).
+
+- (index line, archived with the above)
+- 2026-08-26 — e5 action layer fully resolved (gap-bridged bounce + 2.5 m net exemption); e2/e6 generality clean; e1's double-annotated GT deduped.
