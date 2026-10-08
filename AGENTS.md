@@ -367,7 +367,10 @@ causal and untouched. Owner rules it encodes — keep them when changing it:
 * **Hard / touch is a post-run read (#97, `src/postrun/attack_shape.py`):**
   launch elevation and speed of the flight after the attack, the horizontal
   speed read twice, no type when the reads disagree. The publisher sends
-  that type and never falls back to the causal `SpikeAnalyzer` one. Its two
+  that type and never falls back to the causal `SpikeAnalyzer` one; the web
+  (`player_profile`: `analytics.shots`, `landings[].type`) counts a type only
+  on a row that has `extra.launch`, so a match published before #97 reads
+  "not read" until it is re-published, never the causal guess. Its two
   constants were chosen on the 32 owner-typed match spikes: do not re-tune
   them on those labels — a change needs new typed spikes (another match) and
   `score_spike_type.py --clips output/postrun` on both venues.

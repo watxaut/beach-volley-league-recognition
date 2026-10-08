@@ -3,7 +3,7 @@ import { formatDate } from '../lib/format'
 import {
   LANDING_LABEL, landingError, shots, type LandingKind, type Phase, type Shot, type ShotGroup,
 } from '../lib/landings'
-import type { Landing } from '../lib/types'
+import type { Landing, ShotKey } from '../lib/types'
 import { Segmented, type Option } from './ui'
 
 /** The whole court in the attacker's frame, seen from behind their own
@@ -33,6 +33,27 @@ function Glyph({ kind, x, y }: { kind: LandingKind; x: number; y: number }) {
                stroke={c} strokeWidth={2.5} strokeLinecap="round" />
 }
 
+/** How the ball was sent is the line itself, so it never competes with the
+ * outcome colour: a driven spike is a heavy line, a placed one a dotted
+ * line, a free ball a dashed one, and a spike nobody could type the plain
+ * thin line every attack had before. */
+const SHOT_LINE: Record<ShotKey, { width: number; dash?: string }> = {
+  hard: { width: 3 }, touch: { width: 3, dash: '0.01 6' }, free: { width: 1.5, dash: '5 5' }, unread: { width: 1.5 },
+}
+const SHOT_LABEL: Record<ShotKey, string> = {
+  hard: 'hard spike', touch: 'touch shot', free: 'free ball', unread: 'spike',
+}
+const cap = (text: string) => text[0].toUpperCase() + text.slice(1)
+
+function ShotLine({ shot, width = 26 }: { shot: ShotKey; width?: number }) {
+  const { width: w, dash } = SHOT_LINE[shot]
+  return (
+    <svg width={width} height={10} viewBox={`0 0 ${width} 10`} style={{ marginRight: 6 }} aria-hidden="true">
+      <line x1={2} x2={width - 2} y1={5} y2={5} stroke="var(--ink-2)" strokeWidth={w} strokeLinecap="round" strokeDasharray={dash} />
+    </svg>
+  )
+}
+
 const GROUP_LABEL: Record<Exclude<ShotGroup, 'other'>, string> = { kill: 'Kills', dug: 'Dug', error: 'Errors' }
 const PHASE_LABEL: Record<Phase, string> = { reception: 'Off the reception', transition: 'In transition' }
 const LEGEND: { kind: LandingKind; label: string }[] = [
@@ -47,23 +68,32 @@ const off = (p: { x: number; y: number }) => p.x !== clampX(p.x) || p.y !== clam
 const at = (p: { x: number; y: number } | null) => (p ? `${p.x.toFixed(1)}, ${p.y.toFixed(1)}` : '–')
 
 /** Every attack as a line from where the ball was hit to where it came down
- * or was dug. Colour and the mark at the end say what became of it; a dashed
- * line is a free ball. Positions are best effort from one low camera, so the
+ * or was dug. Colour and the mark at the end say what became of it; the line
+ * says how it was sent (hard, touch, free ball). Positions are best effort
+ * from one low camera, so the
  * attack under the pointer (or the tapped one) shows the area each end may
  * really be in: depth is the weak axis. */
 export function AttackMap({ landings }: { landings: Landing[] }) {
   const [group, setGroup] = useState<ShotGroup | 'all'>('all')
   const [phase, setPhase] = useState<Phase | 'all'>('all')
+  const [pickedShot, setShot] = useState<'hard' | 'touch' | 'all'>('all')
   const [hover, setHover] = useState<number | null>(null)
   const [picked, setPicked] = useState<number | null>(null)
 
   const all = shots(landings)
+  const has = (k: ShotKey) => all.some((s) => s.shot === k)
+  const anyTyped = has('hard') || has('touch')
+  // a time window without a typed attack hides the Shot filter: it must not keep filtering
+  const shot = anyTyped ? pickedShot : 'all'
   const inPhase = all.filter((s) => phase === 'all' || s.phase === phase)
-  const shown = inPhase.filter((s) => (group === 'all' || s.group === group) && (s.start || s.end))
-  const count = (g: ShotGroup) => inPhase.filter((s) => s.group === g).length
+  // each filter counts what the other one leaves
+  const ofShot = inPhase.filter((s) => shot === 'all' || s.shot === shot)
+  const ofGroup = inPhase.filter((s) => group === 'all' || s.group === group)
+  const shown = ofShot.filter((s) => (group === 'all' || s.group === group) && (s.start || s.end))
+  const count = (g: ShotGroup) => ofShot.filter((s) => s.group === g).length
+  const countShot = (k: ShotKey) => ofGroup.filter((s) => s.shot === k).length
   const active = hover ?? picked
   const tip = active === null ? null : shown[active] ?? null
-  const anyFree = all.some((s) => s.free)
   const anyPhase = all.some((s) => s.phase !== null)
   const nowhere = all.filter((s) => !s.start && !s.end).length
   const noLine = all.filter((s) => (s.start || s.end) && !(s.start && s.end)).length
@@ -73,9 +103,15 @@ export function AttackMap({ landings }: { landings: Landing[] }) {
     setPicked(null)
   }
   const groups: Option<ShotGroup | 'all'>[] = [
-    { key: 'all', label: <>All <span className="num muted">{inPhase.length}</span></> },
+    { key: 'all', label: <>All <span className="num muted">{ofShot.length}</span></> },
     ...(['kill', 'dug', 'error'] as const).map((g) => ({
       key: g, label: <>{GROUP_LABEL[g]} <span className="num muted">{count(g)}</span></>, disabled: count(g) === 0,
+    })),
+  ]
+  const kinds: Option<'hard' | 'touch' | 'all'>[] = [
+    { key: 'all', label: 'Any shot' },
+    ...(['hard', 'touch'] as const).map((k) => ({
+      key: k, label: <>{cap(k)} <span className="num muted">{countShot(k)}</span></>, disabled: countShot(k) === 0 && shot !== k,
     })),
   ]
   const phases: Option<Phase | 'all'>[] = [
@@ -102,11 +138,12 @@ export function AttackMap({ landings }: { landings: Landing[] }) {
     <div className="attack-map">
       <div className="filters">
         <Segmented options={groups} value={group} label="Outcome" onChange={(g) => { setGroup(g); reset() }} />
+        {anyTyped && <Segmented options={kinds} value={shot} label="Shot" onChange={(k) => { setShot(k); reset() }} />}
         {anyPhase && <Segmented options={phases} value={phase} label="Rally phase" onChange={(p) => { setPhase(p); reset() }} />}
       </div>
       <div className="chart court">
         <svg viewBox={`0 0 ${W} ${H}`} role="img" tabIndex={0} onKeyDown={keys} onClick={reset}
-             aria-label={`${shown.length} attacks drawn from where the ball was hit to where it came down. Arrow keys step through them.`}>
+             aria-label={`${shown.length} attacks drawn from where the ball was hit to where it came down${anyTyped ? '; a heavy line is a hard spike, a dotted one a touch shot' : ''}. Arrow keys step through them.`}>
           <rect x={px(0)} y={py(16)} width={8 * S} height={16 * S} rx={2} fill="var(--surface-2)" stroke="var(--axis)" />
           <rect x={px(0) - 6} y={py(NET_Y) - 2} width={8 * S + 12} height={4} rx={2} fill="var(--ink-2)" />
           <text x={px(8) + 12} y={py(NET_Y) + 4}>net</text>
@@ -121,11 +158,12 @@ export function AttackMap({ landings }: { landings: Landing[] }) {
           {shown.map((s, i) => {
             const dim = active !== null && active !== i
             const on = active === i
+            const line = SHOT_LINE[s.shot]
             return (
               <g key={i} opacity={dim ? 0.15 : 1}>
                 {s.start && s.end && (
                   <line x1={px(s.start.x)} y1={py(s.start.y)} x2={px(s.end.x)} y2={py(s.end.y)} stroke={KIND_COLOR[s.kind]}
-                        strokeWidth={on ? 2.5 : 1.5} strokeLinecap="round" strokeDasharray={s.free ? '5 5' : undefined}
+                        strokeWidth={on ? line.width + 1 : line.width} strokeLinecap="round" strokeDasharray={line.dash}
                         opacity={on ? 1 : 0.6} />
                 )}
                 {s.start && s.end && <circle cx={px(s.start.x)} cy={py(s.start.y)} r={2.5} fill="var(--ink-2)" />}
@@ -146,7 +184,7 @@ export function AttackMap({ landings }: { landings: Landing[] }) {
           <div className="tooltip tooltip-wrap" style={{
             left: `${Math.min(70, Math.max(30, (px(anchor(tip).x) / W) * 100))}%`, top: `${(py(anchor(tip).y) / H) * 100}%`,
           }}>
-            <strong>{LANDING_LABEL[tip.kind]}</strong> · {tip.free ? 'free ball' : 'spike'}
+            <strong>{LANDING_LABEL[tip.kind]}</strong> · {SHOT_LABEL[tip.shot]}
             {tip.phase && <> · {PHASE_LABEL[tip.phase].toLowerCase()}</>}
             {tip.l.d && <> · {formatDate(tip.l.d)}</>}
             <br />
@@ -170,15 +208,15 @@ export function AttackMap({ landings }: { landings: Landing[] }) {
             </svg>{label}
           </span>
         ))}
-        {anyFree && (
-          <>
-            <span><svg width={22} height={10} viewBox="0 0 22 10" style={{ marginRight: 6 }} aria-hidden="true">
-              <line x1={1} x2={21} y1={5} y2={5} stroke="var(--ink-2)" strokeWidth={1.5} strokeLinecap="round" /></svg>spike</span>
-            <span><svg width={22} height={10} viewBox="0 0 22 10" style={{ marginRight: 6 }} aria-hidden="true">
-              <line x1={1} x2={21} y1={5} y2={5} stroke="var(--ink-2)" strokeWidth={1.5} strokeLinecap="round" strokeDasharray="5 5" /></svg>free ball</span>
-          </>
-        )}
       </div>
+      {/* the line styles, only the ones on this map; one kind of line needs no key */}
+      {(anyTyped || has('free')) && (
+        <div className="legend">
+          {(['hard', 'touch'] as const).filter(has).map((k) => <span key={k}><ShotLine shot={k} />{k}</span>)}
+          {has('unread') && <span><ShotLine shot="unread" />{anyTyped ? 'spike, type not read' : 'spike'}</span>}
+          {has('free') && <span><ShotLine shot="free" />free ball</span>}
+        </div>
+      )}
       {(noLine > 0 || nowhere > 0) && (
         <p className="muted small" style={{ margin: '6px 0 0' }}>
           {noLine > 0 && <>{noLine} with one end only: a mark where the ball was hit, or where it came down. </>}
@@ -197,7 +235,7 @@ export function AttackMap({ landings }: { landings: Landing[] }) {
               {all.map((s, i) => (
                 <tr key={i}>
                   <td className="left">{s.l.d ? formatDate(s.l.d) : '–'}</td>
-                  <td className="left">{s.free ? 'Free ball' : 'Spike'}</td>
+                  <td className="left">{cap(SHOT_LABEL[s.shot])}</td>
                   <td className="left">{s.phase ? PHASE_LABEL[s.phase] : '–'}</td>
                   <td className="left">{LANDING_LABEL[s.kind]}</td>
                   <td>{at(s.start)}</td>

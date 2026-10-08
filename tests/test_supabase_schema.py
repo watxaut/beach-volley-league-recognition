@@ -116,6 +116,17 @@ def test_sql_fantasy_equals_the_publisher_preview(fresh_db, tmp_path):
     assert sql == {s: local.get(s, {"fantasy": 0.0})["fantasy"] for s in sql}
 
 
+def _shot_type(a):
+    """hard / touch as the post-run flight read typed it; a row without
+    ``extra.launch`` only holds the causal guess, which is never a type."""
+    read = "launch" in (a.get("extra") or {})
+    return a.get("spike_type") if read and a.get("spike_type") in ("hard", "touch") else None
+
+
+def _shot(a):
+    return "free" if a["action"] == "overpass" else _shot_type(a) or "unread"
+
+
 def _recount(bundle):
     """The N1-N4 stats, counted in plain Python straight from a bundle: the
     reference the SQL (`player_profile`) has to equal."""
@@ -131,7 +142,9 @@ def _recount(bundle):
                "own_serve": {"n": 0, "won": 0}, "team_serving": {"n": 0, "won": 0},
                "team_receiving": {"n": 0, "won": 0},
                "serve_in": {"opp_serves": 0, "team_credited": 0, "mine": 0},
-               "serve_to": defaultdict(int), "serve_unseen": 0} for s in team_of}
+               "serve_to": defaultdict(int), "serve_unseen": 0,
+               "shots": {k: {"n": 0, "kills": 0, "errors": 0}
+                         for k in ("hard", "touch", "free", "unread")}} for s in team_of}
     for pt in bundle["points"]:
         acts = sorted(by_point[pt["point_no"]], key=lambda a: a["seq"])
         possession, poss_of = 0, {}
@@ -166,6 +179,10 @@ def _recount(bundle):
                 h["n"] += 1
                 h["kills"] += a["outcome"] == "kill"
                 h["errors"] += a["outcome"] == "error"
+                sh = out[a["slot"]]["shots"][_shot(a)]
+                sh["n"] += 1
+                sh["kills"] += a["outcome"] == "kill"
+                sh["errors"] += a["outcome"] == "error"
         if receiver is not None:
             first = [a for a in acts if poss_of[a["seq"]] == 1]
             spike = any(a["action"] == "spike" for a in first)
@@ -245,6 +262,9 @@ rollback;
     for slot, ref in _recount(bundle).items():
         got = sql[slot]
         assert got["hit"] == ref["hit"], slot
+        # attack_shots: hard / touch / free ball / not read, adding up to the attacks
+        assert got["shots"] == ref["shots"], slot
+        assert sum(r["n"] for r in got["shots"].values()) == got["n_attacks"], slot
         assert got["reception"] == ref["reception"], slot
         assert got["rally"] == {k: ref[k] for k in ("own_serve", "team_serving", "team_receiving")}, slot
         assert got["serve_in"] == ref["serve_in"], slot
@@ -269,3 +289,5 @@ rollback;
         assert sorted((spot(l["sx"], l["sy"]) for l in got["landings"]), key=str) == \
             sorted((spot(a.get("own_x_m"), a.get("own_y_m")) for a in attacks), key=str), slot
         assert {l["a"] for l in got["landings"]} <= {"spike", "overpass"}, slot
+        assert sorted((l["type"] for l in got["landings"]), key=str) == \
+            sorted((_shot_type(a) for a in attacks), key=str), slot

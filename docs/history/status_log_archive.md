@@ -6951,3 +6951,30 @@ Passwords and an own HttpOnly-cookie server: no.
 **Not done / owed:** owner decisions (a) limit, (b) domain, (c) second method (open point 34);
 `pg_cron` session cap untested; Supabase plan gating of time-box/inactivity not confirmed on
 supabase.com (blocked from this container); nothing ran against the hosted project.
+
+### 2026-10-08 (ninety-fifth session) — #95: "Unknown player" slots (stats kept in the match, out of every ranking)
+
+**Asked (owner):** opponents the league does not know need an *unknown* tag in the admin match review: their stats stay
+inside that game but they are not in the total ranking; later the admin can re-tag them if they join the site.
+
+**Decision (plan approved):** unknown is a state of the SLOT (`match_participants.is_unknown`, `player_id` NULL), not a placeholder
+`players` row — `unique (match_id, player_id)` would forbid two unknowns in a match and every aggregate would need a guest filter.
+Cross-match functions already join `players` by `player_id`, so an unknown is excluded by construction (AGENTS §13 rule added).
+
+**Built:** `20261008100000_unknown_players.sql` (column + check unknown ⇒ no player, stamp trigger on either change, column grant);
+`backup.py` exports the flag; webapp: "Unknown player" in the slot dropdown (counts as decided for the publish gate), `slotLabel`/`slotNames`
+(`Unknown (P1B)` in box score, report, play-by-play, team names), Admin → Players → **Unknown players** card (every unknown slot, thumbnail,
+"re-tag as" → the match flows into that player's totals), demo mode mirrors it. Cloudflare PR build: `"previews": {}` in `webapp/wrangler.jsonc`.
+
+**Verified:** `rls_smoke.sql` block (check, stamp, republish keeps the flag, box score/report keep the slot, leaderboard 3 rows then 4 after the
+re-tag, viewer cannot flip it) — schema check 5/5 on a scratch Supabase PG17 (psql shim over `docker exec`); the block FAILS on a DB without the
+migration (negative control); vitest 33, typecheck, oxlint; headless-Chrome screenshots of the demo pages. `wrangler preview` not run (needs Cloudflare).
+
+**Not done / owed:** owner pushed the migration (2026-10-08); check the PR preview build; no per-person identity across matches (re-tag is per slot).
+
+### Session index lines moved out of STATUS.md (verbatim, oldest first)
+
+> The index is capped at 100 lines (`tests/test_status_leanness.py`); from 2026-10-08 (#98) the oldest
+> line moves here when a new session is added.
+
+- 2026-08-30 — spike analytics: trail, touch/hard, 9-zone grid, kill/dug outcomes; f297 GT corrected.

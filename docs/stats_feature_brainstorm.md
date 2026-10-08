@@ -7,6 +7,13 @@ be honest about what the camera can really measure. **The owner picks Now /
 Next / Never per ID**; picked items then go to STATUS (Active next, open points
 or task cards).
 
+**Status (2026-10-08, session #98): hard / touch is shown.** The post-run read (#97) met the V1 bars, so
+the Attack map draws the shot as the line (heavy = hard, dotted = touch, dashed = free ball, thin = spike not
+read; colour stays the outcome) with a Shot filter, and a "By shot" card splits every attack into hard / touch /
+free ball / not read with attempts, share, kills, errors and hitting %. Grade B: in-sample on one match, and a
+flat poke reads hard. `player_profile` counts a type only on a row with `extra.launch`, so a match published
+before #97 reads "not read" until it is re-published.
+
 **Status (2026-10-08, session #96): player page v2.** O2 is built as the *Attack map*: a line per
 attack from the contact point (`own_x_m` / `own_y_m`, on every touch since #91, so I3 was already
 half done) to where the ball came down or was dug, colour = outcome, dashed = free ball; hard / touch
@@ -30,7 +37,7 @@ V1 and V2 were run and both **fail** their pre-registered bars, which changes th
 | N4 | hitting % `(K − E) / attacks`, split reception vs transition attacks | same, leaderboard column |
 | N8 + F3 | match report card: MVP, each player vs their own average, fantasy per 21 points, side-out / break, serve targets, per-point fantasy race with best point (play-by-play viewers only); form (newest 5 matches) | `MatchReport.tsx` |
 | I2 | `make republish-all` (`DRY=1` lists): post-run + publish for every run with a `match_bundle.json`; a run whose diag dump is gone is skipped and fails the command | `src/publish/republish.py` |
-| V1 | `scripts/score_spike_type.py` | **FAIL**: a type is published for 16 of the 32 owner-labelled spikes (coverage 0.50, bar 0.80), right on 10 of those 16 (0.625, bar 0.85). 25 of 63 post-run attacks have any causal record. The hard / touch encoding is dropped. **#97 (2026-10-08):** a post-run read (`src/postrun/attack_shape.py`, launch elevation + speed in metres) types 29 of the 32, 26 right (0.906 / 0.897) → both bars met, but in-sample (its two constants were chosen on these labels); practice clips 6/6 on 6 of 8. The publisher now sends that type; the web still hides it (owner decision). |
+| V1 | `scripts/score_spike_type.py` | **FAIL**: a type is published for 16 of the 32 owner-labelled spikes (coverage 0.50, bar 0.80), right on 10 of those 16 (0.625, bar 0.85). 25 of 63 post-run attacks have any causal record. The hard / touch encoding is dropped. **#97 (2026-10-08):** a post-run read (`src/postrun/attack_shape.py`, launch elevation + speed in metres) types 29 of the 32, 26 right (0.906 / 0.897) → both bars met, but in-sample (its two constants were chosen on these labels); practice clips 6/6 on 6 of 8. The publisher now sends that type; the web shows it since #98 (map line style + "By shot", grade B). |
 | V2 | `scripts/check_heights.py` | **FAIL** overall, so O3 may not say "±0.2 m". Net: PASS — 33 live, well-conditioned crossings, all at or above −0.15 m of the tape, median +0.61 m. Stature: far half reads 5–6 % shorter, P2A 12 % (FAIL; real heights not given yet). Contacts: spike 2.52 / 2.51 m near / far, set and overpass agree, **digs 1.37 vs 1.66 m (0.29, FAIL)**. |
 
 How V2 was run: bars fixed first (see the script's docstring). The first run

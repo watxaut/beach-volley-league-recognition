@@ -4,7 +4,7 @@
 // `player_profile` / `match_report` (supabase/migrations/2026100710*). This is
 // the demo mode's copy of those definitions, pinned by analytics.test.ts with
 // the fixture the SQL smoke check uses.
-import type { PlayerAnalytics, PointRow, ReportPlayer, Slot, Tally, Team, WonOf } from './types'
+import type { PlayerAnalytics, PointRow, ReportPlayer, ShotKey, Slot, Tally, Team, WonOf } from './types'
 
 export interface Touch {
   point_no: number
@@ -15,6 +15,8 @@ export interface Touch {
   outcome: 'ace' | 'kill' | 'error' | null
   /** 0 = the serve, then 1, 2, 3 within one possession. */
   touch_number: number
+  /** An attack as the post-run flight read typed it; absent = not read. */
+  spike_type?: 'hard' | 'touch' | null
 }
 
 /** Seat of a player in one match, oldest match first. */
@@ -48,6 +50,13 @@ export function possessions(touches: Touch[]): Map<string, number> {
 }
 
 const tally = (): Tally => ({ n: 0, kills: 0, errors: 0 })
+
+/** The row of the "by shot" split an attack counts in. A free ball is its
+ * own row whatever its flight; a spike without a type is `unread`. (The
+ * database also refuses a type published before the flight read existed.) */
+export function shotOf(t: Pick<Touch, 'action' | 'spike_type'>): ShotKey {
+  return t.action === 'overpass' ? 'free' : t.spike_type ?? 'unread'
+}
 const wonOf = (): WonOf => ({ n: 0, won: 0 })
 
 /** The credited first touch of the receiving team, if any. */
@@ -123,6 +132,7 @@ export function playerAnalytics(seats: Seat[]): Omit<PlayerAnalytics, 'attack_zo
   const out = {
     n_attacks: 0, n_kills: 0, n_attack_errors: 0, n_serves: 0, n_aces: 0, n_serve_errors: 0,
     hit: { reception: tally(), transition: tally() },
+    shots: { hard: tally(), touch: tally(), free: tally(), unread: tally() },
     rally: { own_serve: wonOf(), team_serving: wonOf(), team_receiving: wonOf() },
     serve_in: { opp_serves: 0, team_credited: 0, mine: 0 },
     serve_out: { serves: 0, unseen: 0, to: [] as PlayerAnalytics['serve_out']['to'] },
@@ -143,6 +153,10 @@ export function playerAnalytics(seats: Seat[]): Omit<PlayerAnalytics, 'attack_zo
         bucket.n++
         if (t.outcome === 'kill') bucket.kills++
         if (t.outcome === 'error') bucket.errors++
+        const shot = out.shots[shotOf(t)]
+        shot.n++
+        if (t.outcome === 'kill') shot.kills++
+        if (t.outcome === 'error') shot.errors++
         out.attack_series.push({ d: seat.date, r: t.outcome === 'kill' ? 'kill' : t.outcome === 'error' ? 'error' : 'other' })
       }
       if (t.action === 'serve') {

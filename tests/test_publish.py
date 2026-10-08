@@ -388,6 +388,20 @@ def test_credentials_from_the_environment_need_no_file(tmp_path, monkeypatch):
     assert SupabaseClient.from_env(tmp_path / "missing.env").key == "sb_secret_env"
 
 
+def test_an_unreachable_host_is_named_in_the_error(monkeypatch):
+    """`make republish-all` from a checkout whose env file points at a local
+    stack that is not running: the error says which host refused."""
+    import urllib.error
+    import urllib.request
+
+    def refuse(*_a, **_k):
+        raise urllib.error.URLError(ConnectionRefusedError(61, "Connection refused"))
+
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+    with pytest.raises(SupabaseError, match=r"cannot reach http://127\.0\.0\.1:54321 .*Connection refused"):
+        SupabaseClient("http://127.0.0.1:54321", "sb_secret_abc").upload("match-media", "a.jpg", b"x", "image/jpeg")
+
+
 def test_zone_accepts_pipeline_output_label_and_dict():
     from src.publish.bundle import _zone
     # pipeline_output.json stores "A4"; the in-memory spike record is a dict

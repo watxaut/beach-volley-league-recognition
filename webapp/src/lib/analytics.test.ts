@@ -10,12 +10,13 @@ const pt = (n: number, serving: Team, server: Slot, winner: Team): PointRow => (
   score_a_after: 0, score_b_after: 0, flags: [],
 })
 const t = (point_no: number, seq: number, slot: Slot | null, team: Team, action: string, touch_number: number,
-           outcome: Touch['outcome'] = null): Touch => ({ point_no, seq, slot, team, action, touch_number, outcome })
+           outcome: Touch['outcome'] = null, spike_type: Touch['spike_type'] = null): Touch =>
+  ({ point_no, seq, slot, team, action, touch_number, outcome, spike_type })
 
 const points = [pt(1, 'B', 'P1B', 'A'), pt(2, 'A', 'P1A', 'A')]
 const touches = [
   t(1, 0, 'P1B', 'B', 'serve', 0), t(1, 1, 'P1A', 'A', 'dig', 1), t(1, 2, 'P2A', 'A', 'set', 2),
-  t(1, 3, 'P1A', 'A', 'spike', 3, 'kill'), t(1, 4, null, 'B', 'dig', 1),
+  t(1, 3, 'P1A', 'A', 'spike', 3, 'kill', 'hard'), t(1, 4, null, 'B', 'dig', 1),
   t(2, 0, 'P1A', 'A', 'serve', 0), t(2, 1, 'P1B', 'B', 'dig', 1), t(2, 2, 'P2B', 'B', 'set', 2, 'error'),
 ]
 const who = (slot: Slot) => ({ player_id: null, display_name: { P1B: 'Check Opp1', P2B: 'Check Opp2', P1A: 'Check Ari', P2A: 'Check Joan' }[slot] })
@@ -28,6 +29,10 @@ describe('playerAnalytics (the smoke-check fixture)', () => {
   })
   it('splits attacks by reception vs transition', () => {
     expect(a.hit).toEqual({ reception: { n: 1, kills: 1, errors: 0 }, transition: { n: 0, kills: 0, errors: 0 } })
+  })
+  it('splits attacks by shot, adding up to the attacks', () => {
+    const none = { n: 0, kills: 0, errors: 0 }
+    expect(a.shots).toEqual({ hard: { n: 1, kills: 1, errors: 0 }, touch: none, free: none, unread: none })
   })
   it('side-out and break-point', () => {
     expect(a.rally.own_serve).toEqual({ n: 1, won: 1 })
@@ -58,6 +63,22 @@ describe('reception outcomes beyond the fixture', () => {
   it('a free ball is an overpass reception', () => {
     const over = [t(1, 0, 'P1B', 'B', 'serve', 0), t(1, 1, 'P1A', 'A', 'dig', 1), t(1, 2, 'P2A', 'A', 'overpass', 2)]
     expect(playerAnalytics([{ ...ari, points: [points[0]], touches: over }]).reception.overpass).toBe(1)
+  })
+})
+
+describe('shots beyond the fixture', () => {
+  it('a free ball is its own row whatever its flight; a spike without a type is not read', () => {
+    const rally = [
+      t(1, 0, 'P1B', 'B', 'serve', 0), t(1, 1, 'P2A', 'A', 'dig', 1), t(1, 2, 'P1A', 'A', 'overpass', 2, null, 'touch'),
+      t(1, 3, 'P1B', 'B', 'dig', 1), t(1, 4, 'P1A', 'A', 'spike', 1, 'error'),
+      t(1, 5, 'P1B', 'B', 'dig', 1), t(1, 6, 'P1A', 'A', 'spike', 1, 'kill', 'touch'),
+    ]
+    const s = playerAnalytics([{ ...ari, points: [points[0]], touches: rally }])
+    expect(s.shots).toEqual({
+      hard: { n: 0, kills: 0, errors: 0 }, touch: { n: 1, kills: 1, errors: 0 },
+      free: { n: 1, kills: 0, errors: 0 }, unread: { n: 1, kills: 0, errors: 1 },
+    })
+    expect(Object.values(s.shots!).reduce((n, r) => n + r.n, 0)).toBe(s.n_attacks)
   })
 })
 
