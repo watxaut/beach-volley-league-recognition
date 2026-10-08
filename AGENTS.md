@@ -478,6 +478,10 @@ Pages). Rules that keep it correct:
   `src/postrun` change run `make republish-all` (`DRY=1` first); it needs each
   match's `diag.jsonl` (~50 MB), so **keep the diag dump of every published
   match** -- a run without one is reported as skipped and fails the command.
+  The VIDEO is not needed again (owner, 2026-10-08: little disk, no video kept
+  on the laptop or Drive forever): the publisher records its hash in
+  `<run_dir>/video_identity.json` and reuses `<run_dir>/thumbs/`, so keep the
+  run directory (diag dump, identity record, thumbnails), never the video.
 * **Every stat has a tier (owner decision 2026-10-06, design doc §4 D2).**
   League tier, every member: results, the box-score line and fantasy of each
   slot, the leaderboard, a team's side-out / break-point. Analytics tier,

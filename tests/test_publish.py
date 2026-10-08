@@ -337,6 +337,40 @@ def test_cli_dry_run_without_credentials(tmp_path, recon, monkeypatch, capsys):
     assert saved["content_sha256"] == content_sha256(saved)
 
 
+def test_video_identity_outlives_the_video(tmp_path, monkeypatch):
+    """The video is needed once: its hash is kept beside the run, so a match
+    can be re-published after the file was deleted to free disk space."""
+    video = tmp_path / "20260920_1830_bogatell_ari_joan.mp4"
+    video.write_bytes(b"frames")
+    none = tmp_path / "none"
+    first = cli.video_identity(tmp_path, KEY, str(video), video, none)
+    assert first == {"filename": video.name, "sha256": cli.sha256_file(video)}
+    video.unlink()
+    assert cli.video_identity(tmp_path, KEY, str(video), None, none) == first
+
+
+def test_a_deleted_video_keeps_the_hash_already_published(tmp_path, monkeypatch):
+    """A run published before the record existed: with no file to compare, the
+    hash the database holds stays (and is recorded), never replaced by null."""
+    class Live:
+        def rpc(self, name, params):
+            assert name == "publish_preview" and params == {"p_match_key": KEY}
+            return {"exists": True, "video_sha256": "abc123"}
+
+    monkeypatch.setattr(cli.SupabaseClient, "from_env", classmethod(lambda cls, env: Live()))
+    decoded = "resources/full_videos/20260920_match_up1080.mp4"
+    got = cli.video_identity(tmp_path, KEY, decoded, None, tmp_path / "none")
+    assert got == {"filename": "20260920_match.mp4", "sha256": "abc123"}
+    assert json.loads((tmp_path / cli.IDENTITY_NAME).read_text())["sha256"] == "abc123"
+
+
+def test_no_video_and_no_record_publishes_without_a_hash(tmp_path, monkeypatch):
+    for k in ("SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY"):
+        monkeypatch.delenv(k, raising=False)
+    got = cli.video_identity(tmp_path, KEY, None, None, tmp_path / "none")
+    assert got == {"filename": None, "sha256": None} and not (tmp_path / cli.IDENTITY_NAME).exists()
+
+
 def test_cli_refuses_a_dirty_tree(tmp_path, recon, monkeypatch, capsys):
     monkeypatch.setattr(cli, "git_state", lambda: {"publisher_version": "x", "git_dirty": True})
     rc = cli.main([str(_run_dir(tmp_path, recon)), "--no-thumbs",

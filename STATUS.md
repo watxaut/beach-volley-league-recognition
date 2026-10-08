@@ -339,6 +339,7 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 
 **Perf / infra**
 - **`make republish-all` → `Connection refused` (#98):** this checkout's `.env.publish` is the LOCAL stack (`127.0.0.1:54321`); the hosted URL is only in `~/volley-prod/.env.publish`. `~/volley-prod/output` is a symlink to this checkout's `output/`, so republish from prod only once prod has the current `src/postrun`.
+- **A published match no longer needs its video (#98):** the original's hash lives in `<run_dir>/video_identity.json` (written when hashed; for an older run taken once from `publish_preview`), thumbnails are reused from `<run_dir>/thumbs/`. Before: a deleted original sent `sha256: null` and the database refused it as "a different video".
 - **Schema check without the local Supabase stack (#96):** `colima start`, then `docker run -d --name volley_pg_check -e POSTGRES_PASSWORD=postgres -v "$PWD":"$PWD":ro public.ecr.aws/supabase/postgres:17.11.0.002`, a `psql` shim on PATH (`exec docker exec -i volley_pg_check psql "$@"`) and `PG_DSN=postgresql://postgres:postgres@127.0.0.1:5432/postgres make schema-check`; remove the container after.
 - Pose gating shipped: 84.8 → 68.0 ms/f byte-identical. #89: the "detector floor ~48 ms/f" was half overhead — a YOLO forward is ~11 ms; ultralytics' NMS + rescale on MPS cost 10–20 ms/f in GPU syncs (3 ms on CPU).
 - MPS (M3 Pro, #89): run-to-run deterministic (HEAD reproduces `output/postrun` byte for byte); batch>1 is bit-identical to batch-1 but NOT faster (compute-bound); two models driven from two threads stay bit-identical.
@@ -489,6 +490,11 @@ The page hides both until the database has the migration (`shots` missing → no
 removed → unread, map type null; SQL == Python recount on the simulated and the real match, rows add up to
 `n_attacks`); vitest 52, typecheck, oxlint, build; Python suite 1228 (1227 pass with the schema check on; `test_inbox` fails as before); bar colours pass the dataviz separation check in both themes (ΔE ≥ 15);
 demo screenshots light / dark / phone width, no overflow. Real match on disk: 16 hard, 20 touch, 3 not read, 23 free balls.
+
+**Video-free republish (same session, owner: little disk):** `republish-all` from prod then failed with "already holds a
+different video" — the 720p original was deleted, so the bundle carried no hash. `cli.video_identity` now keeps the
+hash beside the run (`video_identity.json`) and falls back once on the published one; thumbnails of an earlier publish
+are reused. Dry run against the hosted project: hash kept, no video warning. AGENTS §13 updated.
 
 **Not done / owed:** merge, `supabase db push`, prod worktree to the merged commit, `make republish-all` there, then
 the owner's look at the real Attack tab. Not rendered against the real match (demo data only). Hard / touch is still

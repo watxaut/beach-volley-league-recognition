@@ -26,12 +26,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from .bundle import (BundleError, build_bundle, checked_match_key, content_sha256,
+from .bundle import (SLOTS, BundleError, build_bundle, checked_match_key, content_sha256,
                      default_match_key, validate_bundle)
 from .client import DEFAULT_ENV_FILE, SupabaseClient, SupabaseError
 from .fantasy import score_actions
 
 REPO = Path(__file__).resolve().parents[2]
+#: The identity of the run's video, kept in the run directory so that a match
+#: can be re-published after the video itself was deleted from the laptop.
+IDENTITY_NAME = "video_identity.json"
 DEFAULT_LOG = Path("data/publish_log.jsonl")
 BUNDLE_BUCKET = "match-bundles"
 MEDIA_BUCKET = "match-media"
@@ -65,6 +68,51 @@ def _diag_schema(diag: Path) -> Optional[int]:
         return None
 
 
+def video_identity(run_dir: Path, key: str, decoded: Optional[str], source_video: Optional[Path],
+                   env_file: Path, hash_video: bool = True) -> Dict[str, Optional[str]]:
+    """``{filename, sha256}`` of the ORIGINAL video of a run.
+
+    The video is only needed once. While it is on disk it is hashed and the
+    result is written to ``<run_dir>/video_identity.json``; after it was
+    deleted (disk space) that record is the identity. A run published before
+    the record existed falls back on the hash the database already holds for
+    this match key -- with no file there is nothing to compare, so the stored
+    identity is kept instead of being replaced by "unknown".
+    """
+    record = run_dir / IDENTITY_NAME
+    if source_video is not None:
+        ident: Dict[str, Optional[str]] = {"filename": source_video.name, "sha256": None}
+        if hash_video:
+            print(f"hashing {source_video.name} ...", flush=True)
+            ident["sha256"] = sha256_file(source_video)
+            record.write_text(json.dumps(ident, indent=1))
+        return ident
+    try:
+        saved = json.loads(record.read_text())
+        if saved.get("sha256"):
+            print(f"video not on disk: identity from {record.name}", flush=True)
+            return {"filename": saved.get("filename"), "sha256": saved["sha256"]}
+    except (OSError, ValueError, AttributeError):
+        pass
+    filename = None
+    if decoded:
+        from src.utils.video_upscale import resolve_source_stem
+
+        filename = resolve_source_stem(Path(decoded)) + Path(decoded).suffix
+    sha = None
+    try:
+        live = SupabaseClient.from_env(env_file).rpc("publish_preview", {"p_match_key": key}) or {}
+        sha = live.get("video_sha256")
+    except SupabaseError:
+        pass
+    if sha:
+        print("video not on disk: keeping the hash already published for this match", flush=True)
+        record.write_text(json.dumps({"filename": filename, "sha256": sha}, indent=1))
+    else:
+        print("video not on disk and no hash on record: published without a video hash", flush=True)
+    return {"filename": filename, "sha256": sha}
+
+
 def build_from_run(args: argparse.Namespace) -> Dict[str, Any]:
     run_dir = Path(args.run_dir)
     pipeline_path = run_dir / "pipeline_output.json"
@@ -79,11 +127,9 @@ def build_from_run(args: argparse.Namespace) -> Dict[str, Any]:
 
     from .thumbs import find_source_video, make_slot_thumbnails
 
-    video_sha = None
     source_video = find_source_video(decoded)
-    if source_video and not args.no_video_hash:
-        print(f"hashing {source_video.name} ...", flush=True)
-        video_sha = sha256_file(source_video)
+    ident = video_identity(run_dir, key, decoded, source_video, args.env,
+                           hash_video=not args.no_video_hash)
 
     thumb_paths: Dict[str, str] = {}
     diag = run_dir / "diag.jsonl"
@@ -93,7 +139,11 @@ def build_from_run(args: argparse.Namespace) -> Dict[str, Any]:
             made = make_slot_thumbnails(Path(decoded), diag, recon, run_dir / "thumbs")
             thumb_paths = {slot: f"thumbs/{key}/{slot}.jpg" for slot in made}
         else:
-            print("no thumbnails: the decoded video or diag.jsonl is missing", flush=True)
+            # the video is gone: the thumbnails cut on an earlier publish still are the players
+            kept = [s for s in SLOTS if (run_dir / "thumbs" / f"{s}.jpg").exists()]
+            thumb_paths = {slot: f"thumbs/{key}/{slot}.jpg" for slot in kept}
+            print(f"video not on disk: {'keeping the ' + str(len(kept)) + ' thumbnails of an earlier publish' if kept else 'no thumbnails'}",
+                  flush=True)
 
     if not diag.exists():
         print("warning: no diag.jsonl in this run directory. Keep the diag dump of every "
@@ -104,8 +154,7 @@ def build_from_run(args: argparse.Namespace) -> Dict[str, Any]:
                   "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                   "host": socket.gethostname()}
     return build_bundle(run_dir, match_key=key, video_url=args.video_url,
-                        video_sha256=video_sha,
-                        video_filename=source_video.name if source_video else None,
+                        video_sha256=ident["sha256"], video_filename=ident["filename"],
                         thumb_paths=thumb_paths, provenance=provenance, note=args.note,
                         replace_video=args.replace_video)
 
