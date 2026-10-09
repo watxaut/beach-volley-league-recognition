@@ -737,6 +737,120 @@ begin
 end $$;
 reset role;
 
+-- ── feedback: a member sends, reads their own; admins triage ─────────────
+do $$
+begin
+  assert not has_table_privilege('anon', 'public.feedback', 'select'), 'anon must not read feedback';
+  assert not has_function_privilege('anon', 'public.send_feedback(text,text,text,jsonb,text[])', 'execute'),
+    'anon must not send feedback';
+  assert not has_table_privilege('authenticated', 'public.feedback', 'insert')
+     and not has_table_privilege('authenticated', 'public.feedback', 'delete'),
+    'feedback rows come from send_feedback() only and are never deleted';
+  assert has_table_privilege('service_role', 'public.feedback', 'select')
+     and has_column_privilege('service_role', 'public.feedback', 'status', 'update'),
+    'the laptop reads and closes reports';
+  assert not has_column_privilege('authenticated', 'public.feedback', 'message', 'update'),
+    'nobody rewrites a report';
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+do $$
+declare v_id bigint;
+begin
+  insert into storage.objects (bucket_id, name)
+  values ('feedback-media', '00000000-0000-0000-0000-0000000000a1/shot.jpg');
+  begin
+    insert into storage.objects (bucket_id, name)
+    values ('feedback-media', '00000000-0000-0000-0000-0000000000b0/shot.jpg');
+    assert false, 'an upload into another member''s folder must fail';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into storage.objects (bucket_id, name)
+    values ('match-media', '00000000-0000-0000-0000-0000000000a1/shot.jpg');
+    assert false, 'a member must not upload into the match buckets';
+  exception when insufficient_privilege then null;
+  end;
+
+  v_id := public.send_feedback('bug', '  the map is cut off  ', '/players/1', '{"viewport":"390x844"}',
+                               array['00000000-0000-0000-0000-0000000000a1/shot.jpg']);
+  assert (select message = 'the map is cut off' and status = 'open'
+                 and user_id = '00000000-0000-0000-0000-0000000000a1'
+          from public.feedback where id = v_id), 'the report is stored for its author, open';
+  begin
+    perform public.send_feedback('bug', 'x', null, '{}', array['00000000-0000-0000-0000-0000000000b0/shot.jpg']);
+    assert false, 'a screenshot of another folder must be refused';
+  exception when raise_exception then null;
+  end;
+  begin
+    perform public.send_feedback('bug', 'x', null, '{}', array['00000000-0000-0000-0000-0000000000a1/missing.jpg']);
+    assert false, 'a screenshot that was never uploaded must be refused';
+  exception when raise_exception then null;
+  end;
+  begin
+    perform public.send_feedback('spam', 'x');
+    assert false, 'an unknown kind must be refused';
+  exception when check_violation then null;
+  end;
+  begin
+    perform public.send_feedback('bug', '   ');
+    assert false, 'an empty report must be refused';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into public.feedback (user_id, kind, message)
+    values ('00000000-0000-0000-0000-0000000000a1', 'bug', 'direct');
+    assert false, 'a direct insert must fail';
+  exception when insufficient_privilege then null;
+  end;
+  update public.feedback set status = 'done' where id = v_id;
+  assert (select status from public.feedback where id = v_id) = 'open', 'an author cannot close a report';
+
+  -- 20 a day: 1 sent, 19 more pass, the next is refused
+  for i in 1..19 loop
+    perform public.send_feedback('suggestion', 'idea ' || i);
+  end loop;
+  begin
+    perform public.send_feedback('suggestion', 'one too many');
+    assert false, 'the daily limit must hold';
+  exception when raise_exception then null;
+  end;
+  assert (select count(*) from public.feedback) = 20, 'a member reads their own reports';
+end $$;
+reset role;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b0', true);
+do $$
+begin
+  assert (select count(*) from public.feedback) = 0, 'a member does not read another member''s reports';
+  assert (select count(*) from storage.objects where bucket_id = 'feedback-media') = 0,
+    'nor their screenshots';
+  update public.feedback set status = 'dismissed';
+  assert public.send_feedback('suggestion', 'the limit is per member') is not null;
+end $$;
+reset role;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', true);
+do $$
+begin
+  assert (select count(*) from public.feedback) = 21, 'an admin reads every report';
+  assert (select count(*) from public.feedback where status <> 'open') = 0, 'a member closed nothing';
+  assert (select count(*) from storage.objects where bucket_id = 'feedback-media') = 1,
+    'an admin reads the screenshots';
+  update public.feedback set status = 'done', admin_note = 'fixed' where kind = 'bug';
+  assert (select count(*) from public.feedback where status = 'done' and admin_note = 'fixed') = 1,
+    'an admin closes a report with a note';
+  begin
+    update public.feedback set message = 'rewritten' where kind = 'bug';
+    assert false, 'not even an admin rewrites a report';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+
 -- a match with history cannot be hard-deleted (hide it instead)
 do $$
 begin

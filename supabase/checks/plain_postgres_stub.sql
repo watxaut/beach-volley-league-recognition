@@ -39,11 +39,12 @@ create table if not exists storage.objects (
   id        uuid primary key default gen_random_uuid(),
   bucket_id text references storage.buckets,
   name      text,
-  owner     uuid
+  owner     uuid,
+  created_at timestamptz default now()
 );
 alter table storage.objects enable row level security;
 grant usage on schema storage to anon, authenticated, service_role;
-grant select on storage.objects to authenticated;
+grant select, insert on storage.objects to authenticated;
 
 grant usage on schema public to anon, authenticated, service_role;
 -- The PERMISSIVE defaults (every project before 2026-05-30, the local CLI

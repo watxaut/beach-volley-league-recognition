@@ -412,3 +412,33 @@ export interface Session {
   userId: string
   email: string
 }
+
+// Bug reports and suggestions (supabase/migrations/20261009130000_feedback.sql).
+export type FeedbackKind = 'bug' | 'suggestion'
+export type FeedbackStatus = 'open' | 'done' | 'dismissed'
+
+export interface Feedback {
+  id: number
+  user_id: string
+  kind: FeedbackKind
+  message: string
+  /** The route the report was sent from. */
+  page: string | null
+  context: Record<string, string>
+  /** Paths in the private `feedback-media` bucket. */
+  screenshots: string[]
+  status: FeedbackStatus
+  admin_note: string | null
+  created_at: string
+  /** Filled for admins only (a member reads no profile but their own). */
+  author?: { email: string | null; display_name: string | null } | null
+}
+
+export interface NewFeedback {
+  kind: FeedbackKind
+  message: string
+  page: string
+  context: Record<string, string>
+  /** Already downscaled (lib/feedback.ts). */
+  images: Blob[]
+}

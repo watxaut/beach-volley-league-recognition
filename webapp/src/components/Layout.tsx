@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useApp } from '../app/state'
+import { FeedbackButton } from './Feedback'
 
 export function Layout() {
   const { isAdmin, me, session, demo } = useApp()
@@ -17,6 +18,7 @@ export function Layout() {
             <NavLink to="/measure" className={link}>How we measure</NavLink>
             {isAdmin && <NavLink to="/admin" className={link}>Admin</NavLink>}
           </nav>
+          <FeedbackButton />
           <Link to="/settings" className="userchip" title={session?.email}>
             {me?.display_name ?? session?.email?.split('@')[0] ?? 'Me'}
           </Link>

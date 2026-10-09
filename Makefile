@@ -23,7 +23,7 @@ OUTPUT_DIR := output/$(VIDEO_NAME)
 VIZ_FLAG := $(if $(VIZ),,--skip-visualization)
 
 .PHONY: run run-video run-live run-match postrun point-images ingest ingest-all db-reset ui help \
-        calibrate process publish republish-all inbox backup schema-check
+        calibrate process publish republish-all inbox backup feedback schema-check
 
 run:
 ifeq ($(strip $(VIDEO)),)
@@ -138,6 +138,15 @@ inbox:
 backup:
 	$(PYTHON) -m src.publish.backup $(if $(OUT),--out "$(OUT)") $(BACKUP_FLAGS)
 
+# Members' bug reports and suggestions (the web app's Feedback button) ->
+# output/feedback/index.md + one folder per report with its screenshots.
+#   ALL=1            closed reports too
+#   DONE="3 5"       mark as done        DISMISS="4"   mark as not planned
+#   NOTE="..."       note the author reads, stored with DONE / DISMISS
+feedback:
+	$(PYTHON) -m src.publish.feedback $(if $(ALL),--all) $(if $(DONE),--done $(DONE)) \
+		$(if $(DISMISS),--dismiss $(DISMISS)) $(if $(NOTE),--note "$(NOTE)")
+
 # Migrations + RLS smoke check against a Postgres you can create databases on
 # (local Supabase: PG_DSN=postgresql://postgres:postgres@127.0.0.1:54322/postgres).
 PG_DSN ?= postgresql://postgres:postgres@127.0.0.1:54322/postgres
@@ -163,4 +172,5 @@ help:
 	@echo "make republish-all                        Redo post-run + publish for every published match (DRY=1: list)"
 	@echo "make inbox                                One pass over the Drive inbox"
 	@echo "make backup                               Export admin-owned tables to backups/"
+	@echo "make feedback                             Pull open bug reports / suggestions -> output/feedback/ (DONE=\"3 5\" NOTE=... to close)"
 	@echo "make schema-check                         Migrations + RLS check on a local Postgres"

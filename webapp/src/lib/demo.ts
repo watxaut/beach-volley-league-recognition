@@ -3,9 +3,10 @@
 // The data is synthetic; the rules (credited touches, fantasy rules,
 // privacy tiers) mirror the SQL so the pages behave like production.
 import type { Api } from './api'
+import { blobDataUrl } from './feedback'
 import { hitSplit, playerAnalytics, pointFantasy, serveTargets, teamRally, type Seat, type Touch } from './analytics'
 import type {
-  ActionName, ActionRow, BoxRow, FantasyRule, LeaderRow, Match, PointRow, Participant,
+  ActionName, ActionRow, BoxRow, FantasyRule, Feedback, LeaderRow, Match, PointRow, Participant,
   Pass, Player, PlayerProfile, Profile, Publication, ReportPlayer, Ruleset, Session, Slot, Team, WindowParams,
 } from './types'
 
@@ -162,6 +163,12 @@ export function demoApi(): Api {
       }],
     }
   })
+  const feedback: Feedback[] = [{
+    id: 1, user_id: ME, kind: 'bug', message: 'On my phone the attack map is cut off on the right.', page: '/players/1',
+    context: { viewport: '390x844' }, screenshots: [], status: 'done', admin_note: 'Fixed: the map now scales to the screen.',
+    created_at: '2026-10-07T18:20:00Z', author: { email: 'ari@example.com', display_name: 'Ari' },
+  }]
+  const shots: Record<string, string> = {}
   let session: Session | null = { userId: ME, email: 'ari@example.com' }
   const listeners = new Set<(s: Session | null) => void>()
   const isAdmin = () => profiles.find((p) => p.user_id === session?.userId)?.role === 'admin'
@@ -440,6 +447,28 @@ export function demoApi(): Api {
     },
     async activateRuleset(id) {
       rulesets.forEach((r) => (r.is_active = r.id === id))
+    },
+    async sendFeedback(userId, report) {
+      const paths: string[] = []
+      for (const image of report.images) {
+        const path = `${userId}/${feedback.length}-${paths.length}.jpg`
+        shots[path] = await blobDataUrl(image)
+        paths.push(path)
+      }
+      feedback.unshift({
+        id: feedback.length + 1, user_id: userId, kind: report.kind, message: report.message.trim(),
+        page: report.page, context: report.context, screenshots: paths, status: 'open', admin_note: null,
+        created_at: new Date().toISOString(),
+        author: { email: profiles.find((p) => p.user_id === userId)?.email ?? null, display_name: null },
+      })
+    },
+    myFeedback: (userId) => delay(feedback.filter((f) => f.user_id === userId)),
+    allFeedback: () => delay([...feedback]),
+    async setFeedbackStatus(id, status, note) {
+      Object.assign(feedback.find((f) => f.id === id)!, { status, admin_note: note })
+    },
+    async feedbackUrls(paths) {
+      return Object.fromEntries(paths.filter((p) => shots[p]).map((p) => [p, shots[p]]))
     },
   }
 }
