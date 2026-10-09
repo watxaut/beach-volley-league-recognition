@@ -157,7 +157,7 @@ function Overview({ data, board, boardError, windowKey, who, allHistory }: {
                 ? <>Against everyone else, {leagueScope(windowKey)}.</>
                 : <>{windowKey === 'all' ? `The newest ${plural(now.length, 'match', 'matches')}` : `The ${plural(now.length, 'match', 'matches')} of this period`} against
                   the {before.length} before.</>}
-              {noReference && shown === 'league' && <> The league reference appears once {MIN_PEERS} other players have played in this view.</>}
+              {noReference && shown === 'league' && <> The league average appears once {MIN_PEERS} other players have played in this view; until then every bar starts at zero.</>}
             </p>
             <Compare rows={rows} mode={shown} who={who} refName={shown === 'league' ? 'League' : 'Before'} />
           </>

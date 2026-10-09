@@ -62,8 +62,8 @@ export const GLOSSARY = {
   shot_type: { label: 'Hard or touch', what: 'Hard = the ball was driven. Touch = it was placed: a lob, a poke, a slow drop. Read from the flight after the hit: a ball that leaves steeply upward (25° or more) or slowly (under 5 m/s) is a touch, the rest are hard.',
     how: `Right on 26 of 29 spikes of the reference match, the match its two thresholds were chosen on. A flat poke can read as hard: the camera sees the flight, not the swing. About 1 spike in 10 gets no type. Share and hitting % show from ${MIN_N} attacks.`,
     grade: 'B' },
-  compare: { label: 'Comparison', what: 'Right is better on every row. The dot is the player and the bar through it their 95% range; the tall tick is the reference, on its own grey range.',
-    how: `A verdict shows only when the two ranges do not overlap: with ${MIN_N}–20 attempts most gaps are chance.`, grade: 'A' },
+  compare: { label: 'Comparison', what: 'More is to the right on every row. The centre line is the reference and the bar is the gap to it; the hollow dots are the other players. Fewer is better where the row says so.',
+    how: `Inside the shaded zone the gap is smaller than chance alone moves the number, so it reads "too close to call": with ${MIN_N}–20 attempts most gaps are chance. A bar leaves the zone when the two 95% ranges no longer overlap.`, grade: 'A' },
 } satisfies Record<string, Term>
 
 export type TermKey = keyof typeof GLOSSARY

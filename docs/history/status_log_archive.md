@@ -7048,6 +7048,39 @@ and P22 f16037 (the two reads disagree), P18 f12295 (no post-run attack there).
 `make republish-all` (a post-run rule changed); web: Attack map and `/measure` still say hard / touch is off; a
 second match is the first out-of-sample test; swing vs poke needs pose in the diag dump.
 
+### 2026-10-09 (ninety-ninth session) — #99: the comparison card reads at a glance (gap to the league)
+
+**Asked (owner):** the "vs the league" strips are hard to read at first glance: what is the 95 % range, the other
+players' average is too small to see, errors should not be "better to the right"; three proposals to choose from;
+fantasy at the end.
+
+**Diagnosed:** the owner's page has NO league average yet (it needs 3 other players): the faint ticks were one other
+player. The axis was flipped on "fewer is better" rows, so a high error count sat on the left.
+
+**Proposals (one mockup page, the owner's numbers + an example league):** A two bars from zero, B gap to the league,
+C everyone on one line. Owner picked **B**.
+
+**Built (web only, no SQL):** `Compare.tsx` rewritten; `lib/compare.ts` `gapScale` / `barScale` replace `stripScale`;
+fantasy is last in `DEFS` and set apart as the total row. Row = label, you, reference, chart, verdict. The centre line
+is the reference (league average, or earlier matches) and the bar is the gap, MORE to the right on every row; "fewer
+is better" is a tag on the row and the verdict's job. Every row is scaled so that the gap at which the two 95 % ranges
+stop overlapping sits at one distance from the centre: one shaded "too close to call" zone, and a bar leaves it exactly
+when a verdict is called (pinned for every count 0–40 of 40). Inside = faint bar; outside = blue (better) / orange
+(worse), `--gap-better` / `--gap-worse` = the validated team pair (green + red measure deutan ΔE 4.1; blue + orange
+24.7 / 26.8). Hollow dots = the other players. "95% range" reads "likely range", with one sentence under the chart
+built from a real row ("3 in 18 attacks reads 17%, but the real level could be anywhere from 6% to 39%"); "Similar" /
+"Steady" read "Too close to call". A row without a reference (fewer than 3 other players) = plain bars from zero: the
+player's bar with its likely range and one named bar per other player. Hint `compare`, the design doc and AGENTS §13
+follow.
+
+**Verified:** vitest 55 (zone ⇔ verdict, more = right on the error rows, bars from zero), typecheck, oxlint, build;
+demo screenshots through headless Chrome: league, earlier matches (`?w=n1`), no reference with 1 and 2 other players,
+light / dark, 1100 and 400 px, tooltip on focus; no console error, no horizontal overflow.
+
+**Not done / owed:** not seen against the hosted data (demo + fixture rows only). One point differs from the mockup
+the owner chose from: bar lengths were arbitrary there, here they are scaled to the zone. Fantasy has no range, so its
+bar fits its own row (always full length against earlier matches).
+
 ### 2026-10-08 (ninety-eighth session) — #98: hard / touch on the web (attack map + "By shot"), and why `make republish-all` was refused
 
 **Asked (owner):** (1) `make republish-all` fails with `Connection refused` on the thumbnail upload; (2) see hard
@@ -7146,3 +7179,5 @@ republish-all`. Every published position shares the shift (pass map, dug ends), 
 - 2026-09-01 — trail render fix (masked blend, black boxes gone).
 - 2026-09-04 **#3** — e1 GT re-verified (three mixed id conventions unified; queue empty); joust-split adjudicated; reentry contact shipped (e6 f308).
 - 2026-09-04 **#4** — analysis DB + player labeling + local web UI; extraction/DB split by lossless file contract.
+- 2026-09-05 **#5** — player-page court SVG field heatmap (two rounds).
+- 2026-09-05 **#6** — GAME-ON badge latency fixed (rolling sustained-flight provisional); serve-init semantics (provisional fast ON, serve arming); heatmap landscape + cache busting.
