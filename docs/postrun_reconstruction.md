@@ -157,6 +157,92 @@ gravity as the ruler keeps the same attacks there). Amateur "hard" spikes
 are flat and fast (6–15 m/s, −4…+24°), not downward; telling a swing from a
 poke inside the overlap needs the arm (pose), not the ball.
 
+## Court positions, measured (2026-10-09, #101)
+
+`src/postrun/positions.py` — OUTPUT ONLY. `court_x_m` / `court_y_m` /
+`court_err_m` of a touch and `court_xy_m` of a ground end (recon schema 4)
+are no longer the decision read. The decision layers keep `BallEvent.court_y`
+and `DEPTH_SPLIT_BIAS_M`; nothing below feeds a point, a touch, a label or a
+winner.
+
+Why (#100): the web drew the owner's kill at 2:49 (f4886) 2.7 m off the net;
+the frames show the takeoff 0.8–1.3 m from it. Same players on both halves,
+39 spikes: 2.70 m off the net from the near half, −0.30 m from the far half
+(11 of 17 starting across the net).
+
+What a published position does differently:
+
+1. **The net is where it was clicked.** The corner midline is 0.05 m (left
+   sideline) to 1.3 m (right) off the calibration's net-ground clicks, which
+   agree with the post bases in the frame; a ball at that line is 23.7 px
+   wide, the corner model says 22.8. Depth is read against three anchors (far
+   baseline, net, near baseline) and the ground through two homographies that
+   share the net line. Without clicks, or with a click that is not near
+   mid-court, the frame is the corner model exactly.
+2. **The ball's box is wider than the ball, by a number of pixels the video
+   has to show.** The same players play both halves, so a kind of touch sits
+   at one distance from the net whichever half it is played from. One width
+   offset must close that gap for every kind at once:
+
+   | kind | touches near / far | gap before (m) | after |
+   |---|---|---|---|
+   | dig | 28 / 31 | 2.05 | −0.16 |
+   | set | 24 / 25 | 2.21 | +0.14 |
+   | spike | 22 / 17 | 2.06 | 0.00 |
+   | overpass | 12 / 11 | 2.15 | +0.09 |
+
+   20260920: 1.74 px. Refused (positions then use the clicks only, and say
+   so in `positions.width_bias_reason`) without a side switch, with fewer than
+   two kinds of ≥5 touches per half, outside 12 % of the ball's width at the
+   net, or when a kind stays more than 0.6 m apart.
+
+Why pixels and not a shift in metres: 16 near serves put the ball −0.24 m from
+their server's feet (the toss is just in front), so the read is unbiased at
+the near baseline; a flat +1 m would show +0.7 m there. A pixel offset is
+0.25 m at the near baseline, ~1 m at the net, more beyond it.
+
+Result, spikes (distance from the net, near | far half):
+
+| | before | after |
+|---|---|---|
+| all | 2.70 \| −0.30 | 1.40 \| 1.40 |
+| P1A (6 \| 1) | 2.85 \| 0.60 | 1.55 \| 2.30 |
+| P2A (4 \| 9) | 2.65 \| −0.40 | 1.35 \| 1.20 |
+| P1B (5 \| 2) | 2.70 \| 0.00 | 1.40 \| 1.70 |
+| P2B (7 \| 5) | 2.60 \| −0.30 | 1.30 \| 1.40 |
+
+The 2:49 kill reads 1.4 m; 1 of 39 spikes reads across the net and is held at
+it (a touch is played on its own half). All 170 positions move 0.5–2.4 m away
+from the lens. Ground ends move with the net line only (up to 1.2 m beside
+the right sideline).
+
+Neutrality: everything but the position keys is identical on the match and on
+e1–e7 (JSON diff, play-by-play `cmp`); `score_postrun.py` prints the same
+output; practice 5/5 serves, P 52/53; sweep 88 rows, none loses a point or a
+winner; hard / touch 26/29.
+
+Tried and dropped: reading the depth in a short window at the hit (aligned on
+the trajectory kink; arriving flight, leaving flight, or only the flight that
+stays on the touch's half). None is tighter than the whole-flight fits (spike
+IQR ~0.9 m either way), so those stay.
+
+What it rests on, and what stays open:
+
+* **The two halves are played alike.** The players' feet (ground plane,
+  independent of the ball's width) show the same near/far gap at digs and
+  sets (2.6–2.7 m), which is either the person box reading toward the lens
+  too, or play that really differs by end (wind). The symmetry read cannot
+  tell; a real part would be removed as if it were bias. Direct checks at the
+  net disagree: a ball sliding down the near face of the net measures 25 px
+  (the offset is there), two serves into the net measure 23–24 px (it is not).
+* **In-sample:** one match. A second match with switches is the test.
+* **No switch, no offset:** the practice clips keep the clicked net only; a far
+  touch there still reads toward the lens and is held at the net if it crosses.
+* **One position is ±0.6–0.8 m along the court** from the 1.25 m beach tripod
+  (1 px of ball width ≈ 0.6 m at the net; 9 px of sand per metre). A takeoff
+  read from the feet needs a higher camera: the practice venue's ~3 m gives
+  20–24 px per metre.
+
 ## Known limits
 
 * **Players are unscored.** The GT has no stable player identity; within-half

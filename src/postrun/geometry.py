@@ -81,6 +81,7 @@ class CourtGeometry:
         self,
         court_corners: Sequence[Sequence[float]],
         net_top_points: Optional[Sequence[Sequence[float]]] = None,
+        net_ground_points: Optional[Sequence[Sequence[float]]] = None,
     ) -> None:
         corners = np.asarray(court_corners, dtype=np.float64).reshape(4, 2)
         # Calibration order: far-left, far-right, near-right, near-left.
@@ -108,6 +109,12 @@ class CourtGeometry:
         self.net_top_points = (
             np.asarray(net_top_points, dtype=np.float64).reshape(2, 2)
             if net_top_points is not None else None)
+        #: The two clicks under the net (calibration ``midcourt_points``). The
+        #: decision reads above never use them; ``positions`` anchors the
+        #: published court positions on them.
+        self.net_ground_points = (
+            np.asarray(net_ground_points, dtype=np.float64).reshape(2, 2)
+            if net_ground_points is not None else None)
 
     # -- construction ---------------------------------------------------- #
 
@@ -115,12 +122,14 @@ class CourtGeometry:
     def from_file(cls, path: str) -> "CourtGeometry":
         with open(path) as f:
             data = json.load(f)
-        return cls(data["court_corners"], data.get("net_top_points"))
+        return cls(data["court_corners"], data.get("net_top_points"),
+                   data.get("midcourt_points"))
 
     @classmethod
     def from_calibration(cls, calibration: Any) -> "CourtGeometry":
         return cls(calibration.court_corners,
-                   getattr(calibration, "net_top_points", None))
+                   getattr(calibration, "net_top_points", None),
+                   getattr(calibration, "midcourt_points", None))
 
     # -- depth ----------------------------------------------------------- #
 

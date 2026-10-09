@@ -13,7 +13,9 @@ exercised on a stream with a known answer:
 * touches -- half, touch number and alternating players solved jointly;
   hidden touches keep the count right and are never credited;
 * match -- the next serve names the winner, the score closes the set, the
-  service order names the server nobody saw.
+  service order names the server nobody saw;
+* positions -- the published court frame is anchored on the net clicks and
+  the box-width offset is read off the end switches (output only).
 """
 
 import json
@@ -35,6 +37,7 @@ from score_postrun import (  # noqa: E402
     score_reconstruction,
 )
 from src.postrun import ball_flights  # noqa: E402
+from src.postrun import positions  # noqa: E402
 from src.postrun.ball_flights import (  # noqa: E402
     EVENT_BIRTH,
     EVENT_CONTACT,
@@ -563,6 +566,118 @@ def test_rule_violations_are_counted():
 
 
 # --------------------------------------------------------------------------- #
+# published positions (output only)
+# --------------------------------------------------------------------------- #
+
+NET_CLICKS = [[538, 645], [1426, 641]]       # the 20260920 calibration's own
+
+
+def _clicked_geometry():
+    return CourtGeometry(sim.CORNERS, sim.NET_TOP, NET_CLICKS)
+
+
+def test_positions_without_net_clicks_are_the_corner_model():
+    g = sim.geometry()
+    pos = positions.CourtPositions(g)
+    assert pos.net_anchor == positions.NET_ANCHOR_MIDLINE
+    for w in (g.ball_px_far * 0.9, 18.0, g.ball_px_net, 30.0, g.ball_px_near * 1.1):
+        assert pos.court_y_from_width(w) == pytest.approx(float(g.court_y_from_width(w)))
+    for u, v in [(900, 620), (700, 700), (1500, 760), (1000, 595)]:
+        assert pos.image_to_world(u, v) == pytest.approx(g.image_to_world(u, v), abs=1e-6)
+    assert pos.image_to_world(900, 100) is None      # above the horizon
+
+
+def test_net_clicks_anchor_the_net_and_leave_the_baselines():
+    g = _clicked_geometry()
+    pos = positions.CourtPositions(g)
+    assert pos.net_anchor == positions.NET_ANCHOR_CLICKS
+    # the corner midline puts this net 0.05 m off on one sideline, 1.3 m on the other
+    assert g.image_to_world(*NET_CLICKS[0])[1] == pytest.approx(8.05, abs=0.05)
+    assert g.image_to_world(*NET_CLICKS[1])[1] == pytest.approx(9.33, abs=0.05)
+    for click, x in zip(NET_CLICKS, (0.0, 8.0)):     # a click is a pixel or two off the tape
+        assert pos.image_to_world(*click) == pytest.approx((x, NET_Y_M), abs=0.3)
+    assert pos.image_to_world(*sim.CORNERS[0]) == pytest.approx((0.0, 0.0), abs=1e-6)
+    assert pos.image_to_world(*sim.CORNERS[2]) == pytest.approx((8.0, 16.0), abs=1e-6)
+    # a ball at the net is as wide as the net line says, not the corners' mean
+    assert pos.ball_px_net > g.ball_px_net
+    assert pos.court_y_from_width(pos.ball_px_net) == pytest.approx(NET_Y_M)
+    assert pos.court_y_from_width(g.ball_px_far) == pytest.approx(0.0, abs=1e-6)
+    assert pos.court_y_from_width(g.ball_px_near) == pytest.approx(16.0, abs=1e-6)
+    for y in (-1.0, 3.0, 8.0, 12.5, 17.0):           # width <-> depth round trip
+        assert pos.court_y_from_width(pos.width_at(y)) == pytest.approx(y)
+    # a ball above (6, 11): the width scale and the ground plane are two reads
+    # of the same court and agree to a few centimetres
+    u, _ = pos.world_to_image(6.0, 11.0)
+    assert pos.ball_position(u, pos.width_at(11.0))[:2] == pytest.approx((6.0, 11.0), abs=0.05)
+
+
+def test_a_slipped_net_click_falls_back_to_the_corner_midline():
+    g = CourtGeometry(sim.CORNERS, sim.NET_TOP, [[10, 790], [1790, 775]])   # on the near baseline
+    assert positions.CourtPositions(g).net_anchor == positions.NET_ANCHOR_MIDLINE
+
+
+def test_a_touch_reads_on_its_own_half():
+    pos = positions.CourtPositions(_clicked_geometry())
+    w = pos.width_at(8.6)                             # a near-half width
+    assert pos.ball_position(900.0, w, "near")[1:] == (pytest.approx(8.6), False)
+    assert pos.ball_position(900.0, w, "far")[1:] == (NET_Y_M, True)
+
+
+def _switch_samples(pos, bias):
+    """Every kind at its own distance from the net on both halves, seen
+    through boxes ``bias`` px too wide."""
+    out = []
+    for action, distance in (("spike", 1.2), ("set", 2.5), ("dig", 4.5)):
+        for k in range(8):
+            d = distance + 0.1 * (k - 3.5)
+            out.append(positions.WidthSample(action, "near", pos.width_at(8 + d) + bias))
+            out.append(positions.WidthSample(action, "far", pos.width_at(8 - d) + bias))
+    return out
+
+
+def test_box_width_offset_is_read_off_the_end_switch():
+    pos = positions.CourtPositions(_clicked_geometry())
+    cal = positions.calibrate_width_bias(pos, _switch_samples(pos, 1.5), switched=True)
+    assert cal.applied and cal.reason is None
+    assert cal.width_bias_px == pytest.approx(1.5, abs=0.02)
+    assert all(abs(k["gap_after_m"]) < 0.05 for k in cal.kinds.values())
+    assert all(k["gap_before_m"] > 1.0 for k in cal.kinds.values())
+    fixed = positions.CourtPositions(_clicked_geometry(), cal.width_bias_px)
+    assert fixed.court_y_from_width(pos.width_at(9.2) + 1.5) == pytest.approx(9.2, abs=0.02)
+
+
+def test_box_width_offset_is_refused_when_the_video_cannot_show_it():
+    pos = positions.CourtPositions(_clicked_geometry())
+    good = _switch_samples(pos, 1.5)
+    refuse = lambda samples, switched=True: positions.calibrate_width_bias(  # noqa: E731
+        pos, samples, switched)
+    assert refuse(good, switched=False).reason == positions.REASON_NO_SWITCH
+    assert refuse([s for s in good if s.action == "spike"]).reason == positions.REASON_TOO_FEW
+    assert refuse(_switch_samples(pos, 6.0)).reason == positions.REASON_OUTSIDE_CAP
+    # one kind played 3 m deeper on the near half: the kinds cannot agree
+    odd = [positions.WidthSample(s.action, s.side,
+                                 pos.width_at(pos.court_y_from_width(s.width_px) + 3.0))
+           if s.action == "dig" and s.side == "near" else s for s in good]
+    cal = refuse(odd)
+    assert cal.reason == positions.REASON_DISAGREE and not cal.applied
+    assert cal.payload()["width_bias_px"] is None
+
+
+def test_positions_never_change_a_decision():
+    script = sim.standard_rally(1.0, "near", sim.NEAR_A)
+    b = sim.StreamBuilder(12.0)
+    b.rally(script)
+    recon = reconstruct(b.build(), b.g)
+    assert recon["positions"]["net_anchor"] == positions.NET_ANCHOR_MIDLINE
+    assert recon["positions"]["width_bias_reason"] == positions.REASON_NO_SWITCH
+    touches = [t for t in recon["points"][0]["touches"] if t["observed"] and t["touch_number"]]
+    assert touches and all(t["court_y_m"] is not None for t in touches)
+    # no clicks, no switch: the published position is the decision read, on its half
+    for t in touches:
+        assert (t["court_y_m"] >= NET_Y_M) == (t["side"] == "near")
+
+
+# --------------------------------------------------------------------------- #
 # the real match (skips when the run is not on disk)
 # --------------------------------------------------------------------------- #
 
@@ -600,3 +715,18 @@ def test_match_touches_beat_the_bar_and_break_no_rule(match_score):
     assert t["side_ok"] == t["matched"]               # never a touch on the wrong half
     assert score["rules"] == {"same_player_twice": 0, "fourth_touch": 0,
                               "reception_on_serving_half": 0}
+
+
+def test_match_positions_mirror_across_the_net(match_score):
+    recon, _ = match_score
+    pos = recon["positions"]
+    assert pos["net_anchor"] == "net_ground_clicks" and pos["width_bias_applied"]
+    assert 1.0 < pos["width_bias_px"] < 2.5           # a loose box, not another ball
+    assert set(pos["kinds"]) == {"dig", "set", "spike", "overpass"}
+    assert all(k["gap_before_m"] > 1.5 for k in pos["kinds"].values())
+    assert all(abs(k["gap_after_m"]) <= 0.3 for k in pos["kinds"].values())
+    spikes = [t for p in recon["points"] for t in p["touches"]
+              if t["action"] == "spike" and t["court_y_m"] is not None]
+    for t in spikes:                                  # an attack starts on its own half
+        assert (t["court_y_m"] >= NET_Y_M) if t["side"] == "near" else (t["court_y_m"] <= NET_Y_M)
+    assert pos["clamped_to_half"] <= 2

@@ -7010,6 +7010,80 @@ a private profile shows Overview + Matches and the notice on the two analytics t
 serve-error / side-out rows; either deploy order is safe). Later: hard vs touch (new validation), pick-a-player highlight, video
 link per attack (I5), line vs cross (N10).
 
+### 2026-10-08 (ninety-seventh session) — #97: hard / touch attacks, read post-run from the flight in metres
+
+**Asked (owner):** new branch from main; on the 20260920 match and the practice clips, get spike touch vs hard /
+accelerated; the net-in-front camera hides speed along its own axis, so try upward movement, the ball's pixel-size
+change, or anything else.
+
+**Diagnosed first (no code):** the causal rule (`SpikeAnalyzer.TOUCH_RISE_PX = 57` px of image ascent) types 16 of
+the 32 owner-typed match spikes, 10 right. It is a pixel rule fitted at the practice venue (2.3× the beach scale) and
+depth-blind: a ball above the lens climbs in the picture just by flying toward it. Per-spike flights in metres (depth
+from ball width): the vertical launch speed is stable across three depth reads (±0.2 m/s); the horizontal speed is
+not (width trend vs attack → dig ends vs a gravity-as-ruler fit differ by up to 30 % for balls flying away). Amateur
+"hard" is flat-ish and fast, not downward (13 of 15 leave at −4…+24°); "touch" is a lob or a slow drop. The classes
+overlap at 19–31° under every read (hard up to 30.6°, touch down to 19.4°). Box elongation (blur) is flat in sunlight (1.04).
+
+**Built:** `src/postrun/attack_shape.py` — hit frame = largest image-velocity step near the vertex; ballistic fit of
+the flight up to the next touch / the sand; elevation = atan(vertical / horizontal); touch = ≥ 25° or < 5 m/s, hard =
+the rest; the horizontal speed is read twice (width trend; attack → next touch) and a type is given only when both
+agree. Stamped on every observed spike / overpass (`spike_type`, `launch`; recon schema 3; `(hard)` / `(touch)` in
+the play-by-play). `src/publish/bundle.py` publishes that type (never the causal one once the recon carries the key;
+the causal type stays in `extra.causal_spike`). `score_spike_type.py` scores both reads (`--clips`, `--rows`);
+`sweep_postrun.py` +5 constants and a `type` column.
+
+**Measured:** match 26/29 right, 29 of 32 typed (accuracy 0.897, 95 % range 0.74–0.96; coverage 0.906) vs causal
+10/16 on 16 → the V1 bars (0.85 / 0.80) are met, IN-SAMPLE (both constants sit in the measured gap). Practice 6/6 on
+6 of 8, same as causal (e6 f310 joust: 2 flight frames; e7 f300: no post-run attack). All 22 typed overpasses read
+touch. Sweep: split 24–26° identical, 18–32° gives 0.82–0.90; speed floor 3–6 m/s identical; without the hit-frame
+search 23/29. Everything else unchanged: the match recon differs from the old one only by the new keys (33/33 points,
+winners 33/33, A 21 – B 12, P 0.976); practice P 52/53, action 52/52; 88 sweep rows lose no point or winner.
+Suite 1227 (1221 pass, 5 skipped, `test_inbox` fails as before).
+
+**Wrong / not typed (sheet: `output/spike_type_review/disputed_spikes.jpg`):** P10 f6320 touch → hard (22.8°,
+6.2 m/s); P30 f23341 hard → touch (27.5°); P33 f25928 hard → touch (30.6°, cross-court, out). No type: P19 f13397
+and P22 f16037 (the two reads disagree), P18 f12295 (no post-run attack there).
+
+**Not done / owed:** owner look at the sheet (the labels may follow the swing, which the ball flight cannot see);
+`make republish-all` (a post-run rule changed); web: Attack map and `/measure` still say hard / touch is off; a
+second match is the first out-of-sample test; swing vs poke needs pose in the diag dump.
+
+### 2026-10-08 (ninety-eighth session) — #98: hard / touch on the web (attack map + "By shot"), and why `make republish-all` was refused
+
+**Asked (owner):** (1) `make republish-all` fails with `Connection refused` on the thumbnail upload; (2) see hard
+("accelerated") spikes vs touch on the court view, and the % of each. Sheet feedback: P10 was a poke on the second
+touch that left flat from mid-court; P22 a touch to the side that barely rose — a touch need not rise, a rising ball
+is mostly a touch.
+
+**Publish (diagnosed, not a code bug):** this checkout's `.env.publish` has `SUPABASE_URL=http://127.0.0.1:54321`
+(local stack, colima stopped); the hosted URL is only in `~/volley-prod/.env.publish`, and that worktree sat at
+`b051478` (before #97) with `output` symlinked here. Fix shipped: the client error names the host it could not reach
+(`cannot reach http://127.0.0.1:54321 (...); check SUPABASE_URL`, test added). Owner chose: publish after the merge,
+from prod. Nothing was published this session.
+
+**Built (owner picked: line style + filter; all attacks in 4 rows).** SQL `20261009110000_attack_shots`:
+`player_profile.analytics.shots` = hard / touch / free / unread, each `{n, kills, errors}`, every attack in exactly
+one row; `landings[].type` and the split take a type ONLY from a row with `extra.launch` (the post-run read ran), so
+the causal guess of a pre-#97 publish is never shown. Web: `AttackMap` draws the shot as the line (heavy solid =
+hard, dotted = touch, dashed = free ball, thin solid = spike not read; colour stays the outcome), a `Shot` filter
+(counts follow the other filters), type in the tooltip, legend and table; Attack tab "By shot" card (share bar +
+Att / Share / K / E / Hit %), hint `shot_type`, grade B ("approximate"); `/measure` row rewritten (was "not shown").
+The page hides both until the database has the migration (`shots` missing → no card, no types).
+
+**Verified:** schema check 5/5 on a throwaway `supabase/postgres:17` (smoke: typed spike → hard 1/1; `extra.launch`
+removed → unread, map type null; SQL == Python recount on the simulated and the real match, rows add up to
+`n_attacks`); vitest 52, typecheck, oxlint, build; Python suite 1228 (1227 pass with the schema check on; `test_inbox` fails as before); bar colours pass the dataviz separation check in both themes (ΔE ≥ 15);
+demo screenshots light / dark / phone width, no overflow. Real match on disk: 16 hard, 20 touch, 3 not read, 23 free balls.
+
+**Video-free republish (same session, owner: little disk):** `republish-all` from prod then failed with "already holds a
+different video" — the 720p original was deleted, so the bundle carried no hash. `cli.video_identity` now keeps the
+hash beside the run (`video_identity.json`) and falls back once on the published one; thumbnails of an earlier publish
+are reused. Dry run against the hosted project: hash kept, no video warning. AGENTS §13 updated.
+
+**Not done / owed:** merge, `supabase db push`, prod worktree to the merged commit, `make republish-all` there, then
+the owner's look at the real Attack tab. Not rendered against the real match (demo data only). Hard / touch is still
+in-sample (one match); a flat poke reads hard (P10) — pose in the dump is the lever, not a re-tune.
+
 ### Session index lines moved out of STATUS.md (verbatim, oldest first)
 
 > The index is capped at 100 lines (`tests/test_status_leanness.py`); from 2026-10-08 (#98) the oldest
@@ -7017,3 +7091,5 @@ link per attack (I5), line vs cross (N10).
 
 - 2026-08-30 — spike analytics: trail, touch/hard, 9-zone grid, kill/dug outcomes; f297 GT corrected.
 - 2026-08-31 — outcome semantics completed: kill = direct fall OR dug-and-dies-without-a-set.
+- 2026-09-01 — trail render fix (masked blend, black boxes gone).
+- 2026-09-04 **#3** — e1 GT re-verified (three mixed id conventions unified; queue empty); joust-split adjudicated; reentry contact shipped (e6 f308).

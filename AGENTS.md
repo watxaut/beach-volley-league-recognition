@@ -374,6 +374,15 @@ causal and untouched. Owner rules it encodes — keep them when changing it:
   constants were chosen on the 32 owner-typed match spikes: do not re-tune
   them on those labels — a change needs new typed spikes (another match) and
   `score_spike_type.py --clips output/postrun` on both venues.
+* **Published positions are an output read (#101, `src/postrun/positions.py`):**
+  `court_x_m` / `court_y_m` / `court_xy_m` come from the net-anchored frame
+  (the calibration's net-ground clicks are the net) with the per-video
+  ball-box offset read off the end switches. The decision layers keep
+  `BallEvent.court_y` + `DEPTH_SPLIT_BIAS_M`: never feed a position back into
+  a decision, and never hard-code the offset — it is refused when the video
+  cannot show it (no switch, too few touches, kinds that disagree). A change
+  there must leave everything but the position keys byte-identical on the
+  match and e1–e7, and needs `make republish-all`.
 
 Validation protocol for any change: `score_postrun.py` on the 20260920 match
 (the bar: 33/33 points, 0 false, winners 33/33, score A 21 – B 12, touch

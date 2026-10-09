@@ -129,6 +129,11 @@ class Touch:
     court_y: Optional[float] = None
     court_x: Optional[float] = None   # ball at the touch, camera frame (0 = image-left line)
     court_err: Optional[Tuple[float, float]] = None   # (across, along) m it may be off
+    # Where the maps draw it (``positions``: net-anchored, box offset removed).
+    # ``court_y`` above stays the read the decisions were made on.
+    pos_x: Optional[float] = None
+    pos_y: Optional[float] = None
+    pos_err: Optional[Tuple[float, float]] = None
     ends_possession: bool = False     # the ball crosses (or dies) after it
     outcome: Optional[str] = None     # ace | kill | error (match layer)
     player_source: Optional[str] = None   # how the player was decided
