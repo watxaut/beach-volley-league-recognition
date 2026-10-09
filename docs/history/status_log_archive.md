@@ -7109,6 +7109,33 @@ demo screenshot (dark). Phone width NOT verified: headless Chrome's ~500 px mini
 **Not done / owed:** `supabase db push` (3 migrations now owed), look at the card on the real match from prod. The spread has no
 benchmark (owner: no target); a "tight / scattered" verdict needs owner-ratified bands.
 
+### 2026-10-08 (hundredth session) — #100: why the attack map draws net attacks off the net (diagnosis, no code)
+
+**Asked (owner):** on the web my spikes start far from the net; the kill at 2 m 49 s was at most 0.5 m off it. Is the
+calculation wrong, can it be better, or can the perspective not tell — and would a higher camera help?
+
+**Found (20260920; scratch probes + a sequential decode, nothing under `src/` changed):** 2:49 (PTS) = f4886, P2B, published
+`court_y_m` 10.7 = 2.7 m off the net. (1) A map line starts at the BALL at the touch; its depth is the ball's pixel width.
+(2) 39 spikes, same players on both halves: 2.70 m from the near half, −0.30 m from the far half (11 of 17 start across
+the net) — a shift toward the lens, the one `DEPTH_SPLIT_BIAS_M = 1.3` already assumes for the half decision and nothing
+removes from the position. (3) Parts: the net is taken as the midline of the 4 corner clicks, but the net-ground clicks
+(and the post bases in the frame) sit at 8.05 (left) / 9.33 (right) there and a ball at the net is 23.7 px, not 22.8
+(≈ 0.5 m); the depth is one straight line over the whole flight, read 2–3 f before the hit (27.7 px there, 25–26 px at
+the hit: ≈ 1 m here, 0.4 m median); the rest is ≈ 1 px of box (a resting ball 24–26 px wide gets 25–28 px boxes).
+(4) In the frames the takeoff is 0.8–1.3 m off the net (feet row 650–655, net row 642, net-anchored ground): the owner is
+right, the map is ~2 m off on this attack.
+
+**Scratch re-reads (near / far medians, m):** published 2.70 / −0.30; net-anchored width model 2.31 / 0.23; plus the width
+at the hit 1.96 / 0.72. A feet-at-takeoff read from tracker boxes was NOT reliable as probed (boxes lag the jump, the
+label drops at the hit) — it needs its own design.
+
+**Camera (owner question):** height buys every ground read linearly (practice venue ~3 m: 20–24 px of sand per metre at
+the net vs 9 here) and nothing for ball-width depth, which wants pixels (this match is the only 720p one). Numbers:
+Learnings (#100).
+
+**Not done / owed:** owner picks the fix (open point 35); then one session under the post-run protocol + `make
+republish-all`. Every published position shares the shift (pass map, dug ends), not only attack starts.
+
 ### Session index lines moved out of STATUS.md (verbatim, oldest first)
 
 > The index is capped at 100 lines (`tests/test_status_leanness.py`); from 2026-10-08 (#98) the oldest

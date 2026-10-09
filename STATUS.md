@@ -368,6 +368,7 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Edge functions (#93): `EdgeRuntime.waitUntil` exists only in a USER worker (the platform's way of running a function), not when the file is the runtime's main service — guard it; a function added while the local stack runs is not served (404) until the stack restarts. `pg_net` was rejected for the broker: its tables and `net.http_post` are granted to `anon` and owned by `supabase_admin`, so a migration cannot revoke that.
 
 ## Session index (one line each)
+- #103 **"Last match" (n1) added to the stats time filter menu (`MATCH_PRESETS` = 1, 3, 5, 10); web only, no migration**
 - #102 **Feedback button on the web: bug / suggestion + ≤3 screenshots → `feedback` table + private `feedback-media` bucket (`20261009130000`); Settings "My reports", Admin → Feedback, `make feedback` → `output/feedback/`**
 - #101 **Published court positions fixed, output only (`positions.py`): net = net-ground clicks, ball-box offset (1.74 px) from the end switches; spikes 2.70 / −0.30 → 1.40 / 1.40 m; decisions byte-identical; schema 4; republish owed**
 - #100 **Attack-map depth diagnosed (no code): published ball depth keeps a ~1.3 m shift toward the lens and the net is not the corner midline; the owner's 2:49 kill reads 2.7 m off the net, frames say ~1 m; fix = open point 35**
@@ -470,6 +471,14 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-09-05 **#5** — player-page court SVG field heatmap (two rounds).
 ## Log (newest first)
 
+### 2026-10-09 (hundred-and-third session) — "last match" on the time filter
+
+**Asked (owner):** add a "last match" option to the stats time filter (the menu started at "last 3 matches").
+
+**Built.** `MATCH_PRESETS` in `webapp/src/lib/window.ts` is now `[1, 3, 5, 10]`; the key `n1` (label "last match", `p_last_n => 1`)
+was already supported by `windowParams` / `windowLabel` and the SQL window (`rls_smoke.sql` pins last-1), so no migration and no
+demo change. vitest +1 (65), typecheck clean.
+
 ### 2026-10-09 (hundred-and-second session) — #102: a Feedback button (bugs / suggestions with screenshots)
 
 **Asked (owner):** a "suggest / report a bug" button on the web; GitHub issues need an account, so onboarded people must be able to
@@ -521,30 +530,3 @@ point or a winner; hard / touch 26/29. Tests +8 (suite 1239: 1233 pass, 5 skippe
 offset; practice clips (no switch) stay uncorrected; in-sample on one match. Plot: `output/postrun/20260920_match/attack_map_now_vs_fixed.png`.
 
 **Not done / owed:** owner look, merge, `make republish-all` from prod (the on-disk `match_reconstruction.json` was left as is).
-
-### 2026-10-08 (hundredth session) — #100: why the attack map draws net attacks off the net (diagnosis, no code)
-
-**Asked (owner):** on the web my spikes start far from the net; the kill at 2 m 49 s was at most 0.5 m off it. Is the
-calculation wrong, can it be better, or can the perspective not tell — and would a higher camera help?
-
-**Found (20260920; scratch probes + a sequential decode, nothing under `src/` changed):** 2:49 (PTS) = f4886, P2B, published
-`court_y_m` 10.7 = 2.7 m off the net. (1) A map line starts at the BALL at the touch; its depth is the ball's pixel width.
-(2) 39 spikes, same players on both halves: 2.70 m from the near half, −0.30 m from the far half (11 of 17 start across
-the net) — a shift toward the lens, the one `DEPTH_SPLIT_BIAS_M = 1.3` already assumes for the half decision and nothing
-removes from the position. (3) Parts: the net is taken as the midline of the 4 corner clicks, but the net-ground clicks
-(and the post bases in the frame) sit at 8.05 (left) / 9.33 (right) there and a ball at the net is 23.7 px, not 22.8
-(≈ 0.5 m); the depth is one straight line over the whole flight, read 2–3 f before the hit (27.7 px there, 25–26 px at
-the hit: ≈ 1 m here, 0.4 m median); the rest is ≈ 1 px of box (a resting ball 24–26 px wide gets 25–28 px boxes).
-(4) In the frames the takeoff is 0.8–1.3 m off the net (feet row 650–655, net row 642, net-anchored ground): the owner is
-right, the map is ~2 m off on this attack.
-
-**Scratch re-reads (near / far medians, m):** published 2.70 / −0.30; net-anchored width model 2.31 / 0.23; plus the width
-at the hit 1.96 / 0.72. A feet-at-takeoff read from tracker boxes was NOT reliable as probed (boxes lag the jump, the
-label drops at the hit) — it needs its own design.
-
-**Camera (owner question):** height buys every ground read linearly (practice venue ~3 m: 20–24 px of sand per metre at
-the net vs 9 here) and nothing for ball-width depth, which wants pixels (this match is the only 720p one). Numbers:
-Learnings (#100).
-
-**Not done / owed:** owner picks the fix (open point 35); then one session under the post-run protocol + `make
-republish-all`. Every published position shares the shift (pass map, dug ends), not only attack starts.

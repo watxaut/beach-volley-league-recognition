@@ -7,7 +7,7 @@ import type { WindowParams } from './types'
 export const ALL_TIME: WindowParams = { season: null, from: null, to: null, lastN: null }
 
 /** The fixed presets, in menu order; seasons are appended from the data. */
-export const MATCH_PRESETS = [3, 5, 10]
+export const MATCH_PRESETS = [1, 3, 5, 10]
 export const DAY_PRESETS = [7, 30, 60]
 
 /** Local calendar day as YYYY-MM-DD (a match date is a local day, not UTC). */

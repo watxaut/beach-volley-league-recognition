@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isWindowKey, windowLabel, windowParams } from './window'
+import { MATCH_PRESETS, isWindowKey, windowLabel, windowParams } from './window'
 
 const today = new Date(2026, 9, 6, 15, 0) // 6 Oct 2026, local
 
@@ -10,6 +10,11 @@ describe('windowParams', () => {
   })
   it('last N matches', () => {
     expect(windowParams('n5', today).lastN).toBe(5)
+  })
+  it('the menu offers the last match on its own, first', () => {
+    expect(MATCH_PRESETS[0]).toBe(1)
+    expect(windowParams('n1', today).lastN).toBe(1)
+    expect(windowLabel(`n${MATCH_PRESETS[0]}`)).toBe('last match')
   })
   it('last N days is a local calendar day, month borders included', () => {
     expect(windowParams('d7', today).from).toBe('2026-09-29')
