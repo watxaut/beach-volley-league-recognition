@@ -533,3 +533,10 @@ Pages). Rules that keep it correct:
   rate of everyone else, from 3 other players, and a gap is called only when
   the two 95 % ranges do not overlap. A stat view holds at most ~5 tiles plus
   its charts; more goes behind a tab.
+* **Reading a comparison (owner, 2026-10-09, #99).** More is to the right on
+  every row: a stat where fewer is better is tagged on its row and judged by
+  its verdict, never drawn on a flipped axis. The reference is a full-size mark
+  with its number beside the player's, never a tick. The chart says "too close
+  to call" and "likely range"; "95 %" stays in the hint and on `/measure`. A
+  called gap is blue / orange (`--gap-better` / `--gap-worse`), never green /
+  red: that pair fails the colour-blind check. Fantasy closes the list.

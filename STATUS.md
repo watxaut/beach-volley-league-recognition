@@ -73,7 +73,7 @@ in/out reads wrong (overridden by the next serve).
 vertical launch speed (ballistic fit) + horizontal speed read twice (ball-width trend; attack → next touch). Touch =
 launch elevation ≥ 25° or leaving under 5 m/s, hard = the rest, NO type when the two reads disagree. Match, 32
 owner-typed spikes: 26/29 right, 29 typed (causal `SpikeAnalyzer`: 10/16 on 16) — V1 bars met, IN-SAMPLE; practice
-6/6 on 6 of 8. Recon schema 3 (`spike_type`, `launch`); the bundle publishes it. **Web (#98):** `player_profile` → `analytics.shots` (hard / touch / free / unread × n, kills, errors; adds up to `n_attacks`) + guarded `landings[].type` (migration `20261009110000_attack_shots`, NOT pushed): only a row with `extra.launch` has a type, so a pre-#97 publish reads "not read". Attack map: line = shot, `Shot` filter; "By shot" card; grade B.
+6/6 on 6 of 8. Recon schema 3 (`spike_type`, `launch`); the bundle publishes it. **Web (#98):** `player_profile` → `analytics.shots` (hard / touch / free / unread × n, kills, errors; adds up to `n_attacks`) + guarded `landings[].type` (migration `20261009110000_attack_shots`, NOT pushed): only a row with `extra.launch` has a type, so a pre-#97 publish reads "not read". Attack map: line = shot, `Shot` filter; "By shot" card; grade B. **Compare (#99):** the Overview card draws the gap to the league average (`gapScale`: more = right, one shaded "too close to call" zone, blue / orange verdict bars, fantasy last); no average yet = bars from zero.
 **Court positions (#101, `positions.py`, OUTPUT ONLY, recon schema 4):** published `court_x_m` / `court_y_m` / `court_xy_m` = net-anchored frame (net-ground clicks) + per-video ball-box offset from the end switches (20260920: 1.74 px; spikes 1.40 m off the net from both halves, was 2.70 / −0.30). Points / touches / labels / winners / txt byte-identical (match + e1–e7); needs `make republish-all`; ±0.6–0.8 m per position (open point 35).
 
 **Product platform (#90, BUILT, not deployed — AGENTS §13).** Drive inbox →
@@ -372,6 +372,7 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - #102 **Feedback button on the web: bug / suggestion + ≤3 screenshots → `feedback` table + private `feedback-media` bucket (`20261009130000`); Settings "My reports", Admin → Feedback, `make feedback` → `output/feedback/`**
 - #101 **Published court positions fixed, output only (`positions.py`): net = net-ground clicks, ball-box offset (1.74 px) from the end switches; spikes 2.70 / −0.30 → 1.40 / 1.40 m; decisions byte-identical; schema 4; republish owed**
 - #100 **Attack-map depth diagnosed (no code): published ball depth keeps a ~1.3 m shift toward the lens and the net is not the corner midline; the owner's 2:49 kill reads 2.7 m off the net, frames say ~1 m; fix = open point 35**
+- #99b **Compare card redrawn as GAP TO THE LEAGUE: centre = average, more = right (never flipped), shaded too-close zone = where the 95% ranges overlap, blue / orange verdict bars, fantasy last; no average yet = bars from zero**
 - #99 **Reception vs defense: a dig after a serve / after an attack; "Where the pass went" card (map start → next touch + spread ring around the player's own usual spot, no fixed target); `analytics.passes` (`20261009120000`)**
 - #98 **Web shows hard / touch: map line = shot (heavy hard, dotted touch, dashed free ball) + Shot filter; "By shot" card from SQL `analytics.shots` (`20261009110000`); pre-#97 publish = "not read"; publish error = local-stack env**
 - #97 **Hard / touch attacks read POST-RUN (`attack_shape.py`): launch elevation ≥25° or <5 m/s = touch, two speed reads must agree; match 26/29 on 29 of 32 (causal 10/16 on 16), practice 6/6; recon schema 3**
@@ -467,8 +468,6 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-09-06 **#9** — in-court preference (off-court cost penalty) fixes bystander squat + Hungarian chain-swaps (point 16).
 - 2026-09-06 **#8** — squatter review: sideline straddlers expire from the roster (e2/e7 slots freed early).
 - 2026-09-06 **#7** — ball-matching rework: identity by trajectory + motion, never confidence; static spares can't bootstrap/steal/starve.
-- 2026-09-05 **#6** — GAME-ON badge latency fixed (rolling sustained-flight provisional); serve-init semantics (provisional fast ON, serve arming); heatmap landscape + cache busting.
-- 2026-09-05 **#5** — player-page court SVG field heatmap (two rounds).
 ## Log (newest first)
 
 ### 2026-10-09 (hundred-and-third session) — "last match" on the time filter

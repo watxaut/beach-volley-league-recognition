@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { compare, countText, highlights, ordinal, rangeTextOf, splitEarlier, stripScale, sumHistory, valueText, type Peer, type Sample } from './compare'
+import {
+  barScale, compare, countText, GAP_ZONE, gapScale, highlights, ordinal, rangeTextOf, splitEarlier, sumHistory, valueText, type Peer, type Sample,
+} from './compare'
 import type { HistoryRow } from './types'
 
 const sample = (over: Partial<Sample> = {}): Sample => ({
@@ -67,7 +69,7 @@ describe('compare', () => {
 
   it('leaves out a stat one side does not have (an older database)', () => {
     const rows = compare(sample(), peers({}, {}, {}))
-    expect(rows.map((r) => r.key)).toEqual(['fantasy', 'hitting', 'kill', 'ace', 'digs', 'assists', 'errors'])
+    expect(rows.map((r) => r.key)).toEqual(['hitting', 'kill', 'ace', 'digs', 'assists', 'errors', 'fantasy'])   // the total last
     const full = compare(sample({ serve_errors: 3, recv_points: 40, recv_won: 22 }),
       peers(...[1, 2, 3].map(() => ({ serve_errors: 4, recv_points: 40, recv_won: 20 }))))
     expect(full.map((r) => r.key)).toContain('serve_err')
@@ -85,15 +87,58 @@ describe('reading the rows', () => {
     expect(highlights(compare(sample(), peers({}, {}, {})))).toEqual({ best: null, worst: null })
   })
 
-  it('puts better on the right of every strip', () => {
+  it('draws more to the right on every row, the reference in the centre', () => {
     const kill = row(rows, 'kill')
-    const x = stripScale(kill)!
-    expect(x(kill.value!)).toBeGreaterThan(x(kill.ref!))
+    const g = gapScale(kill)!
+    expect(g.x(kill.ref!)).toBe(50)
+    expect(g.x(kill.value!)).toBeGreaterThan(50)
     const err = row(rows, 'errors')
-    const xe = stripScale(err)!
-    expect(xe(err.value!)).toBeLessThan(xe(err.ref!))          // more errors = further left
-    expect(xe(err.range!.lo)).toBeLessThanOrEqual(94)
-    expect(xe(err.range!.hi)).toBeGreaterThanOrEqual(6)
+    const ge = gapScale(err)!
+    expect(ge.x(err.value!)).toBeGreaterThan(50)               // more errors = further right, though fewer is better
+    expect(err.verdict).toBe('worse')
+    for (const p of err.peers) expect(Math.abs(ge.x(p.value) - 50)).toBeLessThanOrEqual(46)
+  })
+
+  it('leaves the "too close to call" zone exactly when a verdict is called', () => {
+    const others = peers({}, {}, {})
+    const seen = new Set<string>()
+    for (let kills = 0; kills <= 40; kills++) {
+      const r = row(compare(sample({ kills, attacks: 40 }), others), 'kill')
+      const g = gapScale(r)!
+      expect(g.zone).toBe(GAP_ZONE)
+      expect(Math.abs(g.x(r.value!) - 50) > GAP_ZONE, `${kills}/40`).toBe(r.verdict !== 'same')
+      seen.add(r.verdict!)
+    }
+    expect([...seen].sort()).toEqual(['better', 'same', 'worse'])
+    for (let errors = 0; errors <= 80; errors += 4) {            // a count per 21 points, fewer is better
+      const r = row(compare(sample({ errors }), others), 'errors')
+      expect(Math.abs(gapScale(r)!.x(r.value!) - 50) > GAP_ZONE, `${errors} errors`).toBe(r.verdict !== 'same')
+    }
+  })
+
+  it('judges no zone where there is no verdict to call', () => {
+    const f = gapScale(row(rows, 'fantasy'))!
+    expect(f.zone).toBeNull()
+    expect(f.x(row(rows, 'fantasy').ref!)).toBe(50)
+    const few = row(compare(sample({ kills: 3, attacks: 9 }), peers({}, {}, {})), 'kill')
+    expect(gapScale(few)!.zone).toBeNull()                      // the player is below the minimum
+    const xf = gapScale(few)!.x                                 // the others keep the scale of the league's own range
+    expect(xf(few.refRange!.hi)).toBeCloseTo(50 + (GAP_ZONE * (few.refRange!.hi - few.ref!)) / Math.max(few.refRange!.hi - few.ref!, few.ref! - few.refRange!.lo))
+    expect(Math.max(...[few.refRange!.lo, few.refRange!.hi].map((v) => Math.abs(xf(v) - 50)))).toBeCloseTo(GAP_ZONE)
+    expect(gapScale(row(compare(sample(), peers({}, {})), 'kill'))).toBeNull()   // no reference yet
+  })
+
+  it('draws a row without a reference as bars from zero', () => {
+    const lonely = row(compare(sample({ kills: 2, attack_errors: 9 }), peers({}, {})), 'hitting')
+    expect(lonely.ref).toBeNull()
+    const x = barScale(lonely, 62)
+    expect(x(lonely.value!)).toBeLessThan(x(0))                 // a negative hitting % goes left of zero
+    expect(x(lonely.peers[0].value)).toBeGreaterThan(x(0))
+    expect(x(lonely.range!.lo)).toBe(2)
+    expect(Math.max(...lonely.peers.map((p) => x(p.value)), x(lonely.range!.hi))).toBe(64)
+    const kill = row(compare(sample(), peers({}, {})), 'kill')
+    expect(barScale(kill)(0)).toBe(2)
+    expect(barScale(kill)(kill.range!.hi)).toBe(98)
   })
 
   it('formats each kind the way its stat reads', () => {

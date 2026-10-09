@@ -366,7 +366,7 @@ subtraction.
    play-by-play (tier rules above).
 4. **Player (v2, #96):** a header (record, league rank, form, fantasy) and four tabs, `?tab=` in the
    URL. *Overview* (league tier): five count tiles and "you vs the league / vs your earlier matches",
-   one strip per stat with better to the right, counted from `leaderboard` rows and the profile's match
+   one row per stat drawn as the gap to the reference (#99: more to the right, a shaded "too close to call" zone), counted from `leaderboard` rows and the profile's match
    history. *Attack* and *Serve & receive* (analytics tier, "private" notice otherwise): rate tiles, the
    attack map (a line per attack from where the ball was hit to where it came down; colour = outcome,
    dashed = free ball), reception vs transition, serve targeting, reception outcome, trends. *Matches*:
