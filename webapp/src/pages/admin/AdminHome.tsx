@@ -1,10 +1,12 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
-import { useApp, useMatchList } from '../../app/state'
+import { useApp, useLoad, useMatchList } from '../../app/state'
 import { Card, ErrorBox, Loading, StatusBadge } from '../../components/ui'
 import { formatDate, matchLabel } from '../../lib/format'
 
 export function AdminLayout() {
-  const { isAdmin } = useApp()
+  const { api, isAdmin } = useApp()
+  const open = useLoad(async () => (isAdmin ? (await api.allFeedback()).filter((r) => r.status === 'open').length : 0),
+    [isAdmin])
   if (!isAdmin) return <p>Admins only.</p>
   const link = ({ isActive }: { isActive: boolean }) => (isActive ? 'active' : undefined)
   return (
@@ -13,8 +15,9 @@ export function AdminLayout() {
         <NavLink to="/admin" end className={link}>Review queue</NavLink>
         <NavLink to="/admin/players" className={link}>Players & accounts</NavLink>
         <NavLink to="/admin/scoring" className={link}>Fantasy scoring</NavLink>
+        <NavLink to="/admin/feedback" className={link}>Feedback{open.data ? ` (${open.data})` : ''}</NavLink>
       </nav>
-      <Outlet />
+      <Outlet context={open.reload} />
     </>
   )
 }

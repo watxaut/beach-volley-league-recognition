@@ -119,7 +119,7 @@ p { margin: 0 0 0.75rem; }
   /* phones: brand + user on the first row, the full nav on its own row */
   .topbar-inner { flex-wrap: wrap; height: auto; padding-top: 8px; padding-bottom: 6px; row-gap: 4px; }
   .nav { order: 3; flex-basis: 100%; }
-  .userchip { margin-left: auto; }
+  .feedback-open { margin-left: auto; }
   .scoreboard .big { font-size: 2rem; }
 }
 main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 64px; }
@@ -159,8 +159,8 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 button.primary:hover { filter: brightness(1.08); }
 button.danger { color: var(--bad); }
 button.link { border: none; background: none; color: var(--accent); padding: 0; min-height: 0; font-weight: 500; }
-input, select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--axis); border-radius: 10px; padding: 8px 12px; min-height: 40px; max-width: 100%; }
-input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+input, select, textarea { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--axis); border-radius: 10px; padding: 8px 12px; min-height: 40px; max-width: 100%; }
+input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 label.field { display: block; margin-bottom: 12px; }
 label.field > span { display: block; font-size: 0.85rem; color: var(--ink-2); margin-bottom: 4px; }
 .code-input { font-size: 1.6rem; letter-spacing: 0.4em; text-align: center; width: 18ch; max-width: 100%; font-variant-numeric: tabular-nums; }
@@ -332,3 +332,28 @@ tr.clickable:hover td.sticky-col { background: var(--surface-2); }
 @media (max-width: 640px) { .tiles-4 { grid-template-columns: repeat(2, 1fr); } }
 .trend-wait { margin: 0 0 16px; }
 .card-head h2 .info, h3 .info { vertical-align: 2px; }
+
+/* ── feedback: the top-bar button, its form, the lists of reports ───── */
+.feedback-open { min-height: 0; padding: 6px 12px; border-radius: 999px; font-size: 0.9rem; white-space: nowrap; }
+dialog.feedback { width: min(520px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; border: 1px solid var(--ring); border-radius: var(--radius); background: var(--surface); color: var(--ink); padding: 20px; }
+dialog.feedback::backdrop { background: rgba(11, 11, 11, 0.45); }
+.feedback-field { display: block; margin: 12px 0; }
+.feedback-field span { display: block; font-weight: 600; margin-bottom: 6px; }
+.feedback textarea { width: 100%; resize: vertical; min-height: 110px; }
+.feedback-add { margin-bottom: 10px; }
+.feedback-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.shots { list-style: none; display: flex; flex-wrap: wrap; gap: 10px; padding: 0; margin: 0 0 12px; }
+.shots li { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.shots img { display: block; height: 110px; max-width: 180px; object-fit: cover; border: 1px solid var(--ring); border-radius: 8px; }
+.reports { list-style: none; padding: 0; margin: 0; }
+.reports li { padding: 12px 0; border-top: 1px solid var(--grid); }
+.reports li:first-child { border-top: none; padding-top: 0; }
+.report-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+.report-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.report-note { background: var(--surface-2); border-radius: 8px; padding: 8px 12px; margin: 0; }
+.report-context { overflow-wrap: anywhere; }
+.report-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.report-actions input { flex: 1 1 220px; }
+.badge-fb-open { background: var(--warn); color: #0b0b0b; }
+.badge-fb-done { background: var(--good); color: #fff; }
+.badge-fb-dismissed { background: var(--axis); color: var(--ink); }

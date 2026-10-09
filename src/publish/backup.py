@@ -30,6 +30,8 @@ ADMIN_TABLES = {
     "match_participants": "match_id,slot,player_id,is_unknown,assigned_by,assigned_at",
     "fantasy_rulesets": "*",
     "fantasy_rules": "*",
+    # members' bug reports / suggestions (the screenshots stay in Storage)
+    "feedback": "*",
 }
 
 

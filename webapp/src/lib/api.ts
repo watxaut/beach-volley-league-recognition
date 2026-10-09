@@ -7,8 +7,8 @@
 // viewer did not play in unless an admin opened its detail).
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type {
-  ActionRow, BoxRow, FantasyRule, LeaderRow, Match, MatchPatch, MatchReport, MatchSource,
-  Participant, Player, PlayerPatch, PlayerProfile, PointRow, Profile, Publication, Role, Ruleset,
+  ActionRow, BoxRow, FantasyRule, Feedback, FeedbackStatus, LeaderRow, Match, MatchPatch, MatchReport, MatchSource,
+  NewFeedback, Participant, Player, PlayerPatch, PlayerProfile, PointRow, Profile, Publication, Role, Ruleset,
   Session, Slot, WindowParams,
 } from './types'
 
@@ -23,6 +23,9 @@ export interface Api {
   myProfile(userId: string): Promise<Profile | null>
   myPlayer(userId: string): Promise<Player | null>
   setMyPrivacy(isPublic: boolean): Promise<boolean>
+  // feedback: a member sends and follows their own reports
+  sendFeedback(userId: string, report: NewFeedback): Promise<void>
+  myFeedback(userId: string): Promise<Feedback[]>
   // league reads
   players(): Promise<Player[]>
   matches(): Promise<Match[]>
@@ -52,6 +55,10 @@ export interface Api {
   setRulePoints(rulesetId: number, ruleKey: string, points: number): Promise<void>
   cloneRuleset(fromId: number, name: string): Promise<number>
   activateRuleset(rulesetId: number): Promise<void>
+  allFeedback(): Promise<Feedback[]>
+  setFeedbackStatus(id: number, status: FeedbackStatus, note: string | null): Promise<void>
+  /** Short-lived links to screenshots (the author's own, or any for an admin). */
+  feedbackUrls(paths: string[]): Promise<Record<string, string>>
 }
 
 // Rows are typed by the `Api` signatures (lib/types.ts mirrors the schema);
@@ -75,10 +82,16 @@ export function explainError(err: unknown): string {
   if (/match_participants_match_id_player_id_key|duplicate key/i.test(msg))
     return 'That player already has another slot in this match.'
   if (/rate limit/i.test(msg)) return 'Too many emails requested. Wait a minute and try again.'
+  if (/feedback limit reached/i.test(msg))
+    return 'You have sent a lot of reports today. Try again tomorrow.'
+  if (/row-level security|exceeded the maximum allowed size|mime type/i.test(msg))
+    return 'A screenshot could not be uploaded. Remove it and send the text, or try again tomorrow.'
   if (/captcha/i.test(msg))
     return 'Login is unavailable right now: the login function did not answer. Tell a league admin.'
   return msg
 }
+
+const FEEDBACK_COLUMNS = 'id,user_id,kind,message,page,context,screenshots,status,admin_note,created_at'
 
 const MATCH_COLUMNS =
   'id,match_key,title,venue,season,status,detail_public,match_date,start_time,points_to_win,' +
@@ -133,6 +146,25 @@ export function supabaseApi(url: string, publishableKey: string): Api {
     },
     async setMyPrivacy(isPublic) {
       return must(await sb.rpc('set_my_privacy', { p_public: isPublic }))
+    },
+
+    async sendFeedback(userId, report) {
+      // Screenshots first, into the caller's own folder; send_feedback() then
+      // checks every path it is given.
+      const paths: string[] = []
+      for (const image of report.images) {
+        const path = `${userId}/${crypto.randomUUID()}.jpg`
+        const { error } = await sb.storage.from('feedback-media').upload(path, image, { contentType: 'image/jpeg' })
+        if (error) throw new Error(error.message)
+        paths.push(path)
+      }
+      must(await sb.rpc('send_feedback', {
+        p_kind: report.kind, p_message: report.message, p_page: report.page,
+        p_context: report.context, p_screenshots: paths }))
+    },
+    async myFeedback(userId) {
+      return must(await sb.from('feedback').select(FEEDBACK_COLUMNS).eq('user_id', userId)
+        .order('created_at', { ascending: false }))
     },
 
     async players() {
@@ -234,6 +266,21 @@ export function supabaseApi(url: string, publishableKey: string): Api {
     },
     async activateRuleset(rulesetId) {
       must(await sb.rpc('activate_ruleset', { p_ruleset_id: rulesetId }))
+    },
+    async allFeedback() {
+      return must(await sb.from('feedback').select(`${FEEDBACK_COLUMNS},author:profiles(email,display_name)`)
+        .order('created_at', { ascending: false }))
+    },
+    async setFeedbackStatus(id, status, note) {
+      must(await sb.from('feedback').update({ status, admin_note: note }).eq('id', id))
+    },
+    async feedbackUrls(paths) {
+      if (!paths.length) return {}
+      const { data, error } = await sb.storage.from('feedback-media').createSignedUrls(paths, 3600)
+      if (error) throw new Error(error.message)
+      const out: Record<string, string> = {}
+      for (const d of data ?? []) if (d.path && d.signedUrl) out[d.path] = d.signedUrl
+      return out
     },
   }
 }

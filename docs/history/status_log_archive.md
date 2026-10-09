@@ -7084,6 +7084,31 @@ are reused. Dry run against the hosted project: hash kept, no video warning. AGE
 the owner's look at the real Attack tab. Not rendered against the real match (demo data only). Hard / touch is still
 in-sample (one match); a flat poke reads hard (P10) — pose in the dump is the lever, not a re-tune.
 
+### 2026-10-08 (ninety-ninth session) — #99: reception vs defense, and where the pass went
+
+**Asked (owner):** tell a reception (after a serve) from a defense (after a spike / touch / overpass); a new graphic on the
+player's view that shows where the set from each went, "ideally all go to the same spot", so a player sees whether to work on it.
+**Decisions (owner):** no fixed target spot — the graphic itself must show whether the balls pile up; it lives as a new card on
+the Serve & receive tab.
+
+**Diagnosed first:** both are `dig` touch 1 in the post-run layer; every touch already carries `own_x_m/own_y_m`, so the split
+and the destination (= the same team's NEXT touch) need no post-run change and no re-publish. Real match: 24 credited
+receptions + 34 defenses, 54 with a seen next touch on the same half (hidden / unseen touches never give a position).
+
+**Built.** SQL `20261009120000_pass_map` (NOT pushed): `player_profile.analytics.passes` = one row per credited reception /
+defense `{k, sx, sy, sex, sey, x, y, ex, ey, to, d}` (analytics tier, same signature). Web: `PassMap` (own half; the big blue dot
+(reception) / grey diamond (defense) is where it was played, a small arrowhead where the ball went next, hollow = next touch not seen, dashed ring = half the balls fall inside it
+around the MEDIAN destination, from 10 seen) + four tiles (counts, spread in m) + "usually X m off the net, Y m from the left
+sideline"; `lib/passes.ts` (+ vitest), hints `pass_map` / `pass_spread` (grade B: depth ±0.7 m, a spread under 1 m is inside the camera's
+noise), two `/measure` rows, demo data. The card hides until the database has the migration.
+
+**Verified:** schema check 5/5 on a throwaway `supabase/postgres:17` (smoke: Ari's reception → (4.5, 6.0) set; Opp1's defense +
+reception with no position; SQL == Python recount on the simulated and the real match); vitest 61, typecheck, oxlint; desktop
+demo screenshot (dark). Phone width NOT verified: headless Chrome's ~500 px minimum width crops every card.
+
+**Not done / owed:** `supabase db push` (3 migrations now owed), look at the card on the real match from prod. The spread has no
+benchmark (owner: no target); a "tight / scattered" verdict needs owner-ratified bands.
+
 ### Session index lines moved out of STATUS.md (verbatim, oldest first)
 
 > The index is capped at 100 lines (`tests/test_status_leanness.py`); from 2026-10-08 (#98) the oldest
@@ -7093,3 +7118,4 @@ in-sample (one match); a flat poke reads hard (P10) — pose in the dump is the 
 - 2026-08-31 — outcome semantics completed: kill = direct fall OR dug-and-dies-without-a-set.
 - 2026-09-01 — trail render fix (masked blend, black boxes gone).
 - 2026-09-04 **#3** — e1 GT re-verified (three mixed id conventions unified; queue empty); joust-split adjudicated; reentry contact shipped (e6 f308).
+- 2026-09-04 **#4** — analysis DB + player labeling + local web UI; extraction/DB split by lossless file contract.

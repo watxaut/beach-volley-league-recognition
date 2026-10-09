@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useApp } from './app/state'
 import { Layout } from './components/Layout'
 import { Loading } from './components/ui'
+import { AdminFeedback } from './pages/admin/AdminFeedback'
 import { AdminLayout, AdminMatches } from './pages/admin/AdminHome'
 import { AdminMatch } from './pages/admin/AdminMatch'
 import { AdminPlayers } from './pages/admin/AdminPlayers'
@@ -35,6 +36,7 @@ export function App() {
             <Route path="matches/:key" element={<AdminMatch />} />
             <Route path="players" element={<AdminPlayers />} />
             <Route path="scoring" element={<AdminScoring />} />
+            <Route path="feedback" element={<AdminFeedback />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

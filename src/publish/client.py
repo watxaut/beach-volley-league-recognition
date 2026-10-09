@@ -81,7 +81,7 @@ class SupabaseClient:
         return headers
 
     def _request(self, method: str, path: str, body: Optional[bytes] = None,
-                 headers: Optional[Dict[str, str]] = None) -> Any:
+                 headers: Optional[Dict[str, str]] = None, raw_bytes: bool = False) -> Any:
         req = urllib.request.Request(self.url + path, data=body, method=method,
                                      headers=self._headers(headers))
         try:
@@ -95,6 +95,8 @@ class SupabaseClient:
             # checkout's env file points at a local stack that is not running.
             raise SupabaseError(f"{method} {path} -> cannot reach {self.url} ({exc.reason}); "
                                 f"check SUPABASE_URL") from exc
+        if raw_bytes:
+            return raw
         if not raw:
             return None
         try:
@@ -120,11 +122,29 @@ class SupabaseClient:
         quoted = urllib.parse.quote(path)
         return self._request("GET", f"/storage/v1/object/{bucket}/{quoted}")
 
-    def select_all(self, table: str, columns: str = "*", page: int = 1000) -> List[Dict]:
+    def download_bytes(self, bucket: str, path: str) -> bytes:
+        """A stored file as it is (``download`` decodes: fine for a JSON bundle,
+        wrong for an image)."""
+        quoted = urllib.parse.quote(path)
+        return self._request("GET", f"/storage/v1/object/{bucket}/{quoted}", raw_bytes=True)
+
+    def update(self, table: str, filters: Dict[str, str], values: Dict[str, Any]) -> List[Dict]:
+        """PATCH the rows matching ``filters`` (PostgREST operators, e.g.
+        ``{"id": "in.(3,5)"}``); returns the rows as they are after it."""
+        if not filters:
+            raise SupabaseError("update without a filter is refused")
+        return self._request("PATCH", f"/rest/v1/{table}?{urllib.parse.urlencode(filters)}",
+                             json.dumps(values).encode(),
+                             {"Content-Type": "application/json",
+                              "Prefer": "return=representation"}) or []
+
+    def select_all(self, table: str, columns: str = "*", page: int = 1000,
+                   filters: Optional[Dict[str, str]] = None) -> List[Dict]:
         rows: List[Dict] = []
         offset = 0
         while True:
-            q = urllib.parse.urlencode({"select": columns, "limit": page, "offset": offset})
+            q = urllib.parse.urlencode({**(filters or {}), "select": columns, "limit": page,
+                                        "offset": offset})
             batch = self._request("GET", f"/rest/v1/{table}?{q}") or []
             rows.extend(batch)
             if len(batch) < page:
