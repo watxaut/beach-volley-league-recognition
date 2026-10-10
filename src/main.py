@@ -82,6 +82,13 @@ def parse_arguments() -> argparse.Namespace:
         help="Debug playback speed multiplier (default: 1.0)"
     )
     parser.add_argument(
+        "--start-frame",
+        type=int,
+        default=0,
+        help="With --debug-live: begin showing at this frame. Earlier frames are "
+             "still processed (same state as a full run) but not displayed."
+    )
+    parser.add_argument(
         "--court",
         type=str,
         help="Path to court calibration JSON (auto-detected from calibrations/<video>.json if omitted)"
@@ -268,7 +275,8 @@ def main() -> int:
             if save_path:
                 logger.info(f"Saving annotated video to {save_path}")
             debug_processor.process_video_live(
-                str(video_file), save_video=save_path, display=args.debug_live
+                str(video_file), save_video=save_path, display=args.debug_live,
+                start_frame=args.start_frame,
             )
             _close_diagnostics(debug_processor)
             return 0

@@ -45,7 +45,7 @@ run-live:
 ifeq ($(strip $(VIDEO)),)
 	$(error VIDEO is not set. Usage: make run VIDEO=path/to/video.mp4)
 endif
-	$(PYTHON) -m src.main "$(VIDEO)" --output-dir "$(OUTPUT_DIR)" --debug-live --debug-speed 2
+	$(PYTHON) -m src.main "$(VIDEO)" --output-dir "$(OUTPUT_DIR)" --debug-live --debug-speed 2 $(if $(START),--start-frame $(START))
 	@echo ""
 	@echo "Per-player results CSV: $(OUTPUT_DIR)/results.csv"
 
@@ -158,7 +158,7 @@ schema-check:
 help:
 	@echo "make run VIDEO=path/to/video.mp4        Analyze a video -> $(OUTPUT_DIR)/results.csv + pipeline_output.json"
 	@echo "make run-video VIDEO=path/to/video.mp4  Also save an annotated .mp4 (two-pass, contact-anchored labels)"
-	@echo "make run-live VIDEO=path/to/video.mp4   Play the annotated video live (buffered ~3s so labels land on contact)"
+	@echo "make run-live VIDEO=path/to/video.mp4 [START=<frame>]  Play the annotated video live (buffered ~3s so labels land on contact)"
 	@echo "make run-match VIDEO=path/to/video.mp4  Run + post-run reconstruction -> match_reconstruction.json/.txt"
 	@echo "make postrun VIDEO=path/to/video.mp4    Redo only the reconstruction over an existing run (no decode)"
 	@echo "make point-images VIDEO=path/to/video.mp4 One image per point (POINTS=3,7 to pick) -> $(OUTPUT_DIR)/point_images/"

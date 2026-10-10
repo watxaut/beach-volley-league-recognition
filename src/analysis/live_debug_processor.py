@@ -169,6 +169,7 @@ class LiveDebugProcessor:
         video_path: str,
         save_video: Optional[str] = None,
         display: bool = True,
+        start_frame: int = 0,
     ) -> None:
         """Process a video and render the contact-anchored overlay.
 
@@ -180,7 +181,13 @@ class LiveDebugProcessor:
             save_video: If set, write the annotated frames to this path.
             display: If True, show the live window (needs a display) with
                 q/space/r controls. Set False for headless save-only runs.
+            start_frame: Live display only. Frames before it are still run
+                through ``process_frame`` (so trackers, scoring state and
+                labels are exactly what a full run has at that frame -- never
+                a seek, the video is VFR) but nothing is drawn or paced until
+                it is reached.
         """
+        self._start_frame = max(0, int(start_frame))
         if display:
             self._process_buffered_live(video_path, save_video)
         else:
@@ -753,6 +760,7 @@ class LiveDebugProcessor:
         sits at the queue's back and can never be counted past the bound).
         """
         frame_idx = 0
+        start_frame = getattr(self, "_start_frame", 0)
         try:
             while not stop.is_set():
                 if paused.is_set():
@@ -771,6 +779,13 @@ class LiveDebugProcessor:
                 self._log_resolved_spikes()
                 ball, players, gs, poss, ground = self._overlay_data(result)
                 signals = self._signals(result, frame_idx)
+                if frame_idx < start_frame:
+                    # Fast-forward: same processing, nothing shown.
+                    if frame_idx % 500 == 0:
+                        self.logger.info("Fast-forwarding to frame %d: at %d",
+                                         start_frame, frame_idx)
+                    frame_idx += 1
+                    continue
                 if self.court_detector is not None:
                     frame = self.court_detector.draw_court_overlay(frame)
                 out_queue.put((frame, frame_idx, ball, players, gs, signals, poss, ground))
