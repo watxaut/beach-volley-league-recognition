@@ -6,7 +6,7 @@
 //
 // Samples are small on both sides, so a gap is called only when the player's
 // 95 % range and the reference's 95 % range do not overlap; anything else reads
-// "similar".
+// "too close to call".
 import { signed } from './format'
 import type { TermKey } from './glossary'
 import { hitText, hittingRange, MIN_N, pct, poissonRange, rangeText, wilson, type Range } from './stats'
@@ -55,7 +55,6 @@ interface Def {
 }
 
 const DEFS: Def[] = [
-  { key: 'fantasy', term: 'fantasy_21', kind: 'fantasy', better: 'high', unit: 'points', k: (s) => s.fantasy, n: (s) => s.points_played },
   { key: 'hitting', term: 'hitting', kind: 'hitting', better: 'high', unit: 'attacks', k: (s) => s.kills, n: (s) => s.attacks, e: (s) => s.attack_errors },
   { key: 'kill', term: 'kill_rate', kind: 'share', better: 'high', unit: 'attacks', k: (s) => s.kills, n: (s) => s.attacks },
   { key: 'ace', term: 'ace_rate', kind: 'share', better: 'high', unit: 'serves', k: (s) => s.aces, n: (s) => s.serves },
@@ -64,6 +63,8 @@ const DEFS: Def[] = [
   { key: 'digs', term: 'digs_21', kind: 'per21', better: 'high', unit: 'points', k: (s) => s.digs, n: (s) => s.points_played },
   { key: 'assists', term: 'assists_21', kind: 'per21', better: 'high', unit: 'points', k: (s) => s.assists, n: (s) => s.points_played },
   { key: 'errors', term: 'errors_21', kind: 'per21', better: 'low', unit: 'points', k: (s) => s.errors, n: (s) => s.points_played },
+  // the total closes the list, after the skills it is made of
+  { key: 'fantasy', term: 'fantasy_21', kind: 'fantasy', better: 'high', unit: 'points', k: (s) => s.fantasy, n: (s) => s.points_played },
 ]
 
 const minOf = (kind: Kind) => (kind === 'share' || kind === 'hitting' ? MIN_N : MIN_POINTS)
@@ -163,19 +164,49 @@ export function highlights(rows: CompareRow[]): { best: CompareRow | null; worst
   return { best: top('better'), worst: top('worse') }
 }
 
-/** Where a value sits on a row's strip, 0..100 from the left, with BETTER to
- * the right whatever the stat. The scale spans everything the row draws. */
-export function stripScale(r: CompareRow): ((v: number) => number) | null {
-  const all = [r.value, r.ref, r.range?.lo, r.range?.hi, r.refRange?.lo, r.refRange?.hi, ...r.peers.map((p) => p.value)]
-    .filter((v): v is number => v != null)
-  if (all.length === 0) return null
+/** Half the width of the "too close to call" zone, in % of the lane. */
+export const GAP_ZONE = 20
+/** How far from the centre a gap is drawn at most, in % of the lane. */
+const GAP_REACH = 46
+
+export interface GapScale {
+  /** Where a value sits, 0..100 from the left: the reference is 50. */
+  x: (v: number) => number
+  /** Half-width of the zone a gap must leave to be called; null for a row
+   * that is not judged (fantasy, or the player below the minimum). */
+  zone: number | null
+}
+
+/** A row drawn as its gap to the reference. MORE is to the right whatever
+ * the stat: a "fewer is better" stat is judged by its verdict, never by
+ * flipping the axis. The row is scaled so that the gap at which the two 95 %
+ * ranges stop overlapping sits `GAP_ZONE` from the centre on every row: a bar
+ * leaves the zone exactly when a verdict is called, and its length reads the
+ * same on every row. Null without a reference. */
+export function gapScale(r: CompareRow): GapScale | null {
+  if (r.ref === null) return null
+  const ref = r.ref
+  const clamp = (t: number) => 50 + Math.min(GAP_REACH, Math.max(-GAP_REACH, t))
+  if (r.value !== null && r.range && r.refRange) {
+    const noise = r.value >= ref ? (r.refRange.hi - ref) + (r.value - r.range.lo) : (ref - r.refRange.lo) + (r.range.hi - r.value)
+    if (noise > 0) return { x: (v) => clamp(((v - ref) / noise) * GAP_ZONE), zone: GAP_ZONE }
+  }
+  // nothing of the player's to judge: the others keep the scale of the reference's own range
+  const spread = r.refRange ? Math.max(r.refRange.hi - ref, ref - r.refRange.lo) : 0
+  if (spread > 0) return { x: (v) => clamp(((v - ref) / spread) * GAP_ZONE), zone: null }
+  // fantasy has no range on either side: the row fits what it draws
+  const reach = Math.max(0, ...[r.value, ...r.peers.map((p) => p.value)].filter((v): v is number => v != null).map((v) => Math.abs(v - ref)))
+  return { x: (v) => clamp(reach === 0 ? 0 : ((v - ref) / reach) * GAP_REACH), zone: null }
+}
+
+/** A row without a reference, drawn as plain bars from zero: where a value
+ * sits, 0..100 from the left, more to the right. `span` is the share of the
+ * lane the bars may use (less when names follow them). */
+export function barScale(r: CompareRow, span = 96): (v: number) => number {
+  const all = [0, r.value, r.range?.lo, r.range?.hi, ...r.peers.map((p) => p.value)].filter((v): v is number => v != null)
   const lo = Math.min(...all)
   const hi = Math.max(...all)
-  const pad = 6
-  return (v) => {
-    const t = hi === lo ? 0.5 : (Math.min(Math.max(v, lo), hi) - lo) / (hi - lo)
-    return pad + (r.better === 'high' ? t : 1 - t) * (100 - 2 * pad)
-  }
+  return (v) => 2 + (hi === lo ? 0 : (Math.min(Math.max(v, lo), hi) - lo) / (hi - lo)) * span
 }
 
 /** A value the way its stat reads: "13%", ".250", "8.9", "+6.4". */

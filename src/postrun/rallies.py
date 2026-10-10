@@ -114,6 +114,8 @@ class RallyEnd:
     frame: int
     court_xy: Optional[Tuple[float, float]] = None   # where the ball died (m)
     court_xy_err: Optional[Tuple[float, float]] = None   # (across, along) m it may be off
+    pos_xy: Optional[Tuple[float, float]] = None       # the same spot as the maps draw
+    pos_xy_err: Optional[Tuple[float, float]] = None   # it (``positions``, net-anchored)
     side: Optional[str] = None       # half the ball died in (None = unknown)
     in_court: Optional[bool] = None  # ground ends only; None = too close to call
 

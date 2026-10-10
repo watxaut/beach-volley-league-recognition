@@ -5,12 +5,14 @@ import { useTabKey, useWindowKey } from '../app/window'
 import { RollingChart, Sparkline, StackBar, type Segment } from '../components/Charts'
 import { Compare, type CompareMode } from '../components/Compare'
 import { AttackMap } from '../components/Court'
+import { PassMap } from '../components/PassMap'
 import { HittingTile, RateTile } from '../components/Rate'
 import { Approx, Card, ErrorBox, Loading, Segmented, StatInfo, Tabs, Tile } from '../components/ui'
 import { WindowPicker } from '../components/WindowPicker'
 import { compare, MIN_PEERS, RECENT, splitEarlier, sumHistory, type CompareRow } from '../lib/compare'
 import { formatDate, matchLabel, signed } from '../lib/format'
-import { hitText, hitting, pct, rate, ROLLING_WINDOW, rolling } from '../lib/stats'
+import { passPoints, summarize, type PassKind, PASS_LABEL } from '../lib/passes'
+import { hitText, hitting, MIN_N, pct, rate, ROLLING_WINDOW, rolling } from '../lib/stats'
 import type { HistoryRow, LeaderRow, PlayerAnalytics, PlayerProfile, ShotKey } from '../lib/types'
 import { ALL_TIME, windowLabel, windowParams } from '../lib/window'
 
@@ -155,7 +157,7 @@ function Overview({ data, board, boardError, windowKey, who, allHistory }: {
                 ? <>Against everyone else, {leagueScope(windowKey)}.</>
                 : <>{windowKey === 'all' ? `The newest ${plural(now.length, 'match', 'matches')}` : `The ${plural(now.length, 'match', 'matches')} of this period`} against
                   the {before.length} before.</>}
-              {noReference && shown === 'league' && <> The league reference appears once {MIN_PEERS} other players have played in this view.</>}
+              {noReference && shown === 'league' && <> The league average appears once {MIN_PEERS} other players have played in this view; until then every bar starts at zero.</>}
             </p>
             <Compare rows={rows} mode={shown} who={who} refName={shown === 'league' ? 'League' : 'Before'} />
           </>
@@ -267,6 +269,7 @@ function Serve({ a, who }: { a: PlayerAnalytics; who: string }) {
         <ServeTargeting a={a} who={who} />
         <ReceptionOutcome a={a} />
       </div>
+      <PassCard a={a} />
       <Trend title="Serves in play" unit="serve" hits={a.serve_series.map((s) => s.r !== 'error')}
              dates={a.serve_series.map((s) => s.d)} />
     </>
@@ -326,6 +329,40 @@ function ReceptionOutcome({ a }: { a: PlayerAnalytics }) {
           <p className="small" style={{ margin: '12px 0 0' }}>
             <strong>{r.first_ball_kills}</strong> <span className="muted">won the point on the first attack.</span>
           </p>
+        </>
+      )}
+    </Card>
+  )
+}
+
+/** Receptions (a dig after a serve) and defenses (a dig after an attack) with
+ * where the ball went next. The balls are not judged against a target: the map
+ * shows whether they fall in one spot, the tile how tight that spot is. */
+function PassCard({ a }: { a: PlayerAnalytics }) {
+  const passes = a.passes
+  // a database without the pass_map migration has no `passes` at all
+  if (passes === undefined) return null
+  const points = passPoints(passes)
+  return (
+    <Card title={<>Where the pass went<StatInfo term="pass_map" /></>}>
+      {points.length === 0 ? (
+        <p className="muted" style={{ margin: 0 }}>No receptions or defenses credited yet.</p>
+      ) : (
+        <>
+          <div className="tiles tiles-4" style={{ marginBottom: 12 }}>
+            {(['reception', 'defense'] as PassKind[]).map((k) => {
+              const s = summarize(points, k)
+              return [
+                <Tile key={k} label={`${PASS_LABEL[k]}s`} value={s.n}
+                      sub={`${s.seen} with the next touch seen`} />,
+                <Tile key={`${k}-spread`} label={`${PASS_LABEL[k]} spread`}
+                      value={s.spot ? `${s.spot.r.toFixed(1)} m` : '–'} quiet={!s.spot}
+                      sub={s.spot ? 'half fall within this of their usual spot' : `from ${MIN_N} seen`}
+                      info={<StatInfo term="pass_spread" />} />,
+              ]
+            })}
+          </div>
+          <PassMap passes={passes} />
         </>
       )}
     </Card>

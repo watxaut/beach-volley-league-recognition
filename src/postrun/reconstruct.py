@@ -23,13 +23,16 @@ from .attack_shape import type_attacks
 from .ball_flights import SOURCE_GAP, BallTimeline
 from .geometry import CourtGeometry
 from .match import SQUAD_LETTER, MatchAssembler, Point
+from .positions import publish_positions
 from .rallies import RallySegmenter
 from .stream import MatchStream, load_stream
 from .touches import SOURCE_ALTERNATION, Touch, TouchSolver
 
 #: 2 = touches carry ``court_x_m`` + ``court_err_m``, ground ends ``court_xy_err_m``.
 #: 3 = attacks carry ``spike_type`` + ``launch`` (attack_shape).
-SCHEMA_VERSION = 3
+#: 4 = ``court_x_m`` / ``court_y_m`` / ``court_xy_m`` are the ``positions`` reads
+#:     (net-anchored, box offset removed); ``positions`` says how they were made.
+SCHEMA_VERSION = 4
 logger = logging.getLogger(__name__)
 
 
@@ -47,6 +50,10 @@ def reconstruct(stream: MatchStream, geometry: CourtGeometry,
                             switch_every=switch_every).assemble(points)
     for pt in points:                     # after the match layer: labels are final
         type_attacks(timeline, pt.touches)
+    # Output only, after every decision: the same players must have played
+    # both halves for the box offset to be read off the end switches.
+    positions = publish_positions(
+        timeline, points, switched=bool(checks.get("side_switch_after_point")))
     payload = [_point_payload(i + 1, pt) for i, pt in enumerate(points)]
     return {
         "schema_version": SCHEMA_VERSION,
@@ -58,6 +65,7 @@ def reconstruct(stream: MatchStream, geometry: CourtGeometry,
             "ball_px_near_baseline": round(geometry.ball_px_near, 2),
             "net_top_height_m": _round(geometry.net_top_height_m(), 2),
         },
+        "positions": positions.payload(),
         "checks": checks,
         "points": payload,
         "player_stats": player_stats(payload),
@@ -221,9 +229,9 @@ def _touch_payload(pt: Point, t: Touch) -> Dict[str, Any]:
         "ends_possession": bool(t.ends_possession),
         "outcome": t.outcome,
         "height_m": _round(t.height_m, 2),
-        "court_x_m": _round(t.court_x, 1),
-        "court_y_m": _round(t.court_y, 1),
-        "court_err_m": _err(t.court_err),
+        "court_x_m": _round(t.pos_x, 1),
+        "court_y_m": _round(t.pos_y, 1),
+        "court_err_m": _err(t.pos_err),
         "reach_body_heights": _round(t.reach, 2),
         "perception_action": t.perception_action,
         "spike_type": t.spike_type,
@@ -267,9 +275,9 @@ def _point_payload(index: int, pt: Point) -> Dict[str, Any]:
             "frame": int(end.frame),
             "side": end.side,
             "in_court": end.in_court,
-            "court_xy_m": None if end.court_xy is None else [
-                _round(end.court_xy[0], 1), _round(end.court_xy[1], 1)],
-            "court_xy_err_m": _err(end.court_xy_err),
+            "court_xy_m": None if end.pos_xy is None else [
+                _round(end.pos_xy[0], 1), _round(end.pos_xy[1], 1)],
+            "court_xy_err_m": _err(end.pos_xy_err),
         },
         "winner": _letter(pt.winner_squad),
         "winner_source": pt.winner_source,

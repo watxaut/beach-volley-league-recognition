@@ -363,6 +363,19 @@ The site is only as safe as the three accounts that can change it.
   deletes on purpose.
 - **A failed inbox file:** `python -m src.publish.inbox --retry <key>`.
 
+**Bug reports and suggestions:** every page has a **Feedback** button (text,
+bug or suggestion, up to 3 screenshots). The author follows the report under
+Settings → My reports; you see all of them under Admin → Feedback. To work
+through them in a session:
+
+```bash
+make feedback                            # open reports -> output/feedback/index.md (+ screenshots)
+make feedback DONE="3 5" NOTE="fixed"    # close them; the author reads the note
+make feedback DISMISS=4 NOTE="not planned"
+```
+
+Needs the migration `20261009130000_feedback.sql` (`supabase db push`).
+
 ## Troubleshooting
 
 | Symptom                                                                                               | Cause / fix                                                                                                                                                                                                                                                                                    |

@@ -219,6 +219,9 @@ export interface PlayerAnalytics {
   attack_zones: Record<string, number>
   landings: Landing[]
   touch_depths: { action: string; y: number }[]
+  /** Receptions and defenses with where the ball went next. Missing until the
+   * database has migration 20261009120000. */
+  passes?: Pass[]
 }
 
 export interface PlayerProfile {
@@ -302,6 +305,26 @@ export interface WindowParams {
   from: string | null
   to: string | null
   lastN: number | null
+}
+
+/** One reception (a dig after a serve) or defense (a dig after a spike or a
+ * free ball) credited to the player, in their own frame (x 0..8 from their
+ * left sideline, y 0 = own baseline .. 8 = net). `sx`/`sy` is where it was
+ * played; `x`/`y` is where the ball was at the next touch on the same half
+ * (`to`), null when the ball went over, died or that touch was not seen.
+ * `sex`..`ey` are about one sigma in metres across / along. */
+export interface Pass {
+  k: 'reception' | 'defense'
+  sx: number | null
+  sy: number | null
+  sex?: number | null
+  sey?: number | null
+  x: number | null
+  y: number | null
+  ex?: number | null
+  ey?: number | null
+  to: 'set' | 'spike' | 'overpass' | null
+  d: string | null
 }
 
 /** One attack and where it came down, in the attacker's frame: x 0..8 from
@@ -388,4 +411,34 @@ export type PlayerPatch = Partial<Pick<Player, 'display_name' | 'user_id' | 'han
 export interface Session {
   userId: string
   email: string
+}
+
+// Bug reports and suggestions (supabase/migrations/20261009130000_feedback.sql).
+export type FeedbackKind = 'bug' | 'suggestion'
+export type FeedbackStatus = 'open' | 'done' | 'dismissed'
+
+export interface Feedback {
+  id: number
+  user_id: string
+  kind: FeedbackKind
+  message: string
+  /** The route the report was sent from. */
+  page: string | null
+  context: Record<string, string>
+  /** Paths in the private `feedback-media` bucket. */
+  screenshots: string[]
+  status: FeedbackStatus
+  admin_note: string | null
+  created_at: string
+  /** Filled for admins only (a member reads no profile but their own). */
+  author?: { email: string | null; display_name: string | null } | null
+}
+
+export interface NewFeedback {
+  kind: FeedbackKind
+  message: string
+  page: string
+  context: Record<string, string>
+  /** Already downscaled (lib/feedback.ts). */
+  images: Blob[]
 }

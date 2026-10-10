@@ -3,10 +3,11 @@
 // The data is synthetic; the rules (credited touches, fantasy rules,
 // privacy tiers) mirror the SQL so the pages behave like production.
 import type { Api } from './api'
+import { blobDataUrl } from './feedback'
 import { hitSplit, playerAnalytics, pointFantasy, serveTargets, teamRally, type Seat, type Touch } from './analytics'
 import type {
-  ActionName, ActionRow, BoxRow, FantasyRule, LeaderRow, Match, PointRow, Participant,
-  Player, PlayerProfile, Profile, Publication, ReportPlayer, Ruleset, Session, Slot, Team, WindowParams,
+  ActionName, ActionRow, BoxRow, FantasyRule, Feedback, LeaderRow, Match, PointRow, Participant,
+  Pass, Player, PlayerProfile, Profile, Publication, ReportPlayer, Ruleset, Session, Slot, Team, WindowParams,
 } from './types'
 
 
@@ -162,6 +163,12 @@ export function demoApi(): Api {
       }],
     }
   })
+  const feedback: Feedback[] = [{
+    id: 1, user_id: ME, kind: 'bug', message: 'On my phone the attack map is cut off on the right.', page: '/players/1',
+    context: { viewport: '390x844' }, screenshots: [], status: 'done', admin_note: 'Fixed: the map now scales to the screen.',
+    created_at: '2026-10-07T18:20:00Z', author: { email: 'ari@example.com', display_name: 'Ari' },
+  }]
+  const shots: Record<string, string> = {}
   let session: Session | null = { userId: ME, email: 'ari@example.com' }
   const listeners = new Set<(s: Session | null) => void>()
   const isAdmin = () => profiles.find((p) => p.user_id === session?.userId)?.role === 'admin'
@@ -334,6 +341,21 @@ export function demoApi(): Api {
             return { ...start, type, x: null, y: null, in: null, outcome: 'error', result: 'net' as const, source: null }
           }),
           touch_depths: [],
+          // receptions land close together, defenses are scattered; a few went straight over
+          passes: Array.from({ length: 34 }, (_, i): Pass => {
+            const recv = i % 2 === 0
+            const jitter = (sd: number) => (r() + r() + r() - 1.5) * 2 * sd
+            const went = r() > 0.12
+            return {
+              k: recv ? 'reception' : 'defense',
+              sx: Math.min(8, Math.max(0, 4 + jitter(2.2))), sy: recv ? 1.5 + r() * 3.5 : 2 + r() * 4, sex: 0.4, sey: 0.7,
+              x: went ? Math.min(8, Math.max(0, 4.3 + jitter(recv ? 0.6 : 1.5))) : null,
+              y: went ? Math.min(8.4, Math.max(2, 6.6 + jitter(recv ? 0.5 : 1.2))) : null,
+              ex: went ? 0.4 : null, ey: went ? 0.7 : null,
+              to: went ? (r() > 0.85 ? 'spike' : 'set') : null,
+              d: seats.length ? seats[i % seats.length].date : null,
+            }
+          }),
         } : null,
       }
       return delay(prof)
@@ -425,6 +447,28 @@ export function demoApi(): Api {
     },
     async activateRuleset(id) {
       rulesets.forEach((r) => (r.is_active = r.id === id))
+    },
+    async sendFeedback(userId, report) {
+      const paths: string[] = []
+      for (const image of report.images) {
+        const path = `${userId}/${feedback.length}-${paths.length}.jpg`
+        shots[path] = await blobDataUrl(image)
+        paths.push(path)
+      }
+      feedback.unshift({
+        id: feedback.length + 1, user_id: userId, kind: report.kind, message: report.message.trim(),
+        page: report.page, context: report.context, screenshots: paths, status: 'open', admin_note: null,
+        created_at: new Date().toISOString(),
+        author: { email: profiles.find((p) => p.user_id === userId)?.email ?? null, display_name: null },
+      })
+    },
+    myFeedback: (userId) => delay(feedback.filter((f) => f.user_id === userId)),
+    allFeedback: () => delay([...feedback]),
+    async setFeedbackStatus(id, status, note) {
+      Object.assign(feedback.find((f) => f.id === id)!, { status, admin_note: note })
+    },
+    async feedbackUrls(paths) {
+      return Object.fromEntries(paths.filter((p) => shots[p]).map((p) => [p, shots[p]]))
     },
   }
 }

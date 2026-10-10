@@ -49,6 +49,11 @@ export const GLOSSARY = {
   serve_out: { label: 'Who you serve', what: 'Who took each of the player\'s serves.', grade: 'A' },
   reception: { label: 'After the reception', what: 'What the possession became after the player\'s reception: a spike, a free ball, an error, or no attack.',
     how: 'A pass-quality proxy: nobody grades the pass itself. A soft rainbow below about 2.15 m counts as a free ball.', grade: 'A' },
+  pass_map: { label: 'Where the pass went', what: 'A reception is a dig after a serve, a defense a dig after a spike or a free ball. Each line runs from where the player played the ball to where it was at the next touch, usually the set.',
+    how: `No target is assumed: if the balls land in one spot the dots pile up there. The dashed ring holds half of them, around the player's own usual spot (the middle of where they went), and shows from ${MIN_N} balls with a seen next touch. Left–right is precise. Depth is not: about ±0.7 m, so a spread under 1 m cannot be told from the camera's own noise. A ball nobody saw touched next is not drawn as an end.`,
+    grade: 'B' },
+  pass_spread: { label: 'Pass spread', what: 'Half of the passes of this kind ended within this many metres of the player\'s usual spot.',
+    how: `Smaller is tighter, not better or worse: the page has no target to compare with. It shows from ${MIN_N} passes with a seen next touch. Depth is read to about ±0.7 m.`, grade: 'B' },
   trend: { label: 'Trend', what: 'The rate over the last 30 attempts, redrawn after every attempt.',
     how: 'The band is the 95% range: how far the rate can move by chance alone.', grade: 'A' },
   attack_map: { label: 'Attack map', what: 'Each line runs from where the ball was hit to where it came down or was dug. A heavy line is a hard spike, a dotted one a touch shot, a dashed one a free ball.',
@@ -57,8 +62,8 @@ export const GLOSSARY = {
   shot_type: { label: 'Hard or touch', what: 'Hard = the ball was driven. Touch = it was placed: a lob, a poke, a slow drop. Read from the flight after the hit: a ball that leaves steeply upward (25° or more) or slowly (under 5 m/s) is a touch, the rest are hard.',
     how: `Right on 26 of 29 spikes of the reference match, the match its two thresholds were chosen on. A flat poke can read as hard: the camera sees the flight, not the swing. About 1 spike in 10 gets no type. Share and hitting % show from ${MIN_N} attacks.`,
     grade: 'B' },
-  compare: { label: 'Comparison', what: 'Right is better on every row. The dot is the player and the bar through it their 95% range; the tall tick is the reference, on its own grey range.',
-    how: `A verdict shows only when the two ranges do not overlap: with ${MIN_N}–20 attempts most gaps are chance.`, grade: 'A' },
+  compare: { label: 'Comparison', what: 'More is to the right on every row. The centre line is the reference and the bar is the gap to it; the hollow dots are the other players. Fewer is better where the row says so.',
+    how: `Inside the shaded zone the gap is smaller than chance alone moves the number, so it reads "too close to call": with ${MIN_N}–20 attempts most gaps are chance. A bar leaves the zone when the two 95% ranges no longer overlap.`, grade: 'A' },
 } satisfies Record<string, Term>
 
 export type TermKey = keyof typeof GLOSSARY

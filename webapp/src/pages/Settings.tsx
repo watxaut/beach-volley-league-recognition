@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useApp } from '../app/state'
+import { useApp, useLoad } from '../app/state'
+import { ReportHead, Shots } from '../components/FeedbackList'
 import { Card, ErrorBox } from '../components/ui'
 import { explainError } from '../lib/api'
 
@@ -49,6 +50,36 @@ export function Settings() {
           </label>
         </Card>
       )}
+      <MyReports />
     </>
+  )
+}
+
+/** What the member sent with the Feedback button, and what came of it. */
+function MyReports() {
+  const { api, session } = useApp()
+  const list = useLoad(async () => {
+    const reports = session ? await api.myFeedback(session.userId) : []
+    return { reports, urls: await api.feedbackUrls(reports.flatMap((r) => r.screenshots)) }
+  }, [session?.userId])
+  return (
+    <Card title="My reports">
+      <ErrorBox error={list.error} />
+      {list.data?.reports.length === 0 && (
+        <p className="muted">
+          Nothing sent yet. Found a bug or have an idea? Use the Feedback button at the top of any page.
+        </p>
+      )}
+      <ul className="reports">
+        {list.data?.reports.map((r) => (
+          <li key={r.id}>
+            <ReportHead report={r} />
+            <p className="report-text">{r.message}</p>
+            <Shots paths={r.screenshots} urls={list.data!.urls} />
+            {r.admin_note && <p className="report-note"><strong>Reply:</strong> {r.admin_note}</p>}
+          </li>
+        ))}
+      </ul>
+    </Card>
   )
 }
