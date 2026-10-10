@@ -115,6 +115,31 @@ def make_slot_thumbnails(video_path: Path, diag_path: Path, recon: Dict,
     return written
 
 
+def locate_decoded_video(decoded_path: Optional[str], *names: str) -> Optional[Path]:
+    """The file the run decoded, or its renamed twin.
+
+    ``pipeline_output.json`` records the path the run READ. ``make inbox`` names
+    the video (``YYYYMMDD_HHMM_<venue>_<text>``) after calibration and the run
+    can predate the rename, so the recorded path may be gone while the same
+    video sits next to it under the match name. ``names`` (match key, run
+    directory name) are tried as stems in the recorded directory, with the
+    ``_up1080`` cache variant and the usual extensions.
+    """
+    if not decoded_path:
+        return None
+    p = Path(decoded_path)
+    if p.exists():
+        return p
+    exts = (p.suffix, ".mp4", ".MP4", ".mov", ".MOV", ".m4v", ".mkv", ".avi")
+    for name in names:
+        for stem in (name, f"{name}_up1080"):
+            for ext in dict.fromkeys(exts):
+                cand = p.with_name(stem + ext)
+                if cand.exists():
+                    return cand
+    return None
+
+
 def find_source_video(decoded_path: Optional[str]) -> Optional[Path]:
     """The ORIGINAL file behind the path the run decoded (``<stem>_up1080.mp4``
     is a cache next to ``<stem>.<ext>``): what the video hash is taken of."""

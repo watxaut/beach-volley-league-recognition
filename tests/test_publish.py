@@ -322,6 +322,20 @@ def test_slot_thumbnails(tmp_path):
     assert r > 150 and b < 100, "the crop is frame 12 (red), found by sequential decode"
 
 
+def test_locate_decoded_video_follows_the_rename(tmp_path):
+    """The run read ``<stem>.mp4``; ``make inbox`` renamed it to the match key."""
+    from src.publish.thumbs import locate_decoded_video
+
+    recorded = tmp_path / "20261010_vall_x.mp4"
+    assert locate_decoded_video(str(recorded), "20261010_1000_vall_x") is None
+    renamed = tmp_path / "20261010_1000_vall_x.mp4"
+    renamed.write_bytes(b"")
+    assert locate_decoded_video(str(recorded), "nope", "20261010_1000_vall_x") == renamed
+    recorded.write_bytes(b"")
+    assert locate_decoded_video(str(recorded), "20261010_1000_vall_x") == recorded
+    assert locate_decoded_video(None, "20261010_1000_vall_x") is None
+
+
 # --------------------------------------------------------------------------- #
 # CLI guards (no network)
 # --------------------------------------------------------------------------- #

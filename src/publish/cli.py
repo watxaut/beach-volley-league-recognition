@@ -125,8 +125,12 @@ def build_from_run(args: argparse.Namespace) -> Dict[str, Any]:
     checked_match_key(key)  # refuse a non-conforming name before hashing / decoding
     decoded = (pipeline.get("video") or {}).get("path")
 
-    from .thumbs import find_source_video, make_slot_thumbnails
+    from .thumbs import find_source_video, locate_decoded_video, make_slot_thumbnails
 
+    located = locate_decoded_video(decoded, key, run_dir.name)
+    if located is not None and decoded and Path(decoded) != located:
+        print(f"video: {decoded} was renamed, using {located}", flush=True)
+        decoded = str(located)
     source_video = find_source_video(decoded)
     ident = video_identity(run_dir, key, decoded, source_video, args.env,
                            hash_video=not args.no_video_hash)
