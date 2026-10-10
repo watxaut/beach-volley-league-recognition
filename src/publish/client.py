@@ -128,6 +128,31 @@ class SupabaseClient:
         quoted = urllib.parse.quote(path)
         return self._request("GET", f"/storage/v1/object/{bucket}/{quoted}", raw_bytes=True)
 
+    def list_objects(self, bucket: str, folder: str, page: int = 1000) -> List[str]:
+        """Full paths of the files directly in ``folder`` of a bucket."""
+        folder = folder.strip("/")
+        paths: List[str] = []
+        offset = 0
+        while True:
+            batch = self._request("POST", f"/storage/v1/object/list/{bucket}",
+                                  json.dumps({"prefix": folder, "limit": page, "offset": offset,
+                                              "sortBy": {"column": "name", "order": "asc"}}).encode(),
+                                  {"Content-Type": "application/json"}) or []
+            # a sub-folder is listed with no id; a name may or may not repeat the folder
+            paths.extend(f"{folder}/{str(o['name']).rsplit('/', 1)[-1]}" for o in batch
+                         if isinstance(o, dict) and o.get("name") and o.get("id"))
+            if len(batch) < page:
+                return paths
+            offset += page
+
+    def remove_objects(self, bucket: str, paths: List[str], chunk: int = 100) -> int:
+        """Delete files of a bucket; returns how many were asked for."""
+        for i in range(0, len(paths), chunk):
+            self._request("DELETE", f"/storage/v1/object/{bucket}",
+                          json.dumps({"prefixes": paths[i:i + chunk]}).encode(),
+                          {"Content-Type": "application/json"})
+        return len(paths)
+
     def update(self, table: str, filters: Dict[str, str], values: Dict[str, Any]) -> List[Dict]:
         """PATCH the rows matching ``filters`` (PostgREST operators, e.g.
         ``{"id": "in.(3,5)"}``); returns the rows as they are after it."""

@@ -528,7 +528,24 @@ Pages). Rules that keep it correct:
   The VIDEO is not needed again (owner, 2026-10-08: little disk, no video kept
   on the laptop or Drive forever): the publisher records its hash in
   `<run_dir>/video_identity.json` and reuses `<run_dir>/thumbs/`, so keep the
-  run directory (diag dump, identity record, thumbnails), never the video.
+  run directory (diag dump, identity record, thumbnails, rally copy), never
+  the video.
+* **Attack clips (owner-asked 2026-10-10, #107, `src/publish/clips.py`).** A
+  credited attack carries a short clip (1 s before the contact, 1.5 s after):
+  `match-media/clips/<match_key>/<frame>-<content hash>.mp4`, named in
+  `actions.extra.clip`. Rules to keep: (1) a clip shows all four players
+  (guests too), so it follows the MATCH, never a profile: the storage policy
+  and `player_profile` both ask `can_see_match_detail()` (owner decision) --
+  a shared profile shows its attack map without clips; (2) clips are cut from
+  the run's rally copy (`rallies.mp4` + `rallies.json`), itself cut from the
+  video by sequential decode (§9): KEEP the rally copy next to the diag dump,
+  it is what gives a clip to an attack a later rules change finds once the
+  video is gone; (3) the crop is sized by the net as it projects (three net
+  heights), never a px constant; (4) Storage holds exactly the clips the live
+  bundle names: uploaded before the rows, the others of that match removed
+  after a successful publish (1 GB is a hard stop); (5) MP4, never GIF (20x
+  the bytes), and no footage of real people in the repo or the demo
+  (`webapp/public/demo-clip.mp4` is drawn).
 * **Every stat has a tier (owner decision 2026-10-06, design doc §4 D2).**
   League tier, every member: results, the box-score line and fantasy of each
   slot, the leaderboard, a team's side-out / break-point. Analytics tier,

@@ -17,7 +17,7 @@ Design and rationale: `docs/web_platform_design.md`.
 ## 0. Install the tools on the M3 (10 min)
 
 ```bash
-brew install supabase/tap/supabase rclone node libpq
+brew install supabase/tap/supabase rclone node libpq ffmpeg
 brew link --force libpq          # gives you `psql` (optional checks)
 ```
 
@@ -376,6 +376,17 @@ make feedback DISMISS=4 NOTE="not planned"
 
 Needs the migration `20261009130000_feedback.sql` (`supabase db push`).
 
+### Attack clips (#107)
+
+On the player page, picking an attack on the map plays a short clip of it.
+To turn it on: `supabase db push` (migration `20261010100000_attack_clips.sql`),
+redeploy the web app (the page and the `media-src` line of
+`webapp/public/_headers`), then `make republish-all` from the prod checkout
+**while each match's video is still on disk**: the first publish writes
+`rallies.mp4` (~45 MB) into the run directory, and from then on the video is
+not needed again. Keep that file with the diag dump. Needs `ffmpeg`
+(`brew install ffmpeg`); without it a publish goes through with no clips.
+
 ## Troubleshooting
 
 | Symptom                                                                                               | Cause / fix                                                                                                                                                                                                                                                                                    |
@@ -390,6 +401,7 @@ Needs the migration `20261009130000_feedback.sql` (`supabase db push`).
 | `make publish`: "already holds a different video"                                                     | Two different files with one name. Rename one, or `PUBLISH_FLAGS=--replace-video` if it is intentional                                                                                                                                                                                         |
 | `make publish`: "not a match key"                                                                     | Pass `MATCH_KEY=YYYYMMDD_HHMM_<venue>_<text>`                                                                                                                                                                                                                                                  |
 | A player sees no play-by-play                                                                         | By design: only that match's players see it (Admin → match → "Everyone can see the play-by-play" opens it)                                                                                                                                                                                     |
+| An attack has no clip on the player page                                                              | The viewer did not play that match (clips follow the play-by-play rule), or the match was published without its video and has no `rallies.mp4`, or `ffmpeg` is missing on the laptop (`make publish` prints how many attacks got a clip) |
 | A slot thumbnail is missing                                                                           | The decoded video or `diag.jsonl` was not on disk at publish time. Assign from the video link instead                                                                                                                                                                                          |
 | The project is paused                                                                                 | Supabase dashboard → Restore. Then check the keep-alive workflow runs                                                                                                                                                                                                                          |
 | The site or `make backup` says "permission denied for table" (42501)                                  | A table or view without a `GRANT`. New ones get none by default: grant it in its migration (see `20261007120000_explicit_grants.sql`)                                                                                                                                                          |

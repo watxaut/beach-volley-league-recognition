@@ -6,6 +6,7 @@
 // policies allow (e.g. `points`/`actions` come back empty for a match the
 // viewer did not play in unless an admin opened its detail).
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { linkCache } from './clips'
 import type {
   ActionRow, BoxRow, FantasyRule, Feedback, FeedbackStatus, LeaderRow, Match, MatchPatch, MatchReport, MatchSource,
   NewFeedback, Participant, Player, PlayerPatch, PlayerProfile, PointRow, Profile, Publication, Role, Ruleset,
@@ -37,6 +38,8 @@ export interface Api {
   leaderboard(window: WindowParams): Promise<LeaderRow[]>
   seasons(): Promise<string[]>
   playerProfile(playerId: number, window: WindowParams): Promise<PlayerProfile | null>
+  /** A short-lived link to the clip of an attack (`Landing.clip`); null when it cannot be read. */
+  clipUrl(path: string): Promise<string | null>
   matchReport(matchId: number): Promise<MatchReport | null>
   // admin
   updateMatch(matchId: number, patch: MatchPatch): Promise<void>
@@ -103,6 +106,22 @@ export function supabaseApi(url: string, publishableKey: string): Api {
   })
   const toSession = (s: { user: { id: string; email?: string } } | null): Session | null =>
     s ? { userId: s.user.id, email: s.user.email ?? '' } : null
+
+  // Attack clips: the storage policy decides who gets a link (whoever may
+  // read that match's touches). A link outlives a logout, so they are
+  // forgotten when the account changes.
+  const clipLink = linkCache(async (path) => {
+    const { data } = await sb.storage.from('match-media').createSignedUrl(path, 3600)
+    return data?.signedUrl ?? null
+  })
+  let clipUser: string | null = null
+  sb.auth.onAuthStateChange((_e, s) => {
+    const user = s?.user.id ?? null
+    if (user !== clipUser) {
+      clipUser = user
+      clipLink.clear()
+    }
+  })
 
   return {
     async getSession() {
@@ -274,6 +293,7 @@ export function supabaseApi(url: string, publishableKey: string): Api {
     async setFeedbackStatus(id, status, note) {
       must(await sb.from('feedback').update({ status, admin_note: note }).eq('id', id))
     },
+    clipUrl: (path) => clipLink(path),
     async feedbackUrls(paths) {
       if (!paths.length) return {}
       const { data, error } = await sb.storage.from('feedback-media').createSignedUrls(paths, 3600)

@@ -1,4 +1,6 @@
-import { useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react'
+import { useEffect, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react'
+import { useApp } from '../app/state'
+import { CLIP_DWELL_MS } from '../lib/clips'
 import { formatDate } from '../lib/format'
 import {
   LANDING_LABEL, landingError, shots, type LandingKind, type Phase, type Shot, type ShotGroup,
@@ -67,6 +69,41 @@ const py = (y: number) => (VIEW.y1 - clampY(y)) * S
 const off = (p: { x: number; y: number }) => p.x !== clampX(p.x) || p.y !== clampY(p.y)
 const at = (p: { x: number; y: number } | null) => (p ? `${p.x.toFixed(1)}, ${p.y.toFixed(1)}` : '–')
 
+/** The clip of one attack: the second before the hit and the 1.5 s after it,
+ * silent and looping. It is fetched only once the attack stayed highlighted
+ * for a moment, and it is simply absent when it cannot be loaded. Mount it
+ * with a key per attack: one instance, one clip, one wait. With `play` false (the pointer
+ * only passed over it and the reader asked for less motion) it waits on its
+ * first frame. */
+function Clip({ path, play }: { path: string; play: boolean }) {
+  const { api } = useApp()
+  const [url, setUrl] = useState<string | null>(null)
+  const [gone, setGone] = useState(false)
+  useEffect(() => {
+    let live = true
+    const wait = setTimeout(() => {
+      void api.clipUrl(path).then((link) => {
+        if (!live) return
+        if (link) setUrl(link)
+        else setGone(true)
+      })
+    }, CLIP_DWELL_MS)
+    return () => {
+      live = false
+      clearTimeout(wait)
+    }
+  }, [api, path])
+  if (gone) return null
+  return (
+    <div className="clip">
+      {url && <video src={url} muted loop playsInline autoPlay={play} preload="auto"
+                     aria-label="Clip of this attack" onError={() => setGone(true)} />}
+    </div>
+  )
+}
+
+const lessMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
 /** Every attack as a line from where the ball was hit to where it came down
  * or was dug. Colour and the mark at the end say what became of it; the line
  * says how it was sent (hard, touch, free ball). Positions are best effort
@@ -125,6 +162,10 @@ export function AttackMap({ landings }: { landings: Landing[] }) {
     setPicked(((picked ?? (step > 0 ? -1 : 0)) + step + shown.length) % shown.length)
   }
   const anchor = (s: Shot) => s.end ?? s.start!
+  const anyClip = shown.some((s) => s.l.clip)
+  // a clip makes the panel tall: under an attack drawn in the upper part of
+  // the map, above one in the lower part, so it stays on the card
+  const below = !!tip?.l.clip && py(anchor(tip).y) / H < 0.45
   const hit = (i: number) => ({
     onPointerEnter: (e: PointerEvent) => e.pointerType === 'mouse' && setHover(i),
     onPointerLeave: () => setHover(null),
@@ -181,7 +222,7 @@ export function AttackMap({ landings }: { landings: Landing[] }) {
           ))}
         </svg>
         {tip && (
-          <div className="tooltip tooltip-wrap" style={{
+          <div className={`tooltip tooltip-wrap${below ? ' tooltip-below' : ''}`} style={{
             left: `${Math.min(70, Math.max(30, (px(anchor(tip).x) / W) * 100))}%`, top: `${(py(anchor(tip).y) / H) * 100}%`,
           }}>
             <strong>{LANDING_LABEL[tip.kind]}</strong> · {SHOT_LABEL[tip.shot]}
@@ -197,6 +238,7 @@ export function AttackMap({ landings }: { landings: Landing[] }) {
               {tip.kind === 'error' && tip.l.in == null && tip.end && ' · line too close to call'}
               {tip.end && landingError(tip.l) && <><br />end {landingError(tip.l)}</>}
             </span>
+            {tip.l.clip && <Clip key={`${active}:${tip.l.clip}`} path={tip.l.clip} play={hover === null || !lessMotion()} />}
           </div>
         )}
       </div>
@@ -216,6 +258,11 @@ export function AttackMap({ landings }: { landings: Landing[] }) {
           {has('unread') && <span><ShotLine shot="unread" />{anyTyped ? 'spike, type not read' : 'spike'}</span>}
           {has('free') && <span><ShotLine shot="free" />free ball</span>}
         </div>
+      )}
+      {anyClip && (
+        <p className="muted small" style={{ margin: '6px 0 0' }}>
+          Pick an attack to watch it: the second before the hit and where the ball went.
+        </p>
       )}
       {(noLine > 0 || nowhere > 0) && (
         <p className="muted small" style={{ margin: '6px 0 0' }}>

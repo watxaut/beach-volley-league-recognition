@@ -4,7 +4,7 @@ needs from a finished run (docs/web_platform_design.md §3).
 Pure: reads ``output/<key>/match_reconstruction.json`` (required) and, when
 present, ``pipeline_output.json`` (video facts, causal spike zones) and
 ``source.json`` (the inbox runner's Drive link). Never decodes video, never
-talks to the network. Point / action keys are the database COLUMN names --
+talks to the network: thumbnail and clip paths are handed in. Point / action keys are the database COLUMN names --
 ``ingest_match_bundle`` inserts them with ``jsonb_populate_recordset``.
 
 Credit rule (the one that keeps the web equal to the owner-ratified
@@ -164,8 +164,10 @@ def _landing(i: int, touches: List[Dict[str, Any]],
 
 
 def build_actions(points: List[Dict[str, Any]],
-                  spikes: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+                  spikes: Optional[List[Dict[str, Any]]] = None,
+                  clip_paths: Optional[Dict[int, str]] = None) -> List[Dict[str, Any]]:
     spikes = spikes or []
+    clips = clip_paths or {}
     rows: List[Dict[str, Any]] = []
     for pt in points:
         touches = pt["touches"]
@@ -230,8 +232,19 @@ def build_actions(points: List[Dict[str, Any]],
                     # never fall back to the causal one (V1: 10 of 16 right).
                     row["spike_type"] = t["spike_type"]
                     row["extra"]["launch"] = t.get("launch")
+                # The clip of a CREDITED attack (src/publish/clips.py). The key
+                # exists only with a clip, so a run without clips builds the
+                # bundle it always did.
+                if row["slot"] and clips.get(row["frame"]):
+                    row["extra"]["clip"] = clips[row["frame"]]
             rows.append(row)
     return rows
+
+
+def attack_frames(points: List[Dict[str, Any]]) -> List[int]:
+    """Contact frame of every attack a player is credited with: the attacks a
+    player page lists, so the ones that get a clip."""
+    return [r["frame"] for r in build_actions(points) if r["action"] in ATTACKS and r["slot"]]
 
 
 def build_points(points: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -304,6 +317,7 @@ def build_bundle(run_dir: Path, *, match_key: Optional[str] = None,
                  video_url: Optional[str] = None, video_sha256: Optional[str] = None,
                  video_filename: Optional[str] = None,
                  thumb_paths: Optional[Dict[str, str]] = None,
+                 clip_paths: Optional[Dict[int, str]] = None,
                  provenance: Optional[Dict[str, Any]] = None,
                  note: Optional[str] = None, replace_video: bool = False) -> Dict[str, Any]:
     run_dir = Path(run_dir)
@@ -353,7 +367,7 @@ def build_bundle(run_dir: Path, *, match_key: Optional[str] = None,
         "match": match,
         "slots": [{"slot": s, "thumb_path": thumbs.get(s)} for s in SLOTS],
         "points": build_points(points),
-        "actions": build_actions(points, pipeline.get("spikes")),
+        "actions": build_actions(points, pipeline.get("spikes"), clip_paths),
         "provenance": {
             "pipeline_version": pipeline.get("pipeline_version"),
             "postrun_schema": recon.get("schema_version"),

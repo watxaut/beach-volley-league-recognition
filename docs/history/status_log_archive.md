@@ -7229,6 +7229,34 @@ PATCH with the secret key ran only against the stub / a fake. No notification on
 was already supported by `windowParams` / `windowLabel` and the SQL window (`rls_smoke.sql` pins last-1), so no migration and no
 demo change. vitest +1 (65), typecheck clean.
 
+### 2026-10-10 (hundred-and-fourth session) — #104: second match through `make run-match` (20261010 vall d'Hebron): wrong score, side switches missed; diagnosis only
+
+**Asked (owner):** run the pipeline and the post-run on `resources/full_videos/20261010_1000_vall_dhebron_jesus_sara_joan_loida.mp4` (calibrated; "we
+finished 21 8 (I believe), won the couple in gray (Joan and Loida)"; the practice venue, other weather).
+
+**Run.** `make run-match` on MPS: 29295 frames in 1831 s (62.5 ms/frame; the 20260920 match runs at 30–32 — not looked at). Net top reads 2.36 m;
+`positions` refused the box offset (`kinds_disagree`). Result: 31 points, A 11 – B 20, set incomplete, switches after [23, 25, 26, 27, 28, 29].
+The calibration is committed; the run, the probe and its feature dump stay in `output/` (git-ignored).
+
+**Truth, read by the agent from frames (serve frame of all 31 points + four suspect spans; NOT owner GT).** Gray pair = squad 1 = A, near
+for P1–7, P17–22, P30–31; the pink pair near for P8–16, P23–29. P8 (04:34): the receiver catches the serve, the ball goes back to the server at the
+net and the same server serves 13 s later → replayed, no point. P14 (06:53): after P13 the receivers touch hands and walk back, the ball is
+lobbed to them from the far half → dead-time return; P13 is theirs. Missed (10:10, f18312): near serve by gray, pink attack, gray dig goes
+out. P30 (15:55): net-cord serve drops on the gray half, pink serves again → pink ace (or replayed). P31: gray wins, the four players meet at the net (f29290).
+That is 30 points, 21–9 (21–8 if P30 was replayed); the score at the switches is 6–1, 12–2, 17–4, 20–8 = 7 / 14 / 21 / 28 points.
+
+**Measured.** (1) Near squad set by hand (scratch what-if, `MatchAssembler._orient` patched, nothing written to the run dir): 21–10, switches
+after [7, 16, 22, 29]; 29 of 30 real points found, 2 false, winners 26/29 (P13 and P20 flipped by the false / missed point after them, P31 by
+the landing read). (2) Identity: `scripts/probe_identity_switches.py` → `identity_features.npz`; the replay reproduces the run's 10 flips
+(f21170 … f28054). Warm-up levels +0.39 / +0.52 (near / far side), mirrored prior −0.39 / −0.52; after the first switch the evidence reads
+−0.06 / −0.19, the CUSUM reads 0.68 at f7900 and 0 afterwards while the state-1 level slides to ~0 within 400 frames. Per rally, `(x_near − x_far) / 2`: squad 1 near
++0.22…+0.39 (15 points), squad 2 near −0.13…+0.07 (16). `LEVEL_ALPHA` 0.0002 / 0: switches found, 24 / 28 flips. (3) Post-run events: P14 =
+track birth at y 2.5 m, peak 4.8 m, 13 m at 7.6 m/s; the missed serve = toss tracked f18308–18328, track dead at the hit, reborn f18354 at
+y 9.5 m, 4.3 m up.
+
+**Not done / owed:** no `src/` change, no suite run (STATUS guard only), nothing published. Owner: confirm 21–9 vs 21–8 and the P8 / P14
+reads; approve the post-run orientation design (Active next 2).
+
 ### Session index lines moved out of STATUS.md (verbatim, oldest first)
 
 > The index is capped at 100 lines (`tests/test_status_leanness.py`); from 2026-10-08 (#98) the oldest
@@ -7244,3 +7272,4 @@ demo change. vitest +1 (65), typecheck clean.
 - 2026-09-06 **#7** — ball-matching rework: identity by trajectory + motion, never confidence; static spares can't bootstrap/steal/starve.
 - 2026-09-06 **#8** — squatter review: sideline straddlers expire from the roster (e2/e7 slots freed early).
 - 2026-09-06 **#9** — in-court preference (off-court cost penalty) fixes bystander squat + Hungarian chain-swaps (point 16).
+- 2026-09-08 **#10** — e6 poke read (resolver touch-3 fall-through + analyzer type + stance-majority team) + rally-opening serve gate + redirect locality; e7 GT ratified; e5/e6 team 1.0.

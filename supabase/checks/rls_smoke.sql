@@ -64,7 +64,8 @@ returns jsonb language sql as $$
                          'spike_type', 'hard',
                          'extra', jsonb_build_object(
                            'court_err_m', jsonb_build_array(0.4, 0.7),
-                           'launch', jsonb_build_object('speed_ms', 11.2, 'elevation_deg', 4.0))),
+                           'launch', jsonb_build_object('speed_ms', 11.2, 'elevation_deg', 4.0),
+                           'clip', 'clips/20260920_1830_check_court/345-0123456789ab.mp4')),
       jsonb_build_object('point_no', 1, 'seq', 4, 'frame', 360, 'slot', null, 'team', 'B',
                          'action', 'dig', 'touch_number', 1, 'observed', false),
       jsonb_build_object('point_no', 2, 'seq', 0, 'frame', 811, 'slot', 'P1A', 'team', 'A',
@@ -100,6 +101,9 @@ begin
     'public.window_matches(text,date,date,int,bigint,boolean)', 'execute'),
     'the window helper is internal';
   assert has_function_privilege('anon', 'public.ping()', 'execute'), 'anon must reach ping()';
+  assert not has_function_privilege('anon', 'public.can_see_match_clip(text)', 'execute')
+     and has_function_privilege('authenticated', 'public.can_see_match_clip(text)', 'execute'),
+    'the clip rule is for members (the storage policy calls it)';
 
   -- table privileges are explicit (20261007120000): the grant is the first
   -- gate, RLS the second
@@ -290,6 +294,23 @@ end $$;
 reset role;
 
 -- ── access tiers ──────────────────────────────────────────────────────────
+-- What the publisher put in the media bucket (attack clips, 20261010100000):
+-- the clip of Ari's spike, a clip under a key no match has, a slot thumbnail.
+insert into storage.objects (bucket_id, name) values
+  ('match-media', 'clips/20260920_1830_check_court/345-0123456789ab.mp4'),
+  ('match-media', 'clips/20990101_0000_no_such_match/1-0123456789ab.mp4'),
+  ('match-media', 'thumbs/20260920_1830_check_court/P1A.jpg');
+
+-- the match is a DRAFT: not even its own players watch its clips
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+do $$
+begin
+  assert (select count(*) from storage.objects where bucket_id = 'match-media') = 0,
+    'no clip of a draft';
+end $$;
+reset role;
+
 -- a stranger (bob) while the match is a DRAFT: sees nothing
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b0', true);
@@ -390,6 +411,8 @@ begin
     assert r ->> 'timeline' is null, 'the per-point timeline needs match detail';
   end;
   assert not public.set_my_privacy(true), 'bob has no player to change';
+  assert (select count(*) from storage.objects where bucket_id = 'match-media') = 0,
+    'a clip follows the touches of its match: none for a member who did not play it';
   update public.players set display_name = 'hacked';
   assert not exists (select 1 from public.players where display_name = 'hacked'),
     'viewers cannot edit players';
@@ -433,6 +456,11 @@ begin
       "free": {"n": 0, "kills": 0, "errors": 0}, "unread": {"n": 0, "kills": 0, "errors": 0}}'::jsonb,
     'attacks by shot';
   assert (v_prof -> 'analytics' -> 'landings' -> 0 ->> 'type') = 'hard', 'the map knows the shot';
+  -- attack clips: the attack names its clip, and she may fetch that file --
+  -- that one only (no thumbnail, no clip under another key)
+  assert (v_prof -> 'analytics' -> 'landings' -> 0 ->> 'clip') = 'clips/20260920_1830_check_court/345-0123456789ab.mp4', 'the attack names its clip';
+  assert (select array_agg(name) from storage.objects where bucket_id = 'match-media')
+         = array['clips/20260920_1830_check_court/345-0123456789ab.mp4'], 'a player of the match reads its clips, nothing else in the bucket';
   -- N1: she served point 2 (won); her team received point 1 (won) and served point 2 (won)
   assert (v_prof -> 'analytics' -> 'rally' -> 'own_serve') = '{"n": 1, "won": 1}'::jsonb, 'break % as server';
   assert (v_prof -> 'analytics' -> 'rally' -> 'team_receiving') = '{"n": 1, "won": 1}'::jsonb, 'side-out %';
@@ -534,6 +562,11 @@ begin
   assert (public.player_profile((select id from public.players where display_name = 'Check Ari'))
           ->> 'can_see_analytics')::boolean, 'opted-in analytics are visible to members';
   assert (select count(*) from public.actions) = 0, 'touches stay participant-only';
+  -- a clip shows all four players: it follows the match, never one profile
+  assert (public.player_profile((select id from public.players where display_name = 'Check Ari'))
+          -> 'analytics' -> 'landings' -> 0 -> 'clip') = 'null'::jsonb
+     and (select count(*) from storage.objects where bucket_id = 'match-media') = 0,
+    'sharing analytics shows the attack map without its clips';
   -- the report follows: Ari's own numbers open, her partner's stay closed, and
   -- so does everything that would give the partner away by subtraction
   declare r jsonb := public.match_report(current_setting('check.match_id')::bigint);
@@ -585,6 +618,20 @@ begin
      and r -> 'serve_targets' ? 'A' and r -> 'serve_targets' ? 'B'
      and jsonb_array_length(r -> 'timeline') = 4,
     'an opened play-by-play opens the whole report with it';
+  assert (public.player_profile((select id from public.players where display_name = 'Check Ari'))
+          -> 'analytics' -> 'landings' -> 0 ->> 'clip') = 'clips/20260920_1830_check_court/345-0123456789ab.mp4'
+     and (select array_agg(name) from storage.objects where bucket_id = 'match-media')
+         = array['clips/20260920_1830_check_court/345-0123456789ab.mp4'], 'and its clips';
+end $$;
+reset role;
+
+-- an admin reads the whole media bucket (thumbnails, every clip)
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', true);
+do $$
+begin
+  assert (select count(*) from storage.objects where bucket_id = 'match-media') = 3,
+    'admins read every file of the match buckets';
 end $$;
 reset role;
 

@@ -57,7 +57,7 @@ export const GLOSSARY = {
   trend: { label: 'Trend', what: 'The rate over the last 30 attempts, redrawn after every attempt.',
     how: 'The band is the 95% range: how far the rate can move by chance alone.', grade: 'A' },
   attack_map: { label: 'Attack map', what: 'Each line runs from where the ball was hit to where it came down or was dug. A heavy line is a hard spike, a dotted one a touch shot, a dashed one a free ball.',
-    how: 'Left–right is precise. Depth is not: about ±0.7 m at the hit, more at the far baseline. A dug ball ends where the defender played it, not where it would have landed. Highlight an attack to see its error area.',
+    how: 'Left–right is precise. Depth is not: about ±0.7 m at the hit, more at the far baseline. A dug ball ends where the defender played it, not where it would have landed. Highlight an attack to see its error area, and its clip where there is one: the second before the hit and the 1.5 s after it.',
     grade: 'B' },
   shot_type: { label: 'Hard or touch', what: 'Hard = the ball was driven. Touch = it was placed: a lob, a poke, a slow drop. Read from the flight after the hit: a ball that leaves steeply upward (25° or more) or slowly (under 5 m/s) is a touch, the rest are hard.',
     how: `Right on 26 of 29 spikes of the reference match, the match its two thresholds were chosen on. A flat poke can read as hard: the camera sees the flight, not the swing. About 1 spike in 10 gets no type. Share and hitting % show from ${MIN_N} attacks.`,
