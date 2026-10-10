@@ -98,7 +98,7 @@ colours/labels. Pass-2 scripts (`relabel_serves`, `resolve_side_switches`,
 `resolve_point_winners` 18/33, `consume_serve_evidence`) are SUPERSEDED by
 `src/postrun` for points/serves/winners; kept as provenance. Entreno action
 gate (causal): e1 0.706, e2 0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933,
-e7 0.75 (same-session A/B only). Test suite **1257** (1251 pass, 5 skipped; `test_inbox` run-match order fails at HEAD, not #105).
+e7 0.75 (same-session A/B only). Test suite **1258** (1252 pass, 5 skipped; `test_inbox` run-match order fails on `main` too, not #105).
 
 **Player detector input (#94, default ON):** `player_bgr_input: true` passes BGR as-is (`false` = the old path; how to compare: Learnings). 4-track frames up on all 7 clips, stream F1 0.824→0.839, post-run identical; match stream labels 81/145→74/146; e3 contact sheet owed. Full text: `docs/history/status_where_we_are_archive.md` (#97).
 
@@ -502,7 +502,7 @@ person (incl. far blockers the tracker sided near); 8 id changes inside rallies,
 0 rule breaks); who 207/208. Sweep 111 rows: none loses a point or a winner, worst P 0.965, action 0.958. Clips e1–e7 re-run: `compare_runs` IDENTICAL ×7,
 dumps identical bar `id_sims` (only e3 / e4 enroll), 52/53 as before. 20261010 re-run (`make run-match`, 2031 s, 69 ms/frame): `pipeline_output.json` + CSVs
 identical bar the video name, all 29 303 dump lines identical bar `id_sims` (107 406 rows, = the injected ones within 0.0004), same reconstruction.
-Suite 1257: 1251 pass, 5 skipped, `test_inbox` run-match order still failing (not this session's).
+Suite 1258 (after merging `main`): 1252 pass, 5 skipped, `test_inbox` run-match order failing as on `main`.
 
 **Not done / owed.** The 20261010 POINTS (blocks 7 / 9 / 6 / 7): owner GT first. Owner label feedback (P2 spike, P2 hidden set, P5 block): recorded only.
 The live overlay keeps the causal labels. Uncommitted in the tree and not this session's: `--start-frame` for `make run-live` (Makefile, `src/main.py`,
