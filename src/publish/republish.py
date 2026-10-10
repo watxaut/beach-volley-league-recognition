@@ -16,6 +16,11 @@ identity, so legacy run names published with ``--match-key`` are found too):
 2. ``python -m src.publish <run_dir> --match-key <key>`` publishes it.
    Identical content is logged ``unchanged`` and writes nothing.
 
+The publisher's own output is not shown, so what it could NOT do for a match
+is: how many of the credited attacks got a clip, and why not all (the video
+is not on disk from this checkout and the run has no rally copy, ffmpeg is
+missing). A bundle without clips is otherwise just "unchanged".
+
 A match whose diag dump (or calibration) was deleted cannot be recomputed:
 it is listed as skipped, never silently left behind. KEEP THE DIAG DUMP of
 every published match (about 50 MB each). Exit code 1 when any match failed
@@ -26,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -54,6 +60,8 @@ class Outcome:
     run_dir: Path
     status: str          # applied | unchanged | skipped | failed | planned
     detail: str = ""
+    #: What the publisher said about the attack clips ("clips 41 of 41").
+    clips: str = ""
 
 
 def _calibration_of(run_dir: Path) -> Optional[Path]:
@@ -95,6 +103,27 @@ def discover(root: Path, cwd: Optional[Path] = None) -> List[Candidate]:
     return out
 
 
+_CLIPS = re.compile(r"^clips\s+(\d+) of (\d+) credited attacks", re.M)
+#: The publisher's lines that say why an attack has no clip.
+_NO_CLIP_REASONS = ("video not on disk and no rally copy", "ffmpeg is not installed",
+                    "attack clips:")
+
+
+def clips_note(publish_stdout: str) -> str:
+    """``clips 41 of 41``, or ``clips 0 of 41: <why>`` with the publisher's
+    own reason; empty when the output has no clip count (an older publisher)."""
+    m = _CLIPS.search(publish_stdout or "")
+    if not m:
+        return ""
+    have, of = int(m.group(1)), int(m.group(2))
+    note = f"clips {have} of {of}"
+    if have < of:
+        why = next((ln.strip() for ln in publish_stdout.splitlines()
+                    if ln.strip().startswith(_NO_CLIP_REASONS)), "")
+        note += f" -- NOT ALL: {why}" if why else " -- NOT ALL"
+    return note
+
+
 def _last_line(text: str) -> str:
     lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
     return lines[-1] if lines else ""
@@ -134,8 +163,12 @@ def republish(candidates: Sequence[Candidate], *, dry_run: bool = False,
             continue
         tail = _last_line(res.stdout)             # "published: applied (revision 3, ...)"
         status = "unchanged" if "unchanged" in tail else "applied"
-        outcomes.append(Outcome(c.key, c.run_dir, status, tail))
-        say(f"[republish] {c.key}: {tail}")
+        note = clips_note(res.stdout)
+        outcomes.append(Outcome(c.key, c.run_dir, status, tail, note))
+        say(f"[republish] {c.key}: {tail}" + (f"; {note}" if note else ""))
+        for line in res.stdout.splitlines():      # e.g. storage could not be listed / cleaned
+            if line.startswith("warning:"):
+                say(f"[republish] {c.key}: {line}")
     return outcomes
 
 
@@ -170,6 +203,11 @@ def main(argv: Optional[List[str]] = None, run: Runner = subprocess.run) -> int:
         return 0
     outcomes = republish(candidates, dry_run=args.dry_run, allow_dirty=args.allow_dirty, run=run)
     print(f"[republish] {summary(outcomes)}")
+    short = [o.key for o in outcomes if "NOT ALL" in o.clips]
+    if short:
+        print(f"[republish] attack clips are missing for: {', '.join(short)}. Publish the match "
+              f"once from the checkout that has its video (it writes rallies.mp4 into the run "
+              f"directory), then run this again.")
     return 1 if any(o.status in ("failed", "skipped") for o in outcomes) else 0
 
 
