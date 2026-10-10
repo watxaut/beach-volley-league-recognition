@@ -68,7 +68,10 @@ check: the two net-top clicks, never used to build the model, land at
    cross-check and the only read for the last point, where the score closing
    the set decides. Squads come from the identity read, so a side switch is
    the rally where the near half changes squad. Service order (teammates
-   alternate on each side-out) names the server of every point.
+   alternate on each side-out) names the server of every point. A serve the
+   receivers touch once, with no second touch, and lose is an ace -- from
+   either end (owner rule 2026-10-10; a far serve is read from the track's
+   birth and counts all the same).
 
 7. **Attack type** (`attack_shape.py`, #97). Every observed spike / overpass
    gets `spike_type` (`hard` / `touch`) from the flight that follows it, in

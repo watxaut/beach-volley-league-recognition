@@ -304,11 +304,14 @@ class MatchAssembler:
             last.outcome = OUTCOME_ERROR
             return
         before = pt.touches[-2]
-        if before.side == last.side or not before.observed:
+        if before.side == last.side:
             return
         if before.touch_number == 0:
+            # The serve is the start of the point whether its launch was seen
+            # or read from the track's birth (every far serve): the receivers
+            # touched it once, nobody touched it again and they lost = an ace.
             before.outcome = OUTCOME_ACE
-        elif before.action in (ACTION_SPIKE, ACTION_OVERPASS):
+        elif before.observed and before.action in (ACTION_SPIKE, ACTION_OVERPASS):
             before.outcome = OUTCOME_KILL
 
     # -- service order ----------------------------------------------------- #

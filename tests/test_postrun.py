@@ -528,6 +528,36 @@ def test_service_order_names_the_server_nobody_saw():
     assert order["A"]["first_server"] == "P1A" and order["A"]["applied"]
 
 
+def _serve_then(side, hits, landing):
+    """One point served from ``side`` with the given receiving touches, then
+    the same half serves again (it won the point)."""
+    b = sim.StreamBuilder(30.0)
+    serve_xy = (6.0, 16.8) if side == "near" else (2.0, -0.6)
+    b.rally(sim.RallyScript(start_s=2.0, serve_xy=serve_xy, hits=hits, landing=landing))
+    b.rally(sim.standard_rally(16.0, side, sim.NEAR_A))
+    return _reconstruct(b, points_to_win=21)["points"][0]
+
+
+def test_serve_touched_once_and_lost_is_an_ace_from_either_end():
+    # Owner rule: a dig and no second touch, the ball not going back over, is
+    # an ace. The far serve has no launch of its own (it is read from the
+    # track's birth, ``observed`` False); it is the start of the point all the
+    # same.
+    near = _serve_then("near", [sim.Hit(1.15, "P1B", sim.DIG_Z)], (1.0, 2.5))
+    assert near["serve"]["outcome"] == "ace" and near["winner"] == "A"
+    far = _serve_then("far", [sim.Hit(1.15, "P1A", sim.DIG_Z)], (7.0, 13.5))
+    assert not far["serve"]["observed"]
+    assert far["serve"]["outcome"] == "ace" and far["winner"] == "B"
+    assert [t["action"] for t in far["touches"]] == ["serve", "dig"]
+
+
+def test_a_set_and_a_third_contact_is_not_an_ace():
+    lost = _serve_then("far", [sim.Hit(1.15, "P1A", sim.DIG_Z), sim.Hit(1.6, "P2A", sim.SET_Z),
+                               sim.Hit(1.6, "P1A", sim.SPIKE_Z)], (4.0, 8.6))
+    assert lost["winner"] == "B" and lost["serve"]["outcome"] is None
+    assert lost["touches"][-1]["outcome"] == "error"
+
+
 def test_touch_credited_after_the_ball_died_is_dropped_by_the_next_serve():
     b = sim.StreamBuilder(40.0)
     # Point 1: A serves, B's attack goes into the net and drops on B's half;
