@@ -253,8 +253,14 @@ The cross-session plan for consistent 4-player IDs:
   `scripts/replay_identity.py`, 17 s): tune the decision layer OFFLINE, never
   by asking the owner for another full run. Per-player (within-side)
   correctness is still only checked on contact sheets.
-  Phase 2 (global stitch / post-hoc relabel) is the owner-approved fallback
-  if online is not enough.
+- Phase 2 is BUILT (#105): online was not enough. On the 20261010 match the
+  resolver read none of the first two switches (the players walk around the
+  net one at a time while it adapts; the unseen orientation is not the mirror
+  it assumes), then flipped ten times. Who is who in everything the product
+  shows is now the post-run identity read (§11, `src/postrun/identity.py`);
+  the causal resolver stays as the live overlay's label and as the MEASURER:
+  the read works from the similarities it computed. Do not tune the causal
+  orientation test again to fix a published identity -- fix the read.
 
 ### 5. Attribution signals — long-axis camera
 
@@ -384,6 +390,23 @@ causal and untouched. Owner rules it encodes — keep them when changing it:
   there must leave everything but the position keys byte-identical on the
   match and e1–e7, and needs `make republish-all`.
 
+* **Who is who is a post-run read (#105, `src/postrun/identity.py`):** which
+  squad is near is one fact per rally, read in hindsight at two levels the
+  MATCH shows (never assume the unseen orientation mirrors the enrolled one,
+  never use the "switch every 7 points" rule to place a switch: the point
+  count can be wrong and the block sizes are the cross-check); who is who
+  inside a rally is one shortest path over frames. Rules to keep: it reads
+  only `id_sims` (similarities to the FIXED enrollment anchors, as the causal
+  resolver measured them) -- never learned prototypes, never the causal
+  labels; a body's half is its SQUAD's half (a blocker stands on the net
+  line, a jump projects the feet deep: feet are a cost, and only clear of the
+  net); a half whose two players cannot be told apart gets no labels
+  (precision first); a dump without `id_sims` keeps its causal labels
+  untouched. A change must hold the bar below, `who 207/208` in
+  `sweep_postrun.py` (the #88 owner CSV) and 31/31 orientations on the
+  20261010 match; a NEW match is checked on a per-rally contact sheet before
+  it is published.
+
 Validation protocol for any change: `score_postrun.py` on the 20260920 match
 (the bar: 33/33 points, 0 false, winners 33/33, score A 21 – B 12, touch
 precision ≥ 0.95, no touch on the wrong half, 0 rule breaks —
@@ -391,8 +414,10 @@ precision ≥ 0.95, no touch on the wrong half, 0 rule breaks —
 `score_postrun_entreno.py` (other venue), then `sweep_postrun.py` (no row may
 lose a point or a winner). Per-player correctness has no GT: it is checked by
 the owner on contact sheets, never claimed from these scores. The input is
-the `--diag-dump` JSONL (schema ≥ 4); a new per-frame need is added to the
-dump as an observation of an already-computed value, never as a second pass.
+the `--diag-dump` JSONL (schema ≥ 4; ≥ 5 for the identity read: `id_sims`
+per clean body + `identity_players` in the header); a new per-frame need is
+added to the dump as an observation of an already-computed value, never as a
+second pass.
 
 ### 12. Speed work must be results-neutral (owner-asked 2026-10-06, #89)
 

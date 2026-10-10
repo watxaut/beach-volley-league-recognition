@@ -22,6 +22,7 @@ import numpy as np
 from .attack_shape import type_attacks
 from .ball_flights import SOURCE_GAP, BallTimeline
 from .geometry import CourtGeometry
+from .identity import read_identities
 from .match import SQUAD_LETTER, MatchAssembler, Point
 from .positions import publish_positions
 from .rallies import RallySegmenter
@@ -32,7 +33,8 @@ from .touches import SOURCE_ALTERNATION, Touch, TouchSolver
 #: 3 = attacks carry ``spike_type`` + ``launch`` (attack_shape).
 #: 4 = ``court_x_m`` / ``court_y_m`` / ``court_xy_m`` are the ``positions`` reads
 #:     (net-anchored, box offset removed); ``positions`` says how they were made.
-SCHEMA_VERSION = 4
+#: 5 = ``identity``: who is who was read per rally in hindsight (or why not).
+SCHEMA_VERSION = 5
 logger = logging.getLogger(__name__)
 
 
@@ -41,11 +43,18 @@ def reconstruct(stream: MatchStream, geometry: CourtGeometry,
                 switch_every: int = 7) -> Dict[str, Any]:
     timeline = BallTimeline(stream, geometry, frame_size=frame_size)
     rallies = RallySegmenter(timeline).segment()
+    # Who is who, per rally, before anything is credited to anyone.
+    identity, reader = read_identities(
+        stream, geometry, [(r.start_frame, r.end_frame) for r in rallies])
     solver = TouchSolver(timeline)
     points: List[Point] = []
-    for rally in rallies:
+    for i, rally in enumerate(rallies):
+        seen = identity.rallies[i] if reader is not None else None
+        if seen is not None:
+            reader.apply(seen)
         touches, roster = solver.solve(rally)
-        points.append(Point(rally=rally, touches=touches, roster=roster))
+        points.append(Point(rally=rally, touches=touches, roster=roster,
+                            near_squad_read=seen.near_squad if seen else None))
     checks = MatchAssembler(points_to_win=points_to_win,
                             switch_every=switch_every).assemble(points)
     for pt in points:                     # after the match layer: labels are final
@@ -66,6 +75,7 @@ def reconstruct(stream: MatchStream, geometry: CourtGeometry,
             "net_top_height_m": _round(geometry.net_top_height_m(), 2),
         },
         "positions": positions.payload(),
+        "identity": identity.payload(),
         "checks": checks,
         "points": payload,
         "player_stats": player_stats(payload),

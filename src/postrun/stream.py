@@ -24,6 +24,10 @@ from .geometry import SIDE_FAR, SIDE_NEAR
 # ball_state codes
 BALL_NONE, BALL_PREDICTED, BALL_TRACKED = 0, 1, 2
 
+#: A rally is read with the stretch around it where the players already /
+#: still stand in formation: seconds before the serve, after the ball is dead.
+RALLY_WINDOW_S = (1.5, 0.5)
+
 #: Perception's court-side letters (AGENTS.md: near half = "A", far = "B").
 #: They name a HALF, never a squad -- squads come from the identity labels.
 _SIDE_OF_LETTER = {"A": SIDE_NEAR, "B": SIDE_FAR}
@@ -40,6 +44,9 @@ class PlayerObs:
     label: Optional[str] = None        # P1A ... (identity resolver, this frame)
     squad: Optional[int] = None
     slot: Optional[int] = None
+    #: Similarity to each enrolled player's anchors, in the dump's
+    #: ``identity_players`` order (schema 5; clean, real bodies only).
+    id_sims: Optional[Tuple[float, ...]] = None
 
     @property
     def foot(self) -> Tuple[float, float]:
@@ -81,6 +88,8 @@ class MatchStream:
     obs_side: List[Optional[str]] = field(default_factory=list)     # #77 row
     obs_ground: List[Optional[str]] = field(default_factory=list)   # #80 row
     schema_version: int = 0
+    #: Labels the ``id_sims`` columns stand for (None: the dump has none).
+    identity_players: Optional[List[str]] = None
 
     # -- derived reads ---------------------------------------------------- #
 
@@ -92,11 +101,21 @@ class MatchStream:
     def tracked(self) -> np.ndarray:
         return self.ball_state == BALL_TRACKED
 
+    @property
+    def has_identity_observations(self) -> bool:
+        return bool(self.identity_players) and any(
+            p.id_sims is not None for row in self.players for p in row)
+
     def seconds(self, frames: float) -> float:
         return float(frames) / self.fps
 
     def frames(self, seconds: float) -> int:
         return int(round(seconds * self.fps))
+
+    def rally_window(self, start_frame: int, end_frame: int) -> Tuple[int, int]:
+        """First and last frame a rally's players are read on."""
+        before, after = (self.frames(s) for s in RALLY_WINDOW_S)
+        return max(0, start_frame - before), min(self.n_frames - 1, end_frame + after)
 
     def players_at(self, frame: int, search: int = 0) -> List[PlayerObs]:
         """Players on ``frame``; with ``search`` > 0 fall back to the nearest
@@ -172,12 +191,14 @@ def load_stream(diag_path: str, fps: Optional[float] = None) -> MatchStream:
             b = p.get("bbox")
             if not b or p.get("track_id") is None:
                 continue
+            sims = p.get("id_sims")
             players[frame].append(PlayerObs(
                 track_id=int(p["track_id"]),
                 bbox=(float(b[0]), float(b[1]), float(b[2]), float(b[3])),
                 predicted=bool(p.get("predicted")),
                 court_side=_SIDE_OF_LETTER.get(p.get("team")),
                 label=p.get("player_label"), squad=p.get("squad"), slot=p.get("slot"),
+                id_sims=tuple(float(v) for v in sims) if sims else None,
             ))
         pos = rec.get("ball_possession") or {}
         obs_side[frame] = pos.get("side")
@@ -191,6 +212,7 @@ def load_stream(diag_path: str, fps: Optional[float] = None) -> MatchStream:
         candidates=sorted(candidates.values(), key=lambda c: (c.frame, not c.accepted)),
         obs_side=obs_side, obs_ground=obs_ground,
         schema_version=int(meta.get("schema_version") or 0),
+        identity_players=list(meta.get("identity_players") or []) or None,
     )
 
 

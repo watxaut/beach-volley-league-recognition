@@ -1,0 +1,31 @@
+# 20261010 match (vall d'Hebron) -- owner feedback on the pipeline's read of the first 9 points
+# (resources/full_videos/20261010_1000_vall_dhebron_jesus_sara_joan_loida.mp4)
+#
+# Dictated by the owner 2026-10-10 (105th session), verbatim, after looking at the
+# point images of the run in output/20261010_1000_vall_dhebron_jesus_sara_joan_loida/
+# (the reconstruction as first run: no side switch read before point 23).
+# Point and frame numbers are the RUN's (match_reconstruction.txt of that run);
+# player labels are the ones enrolled at the start: P1A / P2A = the pair near at
+# the start (Joan in the grey long sleeve = P1A, Loida in black = P2A),
+# P1B / P2B = the pair far at the start (Jesus in pink = P1B, Sara in green and
+# leggings = P2B). Who is who is the agent's read of the frames, not dictated.
+#
+# This is feedback, not a contact-level GT: only what the owner corrected is
+# listed. Everything else in points 1-9 was not commented on.
+
+Feedback from 20261010_1000_vall_dhebron_jesus_sara_joan_loida
+P2 f2009 overpass it's actually a spike
+P2 there is an action between dig f2041 and overpass f2093. It was a set but from outside the court while falling.
+P5 f4973 was a block from P1B actually, not a spike from P1A after the set overpassed a bit, then f4986 is not an overpass from P1A, its a dig from the block, then f5018 is an overpass by P2A, this one is correct.
+P7 was an ace from P1A, then side switch then on P8 P1A serves again. The problem here is that the pipeline changed teams P1A now is serving from the other line but I can read P2B from the point generated images. This is something to fix.
+P8 was another ace from P1A. There is a dig but then there is no set. If there is no set and it is not an overpass, it is an ace. If there is a set and a 3rd contact then it is not considered an ace.
+
+# What follows from it (agent's notes):
+# - First side switch after P7 at A 6 - B 1; P1A serves P7, P8 and P9 (P8 is a point,
+#   an ace -- NOT a replayed serve as the 104th session read it from the frames).
+# - Ace rule (owner): the receivers touch the serve once and there is no second
+#   touch and the ball does not go back over = ace. A set and a third contact = no ace.
+# - P2 f2009: an attack labelled overpass (contact height read under the tape).
+# - P2 f2041 -> f2093: a set played from outside the court, not seen (hidden touch).
+# - P5 f4973 / f4986: a block is not a label of the pipeline; the block was read as
+#   the attacker's spike and the dig after it as an overpass by the wrong team.

@@ -8,12 +8,14 @@ a likelihood cost. This moves each one well away from its shipped value and
 re-scores the reconstruction against the owner GT, so a result that only
 holds on a knife edge shows up as a row that falls apart. The last column is
 the hard / touch read of ``attack_shape`` (right / typed of the 32 owner-typed
-spikes, ``scripts/score_spike_type.py``).
+spikes, ``scripts/score_spike_type.py``); ``who`` counts the touches credited
+to the player the owner ratified (#88 review CSV).
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 from pathlib import Path
@@ -24,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from score_postrun import GT_CONTACTS, GT_POINTS, load_gt, score_reconstruction  # noqa: E402
 from score_spike_type import READ_POSTRUN, gt_spikes  # noqa: E402
 from score_spike_type import score as score_types  # noqa: E402
-from src.postrun import attack_shape, ball_flights, match, rallies, touches  # noqa: E402
+from src.postrun import attack_shape, ball_flights, identity, match, rallies, touches  # noqa: E402
 from src.postrun.geometry import CourtGeometry  # noqa: E402
 from src.postrun.reconstruct import reconstruct  # noqa: E402
 from src.postrun.stream import load_stream  # noqa: E402
@@ -75,6 +77,19 @@ SWEEP = [
     (attack_shape, "CONTACT_SEARCH_S", ((0.04, 0.12), (0.2, 0.4))),
     (attack_shape, "MIN_FLIGHT_SAMPLES", (3, 8)),
     (attack_shape, "MIN_FLIGHT_S", (0.1, 0.3)),
+    # Who is who per rally (needs a schema-5 dump: ``id_sims``; on an older
+    # dump these rows change nothing).
+    (identity, "NET_CLEAR_M", (0.5, 2.0)),
+    (identity, "MIN_SIDE_SECONDS", (0.25, 1.0)),
+    (identity, "SPLIT_MIN_SIGMAS", (3.0, 6.0)),
+    (identity, "SPLIT_MAX_SHARE", (0.3, 0.7)),
+    (identity, "LEVEL_SIGMA_FLOOR", (0.01, 0.04)),
+    (identity, "RALLY_COST_CAP", (4.5, 9.0)),
+    (identity, "SWITCH_COST", (2.0, 5.5)),
+    (identity, "SIDE_PENALTY", (0.25, 1.0)),
+    (identity, "SWAP_MARGIN", (0.08, 0.3)),
+    (identity, "SWAP_SECONDS", (0.5, 2.0)),
+    (identity, "SLOT_MIN_MARGIN", (0.01, 0.04)),
 ]
 
 
@@ -85,8 +100,20 @@ def summarise(score):
             f"serve-half {sv['side_ok']:>2}/{sv['n']}  win {w['ok']:>2}/{w['n']}  "
             f"P {matched / max(t.get('pred', 0), 1):.3f}  R {matched / max(t.get('gt', 0), 1):.3f}  "
             f"action {t.get('action_ok', 0) / max(t.get('action_n', 0), 1):.3f}  "
-            f"half {t.get('side_ok', 0) / max(matched, 1):.3f}  final {score['final_score']}"
+            f"half {t.get('side_ok', 0) / max(matched, 1):.3f}  "
+            f"squad {t.get('team_ok', 0)}/{t.get('team_n', 0)}  who {score['who']}  "
+            f"final {score['final_score']}"
             f"  type {score['types']['correct']}/{score['types']['covered']}")
+
+
+def who(recon, review):
+    """Touches whose player is the one the owner ratified (#88 review CSV:
+    point, frame -> player), out of the reviewed touches still in the
+    reconstruction."""
+    got = {(p["point"], t["frame"]): t["player"] or "" for p in recon["points"]
+           for t in p["touches"]}
+    both = [k for k in review if k in got]
+    return f"{sum(got[k] == review[k] for k in both)}/{len(both)}"
 
 
 def main() -> int:
@@ -94,16 +121,22 @@ def main() -> int:
     parser.add_argument("run_dir")
     parser.add_argument("--calibration",
                         default="calibrations/20260920_match_ari_joan_lost.json")
+    parser.add_argument("--review", help="owner-ratified per-player attribution CSV",
+                        default="ground_truth/20260920_match_reconstruction_player_review.csv")
     args = parser.parse_args()
     stream = load_stream(str(Path(args.run_dir) / "diag.jsonl"))
     geometry = CourtGeometry.from_file(args.calibration)
     gt = load_gt(GT_CONTACTS, GT_POINTS)
     typed = gt_spikes(json.loads(Path(GT_CONTACTS).read_text()))
+    with open(args.review) as f:
+        review = {(int(r["point"]), int(r["frame"])): r["player"]
+                  for r in csv.DictReader(f)}
 
     def run():
         recon = json.loads(json.dumps(reconstruct(stream, geometry)))
         score = score_reconstruction(recon, gt)
         score["types"] = score_types(recon, [], typed, read=READ_POSTRUN)
+        score["who"] = who(recon, review)
         return score
 
     print(f"{'shipped':<34} {summarise(run())}")

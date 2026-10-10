@@ -46,7 +46,13 @@ check: the two net-top clicks, never used to build the model, land at
    routines, pick-ups, balls rolled back) never start or extend a point.
    A rally whose serve was never seen is still found (≥4 touches, ≥2 net
    crossings) with an inferred serve.
-3. **Touches** (`touches.py`). One shortest path per rally over states
+3. **Who is who** (`identity.py`, #105; detail and numbers below). Before
+   anything is credited: which squad is near is read once per rally, then
+   which tracked body is which of the four players inside the rally. The
+   players of each rally window get their `label` / `squad` / `slot` and their
+   half rewritten from that read. A dump without the identity observations
+   (`id_sims`, schema 5) keeps the labels the causal pass stamped.
+4. **Touches** (`touches.py`). One shortest path per rally over states
    (half, touch number 1–3, which of that half's two players). Hard rules:
    the reception belongs to the receivers, at most three touches per
    possession, players alternate. Evidence: ball depth vs the half, ball
@@ -54,17 +60,17 @@ check: the two net-top clicks, never used to build the model, land at
    ball-to-body distance in body heights, time between touches. Vertices that
    fit nowhere are skipped; touches the stream never saw are allowed as
    hidden touches so the seen ones keep the right number.
-4. **Labels**. Same half follows → dig (touch 1) / set. Ends the possession →
+5. **Labels**. Same half follows → dig (touch 1) / set. Ends the possession →
    overpass on touch 1; on touch 2–3 a spike when hit at attack height
    (net − 0.28 m), else an overpass.
-5. **Match** (`match.py`). Winner = whoever serves the next point (rally
+6. **Match** (`match.py`). Winner = whoever serves the next point (rally
    scoring); the ball's death (net / own half / landed in / out) is the
    cross-check and the only read for the last point, where the score closing
-   the set decides. Squads come from the identity labels, so a side switch is
+   the set decides. Squads come from the identity read, so a side switch is
    the rally where the near half changes squad. Service order (teammates
    alternate on each side-out) names the server of every point.
 
-6. **Attack type** (`attack_shape.py`, #97). Every observed spike / overpass
+7. **Attack type** (`attack_shape.py`, #97). Every observed spike / overpass
    gets `spike_type` (`hard` / `touch`) from the flight that follows it, in
    metres: the hit is the largest image-velocity step near the vertex (the
    classifier dates a vertex 1–3 frames early); the flight up to the next
@@ -243,12 +249,99 @@ What it rests on, and what stays open:
   read from the feet needs a higher camera: the practice venue's ~3 m gives
   20–24 px per metre.
 
+## Who is who, measured (2026-10-10, #105)
+
+**Why it exists.** The causal resolver (`TeamIdentityResolver`) decides which
+squad is near frame by frame. On the 20261010 match (vall d'Hebron) it read
+none of the first two side switches and then flipped ten times, so the run
+came out A 11 – B 20 for a set squad A won. Two causes, both measured on the
+probe's feature dump:
+
+* **the players walk around the net one at a time** (first switch: f7450–7800,
+  about 12 s). The resolver follows the level of its evidence with a ~4 s time
+  constant, in dead time too: by the time all four had crossed, its "squad 1
+  is near" level had slid from +0.39 / +0.52 to about 0 and the spread had
+  grown fourfold. Nothing was left to detect;
+* **the unseen orientation is assumed to mirror the enrolled one** (−0.39 /
+  −0.52). It does not: the anchors were enrolled in one view each, so across
+  the net the evidence keeps a view bias as large as the signal. Per rally the
+  two orientations read +0.31…+0.38 and −0.13…+0.08 on that match (one woman
+  of squad B, seen from behind, looks more like squad A's woman than like her
+  own far-view anchor).
+
+**What is read instead** (hindsight, no assumption about the unseen level):
+
+1. *Evidence per rally.* Every clean, real body whose feet are more than 1 m
+   from the net line gives `x` = best squad-1 minus best squad-2 anchor
+   similarity (sign flipped on the far half); a rally's evidence is the mean
+   of its two halves' means. Bodies inside that metre are left out: a far
+   blocker stands on the net line in the picture (20261010 P20 / P30 / P31:
+   the tracker reads him near for the whole rally).
+2. *Two levels from the match.* The best two-level split of the rallies'
+   evidence is accepted as two orientations only if the levels are ≥ 4 spreads
+   apart and the lower one is at most half the upper one; otherwise nobody
+   switched. The first read rally is the enrolled orientation by construction
+   (if it sits at the lower level the read is refused and the causal labels
+   stay). A two-state shortest path over the rallies then decides each one: a
+   switch costs 4 nats and one rally weighs at most 6, so one odd rally in the
+   middle of a block is not two switches, and a last block of one point is
+   still read.
+3. *Players inside the rally.* One shortest path over the frames: a state is
+   which player each of the (up to four) track ids is, an id changes player
+   only when the evidence pays for it (0.15 similarity for 1 s). Per body and
+   frame the evidence is its similarity to that player's anchors minus the
+   value half way between the two teammates of that half in this orientation
+   (read from the match: a view shifts both teammates alike, so a body seen
+   without its teammate is still read unbiased), less 0.5 when its feet are
+   clear of the net on the other squad's half.
+4. *Write-back.* Label, squad, slot and half of every tracked body in the
+   rally window. The half is the SQUAD's half, so the roster of the touch
+   solver holds the two teammates whatever their feet say. A half whose two
+   players are told apart by less than 0.02 similarity gets no labels in that
+   rally (its squad is still known; its touches are credited to nobody).
+
+| | 20261010 (vall d'Hebron) | 20260920 (beach) |
+|---|---|---|
+| evidence levels (squad 1 near / squad 2 near / spread) | +0.347 / −0.038 / 0.044 | +0.146 / −0.083 / 0.023 |
+| rallies oriented right | 31/31 (agent's frame read) | 33/33 (owner GT) |
+| side switches | after 7, 16, 22, 29 (see below) | after 7, 14, 21, 28 |
+| score as reconstructed | A 21 – B 10, set complete (causal labels: A 11 – B 20) | A 21 – B 12 (unchanged) |
+| slot margin, weakest half | 0.040 (grey shirt vs black top, same view) | 0.31 |
+| labels on the right person | 93/93 sampled frames, 3 per rally (agent's eyes) | players = owner CSV on 207/208 touches |
+| id changes inside rallies | 8, 7 with the box jumping to another body | 36, 28 with the box jumping (the rest on coasting boxes) |
+
+20260920 is otherwise unchanged against the record above (points, serves,
+winners, score, touch precision / recall, action, half, squad, 0 rule breaks).
+The one touch that moved (P19 f13624, P1A → P2A; the owner's P1A is right):
+both near players are in one box, the man in front, the woman who bumps the
+ball hidden behind him. The read names the box P2A, which is who it shows; the
+causal label was a stale P1A that happened to be the toucher.
+
+Feet against the assigned half: 42 of 28 633 body-frames on 20261010 and 180
+of 30 475 on 20260920 read the other half by more than a metre (jumps project
+the feet deep, dives and merged boxes read near), in runs of up to 18 frames.
+That is why the feet are a cost and the squad decides.
+
+Sensitivity: the eleven constants moved ×0.5…×2 one at a time keep 31/31
+orientations on 20261010 and every score of 20260920. Labels change in three
+rows on 20261010: side penalty 0.25 (2.4 % of body-frames; the look-alike
+above wins — it holds from 0.35) and swap cost ×2 (0.4 %: one id swap followed
+late).
+
+**Not solved by this:** the 20261010 blocks are 7 / 9 / 6 / 7 points, not
+7 / 7 / 7 / 7 — the orientation is right, the POINTS are not (open point 32h:
+a ball lobbed back in dead time counted as a point, a near serve that left the
+top of the frame lost). `switch_blocks_ok: false` says so. The live overlay
+(`make run-live`) still shows the causal labels.
+
 ## Known limits
 
-* **Players are unscored.** The GT has no stable player identity; within-half
-  correctness rests on the identity resolver. Indirect evidence: the observed
-  servers agree with the service-order rotation on 84 % (A) / 89 % (B) of
-  serves. Owner contact sheets are still the gate.
+* **Players** are scored against the owner-ratified attribution of the
+  20260920 match (#88 CSV: 207/208 with the hindsight read, 208/208 with that
+  run's causal labels) and nothing else: one venue pair, two kits each. Four
+  players dressed alike, or teammates in the same kit, give a small slot
+  margin and no labels (precision first), never a guess -- untested on
+  footage. Owner contact sheets stay the gate for a new match.
 * **Line calls are weak** (blurred box through a 4-click homography): the
   ball-death read exists on 17 of 33 points; the 7 that need no line call
   (into the net, died on the hitter's half) are all right, but 3 of the 10

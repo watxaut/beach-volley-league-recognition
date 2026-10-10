@@ -14,8 +14,10 @@ Two independent reads of a point's winner exist and they check each other:
 When the two disagree and the death read is a confident one, the usual cause
 is a touch credited AFTER the ball was already dead (a pick-up, a ball thrown
 back): trailing touches are dropped until the point agrees with the serve
-that followed it. Squads (1 = A, 2 = B) come from the identity labels, so a
-side switch is simply the rally where the near half changes squad.
+that followed it. Squads (1 = A, 2 = B) come from the identity read
+(``identity``: one orientation per rally, read in hindsight; the causal
+labels when the dump carries no identity observations), so a side switch is
+simply the rally where the near half changes squad.
 """
 
 from __future__ import annotations
@@ -63,6 +65,8 @@ class Point:
     rally: Rally
     touches: List[Touch]
     roster: RallyRoster
+    #: Which squad is near by the post-run identity read (None: not read).
+    near_squad_read: Optional[int] = None
     near_squad: Optional[int] = None
     winner_squad: Optional[int] = None
     winner_source: Optional[str] = None
@@ -159,6 +163,9 @@ class MatchAssembler:
 
     def _orient(self, points: List[Point]) -> None:
         for pt in points:
+            if pt.near_squad_read is not None:
+                pt.near_squad = pt.near_squad_read
+                continue
             near = pt.roster.squad_on(SIDE_NEAR)
             far = pt.roster.squad_on(SIDE_FAR)
             if near is None and far is not None:

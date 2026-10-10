@@ -271,6 +271,11 @@ class BodyObs:
     in_court: bool = False       # foot in court (+slack): learnable
     desc: Optional[Descriptor] = None   # only for real, eligible bodies
     height: Optional[float] = None
+    # Similarity to each player's FIXED anchors, in ``players`` order, as the
+    # decision computed it for a clean body (not behind / merged with another
+    # one). Written by ``update_observed``; nothing in the resolver reads it
+    # back -- it is the observation the post-run identity read works from.
+    anchor_sims: Optional[List[float]] = None
 
 
 @dataclass
@@ -773,6 +778,7 @@ class TeamIdentityResolver:
                 anchor = self._anchor_sims(o.desc)
                 q1, q2 = self._squad_players[1], self._squad_players[2]
                 body["x"] = float(anchor[q1].max() - anchor[q2].max())
+                o.anchor_sims = [float(v) for v in anchor]
             bodies.append(body)
         return bodies
 

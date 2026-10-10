@@ -154,8 +154,7 @@ class RallyRoster:
 
     def __init__(self, stream: MatchStream, start: int, end: int) -> None:
         self.stream = stream
-        lo = max(0, start - stream.frames(1.5))
-        hi = min(stream.n_frames - 1, end + stream.frames(0.5))
+        lo, hi = stream.rally_window(start, end)
         self.lo, self.hi = lo, hi
         track_votes: Dict[int, Dict[str, int]] = {}
         for f in range(lo, hi + 1):
