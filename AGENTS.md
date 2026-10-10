@@ -407,6 +407,19 @@ causal and untouched. Owner rules it encodes — keep them when changing it:
   20261010 match; a NEW match is checked on a per-rally contact sheet before
   it is published.
 
+* **Rulers that came from the second match (#106) — keep them:** attack vs
+  pass is the contact height over the TOUCHER's own standing height
+  (`ATTACK_REACH_RATIO`; the net tape is only the fallback when no player can
+  be measured), with the contact read where the ball leaves its arc, never at
+  the classifier's vertex (0–3 frames early = up to +0.5 m); a landing is
+  where the ball stops falling, not the first frame its width fits the sand;
+  a serve-shaped launch is refused only when both receivers are read to
+  0.5 m, stand more than 1.5 m apart in depth AND fewer than two touches
+  follow. The 1.23 split was set on the 91 labelled touches of 20260920 +
+  20261010: do not re-tune it on them. The players' own count can be wrong
+  (20261010: switch after 15 points, set played to 22): 21 and blocks of 7
+  are checks to report, never a reason to drop or invent a point.
+
 Validation protocol for any change: `score_postrun.py` on the 20260920 match
 (the bar: 33/33 points, 0 false, winners 33/33, score A 21 – B 12, touch
 precision ≥ 0.95, no touch on the wrong half, 0 rule breaks —

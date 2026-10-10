@@ -7221,6 +7221,14 @@ console errors.
 **Not done / owed:** `supabase db push` (4 migrations now owed) and a first report on the hosted project — the storage policies and the
 PATCH with the secret key ran only against the stub / a fake. No notification on a new report (Admin tab count or `make feedback`).
 
+### 2026-10-09 (hundred-and-third session) — "last match" on the time filter
+
+**Asked (owner):** add a "last match" option to the stats time filter (the menu started at "last 3 matches").
+
+**Built.** `MATCH_PRESETS` in `webapp/src/lib/window.ts` is now `[1, 3, 5, 10]`; the key `n1` (label "last match", `p_last_n => 1`)
+was already supported by `windowParams` / `windowLabel` and the SQL window (`rls_smoke.sql` pins last-1), so no migration and no
+demo change. vitest +1 (65), typecheck clean.
+
 ### Session index lines moved out of STATUS.md (verbatim, oldest first)
 
 > The index is capped at 100 lines (`tests/test_status_leanness.py`); from 2026-10-08 (#98) the oldest
@@ -7235,3 +7243,4 @@ PATCH with the secret key ran only against the stub / a fake. No notification on
 - 2026-09-05 **#6** — GAME-ON badge latency fixed (rolling sustained-flight provisional); serve-init semantics (provisional fast ON, serve arming); heatmap landscape + cache busting.
 - 2026-09-06 **#7** — ball-matching rework: identity by trajectory + motion, never confidence; static spares can't bootstrap/steal/starve.
 - 2026-09-06 **#8** — squatter review: sideline straddlers expire from the roster (e2/e7 slots freed early).
+- 2026-09-06 **#9** — in-court preference (off-court cost penalty) fixes bystander squat + Hungarian chain-swaps (point 16).

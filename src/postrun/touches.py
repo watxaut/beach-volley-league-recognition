@@ -106,12 +106,24 @@ ARM_SIDE = 0.25
 SERVER_MIN_DEPTH_GAP_M = 1.5        # server vs partner must differ this much
 SERVER_PARTNER_MAX_DEPTH_M = 5.0    # a lone visible player this close is the partner
 SERVER_MIN_DEPTH_M = 7.0            # a lone visible player this deep is the server
-# Attack vs bump when a touch sends the ball over: contact height relative to
-# the net tape. Measured (20260920, 59 possession-ending touches): every
-# spike / poke was hit above 2.2 m and bump passes below 2.07 m, with soft
-# "rainbow" attacks and high two-handed passes overlapping around 2.05 m.
-# The split sits above that overlap: an ambiguous touch is an overpass,
-# never an invented attack.
+# Attack vs bump when a touch sends the ball over: was it hit with the arm
+# up, above the head? Contact height (where the ball leaves its arc,
+# ``BallTimeline.arc_exit``) in units of the toucher's own STANDING height:
+# a short player's attack is as far above his head as a tall one's. Measured
+# on the 91 labelled possession-ending second / third touches of 20260920
+# (owner GT) and 20261010 (owner feedback): passes read 0.5-1.19, swings and
+# pokes 1.27 and up; two passes played with the arms above the head read
+# 1.27 / 1.29 and are the misses. The split is the middle of the empty band.
+# The tape is the wrong ruler: two players of 20261010 attack at 1.85-2.05 m,
+# under any tape, and read as attacks only when the vertex was dated early.
+ATTACK_REACH_RATIO = 1.23
+# Standing height of a player: this percentile of his box heights in metres
+# (a player waits crouched and jumps with his arms up; the box reads ~10 %
+# under his real height, the same for everyone), seen at least this long.
+STANDING_PERCENTILE = 75.0
+STANDING_MIN_SEEN_S = 0.7
+# Without a player to measure against, the old ruler: contact height under
+# the net tape (20260920: every attack above 2.2 m at the vertex).
 ATTACK_BELOW_TAPE_M = 0.28
 
 
@@ -126,6 +138,10 @@ class Touch:
     squad: Optional[int] = None
     reach: Optional[float] = None     # body heights between ball and player
     height_m: Optional[float] = None
+    #: Ball height where it left its arc, and that height in units of the
+    #: toucher's standing height (attack vs bump; None: no player to measure).
+    contact_height_m: Optional[float] = None
+    contact_ratio: Optional[float] = None
     court_y: Optional[float] = None
     court_x: Optional[float] = None   # ball at the touch, camera frame (0 = image-left line)
     court_err: Optional[Tuple[float, float]] = None   # (across, along) m it may be off
@@ -223,6 +239,19 @@ class RallyRoster:
         y = geometry.foot_court_y(obs.bbox)
         return y if (y is not None and -6.0 < y < 24.0) else None
 
+    def standing_height_m(self, key: str, geometry) -> Optional[float]:
+        """How tall the player stands, in metres of his own picture scale."""
+        heights = []
+        for obs in self.obs.get(key, {}).values():
+            if obs.predicted:
+                continue
+            y = geometry.foot_court_y(obs.bbox)
+            if y is not None and -6.0 < y < 24.0:
+                heights.append(obs.height_px / float(geometry.px_per_metre(y)))
+        if len(heights) < max(1, self.stream.frames(STANDING_MIN_SEEN_S)):
+            return None
+        return float(np.percentile(heights, STANDING_PERCENTILE))
+
     def squad_on(self, side: str) -> Optional[int]:
         votes: Dict[int, int] = {}
         for key in self.by_side.get(side, []):
@@ -230,6 +259,20 @@ class RallyRoster:
             if sq is not None:
                 votes[sq] = votes.get(sq, 0) + len(self.obs[key])
         return max(votes, key=votes.get) if votes else None
+
+
+def standing_heights(rosters: Sequence[RallyRoster], geometry) -> Dict[str, float]:
+    """Standing height of every IDENTIFIED player over the whole video: the
+    median of his per-rally reads (one rally is +-10 %: an ace leaves two
+    seconds of a crouched receiver). A body without an identity label is
+    measured in its own rally only -- a track id is not a person."""
+    reads: Dict[str, List[float]] = {}
+    for roster in rosters:
+        for key in roster.squad:
+            height = roster.standing_height_m(key, geometry)
+            if height is not None:
+                reads.setdefault(key, []).append(height)
+    return {key: float(np.median(v)) for key, v in reads.items()}
 
 
 def reach_in_body_heights(u: float, v: float, bbox: Sequence[float]) -> float:
@@ -255,17 +298,23 @@ class _Step:
 
 
 class TouchSolver:
-    def __init__(self, timeline: BallTimeline) -> None:
+    def __init__(self, timeline: BallTimeline,
+                 body_heights: Optional[Dict[str, float]] = None) -> None:
         self.tl = timeline
         self.stream = timeline.stream
         self.geometry = timeline.geometry
         net = timeline.geometry.net_top_height_m() or 2.43
         self.attack_min_height_m = net - ATTACK_BELOW_TAPE_M
+        #: Standing height per identified player (``standing_heights``); a
+        #: player not in it is measured in the rally being solved.
+        self.body_heights: Dict[str, float] = dict(body_heights or {})
 
     # -- public ----------------------------------------------------------- #
 
-    def solve(self, rally: Rally) -> Tuple[List[Touch], RallyRoster]:
-        roster = RallyRoster(self.stream, rally.start_frame, rally.end_frame)
+    def solve(self, rally: Rally, roster: Optional[RallyRoster] = None
+              ) -> Tuple[List[Touch], RallyRoster]:
+        if roster is None:
+            roster = RallyRoster(self.stream, rally.start_frame, rally.end_frame)
         serve_side = rally.serve.side
         events = rally.touches
         touches: List[Touch] = [self._serve_touch(rally, roster)]
@@ -511,19 +560,46 @@ class TouchSolver:
         if y is not None and np.isfinite(e.u):
             x, _, height = self.geometry.ball_world(e.u, e.v, y)
             err = self.geometry.ball_read_error_m(e.u, e.v, y, e.depth_samples())
+        contact, ratio = height, None
+        hit = self.tl.arc_exit(e) if y is not None else None
+        if hit is not None:
+            contact = self.geometry.ball_world(*self.stream.ball_xy[hit], y)[2]
+        tall = self._standing_height(key, roster)
+        if contact is not None and tall:
+            ratio = contact / tall
         return Touch(
             frame=e.frame, side=side, touch_number=k, action="", observed=True,
             player=credited, squad=roster.squad_on(side), reach=d,
-            height_m=height, court_y=y, court_x=x, court_err=err,
+            height_m=height, contact_height_m=contact, contact_ratio=ratio,
+            court_y=y, court_x=x, court_err=err,
             player_source=SOURCE_REACH if credited else None,
             perception_action=e.candidate.action if e.candidate else None, event=e)
+
+    def _standing_height(self, key: Optional[str], roster: RallyRoster) -> Optional[float]:
+        if key is None:
+            return None
+        known = self.body_heights.get(key)
+        return known if known else roster.standing_height_m(key, self.geometry)
+
+    def _is_attack(self, t: Touch) -> bool:
+        """Was the ball hit with the arm up (a swing, a poke, a roll shot)
+        and not passed with the forearms?"""
+        if t.contact_ratio is not None:
+            return t.contact_ratio >= ATTACK_REACH_RATIO
+        height = t.contact_height_m if t.contact_height_m is not None else t.height_m
+        if height is not None:
+            return height >= self.attack_min_height_m
+        # No height read. Only an UNSEEN third touch defaults to the usual
+        # attack (nobody is credited with it); a seen one never becomes an
+        # attack on a guess.
+        return not t.observed and t.touch_number == 3
 
     def _label(self, touches: List[Touch]) -> None:
         """dig / set / spike / overpass from the possession structure.
 
         A touch the same half follows is a dig (touch 1) or a set. A touch
         that ends the possession sent the ball over: on touch 1 that is an
-        overpass; on touch 2 or 3 it is a spike when hit at attack height and
+        overpass; on touch 2 or 3 it is a spike when hit with the arm up and
         an overpass otherwise (owner GT rule: every non-attack that goes over
         is an overpass). The last touch of the rally is labelled as if the
         ball stayed on its half; the match layer, which knows who won the
@@ -535,13 +611,7 @@ class TouchSolver:
             nxt = touches[i + 1] if i + 1 < len(touches) else None
             stays = nxt is not None and nxt.side == t.side
             t.ends_possession = not stays
-            if t.height_m is not None:
-                attack = t.height_m >= self.attack_min_height_m
-            else:
-                # No height read. Only an UNSEEN third touch defaults to the
-                # usual attack (nobody is credited with it); a seen one never
-                # becomes an attack on a guess.
-                attack = not t.observed and t.touch_number == 3
+            attack = self._is_attack(t)
             if stays:
                 t.action = ACTION_DIG if t.touch_number == 1 else ACTION_SET
             elif t.touch_number == 1:

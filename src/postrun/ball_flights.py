@@ -51,6 +51,14 @@ LAUNCH_WINDOW_S = 0.5
 # Duplicate vertices (accepted + refused on neighbouring frames).
 MERGE_EVENTS_S = 0.25
 
+# Where a ball leaves the arc it arrived on (BallTimeline.arc_exit): the arc
+# is fitted over ARC_FIT_S before the vertex and followed for ARC_WALK_S past
+# it; a sample ARC_MISS_BALLS ball widths off it has been hit.
+ARC_FIT_S = 0.35
+ARC_WALK_S = 0.3
+ARC_MISS_BALLS = 0.5
+ARC_MIN_SAMPLES = 4
+
 # A flight needs this many width samples before its depth is trusted.
 MIN_DEPTH_SAMPLES = 3
 
@@ -253,6 +261,49 @@ class BallTimeline:
         v_post = (s.ball_xy[hi] - s.ball_xy[frame]) / span
         gravity = np.array([0.0, 9.81 / (self.fps ** 2) * px_per_m * span])
         return float(np.hypot(*(v_post - v_pre - gravity)) / px_per_m * self.fps)
+
+    def arc_exit(self, event: BallEvent) -> Optional[int]:
+        """Frame of the ball sample at which the touch of ``event`` happened
+        (None: the arriving flight is too short to say).
+
+        The classifier dates a vertex up to three frames before the picture
+        shows the turn, and a set comes down 0.2 m a frame: read at the
+        vertex, a contact is up to half a metre too high. The ball is hit
+        where it leaves the arc it arrived on -- the lower of the last sample
+        still on that arc and the first one off it (a pass turns at its
+        lowest point; a ball hit downward is one frame further along)."""
+        s = self.stream
+        vertex = event.frame
+        lo = vertex - s.frames(ARC_FIT_S)
+        if event.flight_in is not None:
+            lo = max(lo, event.flight_in.first)
+        before = np.array([f for f in range(max(lo, 0), vertex)
+                           if s.ball_state[f] == BALL_TRACKED], dtype=int)
+        if before.size < ARC_MIN_SAMPLES:
+            return None
+        width = float(np.nanmedian(s.ball_w[before]))
+        if not np.isfinite(width) or width <= 0:
+            return None
+        gravity = 9.81 / (self.fps ** 2) * width / BALL_DIAMETER_M     # px / frame^2
+        t = (before - vertex).astype(np.float64)
+        line = np.vstack([np.ones_like(t), t]).T
+        (u0, du), *_ = np.linalg.lstsq(line, s.ball_xy[before, 0], rcond=None)
+        (v0, dv), *_ = np.linalg.lstsq(
+            line, s.ball_xy[before, 1] - 0.5 * gravity * t * t, rcond=None)
+        on_arc, off_arc = int(before[-1]), None
+        for f in range(vertex, min(vertex + s.frames(ARC_WALK_S), s.n_frames - 1) + 1):
+            if s.ball_state[f] != BALL_TRACKED:
+                continue
+            k = float(f - vertex)
+            miss = np.hypot(s.ball_xy[f, 0] - (u0 + du * k),
+                            s.ball_xy[f, 1] - (v0 + dv * k + 0.5 * gravity * k * k))
+            if miss > ARC_MISS_BALLS * width:
+                off_arc = f
+                break
+            on_arc = f
+        if off_arc is not None and s.ball_xy[off_arc, 1] > s.ball_xy[on_arc, 1]:
+            return off_arc
+        return on_arc
 
     def _gap_kind(self, end: int, start: int) -> str:
         """What happened across the tracking gap (end, start).

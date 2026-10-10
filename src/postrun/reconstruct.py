@@ -27,14 +27,22 @@ from .match import SQUAD_LETTER, MatchAssembler, Point
 from .positions import publish_positions
 from .rallies import RallySegmenter
 from .stream import MatchStream, load_stream
-from .touches import SOURCE_ALTERNATION, Touch, TouchSolver
+from .touches import (
+    SOURCE_ALTERNATION,
+    RallyRoster,
+    Touch,
+    TouchSolver,
+    standing_heights,
+)
 
 #: 2 = touches carry ``court_x_m`` + ``court_err_m``, ground ends ``court_xy_err_m``.
 #: 3 = attacks carry ``spike_type`` + ``launch`` (attack_shape).
 #: 4 = ``court_x_m`` / ``court_y_m`` / ``court_xy_m`` are the ``positions`` reads
 #:     (net-anchored, box offset removed); ``positions`` says how they were made.
 #: 5 = ``identity``: who is who was read per rally in hindsight (or why not).
-SCHEMA_VERSION = 5
+#: 6 = touches carry ``contact_height_m`` + ``contact_ratio`` (attack vs bump);
+#:     ``checks.launches_refused`` lists serve-shaped launches not taken for one.
+SCHEMA_VERSION = 6
 logger = logging.getLogger(__name__)
 
 
@@ -42,21 +50,29 @@ def reconstruct(stream: MatchStream, geometry: CourtGeometry,
                 frame_size=(1920, 1080), points_to_win: int = 21,
                 switch_every: int = 7) -> Dict[str, Any]:
     timeline = BallTimeline(stream, geometry, frame_size=frame_size)
-    rallies = RallySegmenter(timeline).segment()
+    segmenter = RallySegmenter(timeline)
+    rallies = segmenter.segment()
     # Who is who, per rally, before anything is credited to anyone.
     identity, reader = read_identities(
         stream, geometry, [(r.start_frame, r.end_frame) for r in rallies])
-    solver = TouchSolver(timeline)
-    points: List[Point] = []
+    rosters: List[RallyRoster] = []
     for i, rally in enumerate(rallies):
+        if reader is not None:
+            reader.apply(identity.rallies[i])
+        rosters.append(RallyRoster(stream, rally.start_frame, rally.end_frame))
+    # A player's standing height is one number for the whole video.
+    solver = TouchSolver(timeline, body_heights=standing_heights(rosters, geometry))
+    points: List[Point] = []
+    for i, (rally, roster) in enumerate(zip(rallies, rosters)):
         seen = identity.rallies[i] if reader is not None else None
-        if seen is not None:
-            reader.apply(seen)
-        touches, roster = solver.solve(rally)
+        touches, roster = solver.solve(rally, roster)
         points.append(Point(rally=rally, touches=touches, roster=roster,
                             near_squad_read=seen.near_squad if seen else None))
     checks = MatchAssembler(points_to_win=points_to_win,
                             switch_every=switch_every).assemble(points)
+    checks["launches_refused"] = [
+        {"frame": int(r.frame), "side": r.side, "reason": r.reason,
+         "receivers_stagger_m": _round(r.stagger_m, 1)} for r in segmenter.refused]
     for pt in points:                     # after the match layer: labels are final
         type_attacks(timeline, pt.touches)
     # Output only, after every decision: the same players must have played
@@ -161,8 +177,12 @@ def format_report(result: Dict[str, Any]) -> str:
         f"set complete: {checks['set_complete']}",
         f"Side switches after points {checks['side_switch_after_point']} "
         f"(points per block {checks['points_between_switches']})",
-        "",
     ]
+    for r in checks.get("launches_refused") or []:
+        lines.append(
+            f"Not a serve: {_clock(r['frame'], fps)} f{r['frame']} from the {r['side']} half "
+            f"(receivers {r['receivers_stagger_m']} m apart in depth, ball not played)")
+    lines.append("")
     for pt in result["points"]:
         serve = pt["serve"]
         score = pt["score_after"]
@@ -239,6 +259,8 @@ def _touch_payload(pt: Point, t: Touch) -> Dict[str, Any]:
         "ends_possession": bool(t.ends_possession),
         "outcome": t.outcome,
         "height_m": _round(t.height_m, 2),
+        "contact_height_m": _round(t.contact_height_m, 2),
+        "contact_ratio": _round(t.contact_ratio, 2),
         "court_x_m": _round(t.pos_x, 1),
         "court_y_m": _round(t.pos_y, 1),
         "court_err_m": _err(t.pos_err),

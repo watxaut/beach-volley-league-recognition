@@ -56,3 +56,20 @@ P26 (pipeline) the contact at f24630 is a block by P1A, then P1B digs at f24652 
 P27 (pipeline) f25730 is not an overpass, is a spike, same as the others.
 
 P31 is a cut shot from P1A, wins the point at makes it 21 points
+
+# ---------------------------------------------------------------------------
+# Third round (owner, 2026-10-10, after the #105b run: 32 points, A 22 - B 10;
+# verbatim). Point numbers are that run's.
+
+I checked the points, aside from what we already surfaced, all the other points look good. Just one thing, at the start of point 16 (pipeline) the result is already 13A - 1B. We should have switched sides but we miss counted the points, so team A actually does 22 points, just to take into account.
+
+# What follows from it (agent's notes):
+# - Every label of that run the owner did not correct stands as reviewed.
+# - 14 points were played before run-P16 and the players switched one point
+#   late (after 15); they counted one short from there, so the set ran to
+#   A 22: 31 points, A 22 - B 9, blocks 7 / 8 / 7 / 7. (His earlier line gives
+#   11 - 2 before the 07:17 point; 13 - 1 here is the same 14 points.)
+# - Asked for: the dead-time return counted as a point, the attacks read as
+#   overpass, the last point's winner (#106).
+# - P25 f23222 (run numbering) was not named by the owner; the frames show a
+#   jump attack by P2A into the block, so #106 reads it as a spike too.
