@@ -29,3 +29,30 @@ P8 was another ace from P1A. There is a dig but then there is no set. If there i
 # - P2 f2041 -> f2093: a set played from outside the court, not seen (hidden touch).
 # - P5 f4973 / f4986: a block is not a label of the pipeline; the block was read as
 #   the attacker's spike and the dig after it as an overpass by the wrong team.
+
+# ---------------------------------------------------------------------------
+# Rest of the feedback (owner, same day, verbatim). Point numbers are those of
+# the run BEFORE the lost point at 10:11 was found (31 points); from old P21 on
+# the current reconstruction numbers them one higher.
+
+P10 P2B spikes into the net. There is no overpass from team A
+P11 F10212 is a spike from P2A
+P13 f12092 is a rainbow that hits the line, so it's in and point to team B, not an error.
+Point 14, this point is wrong, nothing happens from 6.45 to 07.17, just walking to the ball and sending from team A to team B. The point starts at 11A-2B, then 07.17 serve by P1B after winning point, Dig 07.18 by P2A, set 07.19 by P1A, spike 07.21 by P2A, Dig 07.22 by P1B, ball falls to sand and point ends -> 12A - 2B
+
+Then point 15 serve happens by P2A at 07.53, its not a set error at 07.16 as the pipeline says (which is point 16 for the pipeline)
+
+Point 17 (pipeline) f15258 is not overpass but spike (from the same player as point P2, so probably something related to the height maybe)
+
+P20 (pipeline) is not an ace, but an error by P2B, the serve says P1B which is wrong.
+Then P1A serves at 10.11, P1B digs at 10.13, P2B sets at 10.14, P1B spikes at 10.15, P2A one hand digs at 10.16 and loses ball, B team wins the point. If you take a look, P2B serves on P20 (not P1B as the pipeline says), but then P1B serves on the next point, this is not possible, there should have been a point in the middle (what we lost now).
+
+P21 (pipeline) its a set from P2B, and a spike from P1A into the line at 10.54 with a kill
+
+P22 (pipeline) P2A is the one serving, not P1A, there has been a switch here, then on P23 it is correct as well, then serve P24 is incorrect again (serve to P1A when is P2A, then the dig at f23126 is credited correctly to P2A), then on point 26 is wrong again on the serve (it should be P1A)
+
+P26 (pipeline) the contact at f24630 is a block by P1A, then P1B digs at f24652 and P2B spikes (not overpass again from the same player) at f24691
+
+P27 (pipeline) f25730 is not an overpass, is a spike, same as the others.
+
+P31 is a cut shot from P1A, wins the point at makes it 21 points

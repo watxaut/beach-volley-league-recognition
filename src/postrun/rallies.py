@@ -152,10 +152,48 @@ class RallySegmenter:
                 serves.append(launch)
         return serves
 
+    def _serve_past_the_frame(self, index: int, e: BallEvent) -> Optional[ServeLaunch]:
+        """A serve whose hit was not seen because the ball left the picture:
+        the track of a toss beside a baseline dies, and the ball is next seen
+        already on its way to the other half, where a serve hit at the end of
+        that toss would be. (A high tripod cuts the top of a near serve.)"""
+        events, s = self.tl.events, self.stream
+        fl = e.flight_out
+        if e.kind != EVENT_BIRTH or fl is None or index < 2:
+            return None
+        death, toss_birth = events[index - 1], events[index - 2]
+        toss = toss_birth.flight_out
+        if (death.kind != EVENT_DEATH or toss_birth.kind != EVENT_BIRTH or toss is None
+                or toss.end != death.frame or toss.n < SERVE_MIN_SAMPLES):
+            return None
+        gap = s.seconds(e.frame - death.frame)
+        if not 0 < gap <= MAX_AIR_S or abs(toss.y_end - toss.y_start) > TOSS_DEPTH_M:
+            return None
+        if toss.y_end >= NEAR_SERVE_MIN_Y:
+            side, toward_net = SIDE_NEAR, -1.0
+        elif toss.y_end <= 0.0:
+            side, toward_net = SIDE_FAR, +1.0
+        else:
+            return None
+        # From the toss to where the ball is seen again, and on from there,
+        # at serve speed and to the other half.
+        hidden = toward_net * (fl.y_start - toss.y_end)
+        if hidden <= 0 or hidden / gap < SERVE_MIN_SPEED_MS:
+            return None
+        if (toward_net * fl.axis_speed_ms(s.fps) < SERVE_MIN_SPEED_MS
+                or toward_net * (fl.y_end - toss.y_end) < SERVE_MIN_TRAVEL_M
+                or toward_net * (fl.y_end - NET_Y_M) <= 0):
+            return None
+        return ServeLaunch(frame=death.frame, side=side, event_index=index,
+                           observed=False)
+
     def _serve_launch(self, index: int, e: BallEvent) -> Optional[ServeLaunch]:
         fl = e.flight_out
         if fl is None or e.kind == EVENT_DEATH:
             return None
+        past = self._serve_past_the_frame(index, e)
+        if past is not None:
+            return past
         if not np.isfinite(fl.peak_height_m) or fl.peak_height_m < SERVE_MIN_PEAK_M:
             return None
         if not fl.start_height_m <= SERVE_MAX_CONTACT_M:
@@ -464,12 +502,15 @@ class RallySegmenter:
             if s.seconds(nxt.frame - e.frame) > MAX_AIR_S:
                 return False
             if nxt.kind == EVENT_CONTACT:
-                # ...and the ball is up again after THAT vertex too: a ball
-                # dropping to the sand passes one more vertex on its way.
+                # ...and the ball is up again after a LATER vertex too: a ball
+                # dropping to the sand passes one more vertex on its way and
+                # then only rolls, while a rally keeps sending it up (a short
+                # low flight between two touches is not the end of it).
                 after = nxt.flight_out
-                return (not self._is_ground_event(nxt) and after is not None
-                        and after.peak_height_m >= LIVE_MIN_PEAK_M
-                        and after.ground_frames < GROUND_FLIGHT_FRAMES)
+                if after is None or after.ground_frames >= GROUND_FLIGHT_FRAMES:
+                    return False
+                if after.peak_height_m >= LIVE_MIN_PEAK_M:
+                    return True
         return False
 
     def _is_net_fault(self, e: BallEvent, touch_frame: int) -> bool:

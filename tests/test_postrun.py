@@ -760,3 +760,16 @@ def test_match_positions_mirror_across_the_net(match_score):
     for t in spikes:                                  # an attack starts on its own half
         assert (t["court_y_m"] >= NET_Y_M) if t["side"] == "near" else (t["court_y_m"] <= NET_Y_M)
     assert pos["clamped_to_half"] <= 2
+
+
+def test_service_order_breaks_where_a_run_of_seen_servers_says_so():
+    from src.postrun.match import _serving_order
+
+    # alternating, one odd read in the middle: a misread, the order holds
+    order, breaks = _serving_order({0: [1], 1: [2, 2], 2: [2], 3: [2], 4: [1]}, 5)
+    assert order == [1, 2, 1, 2, 1] and breaks == []
+    # a point lost between turn 1 and 2 shifts everything after it
+    order, breaks = _serving_order({0: [2], 1: [1], 2: [1], 3: [2], 4: [1], 5: [2]}, 6)
+    assert order == [2, 1, 1, 2, 1, 2] and breaks == [2]
+    # unseen turns take the alternation
+    assert _serving_order({0: [1], 3: [2]}, 4) == ([1, 2, 1, 2], [])
