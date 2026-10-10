@@ -3061,3 +3061,13 @@ live run confirms it end to end: the post-run squads are right on 33/33
 serves and 166/166 touches. Within-half slot RATIFIED by the same owner
 review (#88). Owed: entreno 0-flip run. Detail:
 `docs/history/status_where_we_are_archive.md`.
+
+## Archived 2026-10-10 (#105): the #104 identity and second-match blocks of "Where we are", verbatim (superseded: the orientation is read post-run)
+
+**Identity (#85 → #104: orientation is NOT solved in general).** `TeamIdentityResolver` (`player_identity_mode:"team"`, default) stamps P1A/P2A/P1B/P2B per frame. 20260920: 4/4 switches, 0 stray (replay), squads right on 33/33 serves and 166/166 touches, slots ratified (#88).
+**20261010 (#104): it fails** — no flip at the first two switches, then 10 flips in the last 5 minutes. The unseen orientation is assumed to MIRROR the enrolled one (levels ±0.39 near side / ±0.52 far side); here it reads about 0 (−0.06 / −0.19), so the shift lands between the two assumed levels and the level adaptation (~4 s) absorbs it.
+The evidence itself is good: averaged over each rally it separates the two orientations on 31/31 points (+0.22…+0.39 vs −0.13…+0.07). Fix = a post-run read per rally (Active next 2). Owed: entreno 0-flip run. Earlier text: `docs/history/status_where_we_are_archive.md`.
+
+**Second match (#104, 20261010 vall d'Hebron, 1080p 30 fps; `output/20261010_vall_dhebron_jesus_sara_joan_loida/`) — DO NOT PUBLISH this run.** As run: 31 points, A 11 – B 20, set incomplete, switches after [23, 25, 26, 27, 28, 29]; per-player stats scrambled with the squads.
+Truth by the AGENT's read of the frames (owner: "21–8, I believe"; not owner GT): 30 points, A 21 – B 9 (21–8 if the 15:55 net-cord serve was replayed), switches after 7 / 14 / 21 / 28 at 6–1, 12–2, 17–4, 20–8.
+With the near squad set by hand the same run reads 21–10: 29 of 30 points found, 2 false (P8 a caught serve that was replayed; P14 a ball lobbed back over the net in dead time), 1 missed (10:10, a near serve that left the top of the frame), winners 26/29. Detail: Log #104, open point 32h.

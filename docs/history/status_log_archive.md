@@ -7197,6 +7197,30 @@ offset; practice clips (no switch) stay uncorrected; in-sample on one match. Plo
 
 **Not done / owed:** owner look, merge, `make republish-all` from prod (the on-disk `match_reconstruction.json` was left as is).
 
+### 2026-10-09 (hundred-and-second session) — #102: a Feedback button (bugs / suggestions with screenshots)
+
+**Asked (owner):** a "suggest / report a bug" button on the web; GitHub issues need an account, so onboarded people must be able to
+send bugs or ideas easily, with screenshots, "so that we can get them easily and tackle them in a session".
+**Decisions (owner):** reports stay in Supabase only (no GitHub mirror, no new secret or host); members see the status of what they sent.
+
+**Built.** Migration `20261009130000_feedback` (NOT pushed): table `feedback` (kind bug / suggestion, text, page, context, ≤3
+screenshot paths, status open / done / dismissed, admin note) + private bucket `feedback-media` (1 MB, images only, a member writes
+under `<user id>/` only). `send_feedback()` is the only way a row gets in (author = caller, every screenshot must exist in the caller's
+folder, 20 reports a day); uploads capped at 30 a day (`feedback_upload_allowed()`); a member reads their own, admins read all and set
+status + note, nobody rewrites the text, `anon` nothing. Web: `Feedback` button in the top bar → native `<dialog>` (kind, text, pick or
+paste screenshots, downscaled in the browser to ≤1600 px JPEG via `createImageBitmap`, so no CSP change), sends route + viewport +
+browser + build (`__BUILD__` = Cloudflare commit); Settings → "My reports" (status + reply); Admin → Feedback (open count on the tab,
+Done / Not planned / Reopen, note). Laptop: `make feedback` (`src/publish/feedback.py`) replaces `output/feedback/` with `index.md` +
+`<id>_<kind>/report.md` + screenshots; `DONE="3 5" NOTE=...` / `DISMISS=` close reports from a session. `make backup` exports the table.
+
+**Verified:** schema check 5/5 on a throwaway `supabase/postgres:17` (smoke: own folder only, foreign / missing screenshot refused,
+direct insert refused, daily limit, member vs member vs admin, column grants); `tests/test_feedback_pull.py` 3; vitest 64, typecheck,
+oxlint, build; demo mode driven in Chrome at 1100 px and 390 px (send with a 2400 px image → 1600 px, Settings, Admin, close), 0
+console errors.
+
+**Not done / owed:** `supabase db push` (4 migrations now owed) and a first report on the hosted project — the storage policies and the
+PATCH with the secret key ran only against the stub / a fake. No notification on a new report (Admin tab count or `make feedback`).
+
 ### Session index lines moved out of STATUS.md (verbatim, oldest first)
 
 > The index is capped at 100 lines (`tests/test_status_leanness.py`); from 2026-10-08 (#98) the oldest
@@ -7210,3 +7234,4 @@ offset; practice clips (no switch) stay uncorrected; in-sample on one match. Plo
 - 2026-09-05 **#5** — player-page court SVG field heatmap (two rounds).
 - 2026-09-05 **#6** — GAME-ON badge latency fixed (rolling sustained-flight provisional); serve-init semantics (provisional fast ON, serve arming); heatmap landscape + cache busting.
 - 2026-09-06 **#7** — ball-matching rework: identity by trajectory + motion, never confidence; static spares can't bootstrap/steal/starve.
+- 2026-09-06 **#8** — squatter review: sideline straddlers expire from the roster (e2/e7 slots freed early).
