@@ -7273,3 +7273,38 @@ reads; approve the post-run orientation design (Active next 2).
 - 2026-09-06 **#8** — squatter review: sideline straddlers expire from the roster (e2/e7 slots freed early).
 - 2026-09-06 **#9** — in-court preference (off-court cost penalty) fixes bystander squat + Hungarian chain-swaps (point 16).
 - 2026-09-08 **#10** — e6 poke read (resolver touch-3 fall-through + analyzer type + stance-majority team) + rally-opening serve gate + redirect locality; e7 GT ratified; e5/e6 team 1.0.
+
+## Archived 2026-10-10 (#108): the oldest Log session and the oldest Session index line moved out of STATUS.md verbatim (Log ≤3 sessions, index budget 100)
+
+### 2026-10-10 (hundred-and-fifth session) — #105: side switches are read after the run (`src/postrun/identity.py`); owner feedback on the first 9 points
+
+**Asked (owner):** feedback on P1–P9 of the 20261010 run (verbatim in `ground_truth/20261010_1000_vall_dhebron_owner_feedback.txt`): P2 f2009 is a
+spike, a set from off court is missing in P2, P5 f4973 is a block by P1B, P7 and P8 are aces by P1A with the side switch between them — "the pipeline changed
+teams … I can read P2B". Then: "focus on the biggest problem … make it so that the side switches we keep tracking the same player".
+
+**Why the switch was missed (replay of the probe's feature dump).** The four players crossed one at a time between f7450 and f7800. The resolver adapts the
+level of its "squad 1 near" evidence in dead time too (~4 s): +0.39 / +0.52 slid to ~0 and the spread grew fourfold before the last one was across; its CUSUM
+never passed 1.9 of 8. And the unseen orientation is assumed at −0.39 / −0.52 where it reads −0.06 / −0.19.
+
+**Built (Phase 2 of AGENTS §4, post-run).** `id_sims` per clean body in the diag dump (schema 5: the resolver's own anchor similarities,
+`BodyObs.anchor_sims`). `src/postrun/identity.py`: evidence per rally from bodies > 1 m off the net line → two levels from the match (≥ 4 spreads apart, the
+lower ≤ half the upper, else "nobody switched") → two-state path over the rallies → per rally one path over frames (which player each track id is) → label,
+squad, slot and half rewritten before `TouchSolver`. `Point.near_squad` comes from the read; `publish/thumbs.py` cuts at the read's labels; `sweep_postrun.py`
+sweeps the 11 constants and prints `who` (the #88 CSV). Ace rule (owner): a serve touched once and lost is an ace from either end (`match._outcomes`).
+
+**Measured.** 20261010: 31/31 rallies (agent's frame read), levels +0.347 / −0.038 (spread 0.044); 93 sampled frames, 3 per rally, every label on the right
+person (incl. far blockers the tracker sided near); 8 id changes inside rallies, 7 with a box jump. Score A 21 – B 10, complete, switches after
+7 / 16 / 22 / 29; P7 and P8 = P1A ACE. 20260920 (probe re-run with `player_bgr_input: false`, similarities injected into the golden dump by (frame, track id),
+0 box mismatches): levels +0.146 / −0.083; the whole record unchanged (33/33, winners 33/33, 21–12, P 0.976 / R 0.933, action 0.982, half and squad 1.000,
+0 rule breaks); who 207/208. Sweep 111 rows: none loses a point or a winner, worst P 0.965, action 0.958. Clips e1–e7 re-run: `compare_runs` IDENTICAL ×7,
+dumps identical bar `id_sims` (only e3 / e4 enroll), 52/53 as before. 20261010 re-run (`make run-match`, 2031 s, 69 ms/frame): `pipeline_output.json` + CSVs
+identical bar the video name, all 29 303 dump lines identical bar `id_sims` (107 406 rows, = the injected ones within 0.0004), same reconstruction.
+Suite 1258 (after merging `main`): 1252 pass, 5 skipped, `test_inbox` run-match order failing as on `main`.
+
+**Second pass, same day (#105b; owner feedback on the rest of the match, "players of team A switch between themselves … some points were lost … without overfitting").** The "switching" was the service-order rotation overriding seen servers: one lost point shifted the order and the majority vote renamed the rest. Fixed three things in `src/postrun`: the order may break (`match._serving_order`); a rally does not end on a low dig if a later vertex sends the ball up (`rallies._play_follows`); a serve whose hit is past the top of the frame (`rallies._serve_past_the_frame`). 20261010: 32 points, A 22 – B 10, switches after 7 / 16 / 23 / 30; every server the owner named is right; both lost rallies read as he described. 20260920 and the clips: every score and every server unchanged. Left: the dead-time return (run-P14) and the label items (Active next 2).
+
+**Not done / owed.** The 20261010 POINTS (blocks 7 / 9 / 6 / 7): owner GT first. Owner label feedback (P2 spike, P2 hidden set, P5 block): recorded only.
+The live overlay keeps the causal labels. Uncommitted in the tree and not this session's: `--start-frame` for `make run-live` (Makefile, `src/main.py`,
+`live_debug_processor.py`). `match_bundle.json` in the run directory pre-dates the re-run.
+
+- 2026-09-09 **#11** — poke GT ratified; the 09-08 dictation was misattributed (e5 f300 = poke, e6 f310 = hard).
