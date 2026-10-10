@@ -3051,3 +3051,13 @@ action labels 81/145→74/146 (rally cascades in P9/P19/P22/P25); e3 moves 2 spi
 `detector_fast_inference` (`yolo_inference.py`): match 1955 → 783–836 s, clips 291 → 131 s, byte-identical to the
 pre-#94 `output/postrun/` goldens (= `player_bgr_input: false`). Bound: MediaPipe pose (open point 33). Full text:
 `docs/history/status_where_we_are_archive.md` (#94).
+
+## Archived 2026-10-10 (#104): the #85 identity block of "Where we are", verbatim (superseded: orientation is not solved on a second match)
+
+**Identity (#85):** `TeamIdentityResolver` (`player_identity_mode:"team"`,
+default) stamps P1A/P2A/P1B/P2B per frame; orientation = two-state LLR on
+fixed anchors (replay: 4/4 switches, 0 stray, 211/211 GT contacts). The #87
+live run confirms it end to end: the post-run squads are right on 33/33
+serves and 166/166 touches. Within-half slot RATIFIED by the same owner
+review (#88). Owed: entreno 0-flip run. Detail:
+`docs/history/status_where_we_are_archive.md`.

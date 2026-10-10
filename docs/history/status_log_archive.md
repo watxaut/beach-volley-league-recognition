@@ -7169,6 +7169,34 @@ Learnings (#100).
 **Not done / owed:** owner picks the fix (open point 35); then one session under the post-run protocol + `make
 republish-all`. Every published position shares the shift (pass map, dug ends), not only attack starts.
 
+### 2026-10-09 (hundred-and-first session) — #101: published court positions — net-anchored, ball-box offset from the end switches
+
+**Asked (owner):** "yes, let's try it out and see how the new map plots" — build the #100 fix and plot the four players.
+
+**Diagnosed first (it changed the fix):** (1) net clicks: kept — the corner midline is 0.05 / 1.3 m off the clicked net, a ball at
+the net is 23.7 px (model 22.8). (2) Depth "at the hit": DROPPED — kink-aligned windows over the arriving, leaving or same-half
+flight are no tighter than the whole-flight fits (spike IQR 0.9 m either way). (3) The rest is not an attack effect: every kind
+of touch shows the same near/far gap (dig 2.05, set 2.21, spike 2.06, overpass 2.15 m), near serves sit on their server (−0.24 m,
+16 serves: no bias at the near baseline), so it is a box a fixed number of pixels wider than the ball, not a metre shift.
+
+**Built (`src/postrun/positions.py`, output only):** `CourtPositions` (three depth anchors, two ground homographies sharing the
+clicked net line; no clicks or a slipped click = the corner model, exactly) + `calibrate_width_bias` (one offset that closes the
+gap of every kind with ≥5 touches per half; refused without a side switch, with <2 kinds, outside 12 % of the ball's width at the
+net, or when a kind stays >0.6 m apart). `Touch.pos_*` / `RallyEnd.pos_xy*` feed `court_x_m` / `court_y_m` / `court_err_m` /
+`court_xy_m`; a touch that reads across the net is held at it; `positions` block in the JSON; recon schema 4.
+
+**Measured (20260920):** offset 1.74 px, gaps after −0.16 / +0.14 / 0.00 / +0.09 m. Spikes 2.70 / −0.30 → 1.40 / 1.40 m (11 far
+starts across the net → 0; 1 of 39 held at the net). Per player near | far: P1A 1.55 (6) | 2.30 (1), P2A 1.35 | 1.20, P1B 1.40 |
+1.70 (2), P2B 1.30 | 1.40; the 2:49 kill 2.7 → 1.4 m (frames: takeoff 0.8–1.3 m). All 170 positions move 0.5–2.4 m away from the
+lens. **Neutral:** everything but the position keys identical on the match and e1–e7 (JSON + txt `cmp`); `score_postrun` output
+identical (33/33, winners 33/33, P 0.976 / R 0.933, 0 rule breaks); practice 5/5 serves, P 52/53; sweep 88 rows, none loses a
+point or a winner; hard / touch 26/29. Tests +8 (suite 1239: 1233 pass, 5 skipped, the known `test_inbox` failure).
+
+**Not settled (open point 35):** the players' feet show the same gap, so part may be real play; two serves into the net read no
+offset; practice clips (no switch) stay uncorrected; in-sample on one match. Plot: `output/postrun/20260920_match/attack_map_now_vs_fixed.png`.
+
+**Not done / owed:** owner look, merge, `make republish-all` from prod (the on-disk `match_reconstruction.json` was left as is).
+
 ### Session index lines moved out of STATUS.md (verbatim, oldest first)
 
 > The index is capped at 100 lines (`tests/test_status_leanness.py`); from 2026-10-08 (#98) the oldest
@@ -7181,3 +7209,4 @@ republish-all`. Every published position shares the shift (pass map, dug ends), 
 - 2026-09-04 **#4** — analysis DB + player labeling + local web UI; extraction/DB split by lossless file contract.
 - 2026-09-05 **#5** — player-page court SVG field heatmap (two rounds).
 - 2026-09-05 **#6** — GAME-ON badge latency fixed (rolling sustained-flight provisional); serve-init semantics (provisional fast ON, serve arming); heatmap landscape + cache busting.
+- 2026-09-06 **#7** — ball-matching rework: identity by trajectory + motion, never confidence; static spares can't bootstrap/steal/starve.
