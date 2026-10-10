@@ -161,6 +161,10 @@ deploy `main`.
    # resources/ is tracked in git (one script), so link the videos in, not the folder:
    find <path to repo>/resources -maxdepth 1 \
         \( -iname '*.mp4' -o -iname '*.mov' \) -exec ln -sf {} resources/ \;
+   # the match videos live in resources/full_videos/: link the FOLDER, so a
+   # video added later is there too (a per-file link misses it, and that
+   # match is then published without thumbnails and attack clips)
+   ln -s <path to repo>/resources/full_videos resources/full_videos
    # Clone the EXACT packages of your working venv/: it has ultralytics 8.3.169,
    # the only release the detector fast path is verified on (AGENTS §12) and
    # the one every GT number was measured with. A fresh `pip install -e .`
@@ -384,7 +388,10 @@ redeploy the web app (the page and the `media-src` line of
 `webapp/public/_headers`), then `make republish-all` from the prod checkout
 **while each match's video is still on disk**: the first publish writes
 `rallies.mp4` (~45 MB) into the run directory, and from then on the video is
-not needed again. Keep that file with the diag dump. Needs `ffmpeg`
+not needed again. "On disk" means reachable from the checkout that publishes:
+`make republish-all` ends every match's line with `clips 41 of 41`, or with
+`clips 0 of 41 -- NOT ALL: video not on disk and no rally copy` when the
+video is only in the other checkout (link `resources/full_videos`, step 3.1). Keep that file with the diag dump. Needs `ffmpeg`
 (`brew install ffmpeg`); without it a publish goes through with no clips.
 
 ## Troubleshooting
@@ -401,7 +408,7 @@ not needed again. Keep that file with the diag dump. Needs `ffmpeg`
 | `make publish`: "already holds a different video"                                                     | Two different files with one name. Rename one, or `PUBLISH_FLAGS=--replace-video` if it is intentional                                                                                                                                                                                         |
 | `make publish`: "not a match key"                                                                     | Pass `MATCH_KEY=YYYYMMDD_HHMM_<venue>_<text>`                                                                                                                                                                                                                                                  |
 | A player sees no play-by-play                                                                         | By design: only that match's players see it (Admin → match → "Everyone can see the play-by-play" opens it)                                                                                                                                                                                     |
-| An attack has no clip on the player page                                                              | The viewer did not play that match (clips follow the play-by-play rule), or the match was published without its video and has no `rallies.mp4`, or `ffmpeg` is missing on the laptop (`make publish` prints how many attacks got a clip) |
+| An attack has no clip on the player page                                                              | The viewer did not play that match (clips follow the play-by-play rule), or the match was published from a checkout that could not reach its video and has no `rallies.mp4` (`make republish-all` says `clips 0 of N -- NOT ALL` and why), or `ffmpeg` is missing on the laptop |
 | A slot thumbnail is missing                                                                           | The decoded video or `diag.jsonl` was not on disk at publish time. Assign from the video link instead                                                                                                                                                                                          |
 | The project is paused                                                                                 | Supabase dashboard → Restore. Then check the keep-alive workflow runs                                                                                                                                                                                                                          |
 | The site or `make backup` says "permission denied for table" (42501)                                  | A table or view without a `GRANT`. New ones get none by default: grant it in its migration (see `20261007120000_explicit_grants.sql`)                                                                                                                                                          |
