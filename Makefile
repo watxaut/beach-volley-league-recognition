@@ -56,6 +56,7 @@ run-match:
 ifeq ($(strip $(VIDEO)),)
 	$(error VIDEO is not set. Usage: make run-match VIDEO=path/to/video.mp4)
 endif
+	$(PYTHON) scripts/check_video_name.py "$(VIDEO)"
 	$(PYTHON) -m src.main "$(VIDEO)" --output-dir "$(OUTPUT_DIR)" $(VIZ_FLAG) --diag-dump "$(OUTPUT_DIR)/diag.jsonl"
 	$(PYTHON) -m src.postrun "$(OUTPUT_DIR)"
 	@echo ""
@@ -109,6 +110,7 @@ calibrate:
 ifeq ($(strip $(VIDEO)),)
 	$(error VIDEO is not set. Usage: make calibrate VIDEO=resources/<key>.mp4)
 endif
+	$(PYTHON) scripts/check_video_name.py "$(VIDEO)"
 	$(PYTHON) scripts/test_court_calibration.py "$(VIDEO)"
 
 # Full match -> draft on the web: run + post-run reconstruction + publish.
@@ -117,7 +119,7 @@ process: run-match publish
 # Publish output/<key>/ to Supabase (a new match lands as a DRAFT; re-running is
 # safe: identical content is logged as 'unchanged').
 #   DRY=1            build + diff against what is live, write nothing
-#   MATCH_KEY=...    key override for runs whose video lacks the HHMM part
+#   MATCH_KEY=...    key override for OLD runs whose video lacks the HHMM part (new videos must be named right: make calibrate / run-match refuse otherwise)
 #   NOTE="..."       note stored in the publication log
 #   PUBLISH_FLAGS=   extra flags (--replace-video, --allow-dirty, --no-thumbs)
 publish:
