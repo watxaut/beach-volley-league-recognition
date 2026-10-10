@@ -442,3 +442,14 @@ def test_zone_accepts_pipeline_output_label_and_dict():
     assert _zone("A4") == 4 and _zone("B2") == 2
     assert _zone({"side": "A", "zone": 7}) == 7
     assert _zone(None) is None and _zone("?") is None and _zone("A0") is None
+
+
+def test_match_flow_refuses_a_video_not_named_as_a_match_key():
+    from src.publish.naming import MatchKeyError, require_match_name
+
+    assert require_match_name("resources/full_videos/20261010_1000_vall_dhebron_a_b.mp4") == \
+        "20261010_1000_vall_dhebron_a_b"
+    assert require_match_name("x/20261010_1000_vall_dhebron_a_b_up1080.mp4") == "20261010_1000_vall_dhebron_a_b"
+    for bad in ("20261010_vall_dhebron_a_b.mp4", "IMG_1234.mov", "20261010_1000_Vall.mp4"):
+        with pytest.raises(MatchKeyError, match="BEFORE calibrating"):
+            require_match_name(bad)

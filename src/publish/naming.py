@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from pathlib import Path
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import Optional
@@ -55,6 +56,25 @@ def parse_match_key(key: str, today: Optional[date] = None) -> MatchKey:
     if d > today + FUTURE_SLACK:
         raise MatchKeyError(f"{key!r}: the date {d} is in the future (typo?)")
     return MatchKey(key=key, match_date=d, start_time=t, slug=slug)
+
+
+def require_match_name(video_path: str) -> str:
+    """The key of the video at ``video_path``; raises ``MatchKeyError`` unless its
+    file name already IS ``YYYYMMDD_HHMM_<venue>_<text>`` (``_up1080`` cache
+    suffix ignored).
+
+    The match flow (calibrate -> run -> publish) refuses any other name: the
+    run records the path it read and the calibration is looked up by name, so
+    renaming the file afterwards splits one match across two names.
+    """
+    stem = Path(video_path).stem
+    if stem.endswith("_up1080"):
+        stem = stem[: -len("_up1080")]
+    try:
+        return parse_match_key(stem).key
+    except MatchKeyError as exc:
+        raise MatchKeyError(f"{exc}\nRename the video BEFORE calibrating "
+                            f"(name it exactly like that, then run again).") from exc
 
 
 def slugify(text: str) -> str:
