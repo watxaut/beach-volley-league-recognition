@@ -443,6 +443,29 @@ def test_far_player_occluded_by_a_near_body_does_not_flip():
     assert res.cusum < 0.25 * res.switch_threshold
 
 
+def test_clean_bodies_carry_their_anchor_similarities():
+    """What the post-run identity read works from: the similarity of every
+    clean body to each player's fixed anchors, as the decision computed it."""
+    res = _resolver()
+    rng = np.random.default_rng(6)
+    run(res, 30, 1, TIDS, 0, rng)
+    order = [m.label for m in res.players]
+    seen = {o.tid: o for o in res.last_observations}
+    assert len(seen) == 4
+    for label, tid in TIDS.items():
+        sims = seen[tid].anchor_sims
+        assert sims is not None and len(sims) == 4
+        assert order[int(np.argmax(sims))] == label      # enrolled view: own anchor wins
+    # two far bodies merged into one another show two people each: no
+    # similarities for them, the near pair keeps its own
+    pl = positions(1, 30, rng)
+    pl = [(l, (pl[2][1] + 6 if l == "P2B" else cx), fy) for l, cx, fy in pl]
+    res.update(30, scene(pl, rng), tracked(pl, TIDS))
+    seen = {o.tid: o for o in res.last_observations}
+    assert seen[TIDS["P1B"]].anchor_sims is None and seen[TIDS["P2B"]].anchor_sims is None
+    assert seen[TIDS["P1A"]].anchor_sims is not None
+
+
 def test_stranger_in_court_stays_unlabeled():
     res = _resolver()
     rng = np.random.default_rng(6)

@@ -45,8 +45,19 @@ check: the two net-top clicks, never used to build the model, land at
    touch for longer than a ball stays in the air. Dead-time vertices (bounce
    routines, pick-ups, balls rolled back) never start or extend a point.
    A rally whose serve was never seen is still found (≥4 touches, ≥2 net
-   crossings) with an inferred serve.
-3. **Touches** (`touches.py`). One shortest path per rally over states
+   crossings) with an inferred serve. Two reads added on the second match
+   (#106, numbers below): a serve-shaped launch at receivers who are NOT
+   standing side by side and do not play the ball is the ball going back
+   between two points (`checks.launches_refused`, "Not a serve" in the
+   report); a landing is read where the ball stops falling, not at the first
+   frame its width fits the sand.
+3. **Who is who** (`identity.py`, #105; detail and numbers below). Before
+   anything is credited: which squad is near is read once per rally, then
+   which tracked body is which of the four players inside the rally. The
+   players of each rally window get their `label` / `squad` / `slot` and their
+   half rewritten from that read. A dump without the identity observations
+   (`id_sims`, schema 5) keeps the labels the causal pass stamped.
+4. **Touches** (`touches.py`). One shortest path per rally over states
    (half, touch number 1–3, which of that half's two players). Hard rules:
    the reception belongs to the receivers, at most three touches per
    possession, players alternate. Evidence: ball depth vs the half, ball
@@ -54,17 +65,25 @@ check: the two net-top clicks, never used to build the model, land at
    ball-to-body distance in body heights, time between touches. Vertices that
    fit nowhere are skipped; touches the stream never saw are allowed as
    hidden touches so the seen ones keep the right number.
-4. **Labels**. Same half follows → dig (touch 1) / set. Ends the possession →
-   overpass on touch 1; on touch 2–3 a spike when hit at attack height
-   (net − 0.28 m), else an overpass.
-5. **Match** (`match.py`). Winner = whoever serves the next point (rally
+5. **Labels**. Same half follows → dig (touch 1) / set. Ends the possession →
+   overpass on touch 1; on touch 2–3 a spike when the ball was hit with the
+   arm up, else an overpass. "Arm up" = contact height ≥ 1.23 × the toucher's
+   own standing height (#106): the contact is read where the ball leaves the
+   arc it arrived on (`BallTimeline.arc_exit`), the standing height is the
+   75th percentile of the player's box heights, one number per identified
+   player for the whole video. Net − 0.28 m is only the fallback when no
+   player can be measured.
+6. **Match** (`match.py`). Winner = whoever serves the next point (rally
    scoring); the ball's death (net / own half / landed in / out) is the
    cross-check and the only read for the last point, where the score closing
-   the set decides. Squads come from the identity labels, so a side switch is
+   the set decides. Squads come from the identity read, so a side switch is
    the rally where the near half changes squad. Service order (teammates
-   alternate on each side-out) names the server of every point.
+   alternate on each side-out) names the server of every point. A serve the
+   receivers touch once, with no second touch, and lose is an ace -- from
+   either end (owner rule 2026-10-10; a far serve is read from the track's
+   birth and counts all the same).
 
-6. **Attack type** (`attack_shape.py`, #97). Every observed spike / overpass
+7. **Attack type** (`attack_shape.py`, #97). Every observed spike / overpass
    gets `spike_type` (`hard` / `touch`) from the flight that follows it, in
    metres: the hit is the largest image-velocity step near the vertex (the
    classifier dates a vertex 1–3 frames early); the flight up to the next
@@ -123,7 +142,9 @@ have no serve in the clip and are found through the serve-less path.
 
 Sensitivity (`sweep_postrun.py`, 78 one-at-a-time moves of every constant by
 roughly ×0.6…×1.6): every row keeps 33/33 points, 0 false, winners 33/33;
-worst precision 0.965, recall 0.893, action 0.958, half 0.994.
+worst precision 0.965, recall 0.893, action 0.958, half 0.994. (#106: 130
+moves, same points / winners on every row, action 0.988 shipped and 0.970 at
+worst.)
 
 ## Attack type, measured (2026-10-08, #97)
 
@@ -243,23 +264,168 @@ What it rests on, and what stays open:
   read from the feet needs a higher camera: the practice venue's ~3 m gives
   20–24 px per metre.
 
+## Who is who, measured (2026-10-10, #105)
+
+**Why it exists.** The causal resolver (`TeamIdentityResolver`) decides which
+squad is near frame by frame. On the 20261010 match (vall d'Hebron) it read
+none of the first two side switches and then flipped ten times, so the run
+came out A 11 – B 20 for a set squad A won. Two causes, both measured on the
+probe's feature dump:
+
+* **the players walk around the net one at a time** (first switch: f7450–7800,
+  about 12 s). The resolver follows the level of its evidence with a ~4 s time
+  constant, in dead time too: by the time all four had crossed, its "squad 1
+  is near" level had slid from +0.39 / +0.52 to about 0 and the spread had
+  grown fourfold. Nothing was left to detect;
+* **the unseen orientation is assumed to mirror the enrolled one** (−0.39 /
+  −0.52). It does not: the anchors were enrolled in one view each, so across
+  the net the evidence keeps a view bias as large as the signal. Per rally the
+  two orientations read +0.31…+0.38 and −0.13…+0.08 on that match (one woman
+  of squad B, seen from behind, looks more like squad A's woman than like her
+  own far-view anchor).
+
+**What is read instead** (hindsight, no assumption about the unseen level):
+
+1. *Evidence per rally.* Every clean, real body whose feet are more than 1 m
+   from the net line gives `x` = best squad-1 minus best squad-2 anchor
+   similarity (sign flipped on the far half); a rally's evidence is the mean
+   of its two halves' means. Bodies inside that metre are left out: a far
+   blocker stands on the net line in the picture (20261010 P20 / P30 / P31:
+   the tracker reads him near for the whole rally).
+2. *Two levels from the match.* The best two-level split of the rallies'
+   evidence is accepted as two orientations only if the levels are ≥ 4 spreads
+   apart and the lower one is at most half the upper one; otherwise nobody
+   switched. The first read rally is the enrolled orientation by construction
+   (if it sits at the lower level the read is refused and the causal labels
+   stay). A two-state shortest path over the rallies then decides each one: a
+   switch costs 4 nats and one rally weighs at most 6, so one odd rally in the
+   middle of a block is not two switches, and a last block of one point is
+   still read.
+3. *Players inside the rally.* One shortest path over the frames: a state is
+   which player each of the (up to four) track ids is, an id changes player
+   only when the evidence pays for it (0.15 similarity for 1 s). Per body and
+   frame the evidence is its similarity to that player's anchors minus the
+   value half way between the two teammates of that half in this orientation
+   (read from the match: a view shifts both teammates alike, so a body seen
+   without its teammate is still read unbiased), less 0.5 when its feet are
+   clear of the net on the other squad's half.
+4. *Write-back.* Label, squad, slot and half of every tracked body in the
+   rally window. The half is the SQUAD's half, so the roster of the touch
+   solver holds the two teammates whatever their feet say. A half whose two
+   players are told apart by less than 0.02 similarity gets no labels in that
+   rally (its squad is still known; its touches are credited to nobody).
+
+| | 20261010 (vall d'Hebron) | 20260920 (beach) |
+|---|---|---|
+| evidence levels (squad 1 near / squad 2 near / spread) | +0.347 / −0.038 / 0.044 | +0.146 / −0.083 / 0.023 |
+| rallies oriented right | 31/31 (agent's frame read) | 33/33 (owner GT) |
+| side switches | after 7, 16, 22, 29 (see below) | after 7, 14, 21, 28 |
+| score as reconstructed | A 21 – B 10, set complete (causal labels: A 11 – B 20) | A 21 – B 12 (unchanged) |
+| slot margin, weakest half | 0.040 (grey shirt vs black top, same view) | 0.31 |
+| labels on the right person | 93/93 sampled frames, 3 per rally (agent's eyes) | players = owner CSV on 207/208 touches |
+| id changes inside rallies | 8, 7 with the box jumping to another body | 36, 28 with the box jumping (the rest on coasting boxes) |
+
+20260920 is otherwise unchanged against the record above (points, serves,
+winners, score, touch precision / recall, action, half, squad, 0 rule breaks).
+The one touch that moved (P19 f13624, P1A → P2A; the owner's P1A is right):
+both near players are in one box, the man in front, the woman who bumps the
+ball hidden behind him. The read names the box P2A, which is who it shows; the
+causal label was a stale P1A that happened to be the toucher.
+
+Feet against the assigned half: 42 of 28 633 body-frames on 20261010 and 180
+of 30 475 on 20260920 read the other half by more than a metre (jumps project
+the feet deep, dives and merged boxes read near), in runs of up to 18 frames.
+That is why the feet are a cost and the squad decides.
+
+Sensitivity: the eleven constants moved ×0.5…×2 one at a time keep 31/31
+orientations on 20261010 and every score of 20260920. Labels change in three
+rows on 20261010: side penalty 0.25 (2.4 % of body-frames; the look-alike
+above wins — it holds from 0.35) and swap cost ×2 (0.4 %: one id swap followed
+late).
+
+**Not solved by this:** the 20261010 blocks were 7 / 9 / 6 / 7 points, not
+7 / 7 / 7 / 7 — the orientation is right, the POINTS were not (a ball lobbed
+back in dead time counted as a point, a near serve that left the top of the
+frame lost; both fixed since, #105b / #106: the blocks read 7 / 8 / 7 / 7,
+which is what was played — the players switched one point late). The live
+overlay (`make run-live`) still shows the causal labels.
+
+## Second match, measured (2026-10-10, #106)
+
+Three reads the 20261010 match (vall d'Hebron, tripod ~3 m, a pair of short
+players) showed wrong; each is a mechanism, none a constant fitted to it.
+
+**1. A landing is where the ball stops falling.** A ground end was read at
+the first frame the width test (`grounded`) fired. A falling ball lines up
+with sand metres behind where it will land, and for a frame or two its width
+fits that sand too: the last point's cut shot read 2 m BEHIND the far baseline
+(out, point B) when it lands a metre inside the side line (f29205; the owner:
+in, point A). `_landing_frame` walks from that first frame while the ball
+still comes down faster than 1.5 m/s in the picture. 20261010: 6 landings
+move 4–7 m, in / out reads 5 of 5 agree with the next serve (was 3 of 4), the
+last point is A's, and P11's last attack is no longer dropped as "died on its
+own half" (spike P2A, kill — the owner's read). 20260920: one landing moves
+(P6), winners and line calls as before (7 of 10: those three are not this).
+
+**2. A serve needs receivers.** The ball sent back to the next server at
+06:52 was thrown from BEHIND the far baseline (fetched there), peaked at
+4.8 m and flew 13 m at 7.6 m/s: no ball read separates it from a serve. The
+bodies do: a team waiting for a serve stands side by side, a team about to
+serve has one player walking to the line. Depth between the two receivers at
+every serve with both read (ground read of the feet within 0.5 m; the far
+half of the low beach camera is not, and nothing is refused there): ≤ 0.84 m
+at 51 of 52 serves (two matches + clips), 1.37 m in one drill that was played
+on; 2.2 m at the throw. Refused = stagger > 1.5 m AND fewer than two touches
+follow (a rally is a point wherever the receivers stood). It is listed in
+`checks.launches_refused` and in the report. 20261010: 31 points, A 22 – B 9,
+blocks 7 / 8 / 7 / 7, P13 goes to B — the owner's sequence. Limit: a ball
+sent back to a pair that happens to stand level still passes.
+
+**3. An attack is a ball hit above the player's own head.** The tape rule
+(contact ≥ net − 0.28 m) failed twice over. The contact height was read at
+the classifier's vertex, which is dated up to three frames early while a set
+drops 0.2 m a frame: +0.3…+0.5 m on some touches and not on others. And two
+players attack at 1.85–2.05 m, under any tape: their attacks read "spike"
+only when the vertex happened to be early (6 of 11). Now the contact is the
+sample where the ball leaves its incoming arc, and the ruler is the toucher's
+standing height. The 91 possession-ending second / third touches with a label
+(20260920 owner GT, 20261010 owner feedback):
+
+| contact / standing height | passes | attacks |
+|---|---|---|
+| ≤ 1.19 | 20 | 0 |
+| 1.27 – 1.29 | 2 (arms above the head: 20260920 f3913, f10789) | 4 |
+| ≥ 1.31 | 0 | 65 |
+
+20261010: the five attacks read as overpass are spikes (four named by the
+owner, f23222 by the frames). 20260920: action 162/165 → 163/165 (two soft
+attacks and one bump read at 2.33 m fixed, the two passes above lost).
+Practice clips 52/52 as before. Standing heights read ~10 % under the real
+ones (crouch, sand) for everybody, which is why the split is a ratio measured
+on the same boxes and not anatomy.
+
 ## Known limits
 
-* **Players are unscored.** The GT has no stable player identity; within-half
-  correctness rests on the identity resolver. Indirect evidence: the observed
-  servers agree with the service-order rotation on 84 % (A) / 89 % (B) of
-  serves. Owner contact sheets are still the gate.
+* **Players** are scored against the owner-ratified attribution of the
+  20260920 match (#88 CSV: 207/208 with the hindsight read, 208/208 with that
+  run's causal labels) and nothing else: one venue pair, two kits each. Four
+  players dressed alike, or teammates in the same kit, give a small slot
+  margin and no labels (precision first), never a guess -- untested on
+  footage. Owner contact sheets stay the gate for a new match.
 * **Line calls are weak** (blurred box through a 4-click homography): the
   ball-death read exists on 17 of 33 points; the 7 that need no line call
   (into the net, died on the hitter's half) are all right, but 3 of the 10
   in/out reads contradict the next serve and are overridden. The last point
-  has only this read plus the score closing the set.
+  has only this read plus the score closing the set. (#106: a landing is
+  now read where the fall stops; the three wrong calls of 20260920 are not
+  that bug and stay.)
 * Constants were set while looking at the whole match (not P1–P8 only); the
   out-of-sample evidence is the practice clips and the sweep. The
   `vall_dhebron` lock is untouched.
 * 12 GT touches go unmatched: 4 are the coarse-frame pairs above, 5 are
   placed as hidden touches (uncredited), 3 are absent. 1 observed touch is
-  credited to nobody (10 more are credited by alternation). Blocks are not a label. Soft "rainbow" attacks
-  below ~2.15 m read as overpasses (2 on the match).
+  credited to nobody (10 more are credited by alternation). Blocks are not a label. A pass played with
+  the arms above the head reads as an attack (2 on the match, #106); a soft attack on the FIRST touch
+  is always an overpass.
 * Needs the `--diag-dump` sidecar (49 MB per match, held in memory until the
   run ends).

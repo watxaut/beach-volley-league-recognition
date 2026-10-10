@@ -7169,6 +7169,66 @@ Learnings (#100).
 **Not done / owed:** owner picks the fix (open point 35); then one session under the post-run protocol + `make
 republish-all`. Every published position shares the shift (pass map, dug ends), not only attack starts.
 
+### 2026-10-09 (hundred-and-first session) — #101: published court positions — net-anchored, ball-box offset from the end switches
+
+**Asked (owner):** "yes, let's try it out and see how the new map plots" — build the #100 fix and plot the four players.
+
+**Diagnosed first (it changed the fix):** (1) net clicks: kept — the corner midline is 0.05 / 1.3 m off the clicked net, a ball at
+the net is 23.7 px (model 22.8). (2) Depth "at the hit": DROPPED — kink-aligned windows over the arriving, leaving or same-half
+flight are no tighter than the whole-flight fits (spike IQR 0.9 m either way). (3) The rest is not an attack effect: every kind
+of touch shows the same near/far gap (dig 2.05, set 2.21, spike 2.06, overpass 2.15 m), near serves sit on their server (−0.24 m,
+16 serves: no bias at the near baseline), so it is a box a fixed number of pixels wider than the ball, not a metre shift.
+
+**Built (`src/postrun/positions.py`, output only):** `CourtPositions` (three depth anchors, two ground homographies sharing the
+clicked net line; no clicks or a slipped click = the corner model, exactly) + `calibrate_width_bias` (one offset that closes the
+gap of every kind with ≥5 touches per half; refused without a side switch, with <2 kinds, outside 12 % of the ball's width at the
+net, or when a kind stays >0.6 m apart). `Touch.pos_*` / `RallyEnd.pos_xy*` feed `court_x_m` / `court_y_m` / `court_err_m` /
+`court_xy_m`; a touch that reads across the net is held at it; `positions` block in the JSON; recon schema 4.
+
+**Measured (20260920):** offset 1.74 px, gaps after −0.16 / +0.14 / 0.00 / +0.09 m. Spikes 2.70 / −0.30 → 1.40 / 1.40 m (11 far
+starts across the net → 0; 1 of 39 held at the net). Per player near | far: P1A 1.55 (6) | 2.30 (1), P2A 1.35 | 1.20, P1B 1.40 |
+1.70 (2), P2B 1.30 | 1.40; the 2:49 kill 2.7 → 1.4 m (frames: takeoff 0.8–1.3 m). All 170 positions move 0.5–2.4 m away from the
+lens. **Neutral:** everything but the position keys identical on the match and e1–e7 (JSON + txt `cmp`); `score_postrun` output
+identical (33/33, winners 33/33, P 0.976 / R 0.933, 0 rule breaks); practice 5/5 serves, P 52/53; sweep 88 rows, none loses a
+point or a winner; hard / touch 26/29. Tests +8 (suite 1239: 1233 pass, 5 skipped, the known `test_inbox` failure).
+
+**Not settled (open point 35):** the players' feet show the same gap, so part may be real play; two serves into the net read no
+offset; practice clips (no switch) stay uncorrected; in-sample on one match. Plot: `output/postrun/20260920_match/attack_map_now_vs_fixed.png`.
+
+**Not done / owed:** owner look, merge, `make republish-all` from prod (the on-disk `match_reconstruction.json` was left as is).
+
+### 2026-10-09 (hundred-and-second session) — #102: a Feedback button (bugs / suggestions with screenshots)
+
+**Asked (owner):** a "suggest / report a bug" button on the web; GitHub issues need an account, so onboarded people must be able to
+send bugs or ideas easily, with screenshots, "so that we can get them easily and tackle them in a session".
+**Decisions (owner):** reports stay in Supabase only (no GitHub mirror, no new secret or host); members see the status of what they sent.
+
+**Built.** Migration `20261009130000_feedback` (NOT pushed): table `feedback` (kind bug / suggestion, text, page, context, ≤3
+screenshot paths, status open / done / dismissed, admin note) + private bucket `feedback-media` (1 MB, images only, a member writes
+under `<user id>/` only). `send_feedback()` is the only way a row gets in (author = caller, every screenshot must exist in the caller's
+folder, 20 reports a day); uploads capped at 30 a day (`feedback_upload_allowed()`); a member reads their own, admins read all and set
+status + note, nobody rewrites the text, `anon` nothing. Web: `Feedback` button in the top bar → native `<dialog>` (kind, text, pick or
+paste screenshots, downscaled in the browser to ≤1600 px JPEG via `createImageBitmap`, so no CSP change), sends route + viewport +
+browser + build (`__BUILD__` = Cloudflare commit); Settings → "My reports" (status + reply); Admin → Feedback (open count on the tab,
+Done / Not planned / Reopen, note). Laptop: `make feedback` (`src/publish/feedback.py`) replaces `output/feedback/` with `index.md` +
+`<id>_<kind>/report.md` + screenshots; `DONE="3 5" NOTE=...` / `DISMISS=` close reports from a session. `make backup` exports the table.
+
+**Verified:** schema check 5/5 on a throwaway `supabase/postgres:17` (smoke: own folder only, foreign / missing screenshot refused,
+direct insert refused, daily limit, member vs member vs admin, column grants); `tests/test_feedback_pull.py` 3; vitest 64, typecheck,
+oxlint, build; demo mode driven in Chrome at 1100 px and 390 px (send with a 2400 px image → 1600 px, Settings, Admin, close), 0
+console errors.
+
+**Not done / owed:** `supabase db push` (4 migrations now owed) and a first report on the hosted project — the storage policies and the
+PATCH with the secret key ran only against the stub / a fake. No notification on a new report (Admin tab count or `make feedback`).
+
+### 2026-10-09 (hundred-and-third session) — "last match" on the time filter
+
+**Asked (owner):** add a "last match" option to the stats time filter (the menu started at "last 3 matches").
+
+**Built.** `MATCH_PRESETS` in `webapp/src/lib/window.ts` is now `[1, 3, 5, 10]`; the key `n1` (label "last match", `p_last_n => 1`)
+was already supported by `windowParams` / `windowLabel` and the SQL window (`rls_smoke.sql` pins last-1), so no migration and no
+demo change. vitest +1 (65), typecheck clean.
+
 ### Session index lines moved out of STATUS.md (verbatim, oldest first)
 
 > The index is capped at 100 lines (`tests/test_status_leanness.py`); from 2026-10-08 (#98) the oldest
@@ -7181,3 +7241,6 @@ republish-all`. Every published position shares the shift (pass map, dug ends), 
 - 2026-09-04 **#4** — analysis DB + player labeling + local web UI; extraction/DB split by lossless file contract.
 - 2026-09-05 **#5** — player-page court SVG field heatmap (two rounds).
 - 2026-09-05 **#6** — GAME-ON badge latency fixed (rolling sustained-flight provisional); serve-init semantics (provisional fast ON, serve arming); heatmap landscape + cache busting.
+- 2026-09-06 **#7** — ball-matching rework: identity by trajectory + motion, never confidence; static spares can't bootstrap/steal/starve.
+- 2026-09-06 **#8** — squatter review: sideline straddlers expire from the roster (e2/e7 slots freed early).
+- 2026-09-06 **#9** — in-court preference (off-court cost penalty) fixes bystander squat + Hungarian chain-swaps (point 16).

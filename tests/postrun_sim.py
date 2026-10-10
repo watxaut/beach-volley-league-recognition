@@ -34,6 +34,7 @@ NEAR_A = {"P1A": (2.5, 11.0), "P2A": (5.5, 11.0), "P1B": (2.5, 5.0), "P2B": (5.5
 NEAR_B = {"P1B": (2.5, 11.0), "P2B": (5.5, 11.0), "P1A": (2.5, 5.0), "P2A": (5.5, 5.0)}
 
 DIG_Z, SET_Z, SPIKE_Z, SERVE_Z = 0.9, 1.7, 2.8, 2.6
+PLAYER_HEIGHT_M = 1.85
 
 
 def geometry() -> CourtGeometry:
@@ -62,6 +63,7 @@ class RallyScript:
     positions: Dict[str, Tuple[float, float]] = field(default_factory=lambda: dict(NEAR_A))
     far_lock_delay: int = 5                  # frames the tracker needs on a far serve
     toss_frames: int = 12                    # tracked toss before a near serve
+    heights: Dict[str, float] = field(default_factory=dict)   # label -> metres (else 1.85)
 
 
 class StreamBuilder:
@@ -90,16 +92,21 @@ class StreamBuilder:
         self.xy[frame] = (u, v)
         self.bbox[frame] = (u - w / 2, v - w / 2, u + w / 2, v + w / 2)
 
-    def player_box(self, x: float, y: float) -> Tuple[float, float, float, float]:
+    def player_box(self, x: float, y: float, height: float = PLAYER_HEIGHT_M
+                   ) -> Tuple[float, float, float, float]:
         scale = float(self.g.px_per_metre(y))
         u, v = self.g.world_to_image(x, y)
-        return (u - 0.3 * scale, v - 1.85 * scale, u + 0.3 * scale, v)
+        return (u - 0.3 * scale, v - height * scale, u + 0.3 * scale, v)
 
     def put_players(self, first: int, last: int,
-                    positions: Dict[str, Tuple[float, float]]) -> None:
+                    positions: Dict[str, Tuple[float, float]],
+                    heights: Optional[Dict[str, float]] = None) -> None:
+        heights = heights or {}
         for f in range(max(first, 0), min(last, self.n - 1) + 1):
             self.players[f] = [
-                PlayerObs(track_id=i + 1, bbox=self.player_box(*positions[label]),
+                PlayerObs(track_id=i + 1,
+                          bbox=self.player_box(*positions[label],
+                                               heights.get(label, PLAYER_HEIGHT_M)),
                           predicted=False,
                           court_side="near" if positions[label][1] > 8.0 else "far",
                           label=label, squad=1 if label.endswith("A") else 2,
@@ -159,7 +166,8 @@ class StreamBuilder:
         self.vertex(land_f, land, accepted=False)            # nobody near: refused
         for k in range(1, 9):                                # rolls to a stop
             self.put_ball(land_f + k, land[0] + 0.03 * k, land[1], 0.11)
-        self.put_players(f - int(3 * FPS), land_f + int(2 * FPS), script.positions)
+        self.put_players(f - int(3 * FPS), land_f + int(2 * FPS), script.positions,
+                         script.heights)
         return frames
 
     def hide(self, first: int, last: int) -> None:

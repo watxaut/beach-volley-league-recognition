@@ -47,6 +47,13 @@ Schema 4 (post-run reconstruction layer): ``ball_track`` also mirrors the
 tracked ball's ``bbox`` + ``velocity`` and every ``players`` row carries the
 identity resolver's ``player_label`` / ``squad`` / ``slot`` AT that frame, so
 the post-run layer can re-attribute a touch without a second video pass.
+
+Schema 5 (post-run identity read): a ``players`` row of a clean, real body
+also carries ``id_sims`` -- its similarity to each enrolled player's fixed
+anchors, as the identity resolver computed it on that frame -- and the header
+names the columns (``identity_players``, e.g. ``["P1A", "P2A", "P1B",
+"P2B"]``). The post-run layer reads which squad is on which half per rally
+from them, in hindsight (``src/postrun/identity.py``).
 """
 
 from __future__ import annotations
@@ -56,7 +63,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 #: Bumped when the record shape changes; recorded in the file header.
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 def _new_frame_record(frame: int) -> Dict[str, Any]:
@@ -85,6 +92,8 @@ class DiagRecorder:
         self.video = video
         self.fps = fps
         self.total_frames = total_frames
+        #: Extra header fields a component fills in during the run.
+        self.meta_extra: Dict[str, Any] = {}
         self._frames: Dict[int, Dict[str, Any]] = {}
         self._closed = False
 
@@ -135,6 +144,7 @@ class DiagRecorder:
                 "fps": self.fps,
                 "total_frames": self.total_frames,
                 "frames_recorded": len(self._frames),
+                **self.meta_extra,
                 "note": "OFF-BY-DEFAULT diagnostic capture; produced from the same "
                         "FrameProcessor.process_frame path as production. Keys are "
                         "observations of values the pipeline already computed.",

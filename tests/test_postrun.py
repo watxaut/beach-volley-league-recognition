@@ -285,6 +285,65 @@ def test_rally_without_a_visible_serve_is_still_a_point():
     assert [t.frame for t in found[0].touches] == frames[1:]
 
 
+def _loose_boxes(builder, first, last, share=0.86):
+    """Blurred frames: the ball's box reads narrower than the ball is."""
+    for f in range(first, last + 1):
+        u, v = builder.xy[f]
+        half = (builder.bbox[f, 2] - builder.bbox[f, 0]) * share / 2.0
+        builder.bbox[f] = (u - half, v - half, u + half, v + half)
+
+
+def test_landing_is_read_where_the_ball_stops_falling(monkeypatch):
+    from src.postrun import rallies
+
+    b = sim.StreamBuilder(12.0)
+    # a tripod at ~3 m (the 20261010 calibration): a ball half a metre up
+    # lines up with sand a few metres behind it, not with the horizon
+    b.g = CourtGeometry([[586, 419], [1229, 423], [1815, 911], [32, 899]],
+                        [[455, 266], [1386, 276]])
+    script = sim.standard_rally(2.0, "far", sim.NEAR_A, landing=(4.0, 4.5))
+    frames = b.rally(script)
+    land = frames[-1] + int(script.landing_dt * sim.FPS)
+    # the last 0.2 s of the fall already measure the width of the sand behind
+    _loose_boxes(b, land - 6, land - 1)
+    _, found = _segment(b)
+    end = found[0].end
+    assert end.kind == END_GROUND and abs(end.frame - land) <= 1
+    assert end.side == "far" and end.in_court is True
+    assert end.court_xy == pytest.approx((4.0, 4.5), abs=0.6)
+    # read at the first frame the width test fires, the same ball is metres deep
+    monkeypatch.setattr(rallies, "LANDED_MAX_FALL_MS", float("inf"))
+    _, found = _segment(b)
+    early = found[0].end
+    assert early.frame < land and early.court_xy[1] < 4.5 - 2.0
+
+
+def test_ball_sent_back_to_a_team_out_of_formation_is_not_a_serve():
+    # the near pair is getting ready to SERVE: one on the way to the line
+    staggered = {**sim.NEAR_A, "P1A": (2.5, 12.0), "P2A": (5.5, 15.2)}
+
+    def thrown_over(positions, hits=()):
+        b = sim.StreamBuilder(12.0)
+        b.rally(sim.RallyScript(start_s=2.0, serve_xy=(5.6, -2.8), hits=list(hits),
+                                landing=(4.0, 14.0), landing_dt=1.4,
+                                positions=dict(positions)))
+        tl = BallTimeline(b.build(), b.g)
+        segmenter = RallySegmenter(tl)
+        return segmenter.segment(), segmenter.refused
+
+    found, refused = thrown_over(staggered)
+    assert found == []
+    assert [(r.side, r.reason) for r in refused] == [("far", "receivers_not_in_formation")]
+    assert refused[0].stagger_m == pytest.approx(3.2, abs=0.4)
+    # the same flight at a pair waiting side by side is a serve (an ace) ...
+    found, refused = thrown_over(sim.NEAR_A)
+    assert len(found) == 1 and refused == []
+    # ... and so is one a staggered pair plays: a rally is a point
+    found, refused = thrown_over(staggered, hits=[
+        sim.Hit(1.3, "P1A", sim.DIG_Z), sim.Hit(1.6, "P2A", sim.SET_Z)])
+    assert len(found) == 1 and refused == []
+
+
 def test_landing_calls_abstain_near_the_lines():
     assert classify_landing((4.0, 12.0)) == ("near", True)
     assert classify_landing((4.0, 2.0)) == ("far", True)
@@ -338,6 +397,40 @@ def test_low_third_touch_over_the_net_is_an_overpass_not_a_spike():
                             landing=(1.0, 14.0), landing_dt=0.8))
     actions = [a[2] for a in _actions(_reconstruct(b)["points"][0])]
     assert actions == ["serve", "dig", "set", "overpass", "dig"]
+
+
+def _third_touch(height_m, z, vertex_early=0):
+    """dig, set and a third touch at ``z`` by P1B, who stands ``height_m`` tall."""
+    b = sim.StreamBuilder(14.0)
+    hits = [sim.Hit(1.15, "P1B", sim.DIG_Z), sim.Hit(1.6, "P2B", sim.SET_Z),
+            sim.Hit(1.6, "P1B", z), sim.Hit(1.5, "P1A", sim.DIG_Z)]
+    frames = b.rally(sim.RallyScript(start_s=2.0, serve_xy=(6.0, 16.8), hits=hits,
+                                     landing=(1.0, 14.0), landing_dt=0.8,
+                                     heights={"P1B": height_m}))
+    if vertex_early:
+        # the classifier dates the vertex before the picture shows the turn
+        cand = next(c for c in b.candidates if c.frame == frames[3])
+        cand.frame -= vertex_early
+        cand.point = tuple(b.xy[cand.frame])
+    return _reconstruct(b)["points"][0]["touches"][3]
+
+
+def test_attack_is_a_ball_hit_above_the_players_own_head():
+    tape = sim.geometry().net_top_height_m()
+    # a short player's swing with the arm up, well under the tape
+    touch = _third_touch(height_m=1.5, z=1.95)
+    assert touch["action"] == "spike" and 1.95 < tape - 0.28
+    assert touch["contact_ratio"] == pytest.approx(1.95 / 1.5, abs=0.1)
+    # the same contact height at a tall player's forehead is a pass
+    assert _third_touch(height_m=1.95, z=1.95)["action"] == "overpass"
+
+
+def test_contact_height_is_read_where_the_ball_leaves_its_arc():
+    touch = _third_touch(height_m=1.85, z=1.2, vertex_early=3)
+    # at the early vertex the set is still 0.6 m above the forearms
+    assert touch["height_m"] > 1.2 + 0.4
+    assert touch["contact_height_m"] == pytest.approx(1.2, abs=0.25)
+    assert touch["action"] == "overpass"
 
 
 def test_unseen_touch_keeps_the_count_and_is_never_credited():
@@ -526,6 +619,36 @@ def test_service_order_names_the_server_nobody_saw():
     assert servers == ["P1A", "P1A", "P1B", "P2A", "P2B", "P1A"]
     order = result["checks"]["service_order"]
     assert order["A"]["first_server"] == "P1A" and order["A"]["applied"]
+
+
+def _serve_then(side, hits, landing):
+    """One point served from ``side`` with the given receiving touches, then
+    the same half serves again (it won the point)."""
+    b = sim.StreamBuilder(30.0)
+    serve_xy = (6.0, 16.8) if side == "near" else (2.0, -0.6)
+    b.rally(sim.RallyScript(start_s=2.0, serve_xy=serve_xy, hits=hits, landing=landing))
+    b.rally(sim.standard_rally(16.0, side, sim.NEAR_A))
+    return _reconstruct(b, points_to_win=21)["points"][0]
+
+
+def test_serve_touched_once_and_lost_is_an_ace_from_either_end():
+    # Owner rule: a dig and no second touch, the ball not going back over, is
+    # an ace. The far serve has no launch of its own (it is read from the
+    # track's birth, ``observed`` False); it is the start of the point all the
+    # same.
+    near = _serve_then("near", [sim.Hit(1.15, "P1B", sim.DIG_Z)], (1.0, 2.5))
+    assert near["serve"]["outcome"] == "ace" and near["winner"] == "A"
+    far = _serve_then("far", [sim.Hit(1.15, "P1A", sim.DIG_Z)], (7.0, 13.5))
+    assert not far["serve"]["observed"]
+    assert far["serve"]["outcome"] == "ace" and far["winner"] == "B"
+    assert [t["action"] for t in far["touches"]] == ["serve", "dig"]
+
+
+def test_a_set_and_a_third_contact_is_not_an_ace():
+    lost = _serve_then("far", [sim.Hit(1.15, "P1A", sim.DIG_Z), sim.Hit(1.6, "P2A", sim.SET_Z),
+                               sim.Hit(1.6, "P1A", sim.SPIKE_Z)], (4.0, 8.6))
+    assert lost["winner"] == "B" and lost["serve"]["outcome"] is None
+    assert lost["touches"][-1]["outcome"] == "error"
 
 
 def test_touch_credited_after_the_ball_died_is_dropped_by_the_next_serve():
@@ -724,9 +847,25 @@ def test_match_positions_mirror_across_the_net(match_score):
     assert 1.0 < pos["width_bias_px"] < 2.5           # a loose box, not another ball
     assert set(pos["kinds"]) == {"dig", "set", "spike", "overpass"}
     assert all(k["gap_before_m"] > 1.5 for k in pos["kinds"].values())
-    assert all(abs(k["gap_after_m"]) <= 0.3 for k in pos["kinds"].values())
+    # a kind with a dozen touches on a half is +-0.4 m by itself
+    assert all(abs(k["gap_after_m"]) <= (0.3 if min(k["near"], k["far"]) >= 15
+                                         else positions.KIND_AGREEMENT_M)
+               for k in pos["kinds"].values())
     spikes = [t for p in recon["points"] for t in p["touches"]
               if t["action"] == "spike" and t["court_y_m"] is not None]
     for t in spikes:                                  # an attack starts on its own half
         assert (t["court_y_m"] >= NET_Y_M) if t["side"] == "near" else (t["court_y_m"] <= NET_Y_M)
     assert pos["clamped_to_half"] <= 2
+
+
+def test_service_order_breaks_where_a_run_of_seen_servers_says_so():
+    from src.postrun.match import _serving_order
+
+    # alternating, one odd read in the middle: a misread, the order holds
+    order, breaks = _serving_order({0: [1], 1: [2, 2], 2: [2], 3: [2], 4: [1]}, 5)
+    assert order == [1, 2, 1, 2, 1] and breaks == []
+    # a point lost between turn 1 and 2 shifts everything after it
+    order, breaks = _serving_order({0: [2], 1: [1], 2: [1], 3: [2], 4: [1], 5: [2]}, 6)
+    assert order == [2, 1, 1, 2, 1, 2] and breaks == [2]
+    # unseen turns take the alternation
+    assert _serving_order({0: [1], 3: [2]}, 4) == ([1, 2, 1, 2], [])

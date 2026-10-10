@@ -18,9 +18,9 @@ update at the end of every session that changes anything and commit with the wor
 - New durable protocol rules go in `AGENTS.md`; new cross-session technical
   facts go one-line-each into *Learnings* below.
 
-Last updated: **2026-10-09 (102nd session) — a Feedback button on every page of the web app: members send a bug or a suggestion with up to
-3 screenshots, follow it under Settings; admins triage under Admin → Feedback; `make feedback` pulls the open ones for a session.**
-#101 (net-anchored court positions), #99 (reception vs defense), #98 / #97 (hard / touch), #96 (player page v2), #95 (unknown-player slots) and #90 (platform) lie underneath.
+Last updated: **2026-10-10 (106th session) — 20261010 reads the owner's sequence: 31 points, A 22 – B 9 (the players switched one point late and played to 22).
+Three post-run reads fixed: a landing is where the ball stops falling, a serve needs receivers side by side, an attack is a ball hit above the player's own head. 20260920 keeps its record (action 0.982 → 0.988).**
+#105 (who is who post-run), #104 (second match, diagnosis), #102 (Feedback button), #101 (net-anchored court positions), #99 (reception vs defense), #98 / #97 (hard / touch), #96 (player page v2), #95 (unknown-player slots) and #90 (platform) lie underneath.
 
 ## North-star goals (set session 24)
 
@@ -47,11 +47,12 @@ Last updated: **2026-10-09 (102nd session) — a Feedback button on every page o
 Offline layer over the `--diag-dump` sidecar (schema 4), ~3 s per match, no
 decode: ball timeline (vertices incl. reach-refused ones, births/deaths, gap
 vertices, one robust depth line per flight) → points (serve = launch beside a
-baseline that clears the net and reaches the other half; far serve = track
-BIRTH; end = sand / net / air-time) → touches (one shortest path per rally
+baseline that clears the net and reaches the other half, at receivers standing
+side by side (#106); far serve = track BIRTH; end = sand / net / air-time, a
+landing read where the fall stops) → touches (one shortest path per rally
 over half × touch number × player: reception to the receivers, ≤3 touches,
-players alternate; hidden touches keep the count, never credited; a seen touch out of reach is credited by alternation) → labels →
-match (winner = next server; ball death is the cross-check; score closes the
+players alternate; hidden touches keep the count, never credited; a seen touch out of reach is credited by alternation) → labels
+(attack = contact ≥ 1.23 × the toucher's standing height, #106) → match (winner = next server; ball death is the cross-check; score closes the
 last point; service order names every server). All constants are metres /
 seconds / costs through the calibration (net height reads 2.43 m beach,
 2.42 m practice). `make run-match` / `make postrun`; output
@@ -60,10 +61,10 @@ seconds / costs through the calibration (net height reads 2.43 m beach,
 **Record (20260920, `scripts/score_postrun.py`, ±15 f):** points 33/33, 0
 false; serve half 33/33, squad 33/33, frame 32/33 (P31 = GT typo); winners
 33/33, score A 21 – B 12 exact, switches after 7/14/21/28; touches P 0.976 /
-R 0.933, action 0.982, half 1.000, squad 1.000; 0 rule breaks (causal stream:
+R 0.933, action 0.988 (#106; 0.982 before), half 1.000, squad 1.000; 0 rule breaks (causal stream:
 P 0.711 / R 0.815 / action 0.559 / half 0.759; 23 same-player-twice, 45
-fourth touches). Practice e1–e7: serves 5/5, P 52/53, action 52/52. Sweep (78
-moves): no row loses a point or a winner; worst P 0.965, action 0.958.
+fourth touches). Practice e1–e7: serves 5/5, P 52/53, action 52/52. Sweep (130
+moves): no row loses a point or a winner; worst P 0.965, action 0.970.
 **Per-player WHO: RATIFIED (#88).** Owner reviewed the 208-row attribution
 CSV — every player right, 0 corrections (incl. the 10 by-alternation and
 rotation-named servers); the CSV is the per-player GT. Line calls: 3 of 10
@@ -82,13 +83,12 @@ transactional Supabase RPC (applied/unchanged, admin rows untouched) → RLS +
 React SPA. Verified offline (scratch PG16, parity, CLI e2e, SPA screenshots);
 hosted Supabase/Cloudflare/Drive/launchd untested — owner deploys (#90 Log). #102: Feedback button (bug / suggestion + ≤3 screenshots; `send_feedback()` is the only way in, 20 reports + 30 uploads a day per member; Settings → My reports, Admin → Feedback, `make feedback` → `output/feedback/`; migration `20261009130000_feedback`, NOT pushed). #91: attack landings carry both axes, a per-axis error and a result (recon schema 2, migration `20261006180000_landing_confidence`); needs `make postrun` + re-publish per match. #92: stats windows + side-out/break + serve targets + reception outcome + hitting % + report card + `/measure` (migration `20261007100000`, no re-publish needed); `make republish-all` redoes post-run + publish for every published match (needs its diag dump). #93 security review (AGENTS §13): table privileges are explicit (`20261007120000`; `anon` holds none), `match_report` gates its per-player extras by tier (`20261007130000`), `webapp/public/_headers` (CSP), the publisher refuses a `.env.publish` others can read, login codes go through `supabase/functions/request-login-code` + `login_code_gate()` (`20261007140000`); verified on the local stack only. #95: `match_participants.is_unknown` (`20261008100000`) = a slot outside the league (AGENTS §13); migration pushed by the owner (2026-10-08). #94 login study (`docs/web_login_study.md`): sessions persist (refresh token, no limit); fixes + passkeys/Google options await owner decisions (open point 34). #96 player page v2: tabs (Overview / Attack / Serve & receive / Matches), "you vs the league / vs your earlier matches" strips counted from league-tier data, attack map start → end from `own_x_m/own_y_m` (already published, no re-publish), grades in the "i" hint (AGENTS §13); migration `20261009100000_player_page_v2` NOT pushed yet. #99 reception vs defense: `analytics.passes` (migration `20261009120000_pass_map`, NOT pushed; no post-run change, no re-publish) + `PassMap` card; the real match has 24 credited receptions / 34 defenses, 54 with a seen destination.
 
-**Identity (#85):** `TeamIdentityResolver` (`player_identity_mode:"team"`,
-default) stamps P1A/P2A/P1B/P2B per frame; orientation = two-state LLR on
-fixed anchors (replay: 4/4 switches, 0 stray, 211/211 GT contacts). The #87
-live run confirms it end to end: the post-run squads are right on 33/33
-serves and 166/166 touches. Within-half slot RATIFIED by the same owner
-review (#88). Owed: entreno 0-flip run. Detail:
-`docs/history/status_where_we_are_archive.md`.
+**Identity (#105: who is who is a POST-RUN read — `src/postrun/identity.py`, AGENTS §4 / §11, numbers in `docs/postrun_reconstruction.md`).** Per RALLY: how much better the bodies of each half (feet > 1 m off the net line) match the squad enrolled there; the two orientations sit at two levels read from the match itself (20261010 +0.347 / −0.038, 20260920 +0.146 / −0.083), a two-state path over the rallies decides (a switch costs 4 nats, one rally weighs ≤ 6).
+Per FRAME inside a rally: one shortest path over which player each track id is (similarity centred between the two teammates of that half, a cost for feet on the other squad's half, an id changes player only when paid for). Label / squad / slot / HALF of every body are rewritten before the touches are solved. Input: `id_sims` per clean body in the diag dump (schema 5); a dump without them keeps its causal labels and reconstructs byte-identical.
+20261010: 31/31 rallies oriented (agent's frame read), 93/93 sampled labels on the right person (score and blocks: next paragraph). 20260920: record unchanged, players = the owner CSV on 207/208 (P19 f13624: the toucher is hidden behind her teammate). Clips e1–e7 unchanged. The causal `TeamIdentityResolver` (live overlay) is untouched and still misses switches.
+
+**Second match (20261010 vall d'Hebron; `output/20261010_1000_vall_dhebron_jesus_sara_joan_loida/`, owner feedback in `ground_truth/20261010_1000_vall_dhebron_owner_feedback.txt`) — the owner's sequence since #106: 31 points, A 22 – B 9, switches after 7 / 15 / 22 / 29** (the players switched one point late and counted one short, so the set ran to 22). #106, numbers in `docs/postrun_reconstruction.md`: (1) landing = where the ball stops falling (the last point's cut shot read 2 m behind the baseline, it lands 1 m inside the side line → A; P11's attack is P2A's kill again); (2) the 06:52 return is refused as a serve — receivers 2.2 m apart in depth and nobody plays it (51 of 52 real serves ≤ 0.84 m), listed as "Not a serve" in the report; (3) attack = contact ≥ 1.23 × the toucher's standing height, contact read where the ball leaves its arc: the five attacks read as overpass are spikes.
+Still not publishable without the owner's contact sheet per rally (AGENTS §11); left on this match: blocks (2), an invented overpass (P10), a set + kill unseen (P21), a set from off court (P2) — open point 32i.
 
 **Production state (causal pass, unchanged):** weights
 `volleyball_ball_best.pt` v3; match 720p upscaled `_up1080`; 30–32 ms/frame
@@ -99,7 +99,7 @@ colours/labels. Pass-2 scripts (`relabel_serves`, `resolve_side_switches`,
 `resolve_point_winners` 18/33, `consume_serve_evidence`) are SUPERSEDED by
 `src/postrun` for points/serves/winners; kept as provenance. Entreno action
 gate (causal): e1 0.706, e2 0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933,
-e7 0.75 (same-session A/B only). Test suite **1228** (1222 pass, 5 skipped; `test_inbox` run-match order fails at HEAD, not #94 / #97 / #98).
+e7 0.75 (same-session A/B only). Test suite **1263** (1257 pass, 5 skipped; `test_inbox` run-match order fails on `main` too, not #106).
 
 **Player detector input (#94, default ON):** `player_bgr_input: true` passes BGR as-is (`false` = the old path; how to compare: Learnings). 4-track frames up on all 7 clips, stream F1 0.824→0.839, post-run identical; match stream labels 81/145→74/146; e3 contact sheet owed. Full text: `docs/history/status_where_we_are_archive.md` (#97).
 
@@ -129,12 +129,12 @@ P31 serve f24543 is 128 f before its reception (owner to confirm ~f24630).
    Next picks (§5): I3 → O3 (relative heights, V2), N10/O2, O1+I4, N7/N9, F1.
 1. ✅ **Product deployed (owner, DONE 2026-10-07):** `docs/deploy_web_platform.md` steps 0–7. Still open: publish 20260920 check
    (fantasy = txt footer), then action_overrides UI, in-app invites, `own_x_m` heatmaps (design §8 "Next"). **Owed (#98), in any order — each step is safe alone:** merge `spike-type-touch-vs-hard`; `supabase db push` (`20261009100000` + `20261009110000` + `20261009120000`); move `~/volley-prod` to that commit and run `make republish-all` THERE (this checkout's `.env.publish` is the local stack; an older prod checkout would rewrite the shared `output/` with the old rules); then look at the Attack tab on the real match.
-2. **Second match / other venue through `make run-match`** (also the first out-of-sample test of #97 hard / touch) — the only
-   21-point match so far is the one the layer was built on; practice clips
-   and the sweep are the out-of-sample evidence.
-3. **Landing line calls** (3 of 10 wrong): needed only for the last point
-   and for kill-vs-out detail; a ground-plane read from raw detections of
-   the resting ball is the candidate (open point 31).
+2. **20261010, what is left (owner feedback file; open point 32i), in this order:** (a) blocks are not a label (P5 f4973, P26 f24630) and make the next touches wrong — incl. the attack at f24691, read as a first-touch overpass; (b) P10: an attack into the net read with an overpass by the other team; (c) P21 (10:48): a set and P1A's kill on the line unseen, the set reads as an overpass; (d) P2: the set from off court unseen; (e) P13's kill is not credited (the track ends before the sand).
+   Owner: look at the regenerated point images (31), then a per-rally contact sheet before publishing; merge PR #25. A full owner GT (serve frame + winner per point) would let this match be scored like 20260920.
+   Live overlay (`make run-live`) still shows the causal labels: fix only if the owner asks. Recording advice given #106 (kits, tripod height, margin behind the baselines): owner decides; `docs/video_recording_guide.md` rewrite still owed (open point 29).
+3. **Landing line calls** (20260920: 3 of 10 wrong, not the #106 bug; 20261010:
+   5 of 5): needed only for the last point and for kill-vs-out detail; a read
+   from raw detections of the resting ball is the candidate (open point 31).
 4. E2 observers (identity drift / side-switch, display only, owner gate).
 5. Deferred fix: comment `src/utils/config.py:101` (32f set-error fixed #90).
 6. **Bugs found in #89 (results-changing → measure with a same-session
@@ -173,14 +173,14 @@ archived under their session date in `docs/history/status_log_archive.md`.)*
     pass DONE #88 (owner CSV review, 0 corrections); (6) landing
     confidence: line calls 7/10 (open point 31). Next: (2) with the DB
     ingest (Active next 1).
-2.  **Side-change survival (player identity) — status: orientation SOLVED
-    (#85 replay: 4/4 switches, 0 stray, 211/211 GT contacts) AND per-player
-    slot RATIFIED #88 (owner reviewed the 208-row attribution CSV: all
-    correct).** Remaining: (b) entreno run to confirm 0 flips on
-    switch-free footage. The 23 wrong-side action attributions in the
-    replay are the classifier's (reach/side attribution, parked point 5),
-    not identity. History: `docs/history/status_where_we_are_archive.md`
-    (#83–#85 sections).
+2.  **Side-change survival (player identity) — status: SOLVED POST-RUN #105.**
+    `src/postrun/identity.py` reads the near squad per rally and the players
+    per frame from `id_sims`: 20261010 31/31 rallies (agent's read) + 93/93
+    sampled labels; 20260920 switches 7/14/21/28, who 207/208 vs the #88 CSV.
+    Open: (a) the causal resolver (live overlay) still misses switches
+    (20261010: 0 of the first 2, then 10 flips) — display only; (b) two
+    venues, visibly different kits: look-alike teammates give no labels,
+    untested on footage; (c) a new match = owner contact sheet first.
 1.  **Stale baselines.** e1/e3 recorded tracking numbers don't reproduce
     (0.771/0.193 vs 0.978/0.133); e2 F1 0.571 recorded vs 0.400 fresh.
     Rule: same-session A/B only; diagnose when touching tracking.
@@ -229,19 +229,19 @@ archived under their session date in `docs/history/status_log_archive.md`.)*
     CFR/VFR, effective fps, resolution).
 31. **Point-end REST / landing line calls.** The tracker drops the final
     descent by design (static suppression), so the post-run ball-death read
-    exists on only 17/33 points and its in/out half is weak (3 of 10 wrong;
-    the 7 reads that need no line call are all right). Harmless for winners
+    exists on only 16/33 points and its in/out half is weak (3 of 10 wrong;
+    #106 fixed the too-deep landing, these three are not it). Harmless for winners
     (next serve decides) except on the LAST point. Next: read the resting
     ball from the dump's raw `removed` detections (it sits in-court at ratio
     0.93–0.98 of the ground prediction) and map its bottom point.
 32. **Post-run layer residuals (#87).** (a) WHO RATIFIED #88 (owner review
     of the 208-touch CSV, 0 corrections; CSV = per-player GT); (b) built
-    and tuned on ONE match — a second 21-point match is the real test;
+    and tuned on ONE match — second match RUN #104 (20261010), see (h);
     (c) needs the `--diag-dump` sidecar (49 MB, in memory until the run
     ends) — decide whether `make run` should always write a compact one;
     (d) blocks are not a label; (e) 1 observed touch is credited to nobody
     (10 more by alternation), 5 are placed as hidden touches; (f) FIXED #90:
-    set/dig `error` = ball handling −1 (`handling_errors`); (g) #97 hard / touch: split fitted on this match's 32 labels (same score for 24–26°), owner looked at the sheet (#98): P10 f6320 = a second-touch poke that left flat from mid-court and P22 f16037 = a touch to the side that barely rose — both labels stand (TOUCH; read hard / untyped), nothing re-tuned; P30, P33, P19 not commented; swing vs poke needs pose in the dump. Next: (b).
+    set/dig `error` = ball handling −1 (`handling_errors`); (g) #97 hard / touch: split fitted on this match's 32 labels (same score for 24–26°), owner looked at the sheet (#98): P10 f6320 = a second-touch poke that left flat from mid-court and P22 f16037 = a touch to the side that barely rose — both labels stand (TOUCH; read hard / untyped), nothing re-tuned; P30, P33, P19 not commented; swing vs poke needs pose in the dump; (h) #104, 20261010 with the orientation set by hand (agent's frame read, not owner GT): 29/30 points, winners 26/29. Residuals: a caught-and-replayed serve counts as a point (P8); a dead-time lob from the far half passes every serve gate (P14: birth 2.5 m inside, peak 4.8 m, 13 m at 7.6 m/s); a near serve that leaves the top of the frame is lost (track dead at the hit, reborn past the net 4.3 m up; the serve-less path did not fire); the last point's winner by landing read was wrong. #105b: the cut rally (07:17) and the serve past the frame (10:11) are FOUND; #106: the dead-time return is refused (receivers not side by side), the last point's winner is right (landing read) → 31 points, A 22 – B 9 = the owner's sequence; (i) owner label feedback: attacks read as overpass FIXED #106 (reach ratio); left: blocks (2) read as the attacker's spike, an attack into the net with an invented overpass (P10), a set + kill unseen (P21), a set from off court unseen (P2). Next: Active next 2.
 33. **Speed, results-neutral (#89).** Shipped: read-ahead + exact detector
     fast path. Left, in order: (a) pose on its own thread, call order kept
     (~30 → ~26 ms/f; touches `ActionClassifier`); (b) read-ahead for the
@@ -256,18 +256,18 @@ archived under their session date in `docs/history/status_log_archive.md`.)*
 5.  **Same-team adjacent-player choice.** Needs the owner-specified engine
     (motion history + ball half, #46); scoreable only with stable-identity
     GT (2); `--ignore-player` stands until then.
-6.  **Phase 2: offline global stitch.** Build only if match validation
-    shows residual swaps/fragmentation phase 1 doesn't catch.
+6.  **Phase 2: offline global stitch.** BUILT #105 as the per-rally identity
+    read (open point 2); no stitch ACROSS rallies needed (fixed anchors).
 9.  **Overpass label lever.** Status: SOLVED POST-HOC (#87) — the crossing
     is known in hindsight (the next touch is on the other half): action
-    0.982 on the match, overpass vs spike by contact height below the tape.
-    Residual: soft "rainbow" attacks under ~2.15 m read as overpasses (2).
+    0.988 on the match, overpass vs spike by contact height over the toucher's
+    standing height (#106). Residual: passes with the arms above the head (2).
     C1–C4 are closed by supersession.
 13. **Ace metric.** Status: DERIVED (#87) — `outcome: ace` on a serve the
     receivers never touch or touch once and lose (owner kill semantics);
-    kill / error likewise. Matches the owner's point descriptions on the
-    match except P18 (final attack unseen → no credit). Next: surface in
-    the UI with open point 21.
+    kill / error likewise. #105 (owner rule): a far serve counts too (its
+    launch is read from the track birth) — 20261010 P8; 20260920 unchanged.
+    Next: surface in the UI with open point 21.
 ## Learnings (standing)
 
 Recording domain + GT conventions live in `AGENTS.md` §7 and
@@ -314,6 +314,16 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Never decide orientation by absolute hypothesis comparison (informative-for-one/neutral-for-the-other terms are a standing flip bias), nor by generic "shift from own baseline" (a 1σ pose/light drift freezes it, #84): two-state LLR between explicit levels, learned prototypes OUT (#85).
 - `np.load(npz)[key]` decompresses the whole array on EVERY access — read each array once before looping (replay >10 min → 17 s, #85).
 - Squatter/bystander: in-court preference + court-membership enforcement in `_may_feed_track`; detection-gap diagnoses in the entreno protocol (AGENTS §1).
+- Orientation levels are NOT mirror images (#104, 20261010): anchors are enrolled in ONE view, so the evidence keeps a view bias as large as the signal (squad 2 near reads ~0, not −0.39 / −0.52). `LEVEL_ALPHA` 0.002 × 4 bodies a frame follows a level in ~4 s, faster than players walk a switch; slower (0.0002 / 0) finds the switches but flaps 24 / 28 times. Decide per rally in hindsight, on rally frames only (in dead time bodies wander onto the other half).
+- Post-run identity (#105): one orientation per RALLY from firm-footed bodies, two levels read from the match (the unseen level is match-specific: −0.038 on 20261010, −0.083 on 20260920; the enrolled one +0.347 / +0.146) — never a fixed threshold, never the 7-point rule (point counts can be wrong; block sizes are the cross-check).
+- A body's half is NOT its feet (#105): a far blocker stands on the net line in the picture (tracker reads him near for whole rallies), a jump projects the feet metres deep, dives and merged boxes read near — 42 of 28 633 firm body-frames on 20261010 and 180 of 30 475 on 20260920 contradict the squad's half, in runs up to 18 frames. The squad decides, feet are a cost.
+- Cross-view look-alike (#105, 20261010): P2B seen from behind matches squad A's anchors better than her own far-view one (0.84 vs 0.63) → an unconstrained 4-way match fails; the PAIR on a half + the half constraint decide (side penalty under 0.35 lets the look-alike win). Centre each player's similarity between the two teammates of that half, or a body seen alone is read with the view's bias.
+- The live resolver lost the first 20261010 switch because the players crossed ONE AT A TIME over 12 s (f7450–7800) while its level and spread adapted (level +0.39 → ~0, spread ×4): by the time all four were across nothing was left to detect.
+- A probe feature dump joins a run's diag dump exactly by (frame, track id) — 0 box mismatches on both matches (MPS is deterministic) — so an identity change can be prototyped by injecting into an existing dump before any 30-minute re-run.
+- A stale causal label can be right by accident (20260920 P19 f13624: two teammates in one box, the hidden one bumps the ball; the box shows the other one) — the one touch where the hindsight read differs from the owner CSV.
+- Service order is NOT one bit per squad when a point is lost or invented (#105b): everything after it is shifted, and a majority vote then overrides correctly SEEN servers (20261010: the owner read it as "team A players switching"). Let the order break where a run of seen servers says so (`_serving_order`, break = 1.5 seen servers); a break marks where to look for a lost / false point.
+- A dig at the far baseline can read at sand level (height from a ±2 m depth read): a rally must not end on it when ANY later vertex within air time sends the ball up again — the next one alone can be a short low flight (20261010 07:17 rally, cut after the reception).
+- High tripod: a near serve leaves the top of the frame — toss tracked beside the baseline, track dead at the hit, ball reborn mid-court above any contact height. Read the serve at the toss's death when the reborn flight is where a serve from there would be (`_serve_past_the_frame`).
 
 **Post-run layer (#87)**
 - Ball width IS depth: `1/width` is linear between the baselines (15.0 / 22.8 / 47.7 px far / net / near on the match), and a flight is ballistic so ONE robust line through `1/width` reads both of its ends; single frames are ±2 m at the far end.
@@ -330,6 +340,13 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - The classifier dates a vertex 1–3 frames BEFORE the picture shows the turn; a launch fit that starts at the vertex swallows the set's descent (type score 23/29 vs 26/29) → `attack_shape.hit_frame` (largest image-velocity step within −0.08…+0.25 s).
 - Hard / touch is asymmetric (owner, #98): a ball that RISES after the attack is almost always a touch, but a touch need not rise (a flat second-touch poke, a touch to the side) → `hard` is the weaker read; the flight cannot see the swing.
 - Practice clips exposed five mechanism bugs the match never hit (re-lock gap vertex, net-fault timing, serve-into-net read, toss-hit search, serve-less rally): run `score_postrun_entreno.py` on every change.
+- Serve-shaped non-points exist (#104): a serve the receiver catches and hands back (replayed), a ball lobbed back over the net between points. "Winner = next server" then gives the wrong winner to the point BEFORE a false or a missed point; `death_disagrees:serve_into_net` marked one such neighbour (P20) and one true net-cord ace (P30) — a "look here" flag, not a winner.
+- The width "grounded" test fires BEFORE a ball lands (#106): a falling ball lines up with sand metres behind its landing spot and its width fits that sand for a frame or two (20261010 last point: 0.7 m up, read 2 m behind the baseline; it lands 1 m inside). A landing = where the fall stops (`_landing_frame`). The higher the tripod, the nearer that wrong sand, so the bug bites high cameras; on the beach the ray is at the horizon and the test stays silent.
+- A classifier vertex is dated 0–3 frames early and a set drops 0.2 m a frame: contact height at the vertex is +0…+0.5 m, at random (#106). Read it where the ball leaves its incoming arc (`BallTimeline.arc_exit`); `attack_shape.hit_frame` (largest velocity step) lands up to 7 frames late on a pass and is not that read.
+- Attack vs pass is the PLAYER's ruler, not the net's (#106): two 20261010 players attack at 1.85–2.05 m, under any tape; contact / standing height reads passes ≤ 1.19, attacks ≥ 1.27 on 91 labelled touches of two matches. Standing height = p75 of box heights in metres, pooled per identified player (one rally is ±10 %); boxes read ~10 % under real height for everyone.
+- A dead-time ball can be a perfect serve for the ball reads (#106: thrown from BEHIND the far baseline where it was fetched, 4.8 m peak, 13 m at 7.6 m/s). What differs is the receiving team: about to serve, it stands one behind the other (2.2 m; 51 of 52 real serves ≤ 0.84 m). Feet depth is only good enough on the near half or under a high tripod (beach far half ±0.7–0.9 m, a garbage box read 2.9 m at a real serve).
+- The players' own count can be wrong (#106, 20261010: side switch after 15 points, set played to 22): never force blocks of 7 or a 21 cap onto a match; `switch_blocks_ok: false` is information.
+- Practice venue (lens ~3 m): a near serve can leave the TOP of the frame — the track dies at the hit and is reborn past the net above `SERVE_MAX_CONTACT_M`, so no serve is found. Checking a run by eye: one frame per point at its serve frame (ffmpeg `select`, one sequential decode) shows who is near; the score at each switch must be 7 / 14 / 21 / 28 points.
 
 **GT / scoring semantics**
 - Contacts dictation has two dialects; `gt_point_start_end.txt` is game-state VIDEO, not the match; match serve team = winner-of-previous; `touch_number` is per-TEAM possession; kill = direct fall OR dug-and-dies; GT edits only via owner-ratified contact sheets; re-adjudicate GT when the model shifts streams.
@@ -369,6 +386,9 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Edge functions (#93): `EdgeRuntime.waitUntil` exists only in a USER worker (the platform's way of running a function), not when the file is the runtime's main service — guard it; a function added while the local stack runs is not served (404) until the stack restarts. `pg_net` was rejected for the broker: its tables and `net.http_post` are granted to `anon` and owned by `supabase_admin`, so a migration cannot revoke that.
 
 ## Session index (one line each)
+- #106 **20261010 = the owner's sequence (31 points, A 22–B 9): landing read where the fall stops, dead-time return refused (receivers not side by side), attack = contact ≥ 1.23 × standing height; 20260920 action 0.982→0.988**
+- #105 **Side switches read POST-RUN (`src/postrun/identity.py`): near squad per rally + per-frame player path; 20261010 A 11–B 20 → A 21–B 10, 31/31 rallies; 20260920 unchanged, who 207/208; ace rule from either end**
+- #104 **Second match run (20261010 vall d'Hebron): A 11–B 20 as run vs 21–9 true; resolver missed 2 of 4 side switches then flapped; by hand 29/30 points, 2 false, winners 26/29; diagnosis only, post-run orientation proposed**
 - #103 **"Last match" (n1) added to the stats time filter menu (`MATCH_PRESETS` = 1, 3, 5, 10); web only, no migration**
 - #102 **Feedback button on the web: bug / suggestion + ≤3 screenshots → `feedback` table + private `feedback-media` bucket (`20261009130000`); Settings "My reports", Admin → Feedback, `make feedback` → `output/feedback/`**
 - #101 **Published court positions fixed, output only (`positions.py`): net = net-ground clicks, ball-box offset (1.74 px) from the end switches; spikes 2.70 / −0.30 → 1.40 / 1.40 m; decisions byte-identical; schema 4; republish owed**
@@ -466,67 +486,75 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-09-09 **#12** — poke rule retuned ASCENT-ONLY (TOUCH_RISE_PX 57), level-exit vx rule deleted; eval merges GT overrides.
 - 2026-09-09 **#11** — poke GT ratified; the 09-08 dictation was misattributed (e5 f300 = poke, e6 f310 = hard).
 - 2026-09-08 **#10** — e6 poke read (resolver touch-3 fall-through + analyzer type + stance-majority team) + rally-opening serve gate + redirect locality; e7 GT ratified; e5/e6 team 1.0.
-- 2026-09-06 **#9** — in-court preference (off-court cost penalty) fixes bystander squat + Hungarian chain-swaps (point 16).
-- 2026-09-06 **#8** — squatter review: sideline straddlers expire from the roster (e2/e7 slots freed early).
-- 2026-09-06 **#7** — ball-matching rework: identity by trajectory + motion, never confidence; static spares can't bootstrap/steal/starve.
 ## Log (newest first)
 
-### 2026-10-09 (hundred-and-third session) — "last match" on the time filter
+### 2026-10-10 (hundred-and-sixth session) — #106: 20261010 reads the owner's sequence — landing, reception formation, attack by reach
 
-**Asked (owner):** add a "last match" option to the stats time filter (the menu started at "last 3 matches").
+**Asked (owner):** "all the other points look good"; at run-P16 the score is already 14 points — the players switched late and "team A actually does 22 points". Fix items 1 (dead-time return counted as a point), 2 (attacks read as overpass) and 5 (last point's winner); if not possible say why and what to change when recording, with as little preparation as possible. Verbatim in the feedback file.
 
-**Built.** `MATCH_PRESETS` in `webapp/src/lib/window.ts` is now `[1, 3, 5, 10]`; the key `n1` (label "last match", `p_last_n => 1`)
-was already supported by `windowParams` / `windowLabel` and the SQL window (`rls_smoke.sql` pins last-1), so no migration and no
-demo change. vitest +1 (65), typecheck clean.
+**Diagnosed first (frames grabbed by sequential decode, per-frame ball reads).** (5) the last attack lands at f29205 a metre inside the side line; the rally end was read at f29200, the first frame the width test fired, with the ball 0.7 m up and its ray on sand 2 m behind the baseline. (2) every flagged attack is a one-arm swing at 1.85–2.05 m by the two short players; the same players' other attacks read "spike" only because the vertex was dated 1–3 frames early (+0.3…+0.5 m). (1) the return was thrown from behind the far baseline (y −2.8 m): no ball or thrower read separates it; the near pair stood 2.2 m apart in depth.
 
-### 2026-10-09 (hundred-and-second session) — #102: a Feedback button (bugs / suggestions with screenshots)
+**Built (`src/postrun`, recon schema 6).** `rallies._landing_frame` (walk while the ball falls faster than 1.5 m/s); `rallies._receivers_stagger_m` + refusal when > 1.5 m and fewer than two touches follow (`checks.launches_refused`, "Not a serve" line in the txt); `BallTimeline.arc_exit` (contact = lower of the last sample on the incoming arc and the first off it), `RallyRoster.standing_height_m`, `standing_heights` (pooled per identified player), `Touch.contact_height_m` / `contact_ratio`, attack = ratio ≥ 1.23 (tape − 0.28 m only without a player). `reconstruct` builds all rosters first so the heights are match-wide. +5 tests, 10 new sweep rows, `postrun_sim` takes player heights.
 
-**Asked (owner):** a "suggest / report a bug" button on the web; GitHub issues need an account, so onboarded people must be able to
-send bugs or ideas easily, with screenshots, "so that we can get them easily and tackle them in a session".
-**Decisions (owner):** reports stay in Supabase only (no GitHub mirror, no new secret or host); members see the status of what they sent.
+**Measured.** 20261010: 31 points, A 22 – B 9, switches after 7 / 15 / 22 / 29; refused f12389; last point A (landed in); P13 → B; P11 spike P2A kill; the five overpasses → spikes; 20 bumps untouched; own sweep of the 10 new constants: same points / score / refusal on every row (ratio 1.35 loses the short players' attacks). 20260920: 33/33, winners 33/33, 21–12, P 0.976 / R 0.933, action 163/165 = 0.988 (+f12432, f23227, f24944; −f3913, f10789), half / squad 1.000, 0 rule breaks, who 208/208, type 26/29; one landing moves (P6). Sweep 130 moves: no row loses a point or a winner, worst P 0.965, action 0.970. Clips: 5/5, 52/53, 52/52, reconstructions identical. Positions: box offset 1.74 → 1.76 px; the overpass kind (12 near / 8 far after relabel) closes to 0.43 m, so `test_match_positions_mirror_across_the_net` holds 0.3 m for kinds with ≥ 15 a half and the layer's 0.6 m for the rest. Suite 1263 (1257 pass, 5 skipped, `test_inbox` as on `main`).
 
-**Built.** Migration `20261009130000_feedback` (NOT pushed): table `feedback` (kind bug / suggestion, text, page, context, ≤3
-screenshot paths, status open / done / dismissed, admin note) + private bucket `feedback-media` (1 MB, images only, a member writes
-under `<user id>/` only). `send_feedback()` is the only way a row gets in (author = caller, every screenshot must exist in the caller's
-folder, 20 reports a day); uploads capped at 30 a day (`feedback_upload_allowed()`); a member reads their own, admins read all and set
-status + note, nobody rewrites the text, `anon` nothing. Web: `Feedback` button in the top bar → native `<dialog>` (kind, text, pick or
-paste screenshots, downscaled in the browser to ≤1600 px JPEG via `createImageBitmap`, so no CSP change), sends route + viewport +
-browser + build (`__BUILD__` = Cloudflare commit); Settings → "My reports" (status + reply); Admin → Feedback (open count on the tab,
-Done / Not planned / Reopen, note). Laptop: `make feedback` (`src/publish/feedback.py`) replaces `output/feedback/` with `index.md` +
-`<id>_<kind>/report.md` + screenshots; `DONE="3 5" NOTE=...` / `DISMISS=` close reports from a session. `make backup` exports the table.
+**Not done / owed.** Blocks, P10, P21, P2 (Active next 2). f23222 is the agent's frame read, not the owner's. `make republish-all` once merged (labels and landings move on 20260920). Uncommitted and not this session's: `--start-frame` for `make run-live`.
 
-**Verified:** schema check 5/5 on a throwaway `supabase/postgres:17` (smoke: own folder only, foreign / missing screenshot refused,
-direct insert refused, daily limit, member vs member vs admin, column grants); `tests/test_feedback_pull.py` 3; vitest 64, typecheck,
-oxlint, build; demo mode driven in Chrome at 1100 px and 390 px (send with a 2400 px image → 1600 px, Settings, Admin, close), 0
-console errors.
+### 2026-10-10 (hundred-and-fifth session) — #105: side switches are read after the run (`src/postrun/identity.py`); owner feedback on the first 9 points
 
-**Not done / owed:** `supabase db push` (4 migrations now owed) and a first report on the hosted project — the storage policies and the
-PATCH with the secret key ran only against the stub / a fake. No notification on a new report (Admin tab count or `make feedback`).
+**Asked (owner):** feedback on P1–P9 of the 20261010 run (verbatim in `ground_truth/20261010_1000_vall_dhebron_owner_feedback.txt`): P2 f2009 is a
+spike, a set from off court is missing in P2, P5 f4973 is a block by P1B, P7 and P8 are aces by P1A with the side switch between them — "the pipeline changed
+teams … I can read P2B". Then: "focus on the biggest problem … make it so that the side switches we keep tracking the same player".
 
-### 2026-10-09 (hundred-and-first session) — #101: published court positions — net-anchored, ball-box offset from the end switches
+**Why the switch was missed (replay of the probe's feature dump).** The four players crossed one at a time between f7450 and f7800. The resolver adapts the
+level of its "squad 1 near" evidence in dead time too (~4 s): +0.39 / +0.52 slid to ~0 and the spread grew fourfold before the last one was across; its CUSUM
+never passed 1.9 of 8. And the unseen orientation is assumed at −0.39 / −0.52 where it reads −0.06 / −0.19.
 
-**Asked (owner):** "yes, let's try it out and see how the new map plots" — build the #100 fix and plot the four players.
+**Built (Phase 2 of AGENTS §4, post-run).** `id_sims` per clean body in the diag dump (schema 5: the resolver's own anchor similarities,
+`BodyObs.anchor_sims`). `src/postrun/identity.py`: evidence per rally from bodies > 1 m off the net line → two levels from the match (≥ 4 spreads apart, the
+lower ≤ half the upper, else "nobody switched") → two-state path over the rallies → per rally one path over frames (which player each track id is) → label,
+squad, slot and half rewritten before `TouchSolver`. `Point.near_squad` comes from the read; `publish/thumbs.py` cuts at the read's labels; `sweep_postrun.py`
+sweeps the 11 constants and prints `who` (the #88 CSV). Ace rule (owner): a serve touched once and lost is an ace from either end (`match._outcomes`).
 
-**Diagnosed first (it changed the fix):** (1) net clicks: kept — the corner midline is 0.05 / 1.3 m off the clicked net, a ball at
-the net is 23.7 px (model 22.8). (2) Depth "at the hit": DROPPED — kink-aligned windows over the arriving, leaving or same-half
-flight are no tighter than the whole-flight fits (spike IQR 0.9 m either way). (3) The rest is not an attack effect: every kind
-of touch shows the same near/far gap (dig 2.05, set 2.21, spike 2.06, overpass 2.15 m), near serves sit on their server (−0.24 m,
-16 serves: no bias at the near baseline), so it is a box a fixed number of pixels wider than the ball, not a metre shift.
+**Measured.** 20261010: 31/31 rallies (agent's frame read), levels +0.347 / −0.038 (spread 0.044); 93 sampled frames, 3 per rally, every label on the right
+person (incl. far blockers the tracker sided near); 8 id changes inside rallies, 7 with a box jump. Score A 21 – B 10, complete, switches after
+7 / 16 / 22 / 29; P7 and P8 = P1A ACE. 20260920 (probe re-run with `player_bgr_input: false`, similarities injected into the golden dump by (frame, track id),
+0 box mismatches): levels +0.146 / −0.083; the whole record unchanged (33/33, winners 33/33, 21–12, P 0.976 / R 0.933, action 0.982, half and squad 1.000,
+0 rule breaks); who 207/208. Sweep 111 rows: none loses a point or a winner, worst P 0.965, action 0.958. Clips e1–e7 re-run: `compare_runs` IDENTICAL ×7,
+dumps identical bar `id_sims` (only e3 / e4 enroll), 52/53 as before. 20261010 re-run (`make run-match`, 2031 s, 69 ms/frame): `pipeline_output.json` + CSVs
+identical bar the video name, all 29 303 dump lines identical bar `id_sims` (107 406 rows, = the injected ones within 0.0004), same reconstruction.
+Suite 1258 (after merging `main`): 1252 pass, 5 skipped, `test_inbox` run-match order failing as on `main`.
 
-**Built (`src/postrun/positions.py`, output only):** `CourtPositions` (three depth anchors, two ground homographies sharing the
-clicked net line; no clicks or a slipped click = the corner model, exactly) + `calibrate_width_bias` (one offset that closes the
-gap of every kind with ≥5 touches per half; refused without a side switch, with <2 kinds, outside 12 % of the ball's width at the
-net, or when a kind stays >0.6 m apart). `Touch.pos_*` / `RallyEnd.pos_xy*` feed `court_x_m` / `court_y_m` / `court_err_m` /
-`court_xy_m`; a touch that reads across the net is held at it; `positions` block in the JSON; recon schema 4.
+**Second pass, same day (#105b; owner feedback on the rest of the match, "players of team A switch between themselves … some points were lost … without overfitting").** The "switching" was the service-order rotation overriding seen servers: one lost point shifted the order and the majority vote renamed the rest. Fixed three things in `src/postrun`: the order may break (`match._serving_order`); a rally does not end on a low dig if a later vertex sends the ball up (`rallies._play_follows`); a serve whose hit is past the top of the frame (`rallies._serve_past_the_frame`). 20261010: 32 points, A 22 – B 10, switches after 7 / 16 / 23 / 30; every server the owner named is right; both lost rallies read as he described. 20260920 and the clips: every score and every server unchanged. Left: the dead-time return (run-P14) and the label items (Active next 2).
 
-**Measured (20260920):** offset 1.74 px, gaps after −0.16 / +0.14 / 0.00 / +0.09 m. Spikes 2.70 / −0.30 → 1.40 / 1.40 m (11 far
-starts across the net → 0; 1 of 39 held at the net). Per player near | far: P1A 1.55 (6) | 2.30 (1), P2A 1.35 | 1.20, P1B 1.40 |
-1.70 (2), P2B 1.30 | 1.40; the 2:49 kill 2.7 → 1.4 m (frames: takeoff 0.8–1.3 m). All 170 positions move 0.5–2.4 m away from the
-lens. **Neutral:** everything but the position keys identical on the match and e1–e7 (JSON + txt `cmp`); `score_postrun` output
-identical (33/33, winners 33/33, P 0.976 / R 0.933, 0 rule breaks); practice 5/5 serves, P 52/53; sweep 88 rows, none loses a
-point or a winner; hard / touch 26/29. Tests +8 (suite 1239: 1233 pass, 5 skipped, the known `test_inbox` failure).
+**Not done / owed.** The 20261010 POINTS (blocks 7 / 9 / 6 / 7): owner GT first. Owner label feedback (P2 spike, P2 hidden set, P5 block): recorded only.
+The live overlay keeps the causal labels. Uncommitted in the tree and not this session's: `--start-frame` for `make run-live` (Makefile, `src/main.py`,
+`live_debug_processor.py`). `match_bundle.json` in the run directory pre-dates the re-run.
 
-**Not settled (open point 35):** the players' feet show the same gap, so part may be real play; two serves into the net read no
-offset; practice clips (no switch) stay uncorrected; in-sample on one match. Plot: `output/postrun/20260920_match/attack_map_now_vs_fixed.png`.
+### 2026-10-10 (hundred-and-fourth session) — #104: second match through `make run-match` (20261010 vall d'Hebron): wrong score, side switches missed; diagnosis only
 
-**Not done / owed:** owner look, merge, `make republish-all` from prod (the on-disk `match_reconstruction.json` was left as is).
+**Asked (owner):** run the pipeline and the post-run on `resources/full_videos/20261010_1000_vall_dhebron_jesus_sara_joan_loida.mp4` (calibrated; "we
+finished 21 8 (I believe), won the couple in gray (Joan and Loida)"; the practice venue, other weather).
+
+**Run.** `make run-match` on MPS: 29295 frames in 1831 s (62.5 ms/frame; the 20260920 match runs at 30–32 — not looked at). Net top reads 2.36 m;
+`positions` refused the box offset (`kinds_disagree`). Result: 31 points, A 11 – B 20, set incomplete, switches after [23, 25, 26, 27, 28, 29].
+The calibration is committed; the run, the probe and its feature dump stay in `output/` (git-ignored).
+
+**Truth, read by the agent from frames (serve frame of all 31 points + four suspect spans; NOT owner GT).** Gray pair = squad 1 = A, near
+for P1–7, P17–22, P30–31; the pink pair near for P8–16, P23–29. P8 (04:34): the receiver catches the serve, the ball goes back to the server at the
+net and the same server serves 13 s later → replayed, no point. P14 (06:53): after P13 the receivers touch hands and walk back, the ball is
+lobbed to them from the far half → dead-time return; P13 is theirs. Missed (10:10, f18312): near serve by gray, pink attack, gray dig goes
+out. P30 (15:55): net-cord serve drops on the gray half, pink serves again → pink ace (or replayed). P31: gray wins, the four players meet at the net (f29290).
+That is 30 points, 21–9 (21–8 if P30 was replayed); the score at the switches is 6–1, 12–2, 17–4, 20–8 = 7 / 14 / 21 / 28 points.
+
+**Measured.** (1) Near squad set by hand (scratch what-if, `MatchAssembler._orient` patched, nothing written to the run dir): 21–10, switches
+after [7, 16, 22, 29]; 29 of 30 real points found, 2 false, winners 26/29 (P13 and P20 flipped by the false / missed point after them, P31 by
+the landing read). (2) Identity: `scripts/probe_identity_switches.py` → `identity_features.npz`; the replay reproduces the run's 10 flips
+(f21170 … f28054). Warm-up levels +0.39 / +0.52 (near / far side), mirrored prior −0.39 / −0.52; after the first switch the evidence reads
+−0.06 / −0.19, the CUSUM reads 0.68 at f7900 and 0 afterwards while the state-1 level slides to ~0 within 400 frames. Per rally, `(x_near − x_far) / 2`: squad 1 near
++0.22…+0.39 (15 points), squad 2 near −0.13…+0.07 (16). `LEVEL_ALPHA` 0.0002 / 0: switches found, 24 / 28 flips. (3) Post-run events: P14 =
+track birth at y 2.5 m, peak 4.8 m, 13 m at 7.6 m/s; the missed serve = toss tracked f18308–18328, track dead at the hit, reborn f18354 at
+y 9.5 m, 4.3 m up.
+
+**Not done / owed:** no `src/` change, no suite run (STATUS guard only), nothing published. Owner: confirm 21–9 vs 21–8 and the P8 / P14
+reads; approve the post-run orientation design (Active next 2).

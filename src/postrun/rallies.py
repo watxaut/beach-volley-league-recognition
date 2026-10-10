@@ -20,7 +20,7 @@ stream's false contacts live (ball pick-ups, bounce routines, throws).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -33,7 +33,15 @@ from .ball_flights import (
     BallTimeline,
     Flight,
 )
-from .geometry import COURT_LENGTH_M, COURT_WIDTH_M, NET_Y_M, SIDE_FAR, SIDE_NEAR
+from .geometry import (
+    BALL_DIAMETER_M,
+    COURT_LENGTH_M,
+    COURT_WIDTH_M,
+    NET_Y_M,
+    SIDE_FAR,
+    SIDE_NEAR,
+)
+from .stream import BALL_TRACKED
 
 # -- serve launch --------------------------------------------------------- #
 # A serve must clear a 2.24-2.43 m net; one that fails was still aimed over.
@@ -63,6 +71,31 @@ TOSS_DEPTH_M = 2.0
 # A hit after a tracked toss: image-plane velocity step (BallTimeline.impulse).
 SERVE_HIT_IMPULSE_MS = 4.0
 
+# -- reception formation --------------------------------------------------- #
+# A team waiting for a serve stands side by side; a team about to SERVE has
+# one player on the way to the line and the other up the court. A ball sent
+# over to them between points flies like a serve (it can even start behind
+# the baseline, where it was fetched) but lands on a staggered pair that does
+# not play it. Depth between the two receivers, measured at every serve with
+# both of them read (20260920 + 20261010 + practice clips, 52 serves):
+# <= 0.84 m at 51 of them and 1.37 m in one drill (played on, six touches);
+# the ball sent back on 20261010: 2.2 m.
+FORMATION_MAX_STAGGER_M = 1.5
+# Where each receiver stood over this long before the launch, seen at least
+# FORMATION_MIN_SEEN_S of it ...
+FORMATION_WINDOW_S = 0.6
+FORMATION_MIN_SEEN_S = 0.15
+# ... and only when the ground read of the feet is this good (the far half of
+# a low camera is not: +-0.7-0.9 m on the beach, where nothing is refused).
+FORMATION_MAX_READ_ERR_M = 0.5
+# Feet this close to the net line may belong to either half (a player at the
+# net projects across it): not a receiver.
+FORMATION_NET_CLEAR_M = 1.0
+# A launch the other half answers with this many touches was played: it is
+# a serve wherever the receivers stood.
+PLAYED_MIN_TOUCHES = 2
+REFUSED_FORMATION = "receivers_not_in_formation"
+
 # -- rallies without a visible serve -------------------------------------- #
 ORPHAN_MIN_TOUCHES = 4
 ORPHAN_MIN_CROSSINGS = 2
@@ -86,6 +119,10 @@ ROLL_START_HEIGHT_M = 1.0
 SAND_REBOUND_MAX_M = 1.3
 # A flight with this many resting/skimming samples has hit the sand.
 GROUND_FLIGHT_FRAMES = 4
+# A ball still coming down this fast in the picture (in its own scale) has not
+# landed: a 0.5 m drop arrives at 3 m/s, a ball rolling on the sand moves a
+# fraction of that across the image rows.
+LANDED_MAX_FALL_MS = 1.5
 # A ball that reappears mid-rally must be at least this high to still be live.
 LIVE_MIN_PEAK_M = 1.5
 # Net fault: a vertex this soon after the previous touch, at the net plane,
@@ -135,12 +172,24 @@ class Rally:
         return self.end.frame if self.end is not None else self.serve.frame
 
 
+@dataclass
+class RefusedLaunch:
+    """A launch that flew like a serve and was not taken for one."""
+
+    frame: int
+    side: str
+    reason: str
+    stagger_m: float
+
+
 class RallySegmenter:
     def __init__(self, timeline: BallTimeline) -> None:
         self.tl = timeline
         self.stream = timeline.stream
         self.geometry = timeline.geometry
         self.net_height_m = timeline.geometry.net_top_height_m() or 2.43
+        #: Filled by ``segment``: serve-shaped launches refused, for the report.
+        self.refused: List[RefusedLaunch] = []
 
     # -- serves ------------------------------------------------------------ #
 
@@ -152,10 +201,48 @@ class RallySegmenter:
                 serves.append(launch)
         return serves
 
+    def _serve_past_the_frame(self, index: int, e: BallEvent) -> Optional[ServeLaunch]:
+        """A serve whose hit was not seen because the ball left the picture:
+        the track of a toss beside a baseline dies, and the ball is next seen
+        already on its way to the other half, where a serve hit at the end of
+        that toss would be. (A high tripod cuts the top of a near serve.)"""
+        events, s = self.tl.events, self.stream
+        fl = e.flight_out
+        if e.kind != EVENT_BIRTH or fl is None or index < 2:
+            return None
+        death, toss_birth = events[index - 1], events[index - 2]
+        toss = toss_birth.flight_out
+        if (death.kind != EVENT_DEATH or toss_birth.kind != EVENT_BIRTH or toss is None
+                or toss.end != death.frame or toss.n < SERVE_MIN_SAMPLES):
+            return None
+        gap = s.seconds(e.frame - death.frame)
+        if not 0 < gap <= MAX_AIR_S or abs(toss.y_end - toss.y_start) > TOSS_DEPTH_M:
+            return None
+        if toss.y_end >= NEAR_SERVE_MIN_Y:
+            side, toward_net = SIDE_NEAR, -1.0
+        elif toss.y_end <= 0.0:
+            side, toward_net = SIDE_FAR, +1.0
+        else:
+            return None
+        # From the toss to where the ball is seen again, and on from there,
+        # at serve speed and to the other half.
+        hidden = toward_net * (fl.y_start - toss.y_end)
+        if hidden <= 0 or hidden / gap < SERVE_MIN_SPEED_MS:
+            return None
+        if (toward_net * fl.axis_speed_ms(s.fps) < SERVE_MIN_SPEED_MS
+                or toward_net * (fl.y_end - toss.y_end) < SERVE_MIN_TRAVEL_M
+                or toward_net * (fl.y_end - NET_Y_M) <= 0):
+            return None
+        return ServeLaunch(frame=death.frame, side=side, event_index=index,
+                           observed=False)
+
     def _serve_launch(self, index: int, e: BallEvent) -> Optional[ServeLaunch]:
         fl = e.flight_out
         if fl is None or e.kind == EVENT_DEATH:
             return None
+        past = self._serve_past_the_frame(index, e)
+        if past is not None:
+            return past
         if not np.isfinite(fl.peak_height_m) or fl.peak_height_m < SERVE_MIN_PEAK_M:
             return None
         if not fl.start_height_m <= SERVE_MAX_CONTACT_M:
@@ -254,6 +341,7 @@ class RallySegmenter:
 
     def segment(self) -> List[Rally]:
         rallies: List[Rally] = []
+        self.refused = []
         busy_until = -1
         events, s = self.tl.events, self.stream
         for serve in self.find_serves():
@@ -276,11 +364,49 @@ class RallySegmenter:
                 busy_until = prev.end_frame
                 continue
             rally = self._walk(serve)
-            rallies.append(rally)
             busy_until = rally.end_frame
+            stagger = self._receivers_stagger_m(serve)
+            if (stagger is not None and stagger > FORMATION_MAX_STAGGER_M
+                    and len(rally.touches) < PLAYED_MIN_TOUCHES):
+                # Sent over to a team that was not waiting for a serve and
+                # did not play it: the ball going back between two points.
+                self.refused.append(RefusedLaunch(
+                    frame=serve.frame, side=serve.side, reason=REFUSED_FORMATION,
+                    stagger_m=stagger))
+                continue
+            rallies.append(rally)
         rallies.extend(self._orphan_rallies(rallies))
         rallies.sort(key=lambda r: r.start_frame)
         return rallies
+
+    def _receivers_stagger_m(self, serve: ServeLaunch) -> Optional[float]:
+        """Depth between the two receivers when the ball is launched (None:
+        they cannot both be read). The receivers are the two bodies deepest
+        in the other half; a third one at the net is the serving team's."""
+        s, g = self.stream, self.geometry
+        receiving_near = serve.side == SIDE_FAR
+        last = min(serve.frame, s.n_frames - 1)
+        feet: Dict[int, List[Tuple[float, float]]] = {}
+        for f in range(max(0, last - s.frames(FORMATION_WINDOW_S)), last + 1):
+            for p in s.players[f]:
+                xy = None if p.predicted else g.foot_world(p.bbox)
+                if xy is not None:
+                    feet.setdefault(p.track_id, []).append(xy)
+        depths: List[float] = []
+        for seen in feet.values():
+            if len(seen) < max(2, s.frames(FORMATION_MIN_SEEN_S)):
+                continue
+            x, y = (float(np.median(v)) for v in zip(*seen))
+            depth = abs(y - NET_Y_M)
+            if (y > NET_Y_M) != receiving_near or depth < FORMATION_NET_CLEAR_M:
+                continue
+            err = g.ground_read_error_m(*g.world_to_image(x, y))
+            if err is not None and err[1] <= FORMATION_MAX_READ_ERR_M:
+                depths.append(depth)
+        if len(depths) < 2:
+            return None
+        depths.sort(reverse=True)
+        return depths[0] - depths[1]
 
     def _orphan_rallies(self, rallies: List[Rally]) -> List[Rally]:
         """Rallies whose serve was never seen (hidden, off-screen, or the
@@ -353,7 +479,7 @@ class RallySegmenter:
                 return rally
             arriving = e.flight_in
             if arriving is not None and arriving.ground_frames >= GROUND_FLIGHT_FRAMES:
-                rally.end = self._ground_end(self._first_ground_frame(arriving) or e.frame)
+                rally.end = self._ground_end(self._landing_frame(arriving, e.frame) or e.frame)
                 return rally
             if self._stays_down(e) or (
                     self._is_ground_event(e) and not self._play_follows(i)):
@@ -464,12 +590,15 @@ class RallySegmenter:
             if s.seconds(nxt.frame - e.frame) > MAX_AIR_S:
                 return False
             if nxt.kind == EVENT_CONTACT:
-                # ...and the ball is up again after THAT vertex too: a ball
-                # dropping to the sand passes one more vertex on its way.
+                # ...and the ball is up again after a LATER vertex too: a ball
+                # dropping to the sand passes one more vertex on its way and
+                # then only rolls, while a rally keeps sending it up (a short
+                # low flight between two touches is not the end of it).
                 after = nxt.flight_out
-                return (not self._is_ground_event(nxt) and after is not None
-                        and after.peak_height_m >= LIVE_MIN_PEAK_M
-                        and after.ground_frames < GROUND_FLIGHT_FRAMES)
+                if after is None or after.ground_frames >= GROUND_FLIGHT_FRAMES:
+                    return False
+                if after.peak_height_m >= LIVE_MIN_PEAK_M:
+                    return True
         return False
 
     def _is_net_fault(self, e: BallEvent, touch_frame: int) -> bool:
@@ -490,11 +619,28 @@ class RallySegmenter:
             return True
         return out.n >= MIN_DEPTH_SAMPLES and out.peak_height_m <= h + 0.3
 
-    def _first_ground_frame(self, flight: Flight) -> Optional[int]:
-        for f in range(flight.first, flight.last + 1):
-            if self.tl.grounded[f]:
-                return f
-        return None
+    def _landing_frame(self, flight: Flight, until: int) -> Optional[int]:
+        """Frame the ball of ``flight`` reaches the sand (None: never seen on it).
+
+        The width test fires while the ball is still coming down: a falling
+        ball lines up with sand well behind where it will land, and for a
+        frame or two its width fits that sand as well. Read there, a landing
+        is metres too deep (a cut shot inside the line reads behind the
+        baseline). The ball is down where it stops falling."""
+        s = self.stream
+        frames = [f for f in range(flight.first, min(until, s.n_frames - 1) + 1)
+                  if s.ball_state[f] == BALL_TRACKED]
+        first = next((i for i, f in enumerate(frames) if self.tl.grounded[f]), None)
+        if first is None:
+            return None
+        landed = frames[first]
+        for a, b in zip(frames[first:], frames[first + 1:]):
+            px_per_m = s.ball_w[a] / BALL_DIAMETER_M
+            fall = (s.ball_bbox[b, 3] - s.ball_bbox[a, 3]) / (b - a) * s.fps / px_per_m
+            if not fall >= LANDED_MAX_FALL_MS:
+                break
+            landed = b
+        return landed
 
     def _ground_end(self, frame: int) -> RallyEnd:
         f = self.tl._nearest_tracked(frame)

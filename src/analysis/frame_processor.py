@@ -553,6 +553,7 @@ class FrameProcessor:
         divergent fast paths) and only ever reads existing values.
         """
         assert self.diag is not None
+        id_sims = self._identity_similarities(tracked_players)
         # Raw candidates, with what static suppression did to each.
         self.diag.add_frame(frame_index, {
             "ball_dets": self.ball_detector.pop_diag(),
@@ -568,8 +569,9 @@ class FrameProcessor:
                     "player_label": p.get("player_label"),
                     "squad": p.get("squad"),
                     "slot": p.get("slot"),
+                    **({"id_sims": id_sims[i]} if i in id_sims else {}),
                 }
-                for p in tracked_players
+                for i, p in enumerate(tracked_players)
             ],
             # Emitted actions are keyed by their CONTACT frame, not by the
             # frame they were confirmed on.
@@ -587,6 +589,32 @@ class FrameProcessor:
                 "reason": "no_players_tracked",
             }])
         self.diag.add_section("candidates", self.action_classifier.pop_diag())
+
+    def _identity_similarities(
+        self, tracked_players: List[Dict[str, Any]]
+    ) -> Dict[int, List[float]]:
+        """Index in ``tracked_players`` -> the similarities to the enrolled
+        players that the identity resolver computed for that body THIS frame
+        (clean, real bodies only). Read-only: the resolver's own record of
+        what it measured, matched by track id and box so a stale observation
+        can never be written against another frame."""
+        resolver = getattr(self.player_tracker, "team_identity", None)
+        if resolver is None or self.diag is None:
+            return {}
+        self.diag.meta_extra.setdefault(
+            "identity_players", [m.label for m in resolver.players])
+        seen = {o.tid: o for o in resolver.last_observations
+                if o.anchor_sims is not None}
+        out: Dict[int, List[float]] = {}
+        for i, p in enumerate(tracked_players):
+            o = seen.get(p.get("track_id"))
+            bbox = p.get("bbox")
+            if o is None or not bbox or len(bbox) != 4:
+                continue
+            if any(abs(float(a) - float(b)) > 1e-3 for a, b in zip(o.bbox, bbox)):
+                continue
+            out[i] = [round(v, 4) for v in o.anchor_sims]
+        return out
 
     def close_diagnostics(self) -> Optional[str]:
         """Flush the diag dump (if enabled) and return its path."""

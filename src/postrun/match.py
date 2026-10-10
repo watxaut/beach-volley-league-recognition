@@ -14,8 +14,10 @@ Two independent reads of a point's winner exist and they check each other:
 When the two disagree and the death read is a confident one, the usual cause
 is a touch credited AFTER the ball was already dead (a pick-up, a ball thrown
 back): trailing touches are dropped until the point agrees with the serve
-that followed it. Squads (1 = A, 2 = B) come from the identity labels, so a
-side switch is simply the rally where the near half changes squad.
+that followed it. Squads (1 = A, 2 = B) come from the identity read
+(``identity``: one orientation per rally, read in hindsight; the causal
+labels when the dump carries no identity observations), so a side switch is
+simply the rally where the near half changes squad.
 """
 
 from __future__ import annotations
@@ -56,6 +58,9 @@ ARC_SLACK_S = 0.35
 # Service order is applied only when the observed servers back it this well.
 ROTATION_MIN_VOTES = 4
 ROTATION_MIN_AGREEMENT = 0.7
+# A break in the alternation (a lost or invented point shifts the order) is
+# accepted when it explains more than this many seen servers.
+ROTATION_BREAK_COST = 1.5
 
 
 @dataclass
@@ -63,6 +68,8 @@ class Point:
     rally: Rally
     touches: List[Touch]
     roster: RallyRoster
+    #: Which squad is near by the post-run identity read (None: not read).
+    near_squad_read: Optional[int] = None
     near_squad: Optional[int] = None
     winner_squad: Optional[int] = None
     winner_source: Optional[str] = None
@@ -159,6 +166,9 @@ class MatchAssembler:
 
     def _orient(self, points: List[Point]) -> None:
         for pt in points:
+            if pt.near_squad_read is not None:
+                pt.near_squad = pt.near_squad_read
+                continue
             near = pt.roster.squad_on(SIDE_NEAR)
             far = pt.roster.squad_on(SIDE_FAR)
             if near is None and far is not None:
@@ -297,11 +307,14 @@ class MatchAssembler:
             last.outcome = OUTCOME_ERROR
             return
         before = pt.touches[-2]
-        if before.side == last.side or not before.observed:
+        if before.side == last.side:
             return
         if before.touch_number == 0:
+            # The serve is the start of the point whether its launch was seen
+            # or read from the track's birth (every far serve): the receivers
+            # touched it once, nobody touched it again and they lost = an ace.
             before.outcome = OUTCOME_ACE
-        elif before.action in (ACTION_SPIKE, ACTION_OVERPASS):
+        elif before.observed and before.action in (ACTION_SPIKE, ACTION_OVERPASS):
             before.outcome = OUTCOME_KILL
 
     # -- service order ----------------------------------------------------- #
@@ -311,7 +324,9 @@ class MatchAssembler:
         back, and a server keeps serving while the team scores. The only
         freedom is who served first in each squad: one bit per squad, voted
         by every serve whose server was seen. The rotation then names the
-        server of every point, including the ones nobody saw."""
+        server of every point, including the ones nobody saw. The order may
+        break where the seen servers say so (``_serving_order``): a break is
+        flagged, it usually marks a point the layer lost or invented."""
         turn: Dict[int, int] = {}
         turns: List[Optional[int]] = []
         prev_squad = None
@@ -328,32 +343,38 @@ class MatchAssembler:
         report: Dict[str, object] = {}
         for squad in (1, 2):
             letter = SQUAD_LETTER[squad]
-            votes = {1: 0, 2: 0}        # slot that served this squad's turn 0
+            # Servers seen, per serving turn of this squad.
+            seen: Dict[int, List[int]] = {}
             for pt, t in zip(points, turns):
                 player = pt.touches[0].player
-                if pt.serve_squad != squad or t is None or not _is_label(player, letter):
-                    continue
-                slot = int(player[1])
-                votes[slot if t % 2 == 0 else 3 - slot] += 1
-            total = votes[1] + votes[2]
-            first = 1 if votes[1] >= votes[2] else 2
-            agreement = votes[first] / total if total else 0.0
+                if pt.serve_squad == squad and t is not None and _is_label(player, letter):
+                    seen.setdefault(t, []).append(int(player[1]))
+            n_turns = max((t for pt, t in zip(points, turns)
+                           if pt.serve_squad == squad and t is not None), default=-1) + 1
+            order, breaks = _serving_order(seen, n_turns)
+            total = sum(len(v) for v in seen.values())
+            agree = sum(slot == order[t] for t, v in seen.items() for slot in v)
+            agreement = agree / total if total else 0.0
             applied = total >= ROTATION_MIN_VOTES and agreement >= ROTATION_MIN_AGREEMENT
-            report[letter] = {"first_server": f"P{first}{letter}" if total else None,
+            first_point = {t: i + 1 for i, (pt, t) in reversed(list(enumerate(zip(points, turns))))
+                           if pt.serve_squad == squad and t is not None}
+            report[letter] = {"first_server": f"P{order[0]}{letter}" if total else None,
                               "votes": total, "agreement": round(agreement, 2),
-                              "applied": applied}
+                              "applied": applied,
+                              "order_breaks_before_point": [first_point[t] for t in breaks]}
             if not applied:
                 continue
             for pt, t in zip(points, turns):
                 if pt.serve_squad != squad or t is None:
                     continue
-                slot = first if t % 2 == 0 else 3 - first
-                expected = f"P{slot}{letter}"
+                expected = f"P{order[t]}{letter}"
                 serve = pt.touches[0]
                 if serve.player != expected:
                     pt.flags.append(f"server_from_rotation:{serve.player}->{expected}")
                     serve.player = expected
                     serve.player_source = "service_order"
+            for t in breaks:
+                points[first_point[t] - 1].flags.append("service_order_breaks")
         return report
 
     # -- checks ----------------------------------------------------------- #
@@ -377,6 +398,41 @@ class MatchAssembler:
             "switch_blocks_ok": all(b == self.switch_every for b in blocks),
             "flagged_points": {i + 1: p.flags for i, p in enumerate(points) if p.flags},
         }
+
+
+def _serving_order(seen: Dict[int, List[int]], n_turns: int
+                   ) -> Tuple[List[int], List[int]]:
+    """Slot (1 / 2) serving each turn of one squad, and the turns where the
+    alternation BREAKS (the same teammate serves two turns running).
+
+    Teammates alternate, so the order is one bit -- unless a point between
+    two turns was lost (or invented), which shifts everything after it. The
+    order that disagrees with the fewest seen servers wins, a break counting
+    as ROTATION_BREAK_COST of them: one odd server is a misread, a run of
+    them is a shifted order."""
+    if n_turns <= 0:
+        return [], []
+    inf = float("inf")
+    cost = [[sum(slot != s for slot in seen.get(t, [])) for s in (1, 2)]
+            for t in range(n_turns)]
+    best = [cost[0][0], cost[0][1]]
+    back: List[Tuple[int, int]] = []
+    for t in range(1, n_turns):
+        row, new = [], []
+        for k in (0, 1):
+            alt, same = best[1 - k], best[k] + ROTATION_BREAK_COST
+            row.append(1 - k if alt <= same else k)
+            new.append(min(alt, same) + cost[t][k])
+        back.append((row[0], row[1]))
+        best = new
+    k = 0 if best[0] <= best[1] else 1
+    order = [0] * n_turns
+    for t in range(n_turns - 1, -1, -1):
+        order[t] = k + 1
+        if t:
+            k = back[t - 1][k]
+    breaks = [t for t in range(1, n_turns) if order[t] == order[t - 1]]
+    return order, breaks
 
 
 def _is_label(player: Optional[str], letter: str) -> bool:

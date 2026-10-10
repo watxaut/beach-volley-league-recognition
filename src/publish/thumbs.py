@@ -33,11 +33,30 @@ def pick_frames(recon: Dict, per_slot: int = TOUCHES_PER_SLOT) -> Dict[str, List
     return out
 
 
-def _boxes(diag_path: Path, wanted: Dict[str, List[int]]) -> Dict[Tuple[str, int], Tuple]:
-    """(slot, touch frame) -> (frame, bbox) of the labelled player nearest in time."""
+def _labelled_stream(diag_path: Path, recon: Dict):
+    """The run's stream with the labels the reconstruction credited its
+    touches with: the dump's own, or the per-rally identity read when the
+    reconstruction applied one (a box labelled P1A by the causal pass after a
+    side switch it missed is somebody else)."""
     from src.postrun.stream import load_stream
 
     stream = load_stream(str(diag_path))
+    calibration = (recon.get("inputs") or {}).get("calibration")
+    if (recon.get("identity") or {}).get("applied") and calibration \
+            and Path(calibration).exists():
+        from src.postrun.geometry import CourtGeometry
+        from src.postrun.identity import relabel
+
+        relabel(stream, CourtGeometry.from_file(str(calibration)),
+                [(int(p["start_frame"]), int(p["end_frame"]))
+                 for p in recon.get("points") or []])
+    return stream
+
+
+def _boxes(diag_path: Path, wanted: Dict[str, List[int]],
+           recon: Optional[Dict] = None) -> Dict[Tuple[str, int], Tuple]:
+    """(slot, touch frame) -> (frame, bbox) of the labelled player nearest in time."""
+    stream = _labelled_stream(diag_path, recon or {})
     found: Dict[Tuple[str, int], Tuple] = {}
     for slot, frames in wanted.items():
         for f in frames:
@@ -78,7 +97,7 @@ def make_slot_thumbnails(video_path: Path, diag_path: Path, recon: Dict,
     import cv2
 
     wanted = pick_frames(recon)
-    boxes = _boxes(diag_path, wanted)
+    boxes = _boxes(diag_path, wanted, recon)
     if not boxes:
         return {}
     by_frame: Dict[int, List[Tuple[str, Tuple]]] = {}
