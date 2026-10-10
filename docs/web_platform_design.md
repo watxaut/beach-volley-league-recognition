@@ -243,6 +243,19 @@ Rules that come from AGENTS.md:
   decoded **sequentially with `grab()`**, never with a `CAP_PROP_POS_FRAMES`
   seek (§9; `test_vfr_seek_guard.py` would fail it anyway). This takes about
   1–2 min per match. Each is uploaded as `match-media/thumbs/<key>/<slot>.jpg`.
+* **Attack clips** (#107, `src/publish/clips.py`): every credited attack gets
+  a clip, the second before the contact and the 1.5 s after it, cropped
+  around the net (three net heights tall, centred on the net, scaled into
+  640×480), H.264, no sound, ~0.25 MB. The video is not kept, so the cut has
+  two steps: `rallies.mp4` + `rallies.json` in the run directory (every rally
+  in that crop, one sequential decode of the video, ~45 MB) and then
+  `clips/<frame>.mp4` cut from that copy. A re-publish after a rules change
+  cuts the clips of the attacks it now finds from the copy, with no video.
+  Uploaded as `match-media/clips/<key>/<frame>-<content hash>.mp4`; the path
+  goes in the attack's `extra.clip`. Storage holds exactly the clips the live
+  bundle names: a path names its content, so a clip is sent once, and the
+  clips nothing points at any more are removed after a successful publish.
+  First publish: about 3 min more per match; a re-publish: seconds.
 
 ### The publish call
 
@@ -394,8 +407,11 @@ subtraction.
   with the publishable key) prevents it with no laptop involved.
 * **Limits:** 500 MB DB and 1 GB Storage. A match is about 33 points + ~210
   actions (well under 1 MB with indexes), a ~0.3 MB bundle and 4 × ~30 KB
-  thumbnails, so on the order of 1000 matches fit. Video never goes to
-  Supabase in the MVP.
+  thumbnails. The attack clips are what fills Storage: about 10 MB a match
+  (41 clips on 20261010), so about 90 matches fit in 1 GB; 5 GB of egress a
+  month is about 20 000 clip plays. The full video never goes to Supabase.
+  When Storage runs short, drop the clips of the oldest matches
+  (`PUBLISH_FLAGS=--no-clips` on a re-publish removes that match's clips).
 * **Backups:** the free plan has no managed backups. Pipeline data is
   reproducible (`publish --all` from bundles). Admin-owned tables get a weekly
   `python -m src.publish.backup` → JSON into Drive (or `supabase db dump`).
@@ -506,7 +522,10 @@ Your three tables are the right core. Four refinements:
 3. `ingest_match_bundle` is executable by `service_role` only (revoke
    `public`). Aggregate functions check `auth.uid() is not null`.
 4. Storage buckets `match-bundles` and `match-media` are private.
-   Thumbnails are served with short signed URLs.
+   Thumbnails are served with short signed URLs. An attack clip is read by
+   whoever may read that match's touches (`can_see_match_clip()` =
+   `can_see_match_detail()`): it shows all four players, so it follows the
+   match and never a player's `profile_public`.
 5. Admin-only data lives in admin-only tables (`match_sources`,
    `match_publications`), because RLS cannot hide a column.
 6. Players change their own privacy through an RPC (`set_my_privacy(bool)`),

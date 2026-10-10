@@ -356,6 +356,9 @@ export interface Landing {
   p?: number | null
   /** Match date. */
   d?: string | null
+  /** Storage path of the clip of this attack; null / missing when it has
+   * none or the viewer may not read that match's touches. */
+  clip?: string | null
 }
 
 export interface MatchSource {

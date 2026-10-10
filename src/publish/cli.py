@@ -5,10 +5,13 @@
     python -m src.publish output/<old_name>/ --match-key 20260920_1830_bogatell_ari_joan
     python -m src.publish --from-bundle output/<key>/match_bundle.json   # re-apply / roll back
 
-Steps: build the bundle (pure), make the 4 slot thumbnails (sequential
-decode), upload thumbnails + the content-addressed bundle to Storage, then
-ONE call to ``ingest_match_bundle`` -- the database applies it in a single
-transaction (or records it as ``unchanged``). Re-running is always safe.
+Steps: make the 4 slot thumbnails and the attack clips (sequential decode;
+the clips come from the run's rally copy once the video is gone), build the
+bundle (pure), upload thumbnails + clips + the content-addressed bundle to
+Storage, then ONE call to ``ingest_match_bundle`` -- the database applies it
+in a single transaction (or records it as ``unchanged``). Re-running is
+always safe. Clips of this match that no action points at any more are
+removed from Storage after a successful publish.
 Every call is appended to ``data/publish_log.jsonl`` (the database keeps the
 authoritative log in ``match_publications``).
 """
@@ -24,10 +27,10 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from .bundle import (SLOTS, BundleError, build_bundle, checked_match_key, content_sha256,
-                     default_match_key, validate_bundle)
+from .bundle import (ATTACKS, SLOTS, BundleError, attack_frames, build_bundle, checked_match_key,
+                     content_sha256, default_match_key, validate_bundle)
 from .client import DEFAULT_ENV_FILE, SupabaseClient, SupabaseError
 from .fantasy import score_actions
 
@@ -113,6 +116,71 @@ def video_identity(run_dir: Path, key: str, decoded: Optional[str], source_video
     return {"filename": filename, "sha256": sha}
 
 
+def _calibration(recon: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The calibration the reconstruction read (the clip crop is sized by its net)."""
+    path = (recon.get("inputs") or {}).get("calibration")
+    try:
+        return json.loads(Path(path).read_text()) if path else None
+    except (OSError, ValueError):
+        return None
+
+
+def clip_paths_of(bundle: Dict[str, Any]) -> List[str]:
+    """Storage paths of the attack clips a bundle names."""
+    return sorted({a["extra"]["clip"] for a in bundle["actions"]
+                   if (a.get("extra") or {}).get("clip")})
+
+
+def upload_clips(client: SupabaseClient, bundle: Dict[str, Any],
+                 run_dir: Path) -> Optional[List[str]]:
+    """Upload the clips Storage does not hold yet (a path names its content,
+    so a file there is never sent twice). Returns the clips of this match
+    Storage held before the call; None when that could not be listed."""
+    wanted = clip_paths_of(bundle)
+    try:
+        present: Optional[List[str]] = client.list_objects(
+            MEDIA_BUCKET, f"clips/{bundle['match']['match_key']}")
+    except SupabaseError as exc:
+        print(f"warning: the clips in storage could not be listed ({exc}); "
+              f"sending all, removing none", flush=True)
+        present = None
+    from .clips import local_clip
+
+    held = set(present or [])
+    sent = lost = 0
+    for path in wanted:
+        if path in held:
+            continue
+        local = local_clip(run_dir, path)
+        if local is None:
+            lost += 1
+            continue
+        client.upload(MEDIA_BUCKET, path, local.read_bytes(), "video/mp4")
+        sent += 1
+    if wanted:
+        print(f"clips     {sent} uploaded, {len(wanted) - sent - lost} already in storage"
+              + (f", {lost} not in this run directory" if lost else ""), flush=True)
+    return present
+
+
+def prune_clips(client: SupabaseClient, bundle: Dict[str, Any],
+                present: Optional[List[str]]) -> int:
+    """Remove the clips of this match that the bundle now live does not name
+    (an attack whose contact frame moved, or that is no attack any more).
+    Storage is small: an unreachable clip is only cost."""
+    stale = sorted(set(present or []) - set(clip_paths_of(bundle)))
+    if not stale:
+        return 0
+    try:
+        client.remove_objects(MEDIA_BUCKET, stale)
+    except SupabaseError as exc:
+        print(f"warning: {len(stale)} old clips could not be removed from storage ({exc})",
+              flush=True)
+        return 0
+    print(f"clips     {len(stale)} old ones removed from storage", flush=True)
+    return len(stale)
+
+
 def build_from_run(args: argparse.Namespace) -> Dict[str, Any]:
     run_dir = Path(args.run_dir)
     pipeline_path = run_dir / "pipeline_output.json"
@@ -145,6 +213,19 @@ def build_from_run(args: argparse.Namespace) -> Dict[str, Any]:
             print(f"video not on disk: {'keeping the ' + str(len(kept)) + ' thumbnails of an earlier publish' if kept else 'no thumbnails'}",
                   flush=True)
 
+    clip_paths: Dict[int, str] = {}
+    if not args.no_clips:
+        from .clips import make_attack_clips, storage_path
+
+        fps = float(recon.get("fps") or (pipeline.get("video") or {}).get("fps") or 0.0)
+        made = make_attack_clips(
+            run_dir, attack_frames(recon.get("points") or []),
+            points=recon.get("points") or [], fps=fps,
+            video=Path(decoded) if decoded and Path(decoded).exists() else None,
+            calibration=_calibration(recon),
+            n_frames=recon.get("n_frames")) if fps else {}
+        clip_paths = {frame: storage_path(key, frame, path) for frame, path in made.items()}
+
     if not diag.exists():
         print("warning: no diag.jsonl in this run directory. Keep the diag dump of every "
               "published match: without it the match cannot be recomputed when the post-run "
@@ -155,7 +236,8 @@ def build_from_run(args: argparse.Namespace) -> Dict[str, Any]:
                   "host": socket.gethostname()}
     return build_bundle(run_dir, match_key=key, video_url=args.video_url,
                         video_sha256=ident["sha256"], video_filename=ident["filename"],
-                        thumb_paths=thumb_paths, provenance=provenance, note=args.note,
+                        thumb_paths=thumb_paths, clip_paths=clip_paths,
+                        provenance=provenance, note=args.note,
                         replace_video=args.replace_video)
 
 
@@ -171,6 +253,8 @@ def summarize(bundle: Dict[str, Any]) -> str:
         f"video     {m['video'].get('filename')}  url: {m['video'].get('url') or '-'}  "
         f"sha256: {(m['video'].get('sha256') or '-')[:12]}",
         f"thumbs    {', '.join(s['slot'] for s in bundle['slots'] if s['thumb_path']) or '-'}",
+        f"clips     {len(clip_paths_of(bundle))} of "
+        f"{sum(1 for a in actions if a['slot'] and a['action'] in ATTACKS)} credited attacks",
         f"hash      {bundle['content_sha256'][:16]}",
         "fantasy (G1 preview; live scoring uses the database rules):",
     ]
@@ -227,6 +311,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--allow-dirty", action="store_true",
                    help="publish from a working tree with uncommitted changes")
     p.add_argument("--no-thumbs", action="store_true", help="skip the slot thumbnails")
+    p.add_argument("--no-clips", action="store_true",
+                   help="publish without attack clips (the ones in storage are removed)")
     p.add_argument("--no-video-hash", action="store_true", help="skip hashing the source video")
     p.add_argument("--env", type=Path, default=DEFAULT_ENV_FILE, help="credentials file")
     p.add_argument("--log", type=Path, default=DEFAULT_LOG, help="local publish log (JSONL)")
@@ -283,6 +369,7 @@ def main(argv: Optional[list] = None) -> int:
                 if local.exists():
                     client.upload(MEDIA_BUCKET, slot["thumb_path"], local.read_bytes(),
                                   "image/jpeg")
+        clips_before = upload_clips(client, bundle, run_dir)
         bundle_path = f"{key}/{bundle['content_sha256']}.json"
         client.upload(BUNDLE_BUCKET, bundle_path, json.dumps(bundle).encode(),
                       "application/json")
@@ -290,6 +377,7 @@ def main(argv: Optional[list] = None) -> int:
         result = client.rpc("ingest_match_bundle", {
             "p_bundle": bundle, "p_bundle_path": f"{BUNDLE_BUCKET}/{bundle_path}",
             "p_published_by": who})
+        prune_clips(client, bundle, clips_before)
     except SupabaseError as exc:
         print(f"error: {exc}", file=sys.stderr)
         append_log(args.log, {"at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

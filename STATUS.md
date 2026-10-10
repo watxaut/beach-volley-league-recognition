@@ -18,9 +18,9 @@ update at the end of every session that changes anything and commit with the wor
 - New durable protocol rules go in `AGENTS.md`; new cross-session technical
   facts go one-line-each into *Learnings* below.
 
-Last updated: **2026-10-10 (106th session) — 20261010 reads the owner's sequence: 31 points, A 22 – B 9 (the players switched one point late and played to 22).
-Three post-run reads fixed: a landing is where the ball stops falling, a serve needs receivers side by side, an attack is a ball hit above the player's own head. 20260920 keeps its record (action 0.982 → 0.988).**
-#105 (who is who post-run), #104 (second match, diagnosis), #102 (Feedback button), #101 (net-anchored court positions), #99 (reception vs defense), #98 / #97 (hard / touch), #96 (player page v2), #95 (unknown-player slots) and #90 (platform) lie underneath.
+Last updated: **2026-10-10 (107th session) — attack clips on the player page: pick an attack on the map and watch the second before the hit and the 1.5 s after it (640×480 MP4, ~0.2 MB each, cut by frame number).
+Built and verified offline on both matches (41 / 41 and 62 / 62 attacks); NOT deployed: migration, web deploy and `make republish-all` are the owner's.**
+#106 (20261010 = the owner's sequence), #105 (who is who post-run), #104 (second match, diagnosis), #102 (Feedback button), #101 (net-anchored court positions), #99 (reception vs defense), #98 / #97 (hard / touch), #96 (player page v2), #95 (unknown-player slots) and #90 (platform) lie underneath.
 
 ## North-star goals (set session 24)
 
@@ -83,6 +83,8 @@ transactional Supabase RPC (applied/unchanged, admin rows untouched) → RLS +
 React SPA. Verified offline (scratch PG16, parity, CLI e2e, SPA screenshots);
 hosted Supabase/Cloudflare/Drive/launchd untested — owner deploys (#90 Log). #102: Feedback button (bug / suggestion + ≤3 screenshots; `send_feedback()` is the only way in, 20 reports + 30 uploads a day per member; Settings → My reports, Admin → Feedback, `make feedback` → `output/feedback/`; migration `20261009130000_feedback`, NOT pushed). #91: attack landings carry both axes, a per-axis error and a result (recon schema 2, migration `20261006180000_landing_confidence`); needs `make postrun` + re-publish per match. #92: stats windows + side-out/break + serve targets + reception outcome + hitting % + report card + `/measure` (migration `20261007100000`, no re-publish needed); `make republish-all` redoes post-run + publish for every published match (needs its diag dump). #93 security review (AGENTS §13): table privileges are explicit (`20261007120000`; `anon` holds none), `match_report` gates its per-player extras by tier (`20261007130000`), `webapp/public/_headers` (CSP), the publisher refuses a `.env.publish` others can read, login codes go through `supabase/functions/request-login-code` + `login_code_gate()` (`20261007140000`); verified on the local stack only. #95: `match_participants.is_unknown` (`20261008100000`) = a slot outside the league (AGENTS §13); migration pushed by the owner (2026-10-08). #94 login study (`docs/web_login_study.md`): sessions persist (refresh token, no limit); fixes + passkeys/Google options await owner decisions (open point 34). #96 player page v2: tabs (Overview / Attack / Serve & receive / Matches), "you vs the league / vs your earlier matches" strips counted from league-tier data, attack map start → end from `own_x_m/own_y_m` (already published, no re-publish), grades in the "i" hint (AGENTS §13); migration `20261009100000_player_page_v2` NOT pushed yet. #99 reception vs defense: `analytics.passes` (migration `20261009120000_pass_map`, NOT pushed; no post-run change, no re-publish) + `PassMap` card; the real match has 24 credited receptions / 34 defenses, 54 with a seen destination.
 
+**Attack clips (#107, BUILT, not deployed — `src/publish/clips.py`, AGENTS §13).** Every credited attack gets a clip: 1 s before the contact, 1.5 s after, cropped around the net (three net heights tall, centred on the net), 640×480 H.264, no sound. Two steps because the video is not kept: `rallies.mp4` + `rallies.json` in the run directory (every rally in that crop, ONE sequential decode, 39–44 MB) → `clips/<frame>.mp4` cut from that copy, so a re-publish after a rules change needs no video. Storage: `match-media/clips/<key>/<frame>-<hash>.mp4`, path in `actions.extra.clip`; sent once, the ones nothing names removed after a publish. Who sees one = who reads that match's touches (owner decision; migration `20261010100000_attack_clips`, NOT pushed). Web: the attack map's hover / tap panel plays it (fetched after 250 ms of rest, links reused, CSP `media-src`). 20261010: 41 / 41 attacks, 9.9 MB; 20260920: 62 / 62, 11 MB; ~90 matches per GB. First publish +2–3 min, re-publish 2 s with the same bundle hash.
+
 **Identity (#105: who is who is a POST-RUN read — `src/postrun/identity.py`, AGENTS §4 / §11, numbers in `docs/postrun_reconstruction.md`).** Per RALLY: how much better the bodies of each half (feet > 1 m off the net line) match the squad enrolled there; the two orientations sit at two levels read from the match itself (20261010 +0.347 / −0.038, 20260920 +0.146 / −0.083), a two-state path over the rallies decides (a switch costs 4 nats, one rally weighs ≤ 6).
 Per FRAME inside a rally: one shortest path over which player each track id is (similarity centred between the two teammates of that half, a cost for feet on the other squad's half, an id changes player only when paid for). Label / squad / slot / HALF of every body are rewritten before the touches are solved. Input: `id_sims` per clean body in the diag dump (schema 5); a dump without them keeps its causal labels and reconstructs byte-identical.
 20261010: 31/31 rallies oriented (agent's frame read), 93/93 sampled labels on the right person (score and blocks: next paragraph). 20260920: record unchanged, players = the owner CSV on 207/208 (P19 f13624: the toucher is hidden behind her teammate). Clips e1–e7 unchanged. The causal `TeamIdentityResolver` (live overlay) is untouched and still misses switches.
@@ -99,7 +101,7 @@ colours/labels. Pass-2 scripts (`relabel_serves`, `resolve_side_switches`,
 `resolve_point_winners` 18/33, `consume_serve_evidence`) are SUPERSEDED by
 `src/postrun` for points/serves/winners; kept as provenance. Entreno action
 gate (causal): e1 0.706, e2 0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933,
-e7 0.75 (same-session A/B only). Test suite **1263** (1257 pass, 5 skipped; `test_inbox` run-match order fails on `main` too, not #106).
+e7 0.75 (same-session A/B only). Test suite **1286** (1280 pass, 5 skipped; `test_inbox` run-match order fails on `main` too, not #106).
 
 **Player detector input (#94, default ON):** `player_bgr_input: true` passes BGR as-is (`false` = the old path; how to compare: Learnings). 4-track frames up on all 7 clips, stream F1 0.824→0.839, post-run identical; match stream labels 81/145→74/146; e3 contact sheet owed. Full text: `docs/history/status_where_we_are_archive.md` (#97).
 
@@ -114,13 +116,10 @@ tuned on the 17 match far serves; no relabeling reception as serve; no
 vall_dhebron output looks. Serve START is now a post-run read — do not
 reopen causal serve detection for it.
 
-**Refuted/parked mechanisms:** list moved to
-`docs/history/status_where_we_are_archive.md` (#90 block); never `src/`.
+**Refuted/parked mechanisms:** list moved to `docs/history/status_where_we_are_archive.md` (#90 block); never `src/`.
 
-**Known defects:** `annotate_player_gt.py` + `src/db/ingest.py` seek on VFR
-(allow-listed in `test_vfr_seek_guard.py`); stale comment at
-`src/utils/config.py:101`; GT `20260920_match_ari_joan_contacts_p1_p8.txt`
-P31 serve f24543 is 128 f before its reception (owner to confirm ~f24630).
+**Known defects:** `annotate_player_gt.py` + `src/db/ingest.py` seek on VFR (allow-listed in `test_vfr_seek_guard.py`); stale comment at `src/utils/config.py:101`;
+GT `20260920_match_ari_joan_contacts_p1_p8.txt` P31 serve f24543 is 128 f before its reception (owner to confirm ~f24630).
 
 ## Active next (ranked)
 
@@ -129,6 +128,7 @@ P31 serve f24543 is 128 f before its reception (owner to confirm ~f24630).
    Next picks (§5): I3 → O3 (relative heights, V2), N10/O2, O1+I4, N7/N9, F1.
 1. ✅ **Product deployed (owner, DONE 2026-10-07):** `docs/deploy_web_platform.md` steps 0–7. Still open: publish 20260920 check
    (fantasy = txt footer), then action_overrides UI, in-app invites, `own_x_m` heatmaps (design §8 "Next"). **Owed (#98), in any order — each step is safe alone:** merge `spike-type-touch-vs-hard`; `supabase db push` (`20261009100000` + `20261009110000` + `20261009120000`); move `~/volley-prod` to that commit and run `make republish-all` THERE (this checkout's `.env.publish` is the local stack; an older prod checkout would rewrite the shared `output/` with the old rules); then look at the Attack tab on the real match.
+1b. **Attack clips owed (#107), owner, in this order:** merge the PR; `supabase db push` (`20261010100000_attack_clips`); redeploy the web; `make republish-all` from prod WHILE both videos are on disk (writes each `rallies.mp4`); watch a few clips on the real page. Untested: hosted Storage list / delete (a failure there only skips the clean-up).
 2. **20261010, what is left (owner feedback file; open point 32i), in this order:** (a) blocks are not a label (P5 f4973, P26 f24630) and make the next touches wrong — incl. the attack at f24691, read as a first-touch overpass; (b) P10: an attack into the net read with an overpass by the other team; (c) P21 (10:48): a set and P1A's kill on the line unseen, the set reads as an overpass; (d) P2: the set from off court unseen; (e) P13's kill is not credited (the track ends before the sand).
    Owner: look at the regenerated point images (31), then a per-rally contact sheet before publishing; merge PR #25. A full owner GT (serve frame + winner per point) would let this match be scored like 20260920.
    Live overlay (`make run-live`) still shows the causal labels: fix only if the owner asks. Recording advice given #106 (kits, tripod height, margin behind the baselines): owner decides; `docs/video_recording_guide.md` rewrite still owed (open point 29).
@@ -384,8 +384,11 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Supabase Auth (#93, measured on the local stack): with sign-ups off, an invited user who has not opened the invite link gets 422 `signup_disabled` on `/otp` — the link is the only way in and it dies with the email OTP expiry (1 h), so never shorten that. Code length (6–10) is the lever against guessing; the login form takes any. `/otp` answers unknown and known emails differently and cannot be told not to: the fix is the login function (same answer for all) plus CAPTCHA protection ON with a secret no page has a widget for — GoTrue v2.197 then refuses every public mail-sending route (`/otp`, `/signup`, `/recover`, `/magiclink`, `/resend`) identically, while requests with the service key skip the check (`verifyCaptcha`); `/verify` answers a wrong code and an unknown address alike.
 - Supabase Auth lock (#94, read in `supabase/auth` master 2026-10-08): CAPTCHA guards `/otp` `/magiclink` `/recover` `/resend` `/signup` `/sso`, `/token` except `refresh_token`/`pkce`/`id_token` grants, and `/passkeys/authentication/options` — password + passkey sign-in need a broker, OAuth and refresh pass; with sign-ups off an OAuth identity links to the invited account with the same verified email. `supabase-js` `signOut()` defaults to scope `global` (logs out every device).
 - Edge functions (#93): `EdgeRuntime.waitUntil` exists only in a USER worker (the platform's way of running a function), not when the file is the runtime's main service — guard it; a function added while the local stack runs is not served (404) until the stack restarts. `pg_net` was rejected for the broker: its tables and `net.http_post` are granted to `anon` and owned by `supabase_admin`, so a migration cannot revoke that.
+- Attack clips (#107): a 2.5 s clip as GIF (360p, 15 fps) is 5.2–5.9 MB, as H.264 MP4 640×480 0.13–0.33 MB. Clips re-encoded from a crf-25 rally copy (crf 23 = 64 MB, crf 25 slow = 44 MB for 323 s). Players + ball around an attack span ~616 × 681 px (the set's apex dominates): a crop holding the whole court is the whole frame. Net-sized crop (1086 × 814 on vall d'Hebron): attacker never cut, ball leaves sideways in 5 of 41 clips; the central 960 × 720 cuts the attacker in 4.
+- Browser check without a test runner (#107): `VITE_DEMO=1 npx vite` + the playwright in `~/.npm/_npx/*/node_modules/playwright` with `chromium.launch({channel: 'chrome'})`; an element screenshot scrolls and drops the hover — use `page.screenshot`.
 
 ## Session index (one line each)
+- #107 **Attack clips on the player page: hover / tap an attack, watch 1 s before + 1.5 s after (640×480 MP4 from a kept rally copy, cut by frame number); seen by whoever reads that match's touches; 41/41 + 62/62 attacks; not deployed**
 - #106 **20261010 = the owner's sequence (31 points, A 22–B 9): landing read where the fall stops, dead-time return refused (receivers not side by side), attack = contact ≥ 1.23 × standing height; 20260920 action 0.982→0.988**
 - #105 **Side switches read POST-RUN (`src/postrun/identity.py`): near squad per rally + per-frame player path; 20261010 A 11–B 20 → A 21–B 10, 31/31 rallies; 20260920 unchanged, who 207/208; ace rule from either end**
 - #104 **Second match run (20261010 vall d'Hebron): A 11–B 20 as run vs 21–9 true; resolver missed 2 of 4 side switches then flapped; by hand 29/30 points, 2 false, winners 26/29; diagnosis only, post-run orientation proposed**
@@ -485,8 +488,19 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-09-19 **#13** — width-confirmed cross + own-side drive-block refutation (e7 0.625→0.75); f316 ruled a GT slip and folded.
 - 2026-09-09 **#12** — poke rule retuned ASCENT-ONLY (TOUCH_RISE_PX 57), level-exit vx rule deleted; eval merges GT overrides.
 - 2026-09-09 **#11** — poke GT ratified; the 09-08 dictation was misattributed (e5 f300 = poke, e6 f310 = hard).
-- 2026-09-08 **#10** — e6 poke read (resolver touch-3 fall-through + analyzer type + stance-majority team) + rally-opening serve gate + redirect locality; e7 GT ratified; e5/e6 team 1.0.
 ## Log (newest first)
+
+### 2026-10-10 (hundred-and-seventh session) — #107: attack clips on the player page
+
+**Asked (owner):** hover an attack and see a small gif of it, 1 s before the spike and 1.5 s after, not 1080, on the free stack; what it takes, how to make it better, the caveats; maybe keep only the last 3 matches. Then, on the three decisions put to them: "1. keep the same rules [a clip is seen by whoever reads that match's touches], 2. 640×480, 3. keep [the local rally copy]".
+
+**Measured first (20261010, real clips).** GIF 5.2–5.9 MB a clip (4 matches fill the 1 GB of Storage); H.264 MP4 0.2–0.3 MB (~90 matches): no "last 3 matches" limit needed. The crop: players + ball around an attack span the frame top (the set) to y ≈ 800, so the central 960 × 720 shown to the owner cuts the attacker in 4 of 41 clips and loses the ball in 6; a box three net heights tall centred on the net never cuts the attacker and loses the ball sideways in 5 (wide plays). A box holding the whole court is the whole frame.
+
+**Built.** `src/publish/clips.py`: `crop_box` (net-sized, from the calibration), `rallies.mp4` + `rallies.json` (every point −1 s / +2 s, one sequential cv2 pass piped to ffmpeg; the index maps copy frames to source frames), `clips/<frame>.mp4` cut from the copy in one more sequential pass, a manifest so nothing is cut twice. `bundle.py`: `extra.clip` on credited attacks only, no key without a clip (a run without clips builds the bundle it always did). `cli.py`: `--no-clips`, upload before the rows (content-named path, sent once), removal of the unnamed ones after a successful publish; `client.py`: `list_objects` / `remove_objects`. Migration `20261010100000_attack_clips`: `can_see_match_clip()` + storage read policy, `player_profile` → `landings[].clip` only for a caller who may read that match. Web: `Clip` in the attack map panel (250 ms rest before the fetch, muted loop, below the attack in the upper half of the map), `lib/clips.ts` link cache cleared on account change, CSP `media-src`, demo mirror with a DRAWN clip. AGENTS §13 bullet; design + deploy docs.
+
+**Verified.** Frame-accurate: synthetic video whose frames show their own number (copy, clips, a re-publish without the video, an early end); the contact is on clip frame 30 / 26 on both real matches (20260920 is VFR). Both matches end to end through `python -m src.publish --dry-run` on copies of the run directories: 41 / 41 clips (0.19–0.33 MB, 9.9 MB, copy 44 MB, 166 s) and 62 / 62 (0.13–0.23 MB, 11 MB, copy 39 MB, 134 s); second run 2 s, same bundle hash. Schema check on a scratch Postgres 17: 5 pass; the two rules mutated → the smoke fails. Web in headless Chrome (demo): hover plays, a quick sweep fetches nothing, tap plays inline on a phone viewport. pytest 1280 pass (+23), vitest 71 (+3), typecheck + lint clean.
+
+**Not done / owed.** Not deployed (Active next 1b). Hosted Storage list / delete never ran against Supabase (fake client only). No marker on the credited attacker in the clip. The ball leaves the picture sideways in 5 of 41 clips. Local rally copy 39–44 MB per match (the first estimate given to the owner was 27). `Makefile` untouched (it holds someone else's uncommitted `--start-frame`), so `--no-clips` is not in its comment.
 
 ### 2026-10-10 (hundred-and-sixth session) — #106: 20261010 reads the owner's sequence — landing, reception formation, attack by reach
 
@@ -530,31 +544,3 @@ Suite 1258 (after merging `main`): 1252 pass, 5 skipped, `test_inbox` run-match 
 **Not done / owed.** The 20261010 POINTS (blocks 7 / 9 / 6 / 7): owner GT first. Owner label feedback (P2 spike, P2 hidden set, P5 block): recorded only.
 The live overlay keeps the causal labels. Uncommitted in the tree and not this session's: `--start-frame` for `make run-live` (Makefile, `src/main.py`,
 `live_debug_processor.py`). `match_bundle.json` in the run directory pre-dates the re-run.
-
-### 2026-10-10 (hundred-and-fourth session) — #104: second match through `make run-match` (20261010 vall d'Hebron): wrong score, side switches missed; diagnosis only
-
-**Asked (owner):** run the pipeline and the post-run on `resources/full_videos/20261010_1000_vall_dhebron_jesus_sara_joan_loida.mp4` (calibrated; "we
-finished 21 8 (I believe), won the couple in gray (Joan and Loida)"; the practice venue, other weather).
-
-**Run.** `make run-match` on MPS: 29295 frames in 1831 s (62.5 ms/frame; the 20260920 match runs at 30–32 — not looked at). Net top reads 2.36 m;
-`positions` refused the box offset (`kinds_disagree`). Result: 31 points, A 11 – B 20, set incomplete, switches after [23, 25, 26, 27, 28, 29].
-The calibration is committed; the run, the probe and its feature dump stay in `output/` (git-ignored).
-
-**Truth, read by the agent from frames (serve frame of all 31 points + four suspect spans; NOT owner GT).** Gray pair = squad 1 = A, near
-for P1–7, P17–22, P30–31; the pink pair near for P8–16, P23–29. P8 (04:34): the receiver catches the serve, the ball goes back to the server at the
-net and the same server serves 13 s later → replayed, no point. P14 (06:53): after P13 the receivers touch hands and walk back, the ball is
-lobbed to them from the far half → dead-time return; P13 is theirs. Missed (10:10, f18312): near serve by gray, pink attack, gray dig goes
-out. P30 (15:55): net-cord serve drops on the gray half, pink serves again → pink ace (or replayed). P31: gray wins, the four players meet at the net (f29290).
-That is 30 points, 21–9 (21–8 if P30 was replayed); the score at the switches is 6–1, 12–2, 17–4, 20–8 = 7 / 14 / 21 / 28 points.
-
-**Measured.** (1) Near squad set by hand (scratch what-if, `MatchAssembler._orient` patched, nothing written to the run dir): 21–10, switches
-after [7, 16, 22, 29]; 29 of 30 real points found, 2 false, winners 26/29 (P13 and P20 flipped by the false / missed point after them, P31 by
-the landing read). (2) Identity: `scripts/probe_identity_switches.py` → `identity_features.npz`; the replay reproduces the run's 10 flips
-(f21170 … f28054). Warm-up levels +0.39 / +0.52 (near / far side), mirrored prior −0.39 / −0.52; after the first switch the evidence reads
-−0.06 / −0.19, the CUSUM reads 0.68 at f7900 and 0 afterwards while the state-1 level slides to ~0 within 400 frames. Per rally, `(x_near − x_far) / 2`: squad 1 near
-+0.22…+0.39 (15 points), squad 2 near −0.13…+0.07 (16). `LEVEL_ALPHA` 0.0002 / 0: switches found, 24 / 28 flips. (3) Post-run events: P14 =
-track birth at y 2.5 m, peak 4.8 m, 13 m at 7.6 m/s; the missed serve = toss tracked f18308–18328, track dead at the hit, reborn f18354 at
-y 9.5 m, 4.3 m up.
-
-**Not done / owed:** no `src/` change, no suite run (STATUS guard only), nothing published. Owner: confirm 21–9 vs 21–8 and the P8 / P14
-reads; approve the post-run orientation design (Active next 2).

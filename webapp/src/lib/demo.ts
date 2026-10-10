@@ -13,6 +13,8 @@ import type {
 
 const SLOTS: Slot[] = ['P1A', 'P2A', 'P1B', 'P2B']
 const ME = '00000000-0000-0000-0000-0000000000a1'
+/** Every demo attack plays the same drawn clip (public/demo-clip.mp4): no footage of real people ships with the app. */
+const DEMO_CLIP = 'clips/demo/attack.mp4'
 
 function rng(seed: number) {
   let s = seed >>> 0
@@ -333,12 +335,15 @@ export function demoApi(): Api {
               a: free ? 'overpass' : 'spike', p: r() < 0.6 ? 1 : 2, d: seats.length ? seats[i % seats.length].date : null,
             }
             const type = free ? 'touch' : i % 7 === 6 ? null : i % 2 ? 'touch' : 'hard'
-            const spot = { ...start, x: 0.5 + r() * 7, y, zone: 2, type }
+            // a clip follows the touches of its match: the player's own attacks
+            // (they played those matches) and an admin; a shared profile shows none
+            const clip = isAdmin() || p.user_id === session?.userId ? DEMO_CLIP : null
+            const spot = { ...start, x: 0.5 + r() * 7, y, zone: 2, type, clip }
             // depth is the weak axis, and worse far from the camera
             if (k < 0.55) return { ...spot, ex: 0.4, ey: 0.7, in: null, outcome: null, result: 'dug' as const, source: 'next_touch' }
             if (k < 0.8) return { ...spot, ex: 0.3, ey: 0.3 + (y - 8) * 0.1, in: true, outcome: 'kill', result: 'kill' as const, source: 'ball_death' }
             if (k < 0.92) return { ...spot, x: r() > 0.5 ? 9.4 : -1.2, ex: 0.3, ey: 0.3 + (y - 8) * 0.1, in: false, outcome: 'error', result: 'out' as const, source: 'ball_death' }
-            return { ...start, type, x: null, y: null, in: null, outcome: 'error', result: 'net' as const, source: null }
+            return { ...start, type, clip, x: null, y: null, in: null, outcome: 'error', result: 'net' as const, source: null }
           }),
           touch_depths: [],
           // receptions land close together, defenses are scattered; a few went straight over
@@ -467,6 +472,7 @@ export function demoApi(): Api {
     async setFeedbackStatus(id, status, note) {
       Object.assign(feedback.find((f) => f.id === id)!, { status, admin_note: note })
     },
+    clipUrl: async (path) => (path === DEMO_CLIP ? '/demo-clip.mp4' : null),
     async feedbackUrls(paths) {
       return Object.fromEntries(paths.filter((p) => shots[p]).map((p) => [p, shots[p]]))
     },
