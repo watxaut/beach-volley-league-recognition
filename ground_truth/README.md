@@ -146,6 +146,38 @@ python scripts/parse_match_gt_text.py ground_truth/20260920_match_ari_joan_lost.
   owner-ratified frame anchors first. Winner / side-switch scoring activates
   once the pipeline emits those layers.
 
+## Owner Score Table With Times (`<stem>_points.json`, match-points-v2)
+
+`20261010_1100_vall_dhebron_points.json` (2026-10-11): the owner's running
+score of that video, every row with the time of the point on the video
+player's clock. It is `match-points-v1` plus, per point:
+
+- `serve_time_s` -- the owner's `mm.ss`, in seconds. It is the SERVE of the
+  point: all 35 are within 1 s of the run's serve frames once those are read
+  on the video's own timestamps (`frame_times.json`, see
+  `scripts/write_frame_times.py`; frame / average fps is up to 50 s off on
+  that video).
+- `serve_team` -- MECHANICAL: the winner of the previous point serves. Point 1
+  is the run's read, which the owner did not correct.
+
+Score a run against it (points found / invented / missed, serving team,
+winners, final score, side switches):
+
+```bash
+venv/bin/python scripts/score_postrun_points.py \
+    output/20261010_1100_vall_dhebron_jesus_sara_joan_loida \
+    ground_truth/20261010_1100_vall_dhebron_points.json
+```
+
+The verbatim dictation is `20261010_1100_vall_dhebron_owner_feedback.txt`
+(as `20261010_1000_vall_dhebron_owner_feedback.txt` for the first video of
+that morning, which has no times). Two things to know before using its
+per-point notes: point and frame numbers are those of the run the owner
+looked at (31 points; the table has 35), and for team B the owner's player
+labels are the reverse of the run's (owner P1B = the run's P2B, owner P2B =
+the run's P1B; team A labels agree). The notes are corrections, not a
+contact-level GT: a touch the owner did not mention was not ratified.
+
 ## Game-State Ground Truth (`gt_point_start_end.txt`)
 
 For the game on/off state machine there is a plain-text format (owner's

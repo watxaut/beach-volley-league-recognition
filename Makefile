@@ -50,14 +50,17 @@ endif
 	@echo "Per-player results CSV: $(OUTPUT_DIR)/results.csv"
 
 # Full match: the normal run plus the per-frame stream sidecar the post-run
-# layer needs (--diag-dump, same frame path, off by default), then the
-# post-run reconstruction (points, touches, players, winners, score).
+# layer needs (--diag-dump, same frame path, off by default), the video's own
+# frame timestamps (frame_times.json: the clock the play-by-play prints; a
+# failure there only costs the clock), then the post-run reconstruction
+# (points, touches, players, winners, score).
 run-match:
 ifeq ($(strip $(VIDEO)),)
 	$(error VIDEO is not set. Usage: make run-match VIDEO=path/to/video.mp4)
 endif
 	$(PYTHON) scripts/check_video_name.py "$(VIDEO)"
 	$(PYTHON) -m src.main "$(VIDEO)" --output-dir "$(OUTPUT_DIR)" $(VIZ_FLAG) --diag-dump "$(OUTPUT_DIR)/diag.jsonl"
+	-$(PYTHON) scripts/write_frame_times.py "$(OUTPUT_DIR)"
 	$(PYTHON) -m src.postrun "$(OUTPUT_DIR)"
 	@echo ""
 	@echo "Match reconstruction: $(OUTPUT_DIR)/match_reconstruction.json (+ .txt play-by-play)"

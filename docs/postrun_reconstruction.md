@@ -50,7 +50,12 @@ check: the two net-top clicks, never used to build the model, land at
    standing side by side and do not play the ball is the ball going back
    between two points (`checks.launches_refused`, "Not a serve" in the
    report); a landing is read where the ball stops falling, not at the first
-   frame its width fits the sand.
+   frame its width fits the sand. And since #109 (third match, numbers
+   below) a serve the ball alone leaves open -- its flight out of the
+   picture, its toss read inside the court or taken for a pass, a ball the
+   tape stops -- is taken when the court was STILL before it: the owner's
+   cue that at a serve everybody but the server stands (`court_sway`,
+   `serve.confirmed_by: "still_court"`).
 3. **Who is who** (`identity.py`, #105; detail and numbers below). Before
    anything is credited: which squad is near is read once per rally, then
    which tracked body is which of the four players inside the rally. The
@@ -81,7 +86,9 @@ check: the two net-top clicks, never used to build the model, land at
    alternate on each side-out) names the server of every point. A serve the
    receivers touch once, with no second touch, and lose is an ace -- from
    either end (owner rule 2026-10-10; a far serve is read from the track's
-   birth and counts all the same).
+   birth and counts all the same). A spike that is dug and never set is a
+   kill (owner rule 2026-10-11): a second touch after which the ball never
+   climbs back to net height set nothing up, and is nobody's error.
 
 7. **Attack type** (`attack_shape.py`, #97). Every observed spike / overpass
    gets `spike_type` (`hard` / `touch`) from the flight that follows it, in
@@ -108,6 +115,8 @@ A missing action is fine, an invented one is not:
   the report). Otherwise it stays in the point, uncredited;
 * hidden touches (`evidence: "structure"`) are never credited and never
   decide a kill/ace/error;
+* a serve the ball leaves open needs the court still before it; players
+  moving never refuse a serve the ball shows;
 * an ambiguous possession-ending touch is an overpass, never a spike;
 * a kill needs the ball seen coming down;
 * an attack is typed hard / touch only when both horizontal-speed reads
@@ -403,6 +412,137 @@ attacks and one bump read at 2.33 m fixed, the two passes above lost).
 Practice clips 52/52 as before. Standing heights read ~10 % under the real
 ones (crouch, sand) for everybody, which is why the split is a ratio measured
 on the same boxes and not anatomy.
+
+## Third match, measured (2026-10-11, #109)
+
+The owner wrote the running score of `20261010_1100` with the time of every
+point: 35 points, A 13 – B 22, switches after 8 / 15 / 22 / 29
+(`ground_truth/20261010_1100_vall_dhebron_points.json`, scored by
+`scripts/score_postrun_points.py`). The run of #108 had 31 points and A 14 –
+B 17. Four points were lost and one serve was read from the wrong half; each
+was a serve the ball alone could not settle.
+
+| owner time | frame | what it is | why it was dropped |
+|---|---|---|---|
+| 00.41 | f1060 | near serve | toss and hit seen, then the ball leaves the top of the picture and is seen again 5 frames before the reception: no flight long enough to carry a speed |
+| 11.01 | f16535 | far jump serve | the toss is tracked in two pieces; the join reads as a touch 5 m away (16 px of ball width), so the serve is "fed by a pass" |
+| 16.03 | f24669 | near serve into the net | the ball lies at the net for 18 tracked frames: one line through flight AND rest reads the launch 2.3 m inside the court at 3.9 m/s |
+| 19.58 | f31784 | far serve, net cord, drops on the receivers' sand | 4.8 m/s (under the 5.5 m/s a serve that clears the net needs) and it ends at a vertex 2.5 m up, not on the sand |
+| 19.31 | f30939 | far serve (found, wrong half) | toss tracked, read 1 m INSIDE the court (the rule wanted it behind the baseline), track dead at the hit; the serve-less path then took the server's bounce for a reception and invented a near serve |
+
+**The owner's cue: a still court.** "At most serves the people on the court
+are completely still, aside from the one serving." Read as `court_sway`: over
+the 2 s before a launch, how far the feet of each tracked body strayed from
+their own median spot (p90, in that body's own heights); the court's value is
+the THIRD-stillest body's, so a server running up to a jump serve does not
+count. On 20260920 and the three 20261010 videos:
+
+| | n read | ≤ 0.10 | ≤ 0.15 | median |
+|---|---|---|---|---|
+| serves | 138 | 114 (83 %) | 123 (89 %) | 0.03 |
+| attacks (spike / overpass) | 211 | 1 | 3 | 0.41 |
+
+(The one attack under 0.10 is a serve sent straight back by its receiver,
+1.3 s after the serve.) So a still court is strong evidence FOR a serve and
+its absence is weak evidence against one: one serve in six is read with
+somebody walking or a box flickering. It is used one way only -- to let
+through a launch the ball leaves open -- and never to refuse a serve:
+
+* **serve past the frame** (`_serve_past_the_frame`): the hit may be a seen
+  vertex before the track dies; a far toss may read up to `FAR_SERVE_MAX_Y`
+  (as a far launch does); a ball seen again too briefly to carry a speed
+  counts when it is seen INSIDE the court, as it is received, after a toss
+  placed without doubt. Each of these needs the still court. (Tried first
+  without the "received" condition: a far ball glimpsed for half a second,
+  then the near server's toss, read as a far serve on 20261010_1000 and
+  swallowed the real one.)
+* **own toss** (`_own_toss`): a launch "fed by a pass" is a serve when the
+  feeding flight stayed on the server's half and the court was still. A
+  rally's first attack is fed on its own half too, but never with three
+  bodies standing for two seconds.
+* **net cord** (`_dropped_by_the_tape`): a flight toward the net that ends at
+  a vertex at or under the tape, the ball then falling to the sand, is a
+  serve into the net on a still court. The rally ends at the tape (`net`).
+* **airborne part** (`_airborne`, no court needed): a launch flight with the
+  ball lying at its end is fitted up to the landing only.
+
+Six serves are confirmed that way: four on 20261010_1100 and two on _1200
+(f18029, a near serve out of the picture; f43822, a near serve the run had
+replaced by an invented far one -- both checked on frames).
+
+**What else the review changed.**
+
+* *A ball thrown back is not the rally's landing.* A serve-shaped launch
+  within 5 s of a rally whose track was lost used to be merged as its tail.
+  On 1100 P1 that was team B sending the ball to A's server 4.2 s later: its
+  landing became "the spike died on its own half" and the spike was dropped
+  when the next serve said otherwise. Now a launch that comes after the
+  rally's ball had to be down (> 3.2 s) and that nobody plays (< 2 touches)
+  is skipped. Two such launches on four matches, both dead time; the one
+  merge that stays is 1.7 s after the last sighting with three touches.
+* *A dig at sand level.* A flight's "resting on the sand" samples counted
+  the frames a ball spends low as it LEAVES a dig taken off the sand, so the
+  rally ended at its reception (1100 owner P30: serve, dig, set, spike, dig
+  read as an ace). `Flight.landed_frames` counts them only from the moment
+  the ball has climbed above 1.3 m (what sand cannot do); the landing frame
+  is searched from there too. And a flight that stays under 1.3 m is not a
+  bounce when the ball is followed all the way to the next vertex and played
+  on from there (`_seen_to_next`; 1200 P21, a dig popped knee-high to the
+  partner).
+* *The half of a last touch under the tape.* The ball crosses the net above
+  the tape. When it is tracked from the rally's last vertex down to the sand
+  without getting within 0.5 m of the tape, that touch was made on the half
+  it came down on (`UNDER_TAPE_COST`; 1100 owner P2: a second touch 0.9 m up
+  at the net read as the other team's overpass and kill). Only the end of a
+  rally: the same rule between two touches changed nothing on four matches
+  and was not kept.
+* *Dug but never set is a kill* (owner rule, `_dug_never_set`). The 171 sets
+  that are followed by a third touch (four matches) send the ball to 3.7 m
+  or more at the 5th percentile; the second touches that end a rally with
+  the ball not going up peak at 1.3–1.4 m. The split is the net: under it
+  nothing was set up. Then the spike before the dig is a kill (a serve: an
+  ace) and the touch is nobody's error. After an OVERPASS it stays the
+  setter's handling error -- 20260920 P6, "fails hand set", the owner's own
+  label.
+* *The clock.* 1100 runs at 25 fps for 14 min and at 30 after; frame /
+  average fps printed times up to 50 s off the video player. With
+  `frame_times.json` (`scripts/write_frame_times.py`, written by `make
+  run-match`: the packets' timestamps, no decode, refused unless there is
+  exactly one per frame) the report and the point images print the player's
+  clock; the run's 35 serve times are within 1 s of the owner's. Decisions
+  still run on the average rate: speeds on this video are 6 % high before
+  minute 14 and 11 % low after (the net-cord serve is 5.4 m/s, not 4.8).
+* *Longest rally* (owner-asked): every point carries `rally` (touches, net
+  crossings, seconds), `checks.longest_rally` names the longest; one line in
+  the report. 1100: owner P14, 23 touches, 9 crossings, 32 s.
+
+**Result.** 20261010_1100 against the owner's table: 35 / 35 points, 0 false,
+serving team 35 / 35, winners 34 / 35, switches 8 / 15 / 22 / 29 exact. The
+wrong winner is the LAST point (read A from the ball's death, the table says
+B): an over-set and a joust at the net, where the touch 2.1 m up is read as
+B's third instead of A's first. 20260920 and the seven practice clips
+reconstruct exactly as before (33 / 33, winners 33 / 33, A 21 – B 12, P 0.976
+/ R 0.933, action 0.988, who 208 / 208; clips 5 / 5, 52 / 53, 52 / 52).
+20261010_1000 keeps its 31 points and score; one rally end moves 53 frames
+(P3). 20261010_1200 changes: 41 points (40), blocks 8 / 7 / 7 / 7 / 7 (the
+third was 6), A 20 – B 20 with the last point undecided (was A 21 – B 19 and
+"complete") -- no owner table for that video.
+
+Sweep, one constant at a time: 20260920 (156 moves) loses no point and no
+winner on any row. 20261010_1100 (points and winners only, 122 moves) is
+IN-SAMPLE and shows where the recovered points sit: 115 moves change
+nothing; 00.41 is lost with the still-court bar at 0.05 (it reads 0.07) or
+with gaps up to 1.2 s taken for hidden touches, 11.01 with a 3 s window
+(0.19), 19.58 with 0.1 m of tape slack; a 1.9 m serve peak or a 3 s dead time
+each add a false point.
+
+Not fixed, from the same review: blocks (owner P5 / P6: a block read as the
+attacker's spike or error, a joust), an attack into the net replayed by the
+same player (P31, read as the other team's overpass), a "dig" after two
+kills that is the ball on the sand (P20 / P21, never credited), the unseen
+attack behind a block (P29: the owner says it is the setter's partner's; the
+layer still credits no touch it did not see -- 2 such attacks on four
+matches, both real).
 
 ## Known limits
 

@@ -90,6 +90,11 @@ class MatchStream:
     schema_version: int = 0
     #: Labels the ``id_sims`` columns stand for (None: the dump has none).
     identity_players: Optional[List[str]] = None
+    #: The video's own timestamp of every frame, in seconds (None: not on
+    #: disk). OUTPUT ONLY -- the clock the owner reads. Every decision keeps
+    #: ``seconds`` / ``frames``, which run on the average frame rate (a camera
+    #: that drops its rate mid-video is up to 50 s off by the end, AGENTS §7).
+    frame_times: Optional[np.ndarray] = None
 
     # -- derived reads ---------------------------------------------------- #
 
@@ -111,6 +116,12 @@ class MatchStream:
 
     def frames(self, seconds: float) -> int:
         return int(round(seconds * self.fps))
+
+    def time_s(self, frame: int) -> float:
+        """Where ``frame`` sits on the video player's clock."""
+        if self.frame_times is not None and 0 <= frame < len(self.frame_times):
+            return float(self.frame_times[frame])
+        return float(frame) / self.fps
 
     def rally_window(self, start_frame: int, end_frame: int) -> Tuple[int, int]:
         """First and last frame a rally's players are read on."""

@@ -26,6 +26,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
+from .ball_flights import MIN_DEPTH_SAMPLES
 from .geometry import SIDE_FAR, SIDE_NEAR, other_side
 from .rallies import END_GROUND, END_NET, Rally
 from .touches import (
@@ -133,10 +134,11 @@ def death_winner(rally: Rally, touches: List[Touch]
 
 class MatchAssembler:
     def __init__(self, points_to_win: int = 21, win_by: int = 2,
-                 switch_every: int = 7) -> None:
+                 switch_every: int = 7, net_height_m: float = 2.43) -> None:
         self.points_to_win = points_to_win
         self.win_by = win_by
         self.switch_every = switch_every
+        self.net_height_m = net_height_m
 
     def assemble(self, points: List[Point]) -> Dict[str, object]:
         self._orient(points)
@@ -275,14 +277,14 @@ class MatchAssembler:
 
     # -- outcomes ---------------------------------------------------------- #
 
-    @staticmethod
-    def _outcomes(pt: Point) -> None:
+    def _outcomes(self, pt: Point) -> None:
         """ace / kill / error on the hit that decided the point.
 
         Owner semantics (2026-08-31): a kill falls directly OR is dug and
         dies without a set -- so a failed FIRST touch credits the hit before
         it (the serve: ace; an attack: kill), and only a team's own second or
-        third touch is its error. A touch the stream did not see decides
+        third touch is its error. A second touch that set nothing up is no
+        set (``_dug_never_set``). A touch the stream did not see decides
         nothing.
         """
         if pt.winner_squad is None:
@@ -304,7 +306,8 @@ class MatchAssembler:
                 last.outcome = OUTCOME_KILL
             return
         if last.touch_number > 1:
-            last.outcome = OUTCOME_ERROR
+            if not self._dug_never_set(pt):
+                last.outcome = OUTCOME_ERROR
             return
         before = pt.touches[-2]
         if before.side == last.side:
@@ -316,6 +319,33 @@ class MatchAssembler:
             before.outcome = OUTCOME_ACE
         elif before.observed and before.action in (ACTION_SPIKE, ACTION_OVERPASS):
             before.outcome = OUTCOME_KILL
+
+    def _dug_never_set(self, pt: Point) -> bool:
+        """Owner rule (2026-10-11): "if the spike is dug but there is no set,
+        then it's a kill" (a serve: an ace, 2026-10-10). The partner got a
+        hand to the dug ball and it only fell: a set sends the ball up for an
+        attack, so a second touch after which the ball never climbs back to
+        net height set nothing up. The hit before the dig decided the point
+        and nobody is charged with an error. Kept apart from a set that
+        fails after an easy ball (an overpass dug and then dropped by the
+        setter is his handling error -- 20260920 P6, "fails hand set")."""
+        if len(pt.touches) < 3:
+            return False
+        hit, dig, last = pt.touches[-3:]
+        if (last.touch_number != 2 or dig.touch_number != 1 or not dig.observed
+                or dig.side != last.side or hit.side == last.side):
+            return False
+        out = last.event.flight_out if last.event is not None else None
+        if (out is None or out.n < MIN_DEPTH_SAMPLES
+                or not out.peak_height_m < self.net_height_m):
+            return False
+        if hit.touch_number == 0:
+            hit.outcome = OUTCOME_ACE
+        elif hit.observed and hit.action == ACTION_SPIKE:
+            hit.outcome = OUTCOME_KILL
+        else:
+            return False
+        return True
 
     # -- service order ----------------------------------------------------- #
 

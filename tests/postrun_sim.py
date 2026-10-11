@@ -35,6 +35,10 @@ NEAR_B = {"P1B": (2.5, 11.0), "P2B": (5.5, 11.0), "P1A": (2.5, 5.0), "P2A": (5.5
 
 DIG_Z, SET_Z, SPIKE_Z, SERVE_Z = 0.9, 1.7, 2.8, 2.6
 PLAYER_HEIGHT_M = 1.85
+# While the ball is live everybody shuffles on the spot (a third of a metre
+# each way); before the serve they stand. The post-run layer reads that
+# difference (``RallySegmenter.court_sway``), so the stream has to carry it.
+SHUFFLE_M, SHUFFLE_S = 0.35, 1.2
 
 
 def geometry() -> CourtGeometry:
@@ -168,7 +172,18 @@ class StreamBuilder:
             self.put_ball(land_f + k, land[0] + 0.03 * k, land[1], 0.11)
         self.put_players(f - int(3 * FPS), land_f + int(2 * FPS), script.positions,
                          script.heights)
+        self.shuffle(f + 1, land_f, script.positions, script.heights)
         return frames
+
+    def shuffle(self, first: int, last: int, positions: Dict[str, Tuple[float, float]],
+                heights: Optional[Dict[str, float]] = None) -> None:
+        """Players moving as they do in a rally: each sways across the court
+        around his spot, out of step with the others (depth unchanged)."""
+        for f in range(max(first, 0), min(last, self.n - 1) + 1):
+            t = (f - first) / FPS
+            self.put_players(f, f, {
+                label: (x + SHUFFLE_M * float(np.sin(2.0 * np.pi * (t / SHUFFLE_S + i / 4.0))), y)
+                for i, (label, (x, y)) in enumerate(sorted(positions.items()))}, heights)
 
     def hide(self, first: int, last: int) -> None:
         """The tracker loses the ball on [first, last] (and sees no vertex)."""

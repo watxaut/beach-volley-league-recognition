@@ -90,7 +90,8 @@ def main():
         sheet = np.vstack(rows)
         s, sa = p["serve"], p["score_after"]
         hdr = np.full((90, sheet.shape[1], 3), 30, np.uint8)
-        m, sec = divmod(int(p["start_frame"] / fps), 60)
+        # the video player's clock when the run has it (frame_times.json)
+        m, sec = divmod(int(p.get("start_time_s", p["start_frame"] / fps)), 60)
         put(hdr, f'P{p["point"]} {m:02d}:{sec:02d}  {s["team"]} serves ({s["side"]})  ->  '
                  f'{p["winner"]} WINS ({p["winner_source"]})   A {sa["A"]} - B {sa["B"]}', (10, 34), 0.9)
         fl = ", ".join(p["flags"]) or "no flags"

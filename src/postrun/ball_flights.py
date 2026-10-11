@@ -61,6 +61,9 @@ ARC_MIN_SAMPLES = 4
 
 # A flight needs this many width samples before its depth is trusted.
 MIN_DEPTH_SAMPLES = 3
+# Sand kills a bounce: a ball seen this high after a low sample was played up
+# from there (same height as rallies.SAND_REBOUND_MAX_M).
+CLEAR_OF_SAND_M = 1.3
 
 EVENT_CONTACT = "contact"          # classifier vertex
 EVENT_BIRTH = "birth"              # tracked run starts from nothing
@@ -128,6 +131,10 @@ class Flight:
     launch_speed_ms: float = 0.0
     start_height_m: float = float("nan")   # first sample
     end_height_m: float = float("nan")     # last sample
+    #: ``ground_frames`` that can be a LANDING: once the ball has climbed
+    #: higher than sand can send it (CLEAR_OF_SAND_M), the low samples before
+    #: that are a ball leaving a dig taken at sand level, not one lying on it.
+    landed_frames: int = 0
 
     @property
     def crosses_net(self) -> bool:
@@ -466,8 +473,11 @@ class BallTimeline:
             y0 = float(self.geometry.court_y_from_width(1.0 / max(ic + sl * th[0], 1e-4)))
             y1 = float(self.geometry.court_y_from_width(1.0 / max(ic + sl * th[-1], 1e-4)))
             launch_speed = (y1 - y0) / (th[-1] - th[0]) * self.fps
+        low = self.grounded[all_idx]
+        clear = np.flatnonzero(heights > CLEAR_OF_SAND_M)
         return Flight(
             launch_speed_ms=launch_speed,
+            landed_frames=int(low[clear[0]:].sum()) if clear.size else int(low.sum()),
             start_height_m=float(heights[0]), end_height_m=float(heights[-1]),
             start=start, end=end, n=int(ok.size),
             y_start=y_at(start), y_end=y_at(end),

@@ -1,0 +1,423 @@
+{
+ "format": "match-points-v2",
+ "video": "20261010_1100_vall_dhebron_jesus_sara_joan_loida",
+ "source_text": "ground_truth/20261010_1100_vall_dhebron_owner_feedback.txt",
+ "conventions": {
+  "team_a": "fixed squad; played the NEAR side at match start",
+  "team_b": "fixed squad; played the FAR side at match start",
+  "serve_time_s": "the owner's mm.ss on the video player's clock, in seconds; it is the SERVE of the point (within ~1 s of the run's serve frames read on the video's own timestamps)",
+  "serve_team": "mechanically derived: the winner of the previous point serves; point 1 is the run's read (B, far half), which the owner did not correct",
+  "winner": "mechanically derived from the running score table",
+  "side_switch_after_point": "teams swap court halves AFTER the flagged point ordinal; the players switched one point late the first time (after 8) and played the set to 22",
+  "descriptions": "owner dictation, shortened; player labels are the OWNER's: for team B they are the reverse of the run's labels (owner P1B = the run's P2B, green top; owner P2B = the run's P1B, pink shirt). Team A labels agree."
+ },
+ "final_score": {
+  "A": 13,
+  "B": 22
+ },
+ "side_switch_after_point": [
+  8,
+  15,
+  22,
+  29
+ ],
+ "points": [
+  {
+   "point": 1,
+   "serve_time_s": 4,
+   "serve_team": "B",
+   "winner": "A",
+   "score_after": {
+    "A": 1,
+    "B": 0
+   },
+   "side_switch_after": false,
+   "description": "the spike at 00.09 is in, hits the line"
+  },
+  {
+   "point": 2,
+   "serve_time_s": 43,
+   "serve_team": "A",
+   "winner": "B",
+   "score_after": {
+    "A": 1,
+    "B": 1
+   },
+   "side_switch_after": false,
+   "description": "serves at 00.41 team A, digs P1B 00.43, sets P2B 00.44, touch P1B at 00.45, P1A digs, P2A does not get to set and team B wins the point"
+  },
+  {
+   "point": 3,
+   "serve_time_s": 69,
+   "serve_team": "B",
+   "winner": "B",
+   "score_after": {
+    "A": 1,
+    "B": 2
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 4,
+   "serve_time_s": 94,
+   "serve_team": "B",
+   "winner": "B",
+   "score_after": {
+    "A": 1,
+    "B": 3
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 5,
+   "serve_time_s": 116,
+   "serve_team": "B",
+   "winner": "B",
+   "score_after": {
+    "A": 1,
+    "B": 4
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 6,
+   "serve_time_s": 146,
+   "serve_team": "B",
+   "winner": "B",
+   "score_after": {
+    "A": 1,
+    "B": 5
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 7,
+   "serve_time_s": 173,
+   "serve_team": "B",
+   "winner": "A",
+   "score_after": {
+    "A": 2,
+    "B": 5
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 8,
+   "serve_time_s": 224,
+   "serve_team": "A",
+   "winner": "B",
+   "score_after": {
+    "A": 2,
+    "B": 6
+   },
+   "side_switch_after": true
+  },
+  {
+   "point": 9,
+   "serve_time_s": 259,
+   "serve_team": "B",
+   "winner": "A",
+   "score_after": {
+    "A": 3,
+    "B": 6
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 10,
+   "serve_time_s": 287,
+   "serve_team": "A",
+   "winner": "B",
+   "score_after": {
+    "A": 3,
+    "B": 7
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 11,
+   "serve_time_s": 319,
+   "serve_team": "B",
+   "winner": "A",
+   "score_after": {
+    "A": 4,
+    "B": 7
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 12,
+   "serve_time_s": 349,
+   "serve_team": "A",
+   "winner": "A",
+   "score_after": {
+    "A": 5,
+    "B": 7
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 13,
+   "serve_time_s": 395,
+   "serve_team": "A",
+   "winner": "A",
+   "score_after": {
+    "A": 6,
+    "B": 7
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 14,
+   "serve_time_s": 464,
+   "serve_team": "A",
+   "winner": "A",
+   "score_after": {
+    "A": 7,
+    "B": 7
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 15,
+   "serve_time_s": 517,
+   "serve_team": "A",
+   "winner": "B",
+   "score_after": {
+    "A": 7,
+    "B": 8
+   },
+   "side_switch_after": true
+  },
+  {
+   "point": 16,
+   "serve_time_s": 556,
+   "serve_team": "B",
+   "winner": "B",
+   "score_after": {
+    "A": 7,
+    "B": 9
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 17,
+   "serve_time_s": 595,
+   "serve_team": "B",
+   "winner": "B",
+   "score_after": {
+    "A": 7,
+    "B": 10
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 18,
+   "serve_time_s": 628,
+   "serve_team": "B",
+   "winner": "B",
+   "score_after": {
+    "A": 7,
+    "B": 11
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 19,
+   "serve_time_s": 661,
+   "serve_team": "B",
+   "winner": "B",
+   "score_after": {
+    "A": 7,
+    "B": 12
+   },
+   "side_switch_after": false,
+   "description": "(the run of the 108th session did not have this point: far jump serve)"
+  },
+  {
+   "point": 20,
+   "serve_time_s": 689,
+   "serve_team": "B",
+   "winner": "B",
+   "score_after": {
+    "A": 7,
+    "B": 13
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 21,
+   "serve_time_s": 733,
+   "serve_team": "B",
+   "winner": "B",
+   "score_after": {
+    "A": 7,
+    "B": 14
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 22,
+   "serve_time_s": 768,
+   "serve_team": "B",
+   "winner": "A",
+   "score_after": {
+    "A": 8,
+    "B": 14
+   },
+   "side_switch_after": true
+  },
+  {
+   "point": 23,
+   "serve_time_s": 809,
+   "serve_team": "A",
+   "winner": "B",
+   "score_after": {
+    "A": 8,
+    "B": 15
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 24,
+   "serve_time_s": 836,
+   "serve_team": "B",
+   "winner": "A",
+   "score_after": {
+    "A": 9,
+    "B": 15
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 25,
+   "serve_time_s": 872,
+   "serve_team": "A",
+   "winner": "A",
+   "score_after": {
+    "A": 10,
+    "B": 15
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 26,
+   "serve_time_s": 905,
+   "serve_team": "A",
+   "winner": "A",
+   "score_after": {
+    "A": 11,
+    "B": 15
+   },
+   "side_switch_after": false
+  },
+  {
+   "point": 27,
+   "serve_time_s": 936,
+   "serve_team": "A",
+   "winner": "B",
+   "score_after": {
+    "A": 11,
+    "B": 16
+   },
+   "side_switch_after": false,
+   "description": "serve hits at the net and team A loses the point"
+  },
+  {
+   "point": 28,
+   "serve_time_s": 963,
+   "serve_team": "B",
+   "winner": "A",
+   "score_after": {
+    "A": 12,
+    "B": 16
+   },
+   "side_switch_after": false,
+   "description": "P1B serves and hits the net and loses the point"
+  },
+  {
+   "point": 29,
+   "serve_time_s": 984,
+   "serve_team": "A",
+   "winner": "A",
+   "score_after": {
+    "A": 13,
+    "B": 16
+   },
+   "side_switch_after": true,
+   "description": "a spike touch by P2A, occluded by the block"
+  },
+  {
+   "point": 30,
+   "serve_time_s": 1029,
+   "serve_team": "A",
+   "winner": "B",
+   "score_after": {
+    "A": 13,
+    "B": 17
+   },
+   "side_switch_after": false,
+   "description": "not a serve error: dig by P1B at 17.10, set by P2B 17.11, spike 17.13 P1B, dug but then it hits the ground and A loses the point"
+  },
+  {
+   "point": 31,
+   "serve_time_s": 1055,
+   "serve_team": "B",
+   "winner": "B",
+   "score_after": {
+    "A": 13,
+    "B": 18
+   },
+   "side_switch_after": false,
+   "description": "lost by team A: P2A spikes, hits the net and the same player P2A hits the ball again; the ball never crosses"
+  },
+  {
+   "point": 32,
+   "serve_time_s": 1095,
+   "serve_team": "B",
+   "winner": "B",
+   "score_after": {
+    "A": 13,
+    "B": 19
+   },
+   "side_switch_after": false,
+   "description": "the last overpass (run f29494) is a dig that fails; team A loses the point"
+  },
+  {
+   "point": 33,
+   "serve_time_s": 1171,
+   "serve_team": "B",
+   "winner": "B",
+   "score_after": {
+    "A": 13,
+    "B": 20
+   },
+   "side_switch_after": false,
+   "description": "the run's first three actions do not exist, the fourth one is the serve"
+  },
+  {
+   "point": 34,
+   "serve_time_s": 1200,
+   "serve_team": "B",
+   "winner": "B",
+   "score_after": {
+    "A": 13,
+    "B": 21
+   },
+   "side_switch_after": false,
+   "description": "missing ace: 19.58 P2B serves, hits the net and it falls into team A's ground"
+  },
+  {
+   "point": 35,
+   "serve_time_s": 1225,
+   "serve_team": "B",
+   "winner": "B",
+   "score_after": {
+    "A": 13,
+    "B": 22
+   },
+   "side_switch_after": false,
+   "description": "set overpasses (run f32750), then P1A digs, P2A tries to set but the ball falls into the hands of the P2B player; team A loses the point"
+  }
+ ]
+}

@@ -59,8 +59,11 @@ reference for any action A/B), `dump_player_tracks.py` +
 (owner GT passes). Post-run layer: `score_postrun.py <match_reconstruction.json>`
 (points / serves / winners / touches vs the owner match GT, with the causal
 stream as baseline), `score_postrun_entreno.py output/postrun` (practice
-clips), `sweep_postrun.py <run_dir>` (one-at-a-time sensitivity of every
-constant), `score_spike_type.py --clips output/postrun --rows` (hard / touch
+clips), `score_postrun_points.py <run_dir> <owner score table>` (a match
+whose only GT is the owner's running score with times; `--sweep` moves the
+constants), `write_frame_times.py <run_dir>` (the video's own clock for the
+play-by-play; `make run-match` runs it), `sweep_postrun.py <run_dir>`
+(one-at-a-time sensitivity of every constant), `score_spike_type.py --clips output/postrun --rows` (hard / touch
 vs the owner-typed spikes, post-run read and causal baseline).
 
 > **Warning (measured #61): `evaluate.py --predictions <dir>` grades ZERO
@@ -420,12 +423,37 @@ causal and untouched. Owner rules it encodes — keep them when changing it:
   (20261010: switch after 15 points, set played to 22): 21 and blocks of 7
   are checks to report, never a reason to drop or invent a point.
 
+* **Rulers that came from the third match (#109) — keep them:** a STILL
+  COURT (owner's cue: at a serve everybody but the server stands; the
+  third-stillest body's feet within 0.10 of its own height of their spot for
+  the 2 s before the launch) CONFIRMS a serve the ball alone leaves open -- a
+  flight out of the picture, a far toss read inside the court, a toss taken
+  for a pass, a ball the tape drops. It never REFUSES one: one real serve in
+  six is read with somebody moving. A serve-shaped launch after the rally's
+  ball had to be down, which nobody plays, is the ball going back and never
+  that rally's landing. Low samples before a ball has climbed above what sand
+  can bounce are a dig off the sand, not a landing. A rally's last touch
+  after which the ball stays under the tape was made on the half it came
+  down on. Owner rule (2026-10-11): a spike dug and never set -- the second
+  touch does not send the ball back up to net height -- is a kill (a serve:
+  an ace) and nobody's error; after an OVERPASS it stays the setter's
+  handling error (20260920 P6). The clock the owner reads is the video's own
+  (`frame_times.json`); every decision stays on the average frame rate.
+  These were set with the 35 points of 20261010_1100 in view: do not re-tune
+  them on that table -- the test is a new match with an owner score table.
+  A touch nobody saw is still credited to nobody, also the attack hidden
+  behind a block (the owner offered "assume the setter's partner"; that
+  needs the credit rule changed here, in `player_stats` and in the
+  publisher together).
+
 Validation protocol for any change: `score_postrun.py` on the 20260920 match
 (the bar: 33/33 points, 0 false, winners 33/33, score A 21 – B 12, touch
 precision ≥ 0.95, no touch on the wrong half, 0 rule breaks —
 `tests/test_postrun.py` pins it when the run is on disk), then
 `score_postrun_entreno.py` (other venue), then `sweep_postrun.py` (no row may
-lose a point or a winner). Per-player correctness has no GT: it is checked by
+lose a point or a winner), then `score_postrun_points.py` on 20261010_1100
+against the owner's score table (the bar: 35/35 points, 0 false, serving
+team 35/35, winners 34/35 -- the last point -- and switches 8/15/22/29). Per-player correctness has no GT: it is checked by
 the owner on contact sheets, never claimed from these scores. The input is
 the `--diag-dump` JSONL (schema ≥ 4; ≥ 5 for the identity read: `id_sims`
 per clean body + `identity_players` in the header); a new per-frame need is

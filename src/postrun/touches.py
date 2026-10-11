@@ -32,7 +32,7 @@ import numpy as np
 
 from .ball_flights import EVENT_DEATH, SOURCE_GAP, BallEvent, BallTimeline
 from .geometry import NET_Y_M, SIDE_FAR, SIDE_NEAR, other_side
-from .rallies import Rally
+from .rallies import END_GROUND, Rally
 from .stream import MatchStream, PlayerObs
 
 if TYPE_CHECKING:
@@ -65,6 +65,14 @@ DOUBLE_CROSS_COST = 2.0
 # Sending the ball over on touch 1 or 2 is the exception (GT possessions:
 # 3 touches 71 %, 2 touches 11 %, 1 touch 17 %).
 POSSESSION_END_COST = {1: 1.8, 2: 2.2, 3: 0.3}
+# The ball crosses the net ABOVE the tape. A last touch after which the ball
+# was tracked down to the sand without ever getting within this of the tape
+# was made on the half it came down on: the one read that still holds in the
+# metre around the net, where depth cannot tell the halves apart (heights are
+# read to ~0.15 m there).
+UNDER_TAPE_MARGIN_M = 0.5
+UNDER_TAPE_MIN_COVERAGE = 0.5      # of the frames in between, tracked
+UNDER_TAPE_COST = 6.0
 # Not every vertex is a touch (tape brushes, tracker jitter) -- but inside a
 # live rally nearly all are, including the ones perception's reach gate
 # refused (20260920: 169 of 170 in-rally vertices are owner-GT touches; the
@@ -305,6 +313,7 @@ class TouchSolver:
         self.geometry = timeline.geometry
         net = timeline.geometry.net_top_height_m() or 2.43
         self.attack_min_height_m = net - ATTACK_BELOW_TAPE_M
+        self.crossing_min_height_m = net - UNDER_TAPE_MARGIN_M
         #: Standing height per identified player (``standing_heights``); a
         #: player not in it is measured in the rally being solved.
         self.body_heights: Dict[str, float] = dict(body_heights or {})
@@ -362,11 +371,16 @@ class TouchSolver:
         # Best final touch (later vertices skipped); "no touch at all" is the
         # baseline every path must beat.
         end_cost, end = float(skip_prefix[n]), None
+        died_on = self._died_on(rally)
+        low = self._under_tape_to_end(events) if died_on is not None else [False] * n
         for i in range(n):
             tail = skip_prefix[n] - skip_prefix[i + 1]
             for xi in range(len(states)):
-                if best[i][xi] + tail < end_cost:
-                    end_cost, end = best[i][xi] + tail, (i, xi)
+                cost = best[i][xi] + tail
+                if low[i] and states[xi][0] != died_on:
+                    cost += UNDER_TAPE_COST     # it came down where it was touched
+                if cost < end_cost:
+                    end_cost, end = cost, (i, xi)
         if end is None:
             return touches, roster
 
@@ -535,6 +549,35 @@ class TouchSolver:
                           + [(s1, q) for q in range(1, k1)])
                 consider(t + hidden_cost * (m + n) + POSSESSION_END_COST[k0 + m], hidden)
         return best
+
+    def _under_tape_to_end(self, events: Sequence[BallEvent]) -> List[bool]:
+        """Per vertex: from it to the end of the rally the ball was tracked
+        and never got near the tape."""
+        n = len(events)
+        low = [False] * n
+        peak, seen, end = float("-inf"), 0, None
+        for i in range(n - 1, -1, -1):
+            out = events[i].flight_out
+            if out is None or not math.isfinite(out.peak_height_m):
+                break
+            end = out.end if end is None else end
+            peak, seen = max(peak, out.peak_height_m), seen + out.n
+            if peak >= self.crossing_min_height_m:
+                break
+            low[i] = seen >= UNDER_TAPE_MIN_COVERAGE * (end - events[i].frame)
+        return low
+
+    @staticmethod
+    def _died_on(rally: Rally) -> Optional[str]:
+        """Half the ball was SEEN coming down on, in the flight that left the
+        rally's last vertex (None: too close to the net to say, or the ball
+        was only found lying somewhere later -- it rolls under the net)."""
+        end = rally.end
+        last = rally.touches[-1].flight_out if rally.touches else None
+        if (end is None or end.kind != END_GROUND or last is None
+                or end.frame > last.end):
+            return None
+        return end.side
 
     def _gap_prefix(self, rally: Rally) -> np.ndarray:
         """gaps[i] = number of unbridged tracking gaps before vertex i-1's

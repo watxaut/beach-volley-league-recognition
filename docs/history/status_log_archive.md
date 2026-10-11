@@ -7308,3 +7308,17 @@ The live overlay keeps the causal labels. Uncommitted in the tree and not this s
 `live_debug_processor.py`). `match_bundle.json` in the run directory pre-dates the re-run.
 
 - 2026-09-09 **#11** — poke GT ratified; the 09-08 dictation was misattributed (e5 f300 = poke, e6 f310 = hard).
+
+### 2026-10-10 (hundred-and-sixth session) — #106: 20261010 reads the owner's sequence — landing, reception formation, attack by reach
+
+**Asked (owner):** "all the other points look good"; at run-P16 the score is already 14 points — the players switched late and "team A actually does 22 points". Fix items 1 (dead-time return counted as a point), 2 (attacks read as overpass) and 5 (last point's winner); if not possible say why and what to change when recording, with as little preparation as possible. Verbatim in the feedback file.
+
+**Diagnosed first (frames grabbed by sequential decode, per-frame ball reads).** (5) the last attack lands at f29205 a metre inside the side line; the rally end was read at f29200, the first frame the width test fired, with the ball 0.7 m up and its ray on sand 2 m behind the baseline. (2) every flagged attack is a one-arm swing at 1.85–2.05 m by the two short players; the same players' other attacks read "spike" only because the vertex was dated 1–3 frames early (+0.3…+0.5 m). (1) the return was thrown from behind the far baseline (y −2.8 m): no ball or thrower read separates it; the near pair stood 2.2 m apart in depth.
+
+**Built (`src/postrun`, recon schema 6).** `rallies._landing_frame` (walk while the ball falls faster than 1.5 m/s); `rallies._receivers_stagger_m` + refusal when > 1.5 m and fewer than two touches follow (`checks.launches_refused`, "Not a serve" line in the txt); `BallTimeline.arc_exit` (contact = lower of the last sample on the incoming arc and the first off it), `RallyRoster.standing_height_m`, `standing_heights` (pooled per identified player), `Touch.contact_height_m` / `contact_ratio`, attack = ratio ≥ 1.23 (tape − 0.28 m only without a player). `reconstruct` builds all rosters first so the heights are match-wide. +5 tests, 10 new sweep rows, `postrun_sim` takes player heights.
+
+**Measured.** 20261010: 31 points, A 22 – B 9, switches after 7 / 15 / 22 / 29; refused f12389; last point A (landed in); P13 → B; P11 spike P2A kill; the five overpasses → spikes; 20 bumps untouched; own sweep of the 10 new constants: same points / score / refusal on every row (ratio 1.35 loses the short players' attacks). 20260920: 33/33, winners 33/33, 21–12, P 0.976 / R 0.933, action 163/165 = 0.988 (+f12432, f23227, f24944; −f3913, f10789), half / squad 1.000, 0 rule breaks, who 208/208, type 26/29; one landing moves (P6). Sweep 130 moves: no row loses a point or a winner, worst P 0.965, action 0.970. Clips: 5/5, 52/53, 52/52, reconstructions identical. Positions: box offset 1.74 → 1.76 px; the overpass kind (12 near / 8 far after relabel) closes to 0.43 m, so `test_match_positions_mirror_across_the_net` holds 0.3 m for kinds with ≥ 15 a half and the layer's 0.6 m for the rest. Suite 1263 (1257 pass, 5 skipped, `test_inbox` as on `main`).
+
+**Not done / owed.** Blocks, P10, P21, P2 (Active next 2). f23222 is the agent's frame read, not the owner's. `make republish-all` once merged (labels and landings move on 20260920). Uncommitted and not this session's: `--start-frame` for `make run-live`.
+
+- 2026-09-09 **#12** — poke rule retuned ASCENT-ONLY (TOUCH_RISE_PX 57), level-exit vx rule deleted; eval merges GT overrides.
