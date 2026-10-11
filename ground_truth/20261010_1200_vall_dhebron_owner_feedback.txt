@@ -1,0 +1,17 @@
+# 20261010_1200 match (vall d'Hebron) -- owner answer on the last point
+# (resources/full_videos/20261010_1200_vall_dhebron_jesus_sara_joan_loida.mp4)
+#
+# Asked by the agent 2026-10-11 (109th session), after the run read 41 points,
+# A 20 - B 20 with the last point (served at 24:41, f44610-45699, 25 touches)
+# undecided: "did the last rally count, and who won it?"
+# Verbatim answer:
+
+yes, it did count, it was won by team A, the last spike spikes into the net and falls to the ground.
+
+# What follows from it (agent's notes):
+# - 41 points, A 21 - B 20: the set stops at 21 without two clear points.
+# - The last touch (f45667, the run's "B spike P2B") is an attack error.
+# - This is the only owner statement about this video: its 41 points, the
+#   other winners and the side switches (after 8 / 15 / 22 / 29 / 36) are the
+#   run's read, checked by the agent on frames at two serves only (f18029,
+#   f43822). No score table.

@@ -525,8 +525,8 @@ reconstruct exactly as before (33 / 33, winners 33 / 33, A 21 – B 12, P 0.976
 / R 0.933, action 0.988, who 208 / 208; clips 5 / 5, 52 / 53, 52 / 52).
 20261010_1000 keeps its 31 points and score; one rally end moves 53 frames
 (P3). 20261010_1200 changes: 41 points (40), blocks 8 / 7 / 7 / 7 / 7 (the
-third was 6), A 20 – B 20 with the last point undecided (was A 21 – B 19 and
-"complete") -- no owner table for that video.
+third was 6), A 21 – B 20 (was A 21 – B 19 and "complete"; the last point is
+A's by the owner's word, see below) -- no owner table for that video.
 
 Sweep, one constant at a time: 20260920 (156 moves) loses no point and no
 winner on any row. 20261010_1100 (points and winners only, 122 moves) is
@@ -535,6 +535,21 @@ nothing; 00.41 is lost with the still-court bar at 0.05 (it reads 0.07) or
 with gaps up to 1.2 s taken for hidden touches, 11.01 with a 3 s window
 (0.19), 19.58 with 0.1 m of tape slack; a 1.9 m serve peak or a 3 s dead time
 each add a false point.
+
+**A ball that comes down at the net** (same day, the owner on the last
+point of 20261010_1200: "the last spike spikes into the net and falls to the
+ground", A's point; the run had left it undecided at A 20 – B 20). A landing
+within 1.5 m of the net has no half, and a hit INTO the net has no vertex at
+the net (the net stops the ball at the hit, there is no flight to it), so
+neither the landing read nor the net-fault read fires. The ball was followed
+from the spike to the sand, though, and its centre never got above the tape:
+it did not cross (`fell_at_net`, `_never_over_the_tape`). Where the next
+serve can check that read, on four matches: right on 6 of 7 (20260920 P6 and
+P30, 20261010_1000 P14 and P27, _1100 P19, _1200 P35; wrong on _1200 P11, an
+overpass read 0.24 m under the tape that went over). A margin does not
+separate that one (the six read 0.05–1.1 m under), so it is a WEAK read like
+a line call: the next serve overrules it and nothing is dropped for it; it
+decides only a point no serve follows. 1200: 41 points, A 21 – B 20.
 
 Not fixed, from the same review: blocks (owner P5 / P6: a block read as the
 attacker's spike or error, a joust), an attack into the net replayed by the

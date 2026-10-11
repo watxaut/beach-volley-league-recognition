@@ -47,6 +47,12 @@ WINNER_SCORE = "score_closes"       # last point: the only winner that ends the 
 
 #: Ball-death reads that hinge on an in/out line call.
 LINE_CALL_REASONS = ("ace", "serve_out", "landed_in", "landed_out")
+#: A ball that comes down AT the net after an attack: which side of it?
+REASON_FELL_AT_NET = "fell_at_net"
+#: Reads the next serve overrules without anything being dropped.
+WEAK_REASONS = LINE_CALL_REASONS + (REASON_FELL_AT_NET,)
+# "Tracked all the way down": this share of the frames after the last touch.
+FELL_MIN_COVERAGE = 0.7
 
 OUTCOME_ACE = "ace"
 OUTCOME_KILL = "kill"
@@ -100,7 +106,8 @@ class Point:
         return self.squad_on(self.rally.serve.side)
 
 
-def death_winner(rally: Rally, touches: List[Touch]
+def death_winner(rally: Rally, touches: List[Touch],
+                 net_height_m: Optional[float] = None
                  ) -> Tuple[Optional[str], Optional[str]]:
     """(winning half, reason) from how the ball died; (None, None) = no call."""
     last = touches[-1]
@@ -129,7 +136,24 @@ def death_winner(rally: Rally, touches: List[Touch]
             return hitter, "landed_in"
         if end.in_court is False:
             return rival, "landed_out"
+    if end.side is None and net_height_m is not None and _never_over_the_tape(
+            last, end, net_height_m):
+        return rival, REASON_FELL_AT_NET
     return None, None
+
+
+def _never_over_the_tape(last: Touch, end, net_height_m: float) -> bool:
+    """The ball came down at the net, too close to it to say on which side
+    (``end.side`` None) -- but it was followed from the last touch to the
+    sand and its centre never got above the tape: it did not cross. (A hit
+    into the net with no vertex of its own: the net stops the ball at the
+    hit, there is no flight to it.)"""
+    out = last.event.flight_out if last.event is not None else None
+    if (end.kind != END_GROUND or out is None or end.frame > out.end
+            or not math.isfinite(out.peak_height_m)):
+        return False
+    return (out.n >= FELL_MIN_COVERAGE * (out.end - out.start)
+            and out.peak_height_m < net_height_m)
 
 
 class MatchAssembler:
@@ -189,7 +213,7 @@ class MatchAssembler:
     # -- winners ---------------------------------------------------------- #
 
     def _decide(self, pt: Point, nxt: Optional[Point]) -> None:
-        side, reason = death_winner(pt.rally, pt.touches)
+        side, reason = death_winner(pt.rally, pt.touches, self.net_height_m)
         pt.death_winner_side, pt.death_reason = side, reason
         if nxt is None:
             return
@@ -201,9 +225,10 @@ class MatchAssembler:
         pt.winner_squad, pt.winner_source = served, WINNER_NEXT_SERVE
         if side is None or pt.squad_on(side) == served:
             return
-        if reason in LINE_CALL_REASONS:
+        if reason in WEAK_REASONS:
             # In/out is the weakest read the layer has (a blurred box mapped
-            # through a 4-click homography): the serve that followed wins.
+            # through a 4-click homography), and "which side of the net" the
+            # next weakest: the serve that followed wins.
             pt.flags.append(f"line_call_overridden:{reason}")
             return
         # The ball's death contradicts the serve that followed. Touches

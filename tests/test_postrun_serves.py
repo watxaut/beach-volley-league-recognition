@@ -363,6 +363,34 @@ def test_spike_dug_and_never_set_is_a_kill():
     assert point["touches"][-1]["outcome"] == "error"
 
 
+def _spike_into_the_net(then_serves=None):
+    """A serves; B digs, sets and spikes from the net -- the ball never gets
+    above the tape and drops beside it, too close to say on which side."""
+    b = sim.StreamBuilder(34.0)
+    hits = [sim.Hit(1.15, "P1B", sim.DIG_Z), sim.Hit(1.6, "P2B", sim.SET_Z),
+            sim.Hit(1.6, "P1B", 2.2, xy=(4.0, 7.5))]
+    b.rally(sim.RallyScript(start_s=2.0, serve_xy=(6.0, 16.8), hits=hits,
+                            landing=(4.0, 7.4), landing_dt=0.7))
+    if then_serves:
+        b.rally(sim.standard_rally(20.0, then_serves, sim.NEAR_A))
+    return reconstruct(b.build(), b.g)["points"][0]
+
+
+def test_ball_that_never_got_over_the_tape_fell_on_the_hitters_side():
+    # the last point of a video: no serve follows, the landing is at the net
+    point = _spike_into_the_net()
+    assert point["end"]["kind"] == "ground" and point["end"]["side"] is None
+    assert point["ball_death_read"] == {"winner": "A", "reason": "fell_at_net"}
+    assert (point["winner"], point["winner_source"]) == ("A", "ball_death")
+    assert point["touches"][-1]["outcome"] == "error"
+    # it is a weak read (6 of 7 against the next serve on four matches): the
+    # serve that follows overrules it and no touch is dropped for it
+    point = _spike_into_the_net(then_serves="far")
+    assert (point["winner"], point["winner_source"]) == ("B", "next_serve")
+    assert point["flags"] == ["line_call_overridden:fell_at_net"]
+    assert [t["touch_number"] for t in point["touches"]] == [0, 1, 2, 3]
+
+
 def test_serve_dug_and_never_set_is_an_ace():
     b = sim.StreamBuilder(34.0)
     hits = [sim.Hit(1.15, "P1A", sim.DIG_Z), sim.Hit(1.3, "P2A", 0.9, xy=(5.5, 9.5))]

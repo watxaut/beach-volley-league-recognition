@@ -171,7 +171,8 @@ venv/bin/python scripts/score_postrun_points.py \
 
 The verbatim dictation is `20261010_1100_vall_dhebron_owner_feedback.txt`
 (as `20261010_1000_vall_dhebron_owner_feedback.txt` for the first video of
-that morning, which has no times). Two things to know before using its
+that morning, which has no times; `20261010_1200_vall_dhebron_owner_feedback.txt`
+holds one answer only, the winner of that video's last point). Two things to know before using its
 per-point notes: point and frame numbers are those of the run the owner
 looked at (31 points; the table has 35), and for team B the owner's player
 labels are the reverse of the run's (owner P1B = the run's P2B, owner P2B =
