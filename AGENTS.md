@@ -576,7 +576,8 @@ Pages). Rules that keep it correct:
   (`webapp/public/demo-clip.mp4` is drawn).
 * **Every stat has a tier (owner decision 2026-10-06, design doc §4 D2).**
   League tier, every member: results, the box-score line and fantasy of each
-  slot, the leaderboard, a team's side-out / break-point. Analytics tier,
+  slot, the leaderboard, a team's side-out / break-point, a match's longest
+  rally (two counts and a point number, never a touch). Analytics tier,
   everything else about a player (zones, landings, splits, trends, and in
   `match_report` the attack split, own-serve record, vs-average and serve
   targets): the player, admins, players who share (`profile_public`), and

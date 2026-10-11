@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { matchLabel, pct, signed, slotLabel, slotNames, teamName } from './format'
+import { matchLabel, pct, rallyText, signed, slotLabel, slotNames, teamName } from './format'
 import type { Participant, Player } from './types'
 
 describe('format', () => {
@@ -40,5 +40,11 @@ describe('format', () => {
     expect(signed(0)).toBe('0')
     expect(pct(0.4321)).toBe('43%')
     expect(pct(null)).toBe('–')
+  })
+
+  it('says the longest rally in words', () => {
+    expect(rallyText({ point_no: 14, touches: 23, net_crossings: 9 })).toBe('23 touches · over the net 9 times · point 14')
+    expect(rallyText({ point_no: 3, touches: 1, net_crossings: 1 })).toBe('1 touch · over the net once · point 3')
+    expect(rallyText({ point_no: 2, touches: 1, net_crossings: 0 })).toBe('1 touch · never over the net · point 2')
   })
 })

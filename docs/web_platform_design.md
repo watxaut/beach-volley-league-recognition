@@ -358,8 +358,10 @@ protected too. Recommended tiers:
 | Admin only | admins | drafts, video links, publication log, hashes, flags | RLS + a separate `match_sources` table (RLS can't hide one column) |
 
 The match report (`match_report`) mixes tiers, so it applies them per value
-(`20261007130000_match_report_privacy.sql`): the box-score line of each slot
-and the teams' side-out / break-point are League; a player's attack split,
+(`20261007130000_match_report_privacy.sql`): the box-score line of each slot,
+the teams' side-out / break-point and the longest rally of the match (touches
+and net crossings of one point, no player in it; `20261011100000_longest_rally.sql`)
+are League; a player's attack split,
 own-serve record, average over other matches and the serve targets are Player
 analytics, also open to whoever holds Match detail for that match (they could
 count the touches). A count that splits a team total the league already sees
