@@ -117,15 +117,23 @@ def run_inputs(run_dir: Path, calibration: Optional[str] = None) -> Dict[str, An
     }
 
 
-def digest(inputs: Dict[str, Any], calibration: Dict[str, Any]) -> Dict[str, Any]:
-    """Reconstruct with ``calibration`` and keep what a comparison needs."""
+def reconstruct_run(inputs: Dict[str, Any], calibration: Dict[str, Any]) -> Dict[str, Any]:
+    """The run's reconstruction with ``calibration`` (nothing is written)."""
     stream = load_stream(inputs["diag"], fps=inputs["fps"])
     stream.frame_times = load_frame_times(
         Path(inputs["diag"]).parent / FRAME_TIMES_NAME, stream.n_frames)
     geometry = CourtGeometry(calibration["court_corners"],
                              calibration.get("net_top_points"),
                              calibration.get("midcourt_points"))
-    result = reconstruct(stream, geometry, frame_size=inputs["frame_size"])
+    return reconstruct(stream, geometry, frame_size=inputs["frame_size"])
+
+
+def digest(inputs: Dict[str, Any], calibration: Dict[str, Any]) -> Dict[str, Any]:
+    """Reconstruct with ``calibration`` and keep what a comparison needs."""
+    return digest_of(reconstruct_run(inputs, calibration))
+
+
+def digest_of(result: Dict[str, Any]) -> Dict[str, Any]:
     points = [{"frame": p["start_frame"], "serve_team": p["serve"]["team"],
                "winner": p["winner"]} for p in result["points"]]
     touches = {t["frame"]: (t["action"], t["player"])

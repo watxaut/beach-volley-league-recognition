@@ -41,6 +41,7 @@ make run VIDEO=resources/video_entreno_3.mp4        # full pipeline (device auto
 make run-live VIDEO=...                              # --debug-live at 2x speed
 make run-match VIDEO=...                             # run + --diag-dump sidecar + post-run reconstruction (points/touches/score)
 make postrun OUTPUT_DIR=output/<dir>                 # reconstruction only over an existing run (~3 s, no decode)
+make autocalibrate VIDEO=...                         # court calibration without clicks: a proposal (WRITE=1 saves it when accepted) -- §14
 make ui                                              # local web UI over data/volley.db
 make ingest-all                                      # (re)ingest output/*/pipeline_output.json into SQLite
 make db-reset                                        # DELETES the DB incl. owner player labels — ask first
@@ -48,7 +49,9 @@ venv/bin/python -m pytest tests/ -o addopts=""       # cov addopts break w/o pyt
 ```
 
 Per-component probes (`scripts/`): `test_court_calibration.py` (interactive,
-one-time), `test_ball_detection.py`, `test_ball_tracking.py`,
+one-time; shows an automatic proposal first, A = accept), `auto_calibrate.py` +
+`score_autocalibration.py` + `probe_calibration_sensitivity.py` (§14),
+`test_ball_detection.py`, `test_ball_tracking.py`,
 `test_player_tracking.py`, `test_pose_estimation.py`,
 `test_action_recognition.py` (the GT-validated action path — the
 reference for any action A/B), `dump_player_tracks.py` +
@@ -103,12 +106,13 @@ Component invariants that bite if ignored:
   assignment); never a 5th track. Dormant gallery + squatter review +
   bystander guard live here — admission/gating changes are
   GT-validated territory (see entreno protocol below).
-- **CourtCalibration**: interactive one-time 8-point JSON in
-  `calibrations/` (4 corners + 2 net-ground + 2 net-top); provides
+- **CourtCalibration**: one 8-point JSON per video in `calibrations/`
+  (4 corners + 2 net-ground + 2 net-top), clicked or found by
+  `court_autocalibration` (§14; same four keys, `source: "auto"`); provides
   `is_near_net` / `is_behind_baseline` / `get_team` / `is_above_net` /
   `world_point_to_zone` (9-zone grid per half, 180°-symmetric).
-  Court detection uses NO model — `court_model_path`-style config keys
-  are STALE, never wire them up.
+  Court detection uses NO model (the automatic one included: line tape on
+  sand) — `court_model_path`-style config keys are STALE, never wire them up.
 - **ActionClassifier**: event-driven at ball-trajectory inflections only;
   Layer 1 gesture (motion + court + pose) → Layer 2 `ActionContextResolver`
   (dig/set/spike/serve/overpass from touch count). Pose gated on ball
@@ -624,3 +628,49 @@ Pages). Rules that keep it correct:
   to call" and "likely range"; "95 %" stays in the hint and on `/measure`. A
   called gap is blue / orange (`--gap-better` / `--gap-worse`), never green /
   red: that pair fails the colour-blind check. Fantasy closes the list.
+
+### 14. Automatic court calibration (owner-asked 2026-10-11, #110)
+
+`src/detection/court_autocalibration.py` finds the 8 calibration points from
+the picture, so a video can be processed without the owner (design + measured
+record: `docs/auto_calibration.md`). It runs BEFORE the causal pass and
+touches nothing in it. Rules to keep when changing it:
+
+* **Refuse rather than be wrong.** One read of the far baseline is a
+  PROPOSAL; a calibration needs two that agree, a net that reads its height,
+  tape on at least half of each sideline and a plausible camera. Only an
+  accepted result may be written to `calibrations/`, a manual calibration is
+  never overwritten, and a published match is never recalibrated: any
+  recalibration moves the knife-edge points (two of three high-tripod matches
+  have a point that flips at 0.5 % of a baseline width).
+* **The clicks are not ground truth** (the net reads 7.3–9.3 m through them;
+  a corner outside the frame was clicked inside it). The bar is what the match
+  BECOMES: `scripts/score_autocalibration.py` must show, for every view, no
+  point lost or invented and no serving team or winner changed against the
+  manual reconstruction, and the owner's GT scores held; a difference on
+  `auto_points.jpg` is a place to look, never a number to minimise.
+* **Nothing is assumed about a venue.** The tape's colour is read off the
+  court's own lines; tolerances are metres along the court, shares of the
+  frame or robust deviations of the sand's colour. The pixel bands in there
+  are tape widths at 1080p, the size every frame is processed at
+  (`ensure_1080`); never add a colour constant or a threshold fitted to one
+  venue (§7).
+* **A tape is followed as it lies and ends short, never beyond.** Tapes bow
+  and get buried: corners are where two followed tapes cross, of two sideline
+  ends that agree the farther is the corner, and a far baseline some tape runs
+  on beyond is refused.
+* **The camera read confirms, it never decides.** The focal length earlier
+  calibrations agree on (≥ 3 views, the video's own file never read) may turn
+  a single read into a calibration; the points always come from the picture.
+* **Plate frames are decoded in order** (§9), on the frames the pipeline will
+  process.
+* **Held-out discipline.** Developed on e3, 20261010_1000 and 20260920; 1100,
+  1200 and 1230 were scored frozen and are spent. The next NEW video is the
+  held-out one: run it before reading or making its manual file, then compare.
+  A change needs `tests/test_court_autocalibration.py` (drawn courts, known
+  camera) green and the scorer on every view; a full causal re-run (e1–e7 +
+  one match, same session, both arms) when the corners of an accepted view move.
+* **The inbox proposes; the owner switches it to accept.**
+  `VOLLEY_AUTO_CALIBRATION=propose` (default) leaves the proposal for `make
+  calibrate` (A = accept); `accept` runs on a result the detector accepted.
+  Do not change the default without an owner decision.
