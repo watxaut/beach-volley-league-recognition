@@ -26,6 +26,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
+from .ball_flights import MIN_DEPTH_SAMPLES
 from .geometry import SIDE_FAR, SIDE_NEAR, other_side
 from .rallies import END_GROUND, END_NET, Rally
 from .touches import (
@@ -46,6 +47,12 @@ WINNER_SCORE = "score_closes"       # last point: the only winner that ends the 
 
 #: Ball-death reads that hinge on an in/out line call.
 LINE_CALL_REASONS = ("ace", "serve_out", "landed_in", "landed_out")
+#: A ball that comes down AT the net after an attack: which side of it?
+REASON_FELL_AT_NET = "fell_at_net"
+#: Reads the next serve overrules without anything being dropped.
+WEAK_REASONS = LINE_CALL_REASONS + (REASON_FELL_AT_NET,)
+# "Tracked all the way down": this share of the frames after the last touch.
+FELL_MIN_COVERAGE = 0.7
 
 OUTCOME_ACE = "ace"
 OUTCOME_KILL = "kill"
@@ -99,7 +106,8 @@ class Point:
         return self.squad_on(self.rally.serve.side)
 
 
-def death_winner(rally: Rally, touches: List[Touch]
+def death_winner(rally: Rally, touches: List[Touch],
+                 net_height_m: Optional[float] = None
                  ) -> Tuple[Optional[str], Optional[str]]:
     """(winning half, reason) from how the ball died; (None, None) = no call."""
     last = touches[-1]
@@ -128,15 +136,33 @@ def death_winner(rally: Rally, touches: List[Touch]
             return hitter, "landed_in"
         if end.in_court is False:
             return rival, "landed_out"
+    if end.side is None and net_height_m is not None and _never_over_the_tape(
+            last, end, net_height_m):
+        return rival, REASON_FELL_AT_NET
     return None, None
+
+
+def _never_over_the_tape(last: Touch, end, net_height_m: float) -> bool:
+    """The ball came down at the net, too close to it to say on which side
+    (``end.side`` None) -- but it was followed from the last touch to the
+    sand and its centre never got above the tape: it did not cross. (A hit
+    into the net with no vertex of its own: the net stops the ball at the
+    hit, there is no flight to it.)"""
+    out = last.event.flight_out if last.event is not None else None
+    if (end.kind != END_GROUND or out is None or end.frame > out.end
+            or not math.isfinite(out.peak_height_m)):
+        return False
+    return (out.n >= FELL_MIN_COVERAGE * (out.end - out.start)
+            and out.peak_height_m < net_height_m)
 
 
 class MatchAssembler:
     def __init__(self, points_to_win: int = 21, win_by: int = 2,
-                 switch_every: int = 7) -> None:
+                 switch_every: int = 7, net_height_m: float = 2.43) -> None:
         self.points_to_win = points_to_win
         self.win_by = win_by
         self.switch_every = switch_every
+        self.net_height_m = net_height_m
 
     def assemble(self, points: List[Point]) -> Dict[str, object]:
         self._orient(points)
@@ -187,7 +213,7 @@ class MatchAssembler:
     # -- winners ---------------------------------------------------------- #
 
     def _decide(self, pt: Point, nxt: Optional[Point]) -> None:
-        side, reason = death_winner(pt.rally, pt.touches)
+        side, reason = death_winner(pt.rally, pt.touches, self.net_height_m)
         pt.death_winner_side, pt.death_reason = side, reason
         if nxt is None:
             return
@@ -199,9 +225,10 @@ class MatchAssembler:
         pt.winner_squad, pt.winner_source = served, WINNER_NEXT_SERVE
         if side is None or pt.squad_on(side) == served:
             return
-        if reason in LINE_CALL_REASONS:
+        if reason in WEAK_REASONS:
             # In/out is the weakest read the layer has (a blurred box mapped
-            # through a 4-click homography): the serve that followed wins.
+            # through a 4-click homography), and "which side of the net" the
+            # next weakest: the serve that followed wins.
             pt.flags.append(f"line_call_overridden:{reason}")
             return
         # The ball's death contradicts the serve that followed. Touches
@@ -275,14 +302,14 @@ class MatchAssembler:
 
     # -- outcomes ---------------------------------------------------------- #
 
-    @staticmethod
-    def _outcomes(pt: Point) -> None:
+    def _outcomes(self, pt: Point) -> None:
         """ace / kill / error on the hit that decided the point.
 
         Owner semantics (2026-08-31): a kill falls directly OR is dug and
         dies without a set -- so a failed FIRST touch credits the hit before
         it (the serve: ace; an attack: kill), and only a team's own second or
-        third touch is its error. A touch the stream did not see decides
+        third touch is its error. A second touch that set nothing up is no
+        set (``_dug_never_set``). A touch the stream did not see decides
         nothing.
         """
         if pt.winner_squad is None:
@@ -304,7 +331,8 @@ class MatchAssembler:
                 last.outcome = OUTCOME_KILL
             return
         if last.touch_number > 1:
-            last.outcome = OUTCOME_ERROR
+            if not self._dug_never_set(pt):
+                last.outcome = OUTCOME_ERROR
             return
         before = pt.touches[-2]
         if before.side == last.side:
@@ -316,6 +344,33 @@ class MatchAssembler:
             before.outcome = OUTCOME_ACE
         elif before.observed and before.action in (ACTION_SPIKE, ACTION_OVERPASS):
             before.outcome = OUTCOME_KILL
+
+    def _dug_never_set(self, pt: Point) -> bool:
+        """Owner rule (2026-10-11): "if the spike is dug but there is no set,
+        then it's a kill" (a serve: an ace, 2026-10-10). The partner got a
+        hand to the dug ball and it only fell: a set sends the ball up for an
+        attack, so a second touch after which the ball never climbs back to
+        net height set nothing up. The hit before the dig decided the point
+        and nobody is charged with an error. Kept apart from a set that
+        fails after an easy ball (an overpass dug and then dropped by the
+        setter is his handling error -- 20260920 P6, "fails hand set")."""
+        if len(pt.touches) < 3:
+            return False
+        hit, dig, last = pt.touches[-3:]
+        if (last.touch_number != 2 or dig.touch_number != 1 or not dig.observed
+                or dig.side != last.side or hit.side == last.side):
+            return False
+        out = last.event.flight_out if last.event is not None else None
+        if (out is None or out.n < MIN_DEPTH_SAMPLES
+                or not out.peak_height_m < self.net_height_m):
+            return False
+        if hit.touch_number == 0:
+            hit.outcome = OUTCOME_ACE
+        elif hit.observed and hit.action == ACTION_SPIKE:
+            hit.outcome = OUTCOME_KILL
+        else:
+            return False
+        return True
 
     # -- service order ----------------------------------------------------- #
 

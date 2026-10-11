@@ -23,6 +23,8 @@ const ROWS: Row[] = [
     quality: 'Winner right 33 of 33 points', grade: 'A' },
   { what: 'How many touches are counted', how: 'Only touches the camera saw and attributed are credited',
     quality: 'About 1 touch in 15 is never credited, so every count is a lower bound', grade: 'A' },
+  { what: 'How long a rally was (touches, net crossings)', how: 'Every touch of the point, the serve included; the ball went over once per change of team, plus the last ball when it won the point',
+    quality: 'Touches exact on 31 of 33 points of the reference match (one or two short on the other two), net crossings on 33 of 33; the longest rally is the same point with the same counts', grade: 'A' },
   { what: 'Left–right position along the net', how: 'Pixel column of the ball or feet',
     quality: 'A few cm to a decimetre', grade: 'B' },
   { what: 'Contact height', how: 'Ball against the sand at its depth; the net tape reads 2.43 m',

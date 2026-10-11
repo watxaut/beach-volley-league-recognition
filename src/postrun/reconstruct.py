@@ -42,7 +42,15 @@ from .touches import (
 #: 5 = ``identity``: who is who was read per rally in hindsight (or why not).
 #: 6 = touches carry ``contact_height_m`` + ``contact_ratio`` (attack vs bump);
 #:     ``checks.launches_refused`` lists serve-shaped launches not taken for one.
-SCHEMA_VERSION = 6
+#: 7 = points carry ``start_time_s`` / ``end_time_s`` (``clock`` says whose
+#:     seconds) and ``rally`` (touches, net crossings, seconds);
+#:     ``checks.longest_rally``; ``serve.confirmed_by``.
+SCHEMA_VERSION = 7
+#: ``clock``: the video's own timestamps, or frame / average frame rate.
+CLOCK_VIDEO, CLOCK_AVERAGE = "video", "average_fps"
+#: Per-frame timestamps of the video, next to the diag dump (see
+#: ``scripts/write_frame_times.py``).
+FRAME_TIMES_NAME = "frame_times.json"
 logger = logging.getLogger(__name__)
 
 
@@ -68,10 +76,12 @@ def reconstruct(stream: MatchStream, geometry: CourtGeometry,
         touches, roster = solver.solve(rally, roster)
         points.append(Point(rally=rally, touches=touches, roster=roster,
                             near_squad_read=seen.near_squad if seen else None))
-    checks = MatchAssembler(points_to_win=points_to_win,
-                            switch_every=switch_every).assemble(points)
+    checks = MatchAssembler(
+        points_to_win=points_to_win, switch_every=switch_every,
+        net_height_m=segmenter.net_height_m).assemble(points)
     checks["launches_refused"] = [
-        {"frame": int(r.frame), "side": r.side, "reason": r.reason,
+        {"frame": int(r.frame), "time_s": round(stream.time_s(r.frame), 1),
+         "side": r.side, "reason": r.reason,
          "receivers_stagger_m": _round(r.stagger_m, 1)} for r in segmenter.refused]
     for pt in points:                     # after the match layer: labels are final
         type_attacks(timeline, pt.touches)
@@ -79,11 +89,13 @@ def reconstruct(stream: MatchStream, geometry: CourtGeometry,
     # both halves for the box offset to be read off the end switches.
     positions = publish_positions(
         timeline, points, switched=bool(checks.get("side_switch_after_point")))
-    payload = [_point_payload(i + 1, pt) for i, pt in enumerate(points)]
+    payload = [_point_payload(i + 1, pt, stream) for i, pt in enumerate(points)]
+    checks["longest_rally"] = longest_rally(payload)
     return {
         "schema_version": SCHEMA_VERSION,
         "fps": stream.fps,
         "n_frames": stream.n_frames,
+        "clock": CLOCK_VIDEO if stream.frame_times is not None else CLOCK_AVERAGE,
         "geometry": {
             "ball_px_far_baseline": round(geometry.ball_px_far, 2),
             "ball_px_net": round(geometry.ball_px_net, 2),
@@ -163,14 +175,33 @@ def player_stats(points: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
     return out
 
 
-def _clock(frame: int, fps: float) -> str:
-    seconds = int(frame / fps)
+def rally_shape(touches: List[Dict[str, Any]], winner: Optional[str]) -> Dict[str, int]:
+    """How long a rally was: every touch of it (the serve is one; a touch the
+    stream did not see but the rally needs is one too) and how many times the
+    ball went over the net -- once per change of half between two touches,
+    plus the last ball when the team that hit it won (it came down on the
+    other half)."""
+    crossings = sum(a["side"] != b["side"] for a, b in zip(touches, touches[1:]))
+    if touches and winner is not None and touches[-1]["team"] == winner:
+        crossings += 1
+    return {"touches": len(touches), "net_crossings": int(crossings)}
+
+
+def longest_rally(points: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The point with the most touches (owner-asked 2026-10-11)."""
+    if not points:
+        return None
+    best = max(points, key=lambda p: (p["rally"]["touches"], p["rally"]["net_crossings"]))
+    return {"point": best["point"], **best["rally"]}
+
+
+def _clock(seconds: float) -> str:
+    seconds = int(seconds)
     return f"{seconds // 60:02d}:{seconds % 60:02d}"
 
 
 def format_report(result: Dict[str, Any]) -> str:
     """Play-by-play text of a reconstruction (what the owner reads)."""
-    fps = result["fps"]
     checks = result["checks"]
     lines = [
         f"Points {checks['points']}   final score {checks['final_score']}   "
@@ -178,16 +209,24 @@ def format_report(result: Dict[str, Any]) -> str:
         f"Side switches after points {checks['side_switch_after_point']} "
         f"(points per block {checks['points_between_switches']})",
     ]
+    longest = checks.get("longest_rally")
+    if longest:
+        lines.append(
+            f"Longest rally: P{longest['point']}, {longest['touches']} touches, the ball "
+            f"crossed the net {longest['net_crossings']} times, {longest['duration_s']:.0f} s")
+    if result.get("clock") == CLOCK_AVERAGE:
+        lines.append("Times are frame / average frame rate: off from the video player's "
+                     "clock when the camera changed its rate (no frame_times.json)")
     for r in checks.get("launches_refused") or []:
         lines.append(
-            f"Not a serve: {_clock(r['frame'], fps)} f{r['frame']} from the {r['side']} half "
+            f"Not a serve: {_clock(r['time_s'])} f{r['frame']} from the {r['side']} half "
             f"(receivers {r['receivers_stagger_m']} m apart in depth, ball not played)")
     lines.append("")
     for pt in result["points"]:
         serve = pt["serve"]
         score = pt["score_after"]
         lines.append(
-            f"P{pt['point']:<2} {_clock(pt['start_frame'], fps)} f{pt['start_frame']}-"
+            f"P{pt['point']:<2} {_clock(pt['start_time_s'])} f{pt['start_frame']}-"
             f"{pt['end_frame']}  {serve['team'] or '?'} serves from the {serve['side']} "
             f"half  ->  {pt['winner'] or '?'} wins ({pt['winner_source']})  "
             f"A {score.get('A', 0)} - B {score.get('B', 0)}"
@@ -284,12 +323,19 @@ def _launch_payload(t: Touch) -> Optional[Dict[str, Any]]:
     }
 
 
-def _point_payload(index: int, pt: Point) -> Dict[str, Any]:
+def _point_payload(index: int, pt: Point, stream: MatchStream) -> Dict[str, Any]:
     end = pt.rally.end
+    start_s = stream.time_s(pt.rally.start_frame)
+    end_s = stream.time_s(pt.rally.end_frame)
+    touches = [_touch_payload(pt, t) for t in pt.touches]
     return {
         "point": index,
         "start_frame": int(pt.rally.start_frame),
         "end_frame": int(pt.rally.end_frame),
+        "start_time_s": round(start_s, 1),
+        "end_time_s": round(end_s, 1),
+        "rally": {**rally_shape(touches, _letter(pt.winner_squad)),
+                  "duration_s": round(end_s - start_s, 1)},
         "near_team": _letter(pt.near_squad),
         "serve": {
             "frame": int(pt.rally.serve.frame),
@@ -301,6 +347,7 @@ def _point_payload(index: int, pt: Point) -> Dict[str, Any]:
             "observed": bool(pt.rally.serve.observed),
             "inferred": bool(pt.rally.serve.inferred),
             "into_net": bool(pt.rally.serve.into_net),
+            "confirmed_by": pt.rally.serve.confirmed_by,
         },
         "end": None if end is None else {
             "kind": end.kind,
@@ -319,8 +366,23 @@ def _point_payload(index: int, pt: Point) -> Dict[str, Any]:
         },
         "score_after": {SQUAD_LETTER[k]: v for k, v in pt.score_after.items()},
         "flags": list(pt.flags),
-        "touches": [_touch_payload(pt, t) for t in pt.touches],
+        "touches": touches,
     }
+
+
+def load_frame_times(path: Path, n_frames: int) -> Optional[np.ndarray]:
+    """The video's timestamps, one per frame of the run (None: no file, or
+    one that does not belong to this run -- never a clock that is only
+    probably right)."""
+    if not Path(path).exists():
+        return None
+    with open(path) as f:
+        times = np.asarray(json.load(f).get("times_s") or [], dtype=np.float64)
+    if times.size != n_frames or (times.size > 1 and np.any(np.diff(times) < 0)):
+        logger.warning("%s: %d timestamps for %d frames -- ignored, times are "
+                       "frame / average fps", path, times.size, n_frames)
+        return None
+    return times
 
 
 def _resolve_inputs(args: argparse.Namespace) -> Dict[str, Any]:
@@ -341,7 +403,7 @@ def _resolve_inputs(args: argparse.Namespace) -> Dict[str, Any]:
         raise SystemExit("court calibration not found; pass --calibration")
     frame_size = (int(video.get("width") or 1920), int(video.get("height") or 1080))
     return {"diag": diag, "calibration": calibration, "fps": video.get("fps"),
-            "frame_size": frame_size,
+            "frame_size": frame_size, "frame_times": diag.parent / FRAME_TIMES_NAME,
             "out": Path(args.out) if args.out else diag.parent / "match_reconstruction.json"}
 
 
@@ -361,6 +423,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     inputs = _resolve_inputs(args)
     stream = load_stream(str(inputs["diag"]), fps=inputs["fps"])
+    stream.frame_times = load_frame_times(inputs["frame_times"], stream.n_frames)
     geometry = CourtGeometry.from_file(inputs["calibration"])
     result = reconstruct(stream, geometry, frame_size=inputs["frame_size"],
                          points_to_win=args.points_to_win,

@@ -1,4 +1,4 @@
-import type { Match, Participant, Player, Slot, Team } from './types'
+import type { LongestRally, Match, Participant, Player, Slot, Team } from './types'
 
 export function formatDate(isoDate: string, time?: string | null): string {
   const d = new Date(`${isoDate}T${time ?? '12:00:00'}`)
@@ -61,3 +61,11 @@ export const ACTION_LABEL: Record<string, string> = {
 }
 
 export const OUTCOME_LABEL: Record<string, string> = { ace: 'ACE', kill: 'KILL', error: 'ERROR' }
+
+/** "23 touches · over the net 9 times · point 14": the longest rally in words. */
+export function rallyText(r: LongestRally): string {
+  const touches = `${r.touches} touch${r.touches === 1 ? '' : 'es'}`
+  const over = r.net_crossings === 0 ? 'never over the net'
+    : `over the net ${r.net_crossings === 1 ? 'once' : `${r.net_crossings} times`}`
+  return `${touches} · ${over} · point ${r.point_no}`
+}

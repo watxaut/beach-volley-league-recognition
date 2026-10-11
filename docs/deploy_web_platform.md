@@ -394,6 +394,15 @@ not needed again. "On disk" means reachable from the checkout that publishes:
 video is only in the other checkout (link `resources/full_videos`, step 3.1). Keep that file with the diag dump. Needs `ffmpeg`
 (`brew install ffmpeg`); without it a publish goes through with no clips.
 
+### Longest rally on the match page (#109)
+
+Under the score: the point with the most touches, how many, and how many
+times the ball went over the net. To turn it on: `supabase db push`
+(migration `20261011100000_longest_rally.sql`), then redeploy the web app.
+No re-publish: it is counted from the touches already stored, so every
+published match gets it at once. Until the migration is pushed the page
+simply shows no such line.
+
 ## Troubleshooting
 
 | Symptom                                                                                               | Cause / fix                                                                                                                                                                                                                                                                                    |

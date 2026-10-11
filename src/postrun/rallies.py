@@ -96,6 +96,26 @@ FORMATION_NET_CLEAR_M = 1.0
 PLAYED_MIN_TOUCHES = 2
 REFUSED_FORMATION = "receivers_not_in_formation"
 
+# -- a still court ---------------------------------------------------------- #
+# Owner's observation (2026-10-11): at a serve everybody but the server stands
+# still -- the receivers wait in formation, the partner at the net -- while in
+# a rally, and when a ball is passed around between points, bodies move. Read
+# as how far the feet of the third-stillest body strayed from their own median
+# spot over the two seconds before the launch, in that body's own heights
+# (scale-free: far players are small). On 20260920 and the three 20261010
+# videos: <= 0.10 before 114 of 138 serves (83 %) and before 1 of 211 attacks
+# (a serve sent straight back by its receiver); <= 0.15: 89 % / 3 attacks.
+# So a still court CONFIRMS a serve the ball alone leaves open; a court that
+# is not still refuses nothing (one serve in six is read with somebody
+# walking or a box flickering).
+STILL_WINDOW_S = 2.0
+# The launch frame is an estimate, and the receivers move as the ball is hit.
+STILL_LEAD_S = 0.2
+STILL_MAX_SWAY = 0.10               # body heights
+STILL_MIN_SEEN = 0.5                # of the window, as a real (not coasting) box
+STILL_BODIES = 3                    # everybody but the server
+CONFIRMED_STILL = "still_court"
+
 # -- rallies without a visible serve -------------------------------------- #
 ORPHAN_MIN_TOUCHES = 4
 ORPHAN_MIN_CROSSINGS = 2
@@ -123,6 +143,8 @@ GROUND_FLIGHT_FRAMES = 4
 # landed: a 0.5 m drop arrives at 3 m/s, a ball rolling on the sand moves a
 # fraction of that across the image rows.
 LANDED_MAX_FALL_MS = 1.5
+# A flight "followed all the way": tracked on this share of its frames.
+SEEN_TO_NEXT_SHARE = 0.7
 # A ball that reappears mid-rally must be at least this high to still be live.
 LIVE_MIN_PEAK_M = 1.5
 # Net fault: a vertex this soon after the previous touch, at the net plane,
@@ -143,6 +165,9 @@ class ServeLaunch:
     observed: bool             # a contact vertex was seen (else track birth)
     into_net: bool = False
     inferred: bool = False     # no launch seen at all: the rally implies it
+    #: What let a launch the ball alone leaves open through (None: nothing
+    #: was needed) -- see ``RallySegmenter.court_sway``.
+    confirmed_by: Optional[str] = None
 
 
 @dataclass
@@ -211,30 +236,59 @@ class RallySegmenter:
         if e.kind != EVENT_BIRTH or fl is None or index < 2:
             return None
         death, toss_birth = events[index - 1], events[index - 2]
+        # The hit itself may have been seen, as a vertex, a frame or two
+        # before the ball was gone.
+        hit: Optional[BallEvent] = None
+        if toss_birth.kind == EVENT_CONTACT and index >= 3:
+            hit, toss_birth = toss_birth, events[index - 3]
         toss = toss_birth.flight_out
+        launch = death.frame if hit is None else hit.frame
         if (death.kind != EVENT_DEATH or toss_birth.kind != EVENT_BIRTH or toss is None
-                or toss.end != death.frame or toss.n < SERVE_MIN_SAMPLES):
+                or toss.end != launch or toss.n < SERVE_MIN_SAMPLES):
             return None
-        gap = s.seconds(e.frame - death.frame)
+        gap = s.seconds(e.frame - launch)
         if not 0 < gap <= MAX_AIR_S or abs(toss.y_end - toss.y_start) > TOSS_DEPTH_M:
             return None
+        # What the ball shows without help: a toss AT a baseline whose track
+        # dies, and a flight past the net fast enough to be measured. Anything
+        # short of that needs the court to say "serve" too (``court_sway``).
+        firm_toss = True
         if toss.y_end >= NEAR_SERVE_MIN_Y:
             side, toward_net = SIDE_NEAR, -1.0
         elif toss.y_end <= 0.0:
             side, toward_net = SIDE_FAR, +1.0
+        elif toss.y_end <= FAR_SERVE_MAX_Y:
+            # 2 px of ball width is ~2 m at the far end: a far toss reads up
+            # to 4 m inside the court (as a far launch does, FAR_SERVE_MAX_Y).
+            side, toward_net, firm_toss = SIDE_FAR, +1.0, False
         else:
             return None
+        firm = firm_toss and hit is None
         # From the toss to where the ball is seen again, and on from there,
         # at serve speed and to the other half.
         hidden = toward_net * (fl.y_start - toss.y_end)
         if hidden <= 0 or hidden / gap < SERVE_MIN_SPEED_MS:
             return None
-        if (toward_net * fl.axis_speed_ms(s.fps) < SERVE_MIN_SPEED_MS
-                or toward_net * (fl.y_end - toss.y_end) < SERVE_MIN_TRAVEL_M
+        if (toward_net * (fl.y_end - toss.y_end) < SERVE_MIN_TRAVEL_M
                 or toward_net * (fl.y_end - NET_Y_M) <= 0):
             return None
-        return ServeLaunch(frame=death.frame, side=side, event_index=index,
-                           observed=False)
+        if toward_net * fl.axis_speed_ms(s.fps) < SERVE_MIN_SPEED_MS:
+            # Seen again too briefly to carry a speed. Any ball glimpsed past
+            # the net would do (another court's, a spare one): only the one
+            # seen INSIDE the court as it is received, after a toss placed
+            # without doubt.
+            receivers_line = 0.0 if side == SIDE_NEAR else COURT_LENGTH_M
+            nxt = events[index + 1] if index + 1 < len(events) else None
+            if (fl.n >= SERVE_MIN_SAMPLES or not firm_toss
+                    or nxt is None or nxt.kind != EVENT_CONTACT
+                    or toward_net * (fl.y_start - receivers_line) > TOSS_DEPTH_M):
+                return None
+            firm = False
+        if not firm and not self._court_still(launch):
+            return None
+        return ServeLaunch(frame=launch, side=side, event_index=index,
+                           observed=hit is not None,
+                           confirmed_by=None if firm else CONFIRMED_STILL)
 
     def _serve_launch(self, index: int, e: BallEvent) -> Optional[ServeLaunch]:
         fl = e.flight_out
@@ -243,6 +297,7 @@ class RallySegmenter:
         past = self._serve_past_the_frame(index, e)
         if past is not None:
             return past
+        fl = self._airborne(fl)
         if not np.isfinite(fl.peak_height_m) or fl.peak_height_m < SERVE_MIN_PEAK_M:
             return None
         if not fl.start_height_m <= SERVE_MAX_CONTACT_M:
@@ -250,8 +305,11 @@ class RallySegmenter:
         if (fl.n < SERVE_MIN_SAMPLES
                 or self.stream.seconds(fl.end - fl.start) < SERVE_MIN_FLIGHT_S):
             return None
+        confirmed: Optional[str] = None
         if self._fed_by_pass(index):
-            return None                     # a teammate set it up: an attack
+            if not self._own_toss(index):
+                return None                 # a teammate set it up: an attack
+            confirmed = CONFIRMED_STILL
         fps = self.stream.fps
         speed = fl.axis_speed_ms(fps)
         travel = fl.y_end - fl.y_start
@@ -265,11 +323,15 @@ class RallySegmenter:
                    and toward_net * speed >= SERVE_MIN_SPEED_MS)
         # A serve that comes down at the net plane. Depth cannot tell the tape
         # from the first metre behind it; the serve that follows settles it.
-        into_net = (toward_net * travel > 0
-                    and abs(fl.y_end - NET_Y_M) <= NET_ZONE_M
-                    and self._ends_on_ground(index))
+        at_net = toward_net * travel > 0 and abs(fl.y_end - NET_Y_M) <= NET_ZONE_M
+        into_net = at_net and self._ends_on_ground(index)
         if not (reaches or into_net):
-            return None
+            # ... or that the tape stops and drops, on either side of the net
+            # (the ball gets there slower than a serve that clears it).
+            if not (at_net and self._dropped_by_the_tape(index)
+                    and self._court_still(e.frame)):
+                return None
+            into_net, confirmed = True, CONFIRMED_STILL
         frame, observed = e.frame, e.kind == EVENT_CONTACT
         if e.kind == EVENT_BIRTH:
             hit = self._hit_after_toss(fl)
@@ -283,7 +345,74 @@ class RallySegmenter:
                 # from a serve flying straight at the lens.)
                 frame = max(0, e.frame - self.stream.frames(FAR_SERVE_LOCK_DELAY_S))
         return ServeLaunch(frame=frame, side=side, event_index=index,
-                           observed=observed, into_net=into_net)
+                           observed=observed, into_net=into_net,
+                           confirmed_by=confirmed)
+
+    def _airborne(self, fl: Flight) -> Flight:
+        """``fl`` up to where the ball reached the sand. A ball that lies
+        where it fell is still tracked: one line through the flight AND the
+        rest reads neither end (a serve into the net from the near baseline
+        read as leaving 2 m inside the court at 4 m/s)."""
+        if fl.ground_frames < GROUND_FLIGHT_FRAMES:
+            return fl
+        landed = self._landing_frame(fl, fl.end)
+        if landed is None or landed >= fl.end:
+            return fl
+        return self.tl.fit_span(fl.start, landed) or fl
+
+    def _own_toss(self, index: int) -> bool:
+        """Is the "pass" that reached this launch the server's own toss? It
+        stayed on his half, and nobody around him moved: a jump serve is
+        tossed forward, along the axis the far end cannot measure, and a toss
+        tracked in two pieces can be joined to a ball seen elsewhere."""
+        e = self.tl.events[index]
+        toss = e.flight_in
+        return (toss is not None and not toss.crosses_net
+                and self._court_still(e.frame))
+
+    def _dropped_by_the_tape(self, index: int) -> bool:
+        """Does the flight leaving event ``index`` end AT the net, at or under
+        the tape, the ball then falling to the sand untouched?"""
+        events = self.tl.events
+        if index + 1 >= len(events):
+            return False
+        nxt = events[index + 1]
+        return (nxt.kind == EVENT_CONTACT and self._at_the_tape(nxt)
+                and self._ends_on_ground(index + 1))
+
+    # -- a still court ------------------------------------------------------ #
+
+    def court_sway(self, frame: int) -> Optional[float]:
+        """How still the court was before ``frame``: the p90 distance of the
+        feet of the third-stillest body from their own median spot, in body
+        heights (None: fewer than three bodies were seen long enough)."""
+        s = self.stream
+        hi = min(frame - s.frames(STILL_LEAD_S), s.n_frames - 1)
+        lo = max(0, hi - s.frames(STILL_WINDOW_S))
+        if hi <= lo:
+            return None
+        seen: Dict[int, List[Tuple[float, float, float]]] = {}
+        for f in range(lo, hi + 1):
+            for p in s.players[f]:
+                if not p.predicted:
+                    seen.setdefault(p.track_id, []).append((*p.foot, p.height_px))
+        sways: List[float] = []
+        for rows in seen.values():
+            if len(rows) < STILL_MIN_SEEN * (hi - lo + 1):
+                continue
+            u, v, h = (np.asarray(c, dtype=np.float64) for c in zip(*rows))
+            height = float(np.median(h))
+            if height <= 0:
+                continue
+            off = np.hypot(u - np.median(u), v - np.median(v)) / height
+            sways.append(float(np.percentile(off, 90)))
+        if len(sways) < STILL_BODIES:
+            return None
+        return sorted(sways)[STILL_BODIES - 1]
+
+    def _court_still(self, frame: int) -> bool:
+        sway = self.court_sway(frame)
+        return sway is not None and sway <= STILL_MAX_SWAY
 
     def _fed_by_pass(self, index: int) -> bool:
         """Did the ball reach this launch from ANOTHER touch a few metres
@@ -356,6 +485,13 @@ class RallySegmenter:
                 if prev.end is not None and prev.end.kind != END_LOST:
                     continue                # the ball was seen dead: stray throw
                 tail = self._walk(serve)
+                if (s.seconds(serve.frame - prev.end_frame) > MAX_AIR_S
+                        and len(tail.touches) < PLAYED_MIN_TOUCHES):
+                    # ... or the ball going back to whoever serves next: it
+                    # came after the rally's ball had to be down, and nobody
+                    # played it. (Merged, its landing would be read as the
+                    # landing of the rally's last attack.)
+                    continue
                 launch = events[serve.event_index]
                 if launch.kind == EVENT_CONTACT:
                     prev.touches.append(launch)
@@ -478,14 +614,18 @@ class RallySegmenter:
                 rally.end = self._lost_end(e, prev, frame=prev_frame + s.frames(MAX_AIR_S))
                 return rally
             arriving = e.flight_in
-            if arriving is not None and arriving.ground_frames >= GROUND_FLIGHT_FRAMES:
+            if arriving is not None and arriving.landed_frames >= GROUND_FLIGHT_FRAMES:
                 rally.end = self._ground_end(self._landing_frame(arriving, e.frame) or e.frame)
                 return rally
             if self._stays_down(e) or (
                     self._is_ground_event(e) and not self._play_follows(i)):
-                rally.end = self._ground_end(e.frame)
+                rally.end = self._ground_end(e.frame, arriving)
                 return rally
-            if self._is_net_fault(e, touch_frame) and not self._play_follows(i):
+            # (A serve takes longer to reach the net than an attack: the
+            # vertex that made it a serve into the net is that net.)
+            net = self._is_net_fault(e, touch_frame) or (
+                serve.into_net and i == serve.event_index + 1 and self._at_the_tape(e))
+            if net and not self._play_follows(i):
                 rally.end = RallyEnd(kind=END_NET, frame=e.frame,
                                      side=None, court_xy=None)
                 return rally
@@ -581,9 +721,13 @@ class RallySegmenter:
         events, s = self.tl.events, self.stream
         e = events[index]
         out = e.flight_out
-        if out is None or not (out.peak_height_m > SAND_REBOUND_MAX_M):
+        if out is None or out.landed_frames >= GROUND_FLIGHT_FRAMES:
             return False
-        if out.ground_frames >= GROUND_FLIGHT_FRAMES:
+        if not (out.peak_height_m > SAND_REBOUND_MAX_M) and not self._seen_to_next(index):
+            # No higher than sand sends a ball, and lost on the way: a bounce.
+            # (Followed all the way to the next vertex without coming to
+            # rest, it is a low pass to the partner -- what he does with it
+            # decides, below.)
             return False
         for j in range(index + 1, len(events)):
             nxt = events[j]
@@ -601,11 +745,27 @@ class RallySegmenter:
                     return True
         return False
 
+    def _seen_to_next(self, index: int) -> bool:
+        """Was the ball tracked from event ``index`` right up to the next
+        vertex (most of the frames in between)?"""
+        events = self.tl.events
+        out = events[index].flight_out
+        if out is None or index + 1 >= len(events):
+            return False
+        nxt = events[index + 1]
+        return (nxt.kind == EVENT_CONTACT and out.end == nxt.frame
+                and out.n >= SEEN_TO_NEXT_SHARE * (out.end - out.start))
+
     def _is_net_fault(self, e: BallEvent, touch_frame: int) -> bool:
         """A vertex right after a hit, at the net plane and no higher than the
         tape, after which the ball only drops: the hit went into the net."""
         if self.stream.seconds(e.frame - touch_frame) > NET_FAULT_MAX_S:
             return False
+        return self._at_the_tape(e)
+
+    def _at_the_tape(self, e: BallEvent) -> bool:
+        """A vertex at the net plane, no higher than the tape, after which the
+        ball does not climb."""
         arriving, out = e.flight_in, e.flight_out
         if arriving is None or arriving.n < MIN_DEPTH_SAMPLES:
             return False                # no depth read: cannot place it at the net
@@ -630,7 +790,12 @@ class RallySegmenter:
         s = self.stream
         frames = [f for f in range(flight.first, min(until, s.n_frames - 1) + 1)
                   if s.ball_state[f] == BALL_TRACKED]
-        first = next((i for i, f in enumerate(frames) if self.tl.grounded[f]), None)
+        # A ball dug at sand level is low for a frame or two as it LEAVES:
+        # once it has climbed higher than sand can send it, those are behind.
+        up = next((i for i, f in enumerate(frames)
+                   if self.tl.height_m[f] > SAND_REBOUND_MAX_M), 0)
+        first = next((i for i, f in enumerate(frames)
+                      if i >= up and self.tl.grounded[f]), None)
         if first is None:
             return None
         landed = frames[first]
@@ -642,8 +807,12 @@ class RallySegmenter:
             landed = b
         return landed
 
-    def _ground_end(self, frame: int) -> RallyEnd:
+    def _ground_end(self, frame: int, arriving: Optional[Flight] = None) -> RallyEnd:
         f = self.tl._nearest_tracked(frame)
+        if f is None and arriving is not None:
+            # A vertex read in a tracking gap has no ball of its own: the
+            # flight that reached it shows where the ball came down.
+            f = self._landing_frame(arriving, frame)
         xy = self.tl.ground_world(f) if f is not None else None
         side = in_court = err = None
         if xy is not None:

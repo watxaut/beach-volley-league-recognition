@@ -4,7 +4,7 @@
 // `player_profile` / `match_report` (supabase/migrations/2026100710*). This is
 // the demo mode's copy of those definitions, pinned by analytics.test.ts with
 // the fixture the SQL smoke check uses.
-import type { PlayerAnalytics, PointRow, ReportPlayer, ShotKey, Slot, Tally, Team, WonOf } from './types'
+import type { LongestRally, PlayerAnalytics, PointRow, ReportPlayer, ShotKey, Slot, Tally, Team, WonOf } from './types'
 
 export interface Touch {
   point_no: number
@@ -92,6 +92,29 @@ export function teamRally(points: PointRow[]) {
     out[team] = row
   }
   return out
+}
+
+/** The longest rally of one match, as `match_report` counts it: every touch
+ * of the point (the serve, and touches nobody is credited with); the ball
+ * went over the net once per change of team between two touches, plus the
+ * last ball when the team that hit it won the point. Ties: more crossings,
+ * then the earlier point. */
+export function longestRally(points: PointRow[], touches: Pick<Touch, 'point_no' | 'seq' | 'team'>[]): LongestRally | null {
+  let best: LongestRally | null = null
+  for (const p of [...points].sort((a, b) => a.point_no - b.point_no)) {
+    const ts = touches.filter((t) => t.point_no === p.point_no).sort((a, b) => a.seq - b.seq)
+    if (ts.length === 0) continue
+    let crossings = 0
+    for (let i = 1; i < ts.length; i++) {
+      if (ts[i].team && ts[i - 1].team && ts[i].team !== ts[i - 1].team) crossings++
+    }
+    const last = ts[ts.length - 1]
+    if (last.team && last.team === p.winner_team) crossings++
+    if (!best || ts.length > best.touches || (ts.length === best.touches && crossings > best.net_crossings)) {
+      best = { point_no: p.point_no, touches: ts.length, net_crossings: crossings }
+    }
+  }
+  return best
 }
 
 /** N2 per serving team of one match: who took the serves. */

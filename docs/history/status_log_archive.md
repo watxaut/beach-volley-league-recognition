@@ -7273,3 +7273,52 @@ reads; approve the post-run orientation design (Active next 2).
 - 2026-09-06 **#8** — squatter review: sideline straddlers expire from the roster (e2/e7 slots freed early).
 - 2026-09-06 **#9** — in-court preference (off-court cost penalty) fixes bystander squat + Hungarian chain-swaps (point 16).
 - 2026-09-08 **#10** — e6 poke read (resolver touch-3 fall-through + analyzer type + stance-majority team) + rally-opening serve gate + redirect locality; e7 GT ratified; e5/e6 team 1.0.
+
+## Archived 2026-10-10 (#108): the oldest Log session and the oldest Session index line moved out of STATUS.md verbatim (Log ≤3 sessions, index budget 100)
+
+### 2026-10-10 (hundred-and-fifth session) — #105: side switches are read after the run (`src/postrun/identity.py`); owner feedback on the first 9 points
+
+**Asked (owner):** feedback on P1–P9 of the 20261010 run (verbatim in `ground_truth/20261010_1000_vall_dhebron_owner_feedback.txt`): P2 f2009 is a
+spike, a set from off court is missing in P2, P5 f4973 is a block by P1B, P7 and P8 are aces by P1A with the side switch between them — "the pipeline changed
+teams … I can read P2B". Then: "focus on the biggest problem … make it so that the side switches we keep tracking the same player".
+
+**Why the switch was missed (replay of the probe's feature dump).** The four players crossed one at a time between f7450 and f7800. The resolver adapts the
+level of its "squad 1 near" evidence in dead time too (~4 s): +0.39 / +0.52 slid to ~0 and the spread grew fourfold before the last one was across; its CUSUM
+never passed 1.9 of 8. And the unseen orientation is assumed at −0.39 / −0.52 where it reads −0.06 / −0.19.
+
+**Built (Phase 2 of AGENTS §4, post-run).** `id_sims` per clean body in the diag dump (schema 5: the resolver's own anchor similarities,
+`BodyObs.anchor_sims`). `src/postrun/identity.py`: evidence per rally from bodies > 1 m off the net line → two levels from the match (≥ 4 spreads apart, the
+lower ≤ half the upper, else "nobody switched") → two-state path over the rallies → per rally one path over frames (which player each track id is) → label,
+squad, slot and half rewritten before `TouchSolver`. `Point.near_squad` comes from the read; `publish/thumbs.py` cuts at the read's labels; `sweep_postrun.py`
+sweeps the 11 constants and prints `who` (the #88 CSV). Ace rule (owner): a serve touched once and lost is an ace from either end (`match._outcomes`).
+
+**Measured.** 20261010: 31/31 rallies (agent's frame read), levels +0.347 / −0.038 (spread 0.044); 93 sampled frames, 3 per rally, every label on the right
+person (incl. far blockers the tracker sided near); 8 id changes inside rallies, 7 with a box jump. Score A 21 – B 10, complete, switches after
+7 / 16 / 22 / 29; P7 and P8 = P1A ACE. 20260920 (probe re-run with `player_bgr_input: false`, similarities injected into the golden dump by (frame, track id),
+0 box mismatches): levels +0.146 / −0.083; the whole record unchanged (33/33, winners 33/33, 21–12, P 0.976 / R 0.933, action 0.982, half and squad 1.000,
+0 rule breaks); who 207/208. Sweep 111 rows: none loses a point or a winner, worst P 0.965, action 0.958. Clips e1–e7 re-run: `compare_runs` IDENTICAL ×7,
+dumps identical bar `id_sims` (only e3 / e4 enroll), 52/53 as before. 20261010 re-run (`make run-match`, 2031 s, 69 ms/frame): `pipeline_output.json` + CSVs
+identical bar the video name, all 29 303 dump lines identical bar `id_sims` (107 406 rows, = the injected ones within 0.0004), same reconstruction.
+Suite 1258 (after merging `main`): 1252 pass, 5 skipped, `test_inbox` run-match order failing as on `main`.
+
+**Second pass, same day (#105b; owner feedback on the rest of the match, "players of team A switch between themselves … some points were lost … without overfitting").** The "switching" was the service-order rotation overriding seen servers: one lost point shifted the order and the majority vote renamed the rest. Fixed three things in `src/postrun`: the order may break (`match._serving_order`); a rally does not end on a low dig if a later vertex sends the ball up (`rallies._play_follows`); a serve whose hit is past the top of the frame (`rallies._serve_past_the_frame`). 20261010: 32 points, A 22 – B 10, switches after 7 / 16 / 23 / 30; every server the owner named is right; both lost rallies read as he described. 20260920 and the clips: every score and every server unchanged. Left: the dead-time return (run-P14) and the label items (Active next 2).
+
+**Not done / owed.** The 20261010 POINTS (blocks 7 / 9 / 6 / 7): owner GT first. Owner label feedback (P2 spike, P2 hidden set, P5 block): recorded only.
+The live overlay keeps the causal labels. Uncommitted in the tree and not this session's: `--start-frame` for `make run-live` (Makefile, `src/main.py`,
+`live_debug_processor.py`). `match_bundle.json` in the run directory pre-dates the re-run.
+
+- 2026-09-09 **#11** — poke GT ratified; the 09-08 dictation was misattributed (e5 f300 = poke, e6 f310 = hard).
+
+### 2026-10-10 (hundred-and-sixth session) — #106: 20261010 reads the owner's sequence — landing, reception formation, attack by reach
+
+**Asked (owner):** "all the other points look good"; at run-P16 the score is already 14 points — the players switched late and "team A actually does 22 points". Fix items 1 (dead-time return counted as a point), 2 (attacks read as overpass) and 5 (last point's winner); if not possible say why and what to change when recording, with as little preparation as possible. Verbatim in the feedback file.
+
+**Diagnosed first (frames grabbed by sequential decode, per-frame ball reads).** (5) the last attack lands at f29205 a metre inside the side line; the rally end was read at f29200, the first frame the width test fired, with the ball 0.7 m up and its ray on sand 2 m behind the baseline. (2) every flagged attack is a one-arm swing at 1.85–2.05 m by the two short players; the same players' other attacks read "spike" only because the vertex was dated 1–3 frames early (+0.3…+0.5 m). (1) the return was thrown from behind the far baseline (y −2.8 m): no ball or thrower read separates it; the near pair stood 2.2 m apart in depth.
+
+**Built (`src/postrun`, recon schema 6).** `rallies._landing_frame` (walk while the ball falls faster than 1.5 m/s); `rallies._receivers_stagger_m` + refusal when > 1.5 m and fewer than two touches follow (`checks.launches_refused`, "Not a serve" line in the txt); `BallTimeline.arc_exit` (contact = lower of the last sample on the incoming arc and the first off it), `RallyRoster.standing_height_m`, `standing_heights` (pooled per identified player), `Touch.contact_height_m` / `contact_ratio`, attack = ratio ≥ 1.23 (tape − 0.28 m only without a player). `reconstruct` builds all rosters first so the heights are match-wide. +5 tests, 10 new sweep rows, `postrun_sim` takes player heights.
+
+**Measured.** 20261010: 31 points, A 22 – B 9, switches after 7 / 15 / 22 / 29; refused f12389; last point A (landed in); P13 → B; P11 spike P2A kill; the five overpasses → spikes; 20 bumps untouched; own sweep of the 10 new constants: same points / score / refusal on every row (ratio 1.35 loses the short players' attacks). 20260920: 33/33, winners 33/33, 21–12, P 0.976 / R 0.933, action 163/165 = 0.988 (+f12432, f23227, f24944; −f3913, f10789), half / squad 1.000, 0 rule breaks, who 208/208, type 26/29; one landing moves (P6). Sweep 130 moves: no row loses a point or a winner, worst P 0.965, action 0.970. Clips: 5/5, 52/53, 52/52, reconstructions identical. Positions: box offset 1.74 → 1.76 px; the overpass kind (12 near / 8 far after relabel) closes to 0.43 m, so `test_match_positions_mirror_across_the_net` holds 0.3 m for kinds with ≥ 15 a half and the layer's 0.6 m for the rest. Suite 1263 (1257 pass, 5 skipped, `test_inbox` as on `main`).
+
+**Not done / owed.** Blocks, P10, P21, P2 (Active next 2). f23222 is the agent's frame read, not the owner's. `make republish-all` once merged (labels and landings move on 20260920). Uncommitted and not this session's: `--start-frame` for `make run-live`.
+
+- 2026-09-09 **#12** — poke rule retuned ASCENT-ONLY (TOUCH_RISE_PX 57), level-exit vx rule deleted; eval merges GT overrides.

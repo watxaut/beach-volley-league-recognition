@@ -37,6 +37,8 @@ export const GLOSSARY = {
     how: FROM_MIN, grade: 'A' },
   side_out: { label: 'Side-out %', what: 'Points the team won while receiving serve.',
     how: 'A team number: it counts every point the pair received, whoever passed.', grade: 'A' },
+  longest_rally: { label: 'Longest rally', what: 'The point with the most touches: every touch of both teams, the serve included, and how many times the ball went over the net.',
+    how: 'On the reference match the touches of a point were counted exactly on 31 of 33 points (one or two short on the other two, never over) and the net crossings on all 33.', grade: 'A' },
   digs_21: { label: 'Digs / 21 pts', what: 'Digs per 21 points played.', how: LOWER_BOUND, grade: 'A' },
   assists_21: { label: 'Assists / 21 pts', what: 'Assists per 21 points played.', how: LOWER_BOUND, grade: 'A' },
   errors_21: { label: 'Errors / 21 pts', what: 'Errors per 21 points played. Fewer is better.', grade: 'A' },

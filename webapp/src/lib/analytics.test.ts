@@ -1,7 +1,7 @@
 // The same two-point fixture rls_smoke.sql uses, with the same expectations:
 // the browser's copy of the definitions and the database's must not drift.
 import { describe, expect, it } from 'vitest'
-import { bestPoint, cumulative, hitSplit, mvps, playerAnalytics, serveTargets, teamRally, type Seat, type Touch } from './analytics'
+import { bestPoint, cumulative, hitSplit, longestRally, mvps, playerAnalytics, serveTargets, teamRally, type Seat, type Touch } from './analytics'
 import type { PointRow, Slot, Team } from './types'
 
 const pt = (n: number, serving: Team, server: Slot, winner: Team): PointRow => ({
@@ -50,6 +50,33 @@ describe('playerAnalytics (the smoke-check fixture)', () => {
   it('progress series', () => {
     expect(a.attack_series).toEqual([{ d: '2026-09-20', r: 'kill' }])
     expect(a.serve_series).toEqual([{ d: '2026-09-20', r: 'other' }])
+  })
+})
+
+describe('longestRally (the smoke-check fixture)', () => {
+  it('counts every touch of the point and the times the ball went over', () => {
+    // point 1: serve, dig, set, spike, dig; over with the serve and the spike
+    expect(longestRally(points, touches)).toEqual({ point_no: 1, touches: 5, net_crossings: 2 })
+  })
+  it('recounts from the rows: a sixth touch on the same half adds no crossing', () => {
+    expect(longestRally(points, [...touches, t(1, 5, 'P2B', 'B', 'set', 2)]))
+      .toEqual({ point_no: 1, touches: 6, net_crossings: 2 })
+  })
+  it('the last ball crossed when the team that hit it won the point', () => {
+    const ace = [t(2, 0, 'P1A', 'A', 'serve', 0, 'ace')]
+    expect(longestRally([points[1]], ace)).toEqual({ point_no: 2, touches: 1, net_crossings: 1 })
+    expect(longestRally([pt(2, 'A', 'P1A', 'B')], ace)).toEqual({ point_no: 2, touches: 1, net_crossings: 0 })
+  })
+  it('ties go to more crossings, then to the earlier point; no touches, no rally', () => {
+    const three = (n: number) => [t(n, 0, 'P1A', 'A', 'serve', 0), t(n, 1, 'P1B', 'B', 'dig', 1), t(n, 2, 'P2B', 'B', 'set', 2)]
+    const pts = [pt(1, 'A', 'P1A', 'A'), pt(2, 'A', 'P1A', 'B'), pt(3, 'A', 'P1A', 'B')]
+    // the set of points 2 and 3 "won": it is counted as going over
+    expect(longestRally(pts, [...three(1), ...three(2), ...three(3)])).toEqual({ point_no: 2, touches: 3, net_crossings: 2 })
+    expect(longestRally(pts, [])).toBeNull()
+  })
+  it('a touch without a team is a touch and never a crossing', () => {
+    const blind = [t(1, 0, 'P1B', 'B', 'serve', 0), { ...t(1, 1, null, 'A', 'dig', 1), team: null }, t(1, 2, 'P2A', 'A', 'set', 2)]
+    expect(longestRally([pt(1, 'B', 'P1B', 'B')], blind)).toEqual({ point_no: 1, touches: 3, net_crossings: 0 })
   })
 })
 
