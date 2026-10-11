@@ -4,8 +4,8 @@ import { BoxScore } from '../components/BoxScore'
 import { MatchReport } from '../components/MatchReport'
 import { PlayByPlay } from '../components/PlayByPlay'
 import { ScoreWorm } from '../components/ScoreWorm'
-import { Card, ErrorBox, Loading, StatusBadge } from '../components/ui'
-import { formatDate, matchLabel, minutes, slotNames, teamName } from '../lib/format'
+import { Card, ErrorBox, Loading, StatInfo, StatusBadge } from '../components/ui'
+import { formatDate, matchLabel, minutes, rallyText, slotNames, teamName } from '../lib/format'
 import type { Team } from '../lib/types'
 
 export function MatchPage() {
@@ -58,6 +58,12 @@ export function MatchPage() {
           {m.n_points} points · {minutes(m.duration_s)}{m.venue ? ` · ${m.venue}` : ''}
           {m.set_complete === false && ' · set incomplete'}
         </p>
+        {report?.longest_rally && (
+          <p className="small" style={{ textAlign: 'center', margin: '4px 0 0' }}>
+            <span className="muted">Longest rally</span> {rallyText(report.longest_rally)}
+            <StatInfo term="longest_rally" />
+          </p>
+        )}
         {points.length > 1 && (
           <div style={{ marginTop: 16 }}>
             <h3>Score margin, point by point</h3>

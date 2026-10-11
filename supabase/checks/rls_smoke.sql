@@ -408,6 +408,13 @@ begin
             from jsonb_array_elements(r -> 'players') x),
       'attack split, own-serve record and averages are analytics tier';
     assert r -> 'serve_targets' = '{}'::jsonb, 'serve targets are analytics tier';
+    -- point 1: serve, dig, set, spike, dig = 5 touches; over the net with the
+    -- serve and with the spike (the last touch is the losers': it did not go
+    -- back). Point 2 has 3 touches and one crossing.
+    assert r -> 'longest_rally' = '{"point_no": 1, "touches": 5, "net_crossings": 2}'::jsonb,
+      'the longest rally is league tier: two counts and a point number, no touch';
+    assert (select count(*) from public.actions) = 0,
+      'and the reader who gets it still reads no touch of that match';
     assert r ->> 'timeline' is null, 'the per-point timeline needs match detail';
   end;
   assert not public.set_my_privacy(true), 'bob has no player to change';
@@ -541,6 +548,11 @@ declare v_prof jsonb;
 begin
   v_prof := public.player_profile((select id from public.players where display_name = 'Check Opp1'));
   assert jsonb_array_length(v_prof -> 'analytics' -> 'passes') = 2, 'Opp1 has a defense and a reception';
+  -- the set just added is a sixth touch of point 1, on the half the ball was
+  -- already in: one more touch, no more crossings
+  assert public.match_report(current_setting('check.match_id')::bigint) -> 'longest_rally'
+         = '{"point_no": 1, "touches": 6, "net_crossings": 2}'::jsonb,
+    'the longest rally is recounted from the rows';
   assert (v_prof -> 'analytics' -> 'passes' -> 0) @>
     '{"k": "defense", "sx": 3.0, "sy": 3.0, "x": 5.0, "y": 6.2, "to": "set", "d": "2026-09-20"}'::jsonb,
     'the dig after an attack is a defense, and it went to the set';

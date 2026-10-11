@@ -218,6 +218,24 @@ def _recount(bundle):
     return out
 
 
+def _longest_rally(bundle):
+    """The longest rally as the post-run layer counts it (`rally_shape`: a
+    crossing is a change of HALF), from the bundle's own rows."""
+    from src.postrun.reconstruct import rally_shape
+
+    best = None
+    for pt in sorted(bundle["points"], key=lambda p: p["point_no"]):
+        acts = sorted((a for a in bundle["actions"] if a["point_no"] == pt["point_no"]),
+                      key=lambda a: a["seq"])
+        if not acts:
+            continue
+        row = {"point_no": pt["point_no"], **rally_shape(acts, pt["winner_team"])}
+        if best is None or ((row["touches"], row["net_crossings"])
+                            > (best["touches"], best["net_crossings"])):
+            best = row
+    return best
+
+
 def _real_match_bundle():
     path = ROOT / "output" / "postrun" / "20260920_match" / "match_bundle.json"
     if not path.exists():
@@ -264,19 +282,25 @@ union all select 'P1B|' || (public.player_profile(3) -> 'analytics')::text
 union all select 'P2B|' || (public.player_profile(4) -> 'analytics')::text;
 select 'LB|' || display_name || '|' || serve_errors || '|' || recv_points || '|' || recv_won
        || '|' || serve_points || '|' || serve_won from public.leaderboard();
+select 'LR|' || (public.match_report((select min(id) from public.matches)) -> 'longest_rally')::text;
 rollback;
 """
     res = subprocess.run(["psql", fresh_db, "-v", "ON_ERROR_STOP=1", "-X", "-q", "-tA"],
                          input=script, capture_output=True, text=True)
     assert res.returncode == 0, res.stderr
-    sql, board = {}, {}
+    sql, board, longest = {}, {}, None
     for line in res.stdout.splitlines():
         if line[:4] in ("P1A|", "P2A|", "P1B|", "P2B|"):
             sql[line[:3]] = json.loads(line[4:])
         elif line.startswith("LB|"):
             name, *nums = line[3:].split("|")
             board[name] = [int(n) for n in nums]
+        elif line.startswith("LR|"):
+            longest = json.loads(line[3:])
     assert set(sql) == {"P1A", "P2A", "P1B", "P2B"}, res.stdout[-500:]
+    # longest_rally: SQL counts changes of TEAM, the post-run report changes of
+    # HALF; inside a point they are the same thing
+    assert longest == _longest_rally(bundle), "longest rally"
 
     names = {"P1A": "Ari", "P2A": "Joan", "P1B": "Marc", "P2B": "Pau"}
     for slot, ref in _recount(bundle).items():

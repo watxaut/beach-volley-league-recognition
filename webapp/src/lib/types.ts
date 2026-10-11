@@ -296,6 +296,17 @@ export interface MatchReport {
   serve_targets: Partial<Record<Team, { to: Partial<Record<Slot, number>>; unseen: number }>>
   /** F3: fantasy per point and slot; null unless the play-by-play is visible. */
   timeline: { point_no: number; slot: Slot; pts: number }[] | null
+  /** The point with the most touches (league tier); null without touches, and
+   * missing from a database older than migration 20261011100000. */
+  longest_rally?: LongestRally | null
+}
+
+/** How long a rally was: every touch of the point (the serve is one) and how
+ * many times the ball went over the net. */
+export interface LongestRally {
+  point_no: number
+  touches: number
+  net_crossings: number
 }
 
 /** A time filter, as the database takes it. `lastN` counts the newest N

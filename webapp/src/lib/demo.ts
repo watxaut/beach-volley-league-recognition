@@ -4,7 +4,7 @@
 // privacy tiers) mirror the SQL so the pages behave like production.
 import type { Api } from './api'
 import { blobDataUrl } from './feedback'
-import { hitSplit, playerAnalytics, pointFantasy, serveTargets, teamRally, type Seat, type Touch } from './analytics'
+import { hitSplit, longestRally, playerAnalytics, pointFantasy, serveTargets, teamRally, type Seat, type Touch } from './analytics'
 import type {
   ActionName, ActionRow, BoxRow, FantasyRule, Feedback, LeaderRow, Match, PointRow, Participant,
   Pass, Player, PlayerProfile, Profile, Publication, ReportPlayer, Ruleset, Session, Slot, Team, WindowParams,
@@ -404,7 +404,9 @@ export function demoApi(): Api {
       })
       const targets = serveTargets(m.points, m.actions)
       for (const team of ['A', 'B'] as Team[]) if (!teamOk(team === 'A' ? 'B' : 'A')) delete targets[team]
-      return delay({ match_id: m.match.id, teams: teamRally(m.points), players: players_, serve_targets: targets, timeline })
+      // League tier, like the result: two counts and a point number.
+      return delay({ match_id: m.match.id, teams: teamRally(m.points), players: players_, serve_targets: targets, timeline,
+        longest_rally: longestRally(m.points, m.actions) })
     },
     async updateMatch(id, patch) {
       Object.assign(byId(id)!.match, patch)
