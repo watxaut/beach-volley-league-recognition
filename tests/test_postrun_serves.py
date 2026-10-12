@@ -191,6 +191,39 @@ def test_toss_taken_for_a_pass_is_the_servers_own_on_a_still_court(monkeypatch):
     assert [r for r in _segment(b)[1] if not r.serve.inferred] == []
 
 
+def _jump_toss(walking, bounces_before=0):
+    """A near serve whose toss is tracked from the hand and carried 2 m
+    toward the net (a jump serve), the tracker's first vertex a frame after
+    it picked the ball up -- the toss release. ``bounces_before`` adds
+    the ball seen beforehand, as a pass has it."""
+    b = sim.StreamBuilder(14.0)
+    frames = b.rally(sim.standard_rally(2.0, "near", sim.NEAR_A))
+    hit = frames[0]
+    first = hit - 12
+    for k in range(12, 0, -1):
+        b.put_ball(hit - k, 6.0, 16.8 + 2.0 * k / 12.0, sim.SERVE_Z - 0.03 * k)
+    b.vertex(first + 1, (6.0, 16.8 + 2.0 * 11 / 12.0, sim.SERVE_Z - 0.33), accepted=False)
+    for k in range(bounces_before):
+        b.put_ball(first - 1 - k, 6.0, 16.8 + 2.0 * (12 + 1 + k) / 12.0, 1.0)
+    if walking:
+        _walk_about(b, hit - 80, b.n - 1)
+    return frames, _segment(b)[1]
+
+
+def test_toss_released_at_the_hand_is_the_balls_first_sight_not_a_pass():
+    # the ball was only just picked up when the "toucher" released it: nobody
+    # passed it, so a serve-shaped launch is a serve even with the court moving
+    frames, found = _jump_toss(walking=True)
+    assert len(found) == 1 and not found[0].serve.inferred
+    serve = found[0].serve
+    assert (serve.side, serve.frame, serve.observed) == ("near", frames[0], True)
+    assert serve.confirmed_by is None
+    # the same release of a ball that was seen arriving is a pass: with bodies
+    # moving, no launch of that rally is a serve
+    _, found = _jump_toss(walking=True, bounces_before=6)
+    assert [r for r in found if not r.serve.inferred] == []
+
+
 def _serve_into_the_net_left_lying(builder):
     """A near serve into the net; no vertex at the landing, the ball tracked
     for two more seconds where it fell."""
@@ -238,6 +271,36 @@ def test_serve_the_tape_stops_and_drops_is_a_point_on_a_still_court():
     assert rally.touches == [] and rally.end.kind == END_NET
     assert rally.end.frame == frames[1]
     _, found = _net_cord(walking=True)
+    assert found == []
+
+
+def _net_cord_first_seen_at_the_tape(walking, z=2.3):
+    """A far serve whose flight to the net is never seen: the ball is first
+    tracked at the tape, a metre past it, and falls onto the receivers' half."""
+    b = sim.StreamBuilder(12.0)
+    tape = sim.Hit(1.7, None, z, xy=(3.0, 8.0), accepted=False, seen=False)
+    frames = b.rally(sim.RallyScript(start_s=2.0, serve_xy=(2.0, -0.6), hits=[tape],
+                                     landing=(3.0, 9.4), landing_dt=0.6))
+    b.hide(frames[0], frames[1] - 1)
+    # nobody moves while the unseen serve flies (the receivers wait for it)
+    b.put_players(frames[0] - 90, frames[1], sim.NEAR_A)
+    if walking:
+        _walk_about(b, frames[0] - 80, frames[1])
+    return frames, _segment(b)[1]
+
+
+def test_net_cord_serve_first_seen_at_the_tape_is_a_point_on_a_still_court():
+    frames, found = _net_cord_first_seen_at_the_tape(walking=False)
+    assert len(found) == 1
+    serve = found[0].serve
+    assert serve.side == "far" and not serve.observed and not serve.into_net
+    assert serve.confirmed_by == CONFIRMED_STILL
+    assert frames[1] - 40 <= serve.frame <= frames[1]
+    # nothing but the court says "serve" there: with the players walking, no
+    _, found = _net_cord_first_seen_at_the_tape(walking=True)
+    assert found == []
+    # a ball picked up low at the net is a ball rolling or bouncing, never a serve
+    _, found = _net_cord_first_seen_at_the_tape(walking=False, z=0.5)
     assert found == []
 
 
