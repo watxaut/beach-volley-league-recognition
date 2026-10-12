@@ -159,7 +159,7 @@ allows.
   outcome(received|ace|fault)`. That is about 1 line per point, far cheaper than
   full contact GT. Convert timestamps to frames by PTS (no seek, §9).
 - Sessions:
-  - `resources/full_videos/20290928_entreno_vall_dhebron.mp4` (695 s,
+  - `../resources/full_videos/20260928_entreno_vall_dhebron.mp4` (695 s,
     calibrated, never run);
   - `resources/full_videos/Entreno Vall Hebron i Partits - 05 05 2025.mp4`
     (55 min, includes matches; needs the one-time 8-click calibration).

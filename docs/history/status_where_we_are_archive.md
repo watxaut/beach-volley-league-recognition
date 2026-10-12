@@ -1596,7 +1596,7 @@ file has a duplicated `Point 21` header. So S0's *owner* half is DONE and its
 step, not a worksheet. The dialect shapes + the owner's three new conventions
 (overpass-labelled-as-overpass; **"missatr" markers are NOT exhaustive**; a
 no-touch block is attributed to the spiking player) are recorded in
-`ground_truth/README.md`. New footage: **`resources/full_videos/20290928_entreno_vall_dhebron.mp4`**
+`ground_truth/README.md`. New footage: **`../../resources/full_videos/20260928_entreno_vall_dhebron.mp4`**
 (1920x1080 native, 695 s, 20939 frames, ~30.1 fps VFR-ish, practice venue,
 same camera, fewer points, teams keep changing) + `calibrations/20290928_entreno_vall_dhebron.json`
 — **not ingested, no GT, no prediction run.** Camera facts pinned in
@@ -2219,7 +2219,7 @@ dig-vs-ball-death buckets, and the two seek defects the guard test surfaced
   all `source=owner_gt`; P1–P8 rebuild field-identical (only `raw_line_no`
   +3); side→squad is switch PARITY; P30 f23545 `action=null` +
   `owner_action_unspecified`. Builder `scripts/build_match_contact_gt.py`.
-- **New practice video** `20290928_entreno_vall_dhebron.mp4` still not run
+- **New practice video** `20260928_entreno_vall_dhebron.mp4` still not run
   (cheap parallel G3-footage item; it has no labels).
 
 **Production state (as of 2026-09-28; unchanged by #30's documentation-only
@@ -2392,7 +2392,7 @@ is 'consume the events post-hoc (S4)' vs 'keep pushing the ball side'.]**
   remains: consume `serve_candidate` post-hoc as evidence (never as a label),
   plus the ball-PRESENCE question (8/17 far serves have no usable vertex).]**
 - **G3-footage (worker, parallel, cheap) — first run of the new practice video**
-  `20290928_entreno_vall_dhebron.mp4` (`make run VIDEO=…`, ~21k frames, the
+  `20260928_entreno_vall_dhebron.mp4` (`make run VIDEO=…`, ~21k frames, the
   fastest full video here): sanity-check the pipeline on a second recording
   session at a known venue, then use it as the **second fold** for anything
   leave-one-session (T12's precondition) and as the side-change subject IF the

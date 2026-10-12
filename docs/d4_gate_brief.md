@@ -124,7 +124,7 @@ Everything below exists on disk; §3 needs no new run to re-derive.
 
 ## 5. Constraints any decision must respect
 
-- **Held-out lock:** `resources/full_videos/20290928_entreno_vall_dhebron.mp4` and
+- **Held-out lock:** `../resources/full_videos/20260928_entreno_vall_dhebron.mp4` and
   `ground_truth/20290928_entreno_vall_dhebron_serve_anchors.json` have **never
   been run**. Do not run, score or open outputs until rules are frozen and a card
   says "score held-out once".
