@@ -1,0 +1,9 @@
+20261012_1130_masnou_loida_joan_pere_aitana -- owner's words (2026-10-12), verbatim
+=================================================================================
+
+"the result is 21 (wins the team with the boy in yellow tshirt) - 15"
+
+Read by the agent from frames (sequential decode, f1132 / f3047): the team with the
+man in the yellow "1" bib is squad A (near at the start; he serves P3 at f3047
+with the woman in the purple bikini as his partner). So the owner's final is
+A 21 - B 15 = 36 points. No score table, no point times: this is a final score only.
