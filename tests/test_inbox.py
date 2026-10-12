@@ -21,12 +21,13 @@ class FakeRunner:
     """Plays rclone / ffprobe / make / the publisher / pmset."""
 
     def __init__(self, root: Path, files, creation_time="2026-10-04T16:05:12.000000Z",
-                 on_ac=True, run_fails=False):
+                 on_ac=True, run_fails=False, court=2):
         self.root = root
         self.files = files                       # Drive inbox listing
         self.creation_time = creation_time
         self.on_ac = on_ac
         self.run_fails = run_fails
+        self.court = court                       # scripts/auto_calibrate.py exit code
         self.calls = []
 
     def __call__(self, cmd, **kw):
@@ -53,16 +54,25 @@ class FakeRunner:
             key = Path(cmd[2].split("=", 1)[1]).stem
             (self.root / "output" / key / "match_reconstruction.json").write_text("{}")
             return ok()
+        if cmd[1] == "scripts/auto_calibrate.py":
+            key = Path(cmd[2]).stem
+            if self.court == 0 and "--write" in cmd:
+                (self.root / "calibrations").mkdir(exist_ok=True)
+                (self.root / "calibrations" / f"{key}.json").write_text('{"source": "auto"}')
+            return subprocess.CompletedProcess(cmd, self.court, "", "")
         if cmd[1:3] == ["-m", "src.publish"]:
             return ok("score     A 21 - B 12   points 33\npublished: applied")
         raise AssertionError(f"unexpected command {cmd}")
 
     def names(self):
-        return [" ".join(c[:2]) for c in self.calls]
+        # the run is wrapped in ``caffeinate -is`` where that exists (macOS)
+        calls = [c[2:] if c[0] == "caffeinate" else c for c in self.calls]
+        return [" ".join(c[:2]) for c in calls]
 
 
-def _inbox(tmp_path, runner, require_ac=True):
-    cfg = InboxConfig(root=tmp_path, require_ac=require_ac, python="python")
+def _inbox(tmp_path, runner, require_ac=True, auto_calibration="propose"):
+    cfg = InboxConfig(root=tmp_path, require_ac=require_ac, python="python",
+                      auto_calibration=auto_calibration)
     inbox = Inbox(cfg, run=runner, notify_cmd=None)
     return inbox
 
@@ -167,3 +177,82 @@ def test_a_second_pass_while_one_runs_does_nothing(tmp_path):
 ])
 def test_parse_utc(raw, expected):
     assert _parse_utc(raw).isoformat() == expected
+
+
+# -- the court, looked for in the picture first (AGENTS.md §14) --------------- #
+
+def _court_calls(runner):
+    return [c for c in runner.calls if len(c) > 1 and c[1] == "scripts/auto_calibrate.py"]
+
+
+def test_propose_mode_looks_once_and_still_waits_for_the_owner(tmp_path):
+    runner = FakeRunner(tmp_path, _listing(), court=0)       # the detector is sure
+    inbox = _inbox(tmp_path, runner)
+    assert inbox.run_once() == 0 and inbox.run_once() == 0
+    calls = _court_calls(runner)
+    assert len(calls) == 1 and "--write" not in calls[0]     # a proposal, never a calibration
+    assert not (tmp_path / "calibrations").exists()
+    state = json.loads((tmp_path / "data" / "inbox_state.json").read_text())
+    rec = state["files"][DRIVE_ID]
+    assert rec["status"] == "needs_calibration" and rec["auto_calibration"] == "accepted"
+    notes = [m for m in inbox.log if "NOTIFY" in m]
+    assert len(notes) == 1 and "A = accept" in notes[0] and "auto_points.jpg" in notes[0]
+    assert "make run-match" not in runner.names()
+
+
+def test_an_unsure_proposal_says_so(tmp_path):
+    inbox = _inbox(tmp_path, FakeRunner(tmp_path, _listing(), court=2))
+    inbox.run_once()
+    notes = [m for m in inbox.log if "NOTIFY" in m]
+    assert len(notes) == 1 and "unsure" in notes[0] and "make calibrate" in notes[0]
+
+
+def test_accept_mode_runs_on_a_calibration_the_detector_accepted(tmp_path):
+    runner = FakeRunner(tmp_path, _listing(), court=0)
+    inbox = _inbox(tmp_path, runner, auto_calibration="accept")
+    assert inbox.run_once() == 0
+    assert "--write" in _court_calls(runner)[0]
+    names = runner.names()
+    assert names.index("python scripts/auto_calibrate.py") < names.index("make run-match")
+    state = json.loads((tmp_path / "data" / "inbox_state.json").read_text())
+    assert state["files"][DRIVE_ID]["status"] == "archived"
+    assert any("court found automatically" in m for m in inbox.log if "NOTIFY" in m)
+
+
+def test_accept_mode_waits_when_the_detector_is_not_sure(tmp_path):
+    runner = FakeRunner(tmp_path, _listing(), court=2)
+    inbox = _inbox(tmp_path, runner, auto_calibration="accept")
+    inbox.run_once()
+    inbox.run_once()
+    assert len(_court_calls(runner)) == 1 and "make run-match" not in runner.names()
+    state = json.loads((tmp_path / "data" / "inbox_state.json").read_text())
+    assert state["files"][DRIVE_ID]["status"] == "needs_calibration"
+
+
+def test_a_crash_of_the_detector_is_the_old_manual_step(tmp_path):
+    inbox = _inbox(tmp_path, FakeRunner(tmp_path, _listing(), court=1))
+    assert inbox.run_once() == 0
+    state = json.loads((tmp_path / "data" / "inbox_state.json").read_text())
+    assert state["files"][DRIVE_ID]["status"] == "needs_calibration"
+    assert state["files"][DRIVE_ID]["auto_calibration"] == "failed"
+    notes = [m for m in inbox.log if "NOTIFY" in m]
+    assert len(notes) == 1 and "auto_points" not in notes[0]
+
+
+def test_off_mode_and_an_existing_calibration_never_call_the_detector(tmp_path):
+    runner = FakeRunner(tmp_path, _listing())
+    _inbox(tmp_path, runner, auto_calibration="off").run_once()
+    assert not _court_calls(runner)
+    other = tmp_path / "second"
+    (other / "calibrations").mkdir(parents=True)
+    (other / "calibrations" / "20261004_1805_img_1234.json").write_text("{}")
+    runner = FakeRunner(other, _listing(), court=0)
+    _inbox(other, runner, auto_calibration="accept").run_once()
+    assert not _court_calls(runner)                          # a manual one is never replaced
+
+
+def test_the_mode_comes_from_the_environment_and_is_checked(tmp_path):
+    assert InboxConfig.from_env({}, tmp_path).auto_calibration == "propose"
+    assert InboxConfig.from_env({"VOLLEY_AUTO_CALIBRATION": "Accept"}, tmp_path).auto_calibration == "accept"
+    with pytest.raises(ValueError):
+        InboxConfig.from_env({"VOLLEY_AUTO_CALIBRATION": "yes"}, tmp_path)

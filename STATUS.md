@@ -18,12 +18,8 @@ update at the end of every session that changes anything and commit with the wor
 - New durable protocol rules go in `AGENTS.md`; new cross-session technical
   facts go one-line-each into *Learnings* below.
 
-Last updated: **2026-10-11 (109th session) — owner score table for 20261010_1100 (35 points, A 13 – B 22): the four lost points are found (35/35, 0 false, serving team 35/35, winners 34/35, switches exact);
-the owner's cue "the court is still at a serve" confirms serves the ball leaves open; dug-but-never-set = kill; longest-rally stat; the report prints the video's own clock. 20260920 + clips reconstruct as before.**
-#108 (two more videos run), #106 (20261010 = the owner's sequence), #105 (who is who post-run), #104 (second match, diagnosis), #102 (Feedback button), #101 (net-anchored court positions), #99 (reception vs defense), #98 / #97 (hard / touch), #96 (player page v2), #95 (unknown-player slots) and #90 (platform) lie underneath.
-Last updated: **2026-10-10 (107th session) — attack clips on the player page: pick an attack on the map and watch the second before the hit and the 1.5 s after it (640×480 MP4, ~0.2 MB each, cut by frame number).
-Deployed by the owner the same day (migration pushed, web redeployed, `make republish-all`): 20260920 shows its clips; 20261010 was published WITHOUT (the prod checkout had no link to its video) — its rally copy is now built, one more `make republish-all` puts the clips up.**
-#106 (20261010 = the owner's sequence), #105 (who is who post-run), #104 (second match, diagnosis), #102 (Feedback button), #101 (net-anchored court positions), #99 (reception vs defense), #98 / #97 (hard / touch), #96 (player page v2), #95 (unknown-player slots) and #90 (platform) lie underneath.
+Last updated: **2026-10-11 (110th session) — automatic court calibration (`src/detection/court_autocalibration.py`, AGENTS §14, `docs/auto_calibration.md`): the 8 points from the picture, no model; 5 of 6 views accepted (beach refused), held-out corners within 10 px of the clicks, every existing run reconstructs with the same points and winners; the inbox PROPOSES, the owner accepts with one key.**
+#109 (1100 vs the owner's table), #108 (two more videos run), #107 (attack clips), #106 (20261010 = the owner's sequence), #105 (who is who post-run), #104 (second match, diagnosis), #102 (Feedback button), #101 (net-anchored court positions), #99 (reception vs defense), #98 / #97 (hard / touch), #96 (player page v2), #95 (unknown-player slots) and #90 (platform) lie underneath.
 
 ## North-star goals (set session 24)
 
@@ -80,6 +76,8 @@ owner-typed spikes: 26/29 right, 29 typed (causal `SpikeAnalyzer`: 10/16 on 16) 
 6/6 on 6 of 8. Recon schema 3 (`spike_type`, `launch`); the bundle publishes it. **Web (#98):** `player_profile` → `analytics.shots` (hard / touch / free / unread × n, kills, errors; adds up to `n_attacks`) + guarded `landings[].type` (migration `20261009110000_attack_shots`, NOT pushed): only a row with `extra.launch` has a type, so a pre-#97 publish reads "not read". Attack map: line = shot, `Shot` filter; "By shot" card; grade B. **Compare (#99):** the Overview card draws the gap to the league average (`gapScale`: more = right, one shaded "too close to call" zone, blue / orange verdict bars, fantasy last); no average yet = bars from zero.
 **Court positions (#101, `positions.py`, OUTPUT ONLY, recon schema 4):** published `court_x_m` / `court_y_m` / `court_xy_m` = net-anchored frame (net-ground clicks) + per-video ball-box offset from the end switches (20260920: 1.74 px; spikes 1.40 m off the net from both halves, was 2.70 / −0.30). Points / touches / labels / winners / txt byte-identical (match + e1–e7); needs `make republish-all`; ±0.6–0.8 m per position (open point 35).
 
+**Automatic court calibration (#110, BUILT, inbox in `propose` — AGENTS §14, `docs/auto_calibration.md`).** `src/detection/court_autocalibration.py` finds the 8 points from a median plate, no model: tape by colour on the sand, each tape followed as it lies, net tape by colour uniformity + its two edges, far baseline where a sideline's tape ends / far tape shows / the camera's known focal length agrees — one read is a proposal, two a calibration. 6 views (dev e3, 1000, 20260920; 1100, 1200, 1230 scored frozen): 5 accepted, beach refused; held-out corners ≤ 10 px from the clicks, widths ≤ 1.3 %; e1–e7's near-left corner is ~90 px outside the frame. Every existing dump replays with the same points, serving teams and winners; full re-run of 1100 = the manual run against the owner's table. `make autocalibrate`, `make calibrate` (A = accept), `VOLLEY_AUTO_CALIBRATION`.
+
 **Product platform (#90, BUILT, not deployed — AGENTS §13).** Drive inbox →
 `make inbox` (name, calibration wait, run-match, publish DRAFT) → one
 transactional Supabase RPC (applied/unchanged, admin rows untouched) → RLS +
@@ -104,10 +102,9 @@ colours/labels. Pass-2 scripts (`relabel_serves`, `resolve_side_switches`,
 `resolve_point_winners` 18/33, `consume_serve_evidence`) are SUPERSEDED by
 `src/postrun` for points/serves/winners; kept as provenance. Entreno action
 gate (causal): e1 0.706, e2 0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933,
-e7 0.75 (same-session A/B only). Test suite **1307** (1301 pass, 5 skipped; `test_inbox` run-match order fails on `main` too, not #109).
+e7 0.75 (same-session A/B only). Test suite **1344** (1339 pass, 5 skipped).
 
 **Player detector input (#94, default ON):** `player_bgr_input: true` passes BGR as-is (`false` = the old path; how to compare: Learnings). 4-track frames up on all 7 clips, stream F1 0.824→0.839, post-run identical; match stream labels 81/145→74/146; e3 contact sheet owed. Full text: `docs/history/status_where_we_are_archive.md` (#97).
-
 **Speed (#89, results-neutral — AGENTS §12):** `prefetch_depth: 8` + `detector_fast_inference`: match 1955 → 783–836 s, clips 291 → 131 s, byte-identical to the pre-#94 goldens (= `player_bgr_input: false`). Bound: MediaPipe pose (open point 33). Full text: same archive (#94, #97).
 
 **Held-out lock:** `ground_truth/20290928_entreno_vall_dhebron_serve_anchors.json`
@@ -126,9 +123,9 @@ GT `20260920_match_ari_joan_contacts_p1_p8.txt` P31 serve f24543 is 128 f before
 
 ## Active next (ranked)
 
-0. ✅ **Owner security follow-through DONE (2026-10-07):** `supabase db push` (4 migrations), deploy doc 2.4/2.9/4/8, stats pages reviewed.
-   Heights check done with the real heights: not good (V2 ±0.2 m stays FAIL; O3 would show relative heights only).
-   Next picks (§5): I3 → O3 (relative heights, V2), N10/O2, O1+I4, N7/N9, F1.
+0. **Automatic calibration (#110), owner:** look at `output/auto_calibration/<view>/auto_points.jpg` (6 views: green ring = automatic, red cross = your click) and say where a ring is off the tape; let the next NEW video go through the inbox in `propose` (the default) and take or redo its proposal with `make calibrate` (A = accept);
+   after ~5 right proposals set `VOLLEY_AUTO_CALIBRATION=accept` in prod's `.env.publish`. Say whether 20290928 may serve as a fourth held-out view (frames only, no run). Never recalibrate a published match.
+   Then, in this order: posts for the net line, the bumped-camera check, the cross-check from play, the robustness card (open point 36).
 1. ✅ **Product deployed (owner, DONE 2026-10-07):** `docs/deploy_web_platform.md` steps 0–7. Still open: publish 20260920 check
    (fantasy = txt footer), then action_overrides UI, in-app invites, `own_x_m` heatmaps (design §8 "Next"). **Owed (#98), in any order — each step is safe alone:** merge `spike-type-touch-vs-hard`; `supabase db push` (`20261009100000` + `20261009110000` + `20261009120000`); move `~/volley-prod` to that commit and run `make republish-all` THERE (this checkout's `.env.publish` is the local stack; an older prod checkout would rewrite the shared `output/` with the old rules); then look at the Attack tab on the real match.
 1b. **Attack clips (#107), owner:** `make republish-all` once more from prod — 20261010 now has its `rallies.mp4` + 41 clips in the run directory and goes up as `applied` with `clips 41 of 41` (verified by a dry run from the prod checkout, no network). Then link `resources/full_videos` as a FOLDER in `~/volley-prod` (deploy doc 3.1) so the next match's video is reachable. Hosted Storage list / delete ran for the first time on the 20260920 publish: owner to confirm nothing odd in Storage.
@@ -159,15 +156,7 @@ archived under their session date in `docs/history/status_log_archive.md`.)*
 
 ### Active
 
-30. **Serve reliability.** Status: SOLVED POST-HOC (#87) — the post-run
-    layer finds every serve of the match (33/33, half + squad, frame 32/33)
-    and 5/5 on the practice clips; the causal stream stays near 8/16, far
-    0/17, 12 FP and is no longer the source of point starts. Next: nothing
-    causal (STOP list); SR4-FAR / SR3 are closed by supersession.
-22. **Far-side serves.** Status: SOLVED POST-HOC (#87) — a far serve has no
-    vertex (the tracker locks ~0.2 s after the hit), so its launch is the
-    BIRTH of the track: far 17/17 found, frame within ±15 f on 16 (P31 = GT
-    typo). Toss-tracked births read up to 15 f early. Next: none.
+30 / 22. **Serve reliability + far-side serves.** SOLVED POST-HOC (#87); both entries archived verbatim (#110, `docs/history/status_log_archive.md`). Next: none (STOP list).
 21. **Owner's match-feedback backlog.** (1) point count 33/33 DONE (#87);
     (2) per-point + per-action confidence surfaces: the reconstruction
     carries `evidence` (vertex / gap / structure), `flags` and the
@@ -253,6 +242,7 @@ archived under their session date in `docs/history/status_log_archive.md`.)*
     itself off on an unverified release; `venv/` is the only env).
 34. **Web login: fewer code mails (#94, study only, `docs/web_login_study.md`).** Sessions already last until logout (no limit). Owner decides: (a) limit — 30 d (NIST AAL1) via `pg_cron` on free plan; (b) final domain (before passkeys); (c) second method — passkeys (beta, needs an options broker: the Auth lock blocks it) or Google (passes the lock). Then build A: local logout + "all devices", one URL.
 35. **Published court positions (#100 diagnosed → #101 FIXED in code, output only; republish owed).** `src/postrun/positions.py`: `court_x_m` / `court_y_m` / `court_xy_m` are read in a net-anchored frame (the calibration's net-ground clicks) with the ball-box offset removed; the offset is per video, read off the end switches (20260920: 1.74 px closes dig / set / spike / overpass from 2.05–2.21 m to within ±0.16 m; spikes 2.70 / −0.30 → 1.40 / 1.40 m, the 2:49 kill 2.7 → 1.4 m, 1 of 39 held at the net). Decisions untouched (`DEPTH_SPLIT_BIAS_M` stays). Open: (a) it rests on the two halves being played alike — the players' feet show the same near/far gap, so a real part (wind) cannot be excluded; two serves into the net read no offset, one net-slide reads it; (b) a video without a switch (practice clips) stays uncorrected and holds across-net reads at the net; (c) a single position is ±0.6–0.8 m; a takeoff-from-the-feet read needs a higher camera or its own design; (d) in-sample on one match. Next: owner looks at `output/postrun/20260920_match/attack_map_now_vs_fixed.png`, then merge + `make republish-all` from prod.
+36. **Automatic calibration residuals + calibration fragility (#110; `docs/auto_calibration.md`).** Status: BUILT, inbox in `propose`. (a) knife-edge points: 20261010_1000 and _1200 each flip a point at 0.5 % of a baseline width — any recalibration, a re-click included, can move them; a post-run robustness card is owed (anchor ball depth on what play shows, e.g. serves, not only on the corner widths); (b) beach refused: right sideline 30 % seen, far corners 0.5 m off sideways (a far corner could be read off the far tape's own end); (c) the points under the net are the court's middle, the clicks follow the posts (3–20 px): published positions (#101) move up to ~0.7 m on a newly calibrated match — posts are the fix; (d) blind spot: both sideline ends buried alike (only the camera read speaks against it); (e) not built: start / middle / end plates (bumped camera), cross-check from play; (f) 6 views, 2 venues, 2 tape colours; the causal stream loses e7 f163 (reach gate) with the automatic file. Next: Active next 0.
 
 ### Parked / conditional
 
@@ -304,6 +294,16 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Far serve is geometrically invisible to `ActionClassifier` (depth-dominated motion; needs a size-growth cue); far ball detected ~1-in-4 frames; "0–1 tracked" figures are TRACKER counts — the detector sees 14–31 of 31.
 - Serve is structurally recoverable post-hoc: no-contact 60–240 f + far-band person + raw det = 11/17 @ 1.00 precision (union 14/17 @ 0 FP); bind by dead-time EPISODE, not point window; report coverage and binding as two numbers; the far-serve ECHO straddles contact (net crossing separates).
 - Serve-window opener is a weak key (only 4/8 near hits have the serve as first action).
+
+**Court calibration (#110)**
+- The clicks are not GT: the net reads 7.26–9.33 m through the 4-corner homography; e1–e7's near-left corner is ~90 px OUTSIDE the frame and was clicked inside it (that file's near baseline is 5 % short).
+- vall d'Hebron by day: the far baseline tape is BURIED — the far corners are where the sideline tapes end. A tape ends short of its corner (buried), never beyond: of two ends that agree the farther; tape running on beyond a far baseline refutes it.
+- Calibration tolerance (post-run only, `probe_calibration_sensitivity.py`): beach immune (±6 %, ±16 px), 1100 ±4 %; 1000 and 1200 each flip a point at 0.5 % of a baseline width; the net clicks (±16 px) change no decision. Identical decisions after ANY recalibration cannot be promised.
+- Tape evidence = chroma distance from the sand (robust sd) + thin top-hat: shadows vanish. Half-buried tape sits at the sand's own p97–p99, so lines are voted along their whole length, then again on the tape's own colour; specks are dropped before voting, fits use ridge centres (a 12 px tape lets a line lie anywhere in it).
+- A net tape is found by colour UNIFORMITY along its line (spread 7–18 vs 40–130 just above / below), not by brightness: against the bright court behind it a brightness band locked onto a tilted line (1000). Its two edges, weakest third deciding, give row and slope.
+- Tapes bow 12–40 px off a straight fit (the beach left sideline 23 px): follow them from mid-court outwards, rate-limited — an unlimited follower turns the far corner onto the baseline (seen on a drawn court, explained the beach / e3 far-corner errors).
+- Focal length from the corners is a camera constant: four same-morning videos read 1870–1943 px automatically (clicks 1838–1972); ~12 px of focal per px of far row there, so ±2 % pins the far baseline to ~0.3 m. e-clips read ~2160, beach ~1660–1725 (other settings).
+- What cannot place the far baseline: the net height through the calibration (0.006 m per px of far row) and "net y from a 2.43 m tape" (7.2–10 m: ill-conditioned with the lens near tape height).
 
 **Tracker / identity**
 - `BallTracker` returns None when lost — never hallucinates; before calling a detection-recall gap, probe raw detector output (it's often tracker admission/gating).
@@ -400,6 +400,7 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Owner labels vs run labels (#109, 1100): the owner named team B the other way round (owner P1B = run P2B) through the whole video — check a serve frame with the dump's labels drawn before calling an identity bug. The owner's `mm.ss` is the SERVE time; `ffprobe` packet pts ≥ 0, sorted, are the decoder's frames exactly (4 videos: one per frame).
 
 ## Session index (one line each)
+- #110 **Automatic court calibration: 8 points from the picture, no model; 5 of 6 views accepted, held-out corners ≤10 px from the clicks, replays keep every point and winner; inbox `propose`; C0: two matches flip a point at 0.5 % width**
 - #109 **20261010_1100 vs the owner's score table: 31 → 35/35 points, 0 false, winners 34/35; still-court cue confirms open serves; dug-never-set = kill; video clock; 1200 → 41 points, A 21–B 20; longest rally on the match page**
 - #108 **Two more 20261010 videos run and checked by frames: 1200 sound (40 points, A 21–B 19); 1100 not (31 points, A 14–B 17: a missed far jump serve, a rally cut at a dive-dig, clock up to 50 s off); no `src/` change**
 - #107 **Attack clips on the player page: hover / tap an attack, watch 1 s before + 1.5 s after (640×480 MP4 from a kept rally copy, cut by frame number); seen by whoever reads that match's touches; 41/41 + 62/62 attacks; not deployed**
@@ -499,8 +500,19 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-09-24 **#16** — calibration auto-detect fixed for cached `_up1080` files (`resolve_source_stem`).
 - 2026-09-23 **#15** — first full-match run: 14/≈39 points confirmed, roster holds but identities hop; ball recall indicted (tracked 20.6%); width band validated round 2.
 - 2026-09-23 **#14** — match intake: one-time sub-1080p ingest upscale (`ensure_1080`, ffmpeg Lanczos, parity-gated cache).
-- 2026-09-19 **#13** — width-confirmed cross + own-side drive-block refutation (e7 0.625→0.75); f316 ruled a GT slip and folded.
 ## Log (newest first)
+
+### 2026-10-11 (hundred-and-tenth session) — #110: automatic court calibration — the 8 points from the picture, a proposal unless two reads agree
+
+**Asked (owner):** the calibration is what keeps the system from running without them; three setups (practice clips, the beach match, three vall d'Hebron videos, each with its own clicks): think how to do it and with which caveats (plan first), then "pull from main and start".
+
+**Diagnosed first (read-only, plan).** 16 calibration files = 6 distinct in-spec views (e1–e7 share one). The clicks are not pinhole-consistent (net reads 7.26–9.33 m). C0, `scripts/probe_calibration_sensitivity.py` (one quantity at a time, post-run in memory): beach immune to ±6 % / ±16 px, 1100 to ±4 %; 1000 and 1200 each flip a point at 0.5 % of a baseline width; the net clicks change no decision. Plates: at vall d'Hebron by day the far baseline is buried — the far clicks sit where the sideline tapes end.
+
+**Built.** `src/detection/court_autocalibration.py` (no model): median plate (45 frames, decoded in order) → tape = thin + not sand-coloured (robust sd of the sand's chroma), lines by accumulator votes, second pass on the tape's own colour → court = near baseline + two sidelines with the most tape → each tape followed from mid-court outwards (rate-limited bow), corners where tapes cross (outside the frame too) → net tape by colour uniformity along the line, refined on its two edges → across direction = near baseline ∩ net tape → far baseline reads: `left_end` / `right_end` (the farther of two that agree), `far_tape` (unbroken stretches), `camera` (the focal length ≥ 3 other calibrations agree on; confirms within 0.6 m, never decides) → accepted only with two agreeing reads, no tape running on beyond, net 2.10–2.60 m, sidelines ≥ 50 % seen, plausible camera. `scripts/auto_calibrate.py` (`make autocalibrate`, `WRITE=1`), proposal in `output/<key>/calibration_auto/` (`auto_points.jpg`), `make calibrate` shows it first (A = accept, `--accept-proposal`), JSON `source: "auto"` + `auto{}`, readiness says `calibration_method: "auto"` only for such a file, inbox `VOLLEY_AUTO_CALIBRATION` = `propose` (default) / `accept` / `off`. `scripts/score_autocalibration.py`. Tests +34 (drawn courts with a known camera, CLI on a drawn video, inbox modes, readiness); `FakeRunner.names()` unwraps `caffeinate` (the `test_inbox` failure on `main`). AGENTS §14, `docs/auto_calibration.md`, deploy + design docs, `.env.publish.example`.
+
+**Measured (`docs/auto_calibration.md`).** Dev e3 / 1000 / 20260920; 1100, 1200, 1230 scored with the detector frozen (`498898b`; 1230 before reading the owner's file). Corners vs clicks: held-out ≤ 10 px, widths ≤ 1.3 %; 1000 ≤ 5 px; e3's near-left corner −92 px (it is outside the frame; the click is inside); beach far corners +34 / +40 px sideways, refused. Accepted 5 of 6 (frozen: 2 of 6 — the `camera` read was added after seeing that and moved no point). Replays of every existing dump with the automatic file: 0 points lost / invented, 0 serving teams, 0 winners changed; 20260920 and 1000 touch-identical, clips identical, 1100 +12 touches, 1200 −2. Full re-runs (same session): e1–e7 causal 61 → 60 actions (e7 f163 spike lost, e1 f114 dig → spike), post-run P 52/53 → 53/54, action 52/52 → 53/53; 1100 = the manual run against the owner's table (35/35, serving team 35/35, winners 34/35, A 14 – B 21), P13 a 15-touch rally instead of 3 (frames: play goes on to f10412 — agent's read). Suite 1344 (1339 pass, 5 skipped; `test_inbox` passes again).
+
+**Not done / owed.** Owner: look at the six `auto_points.jpg`; next new video through `propose`; OK for 20290928 as a fourth held-out view. Not built: posts for the net line, start / middle / end plates, cross-check from play, the post-run robustness card for the knife-edge points (open point 36). The inbox default is `propose`: nothing runs unattended yet. Branch `feat/auto-court-calibration`.
 
 ### 2026-10-11 (hundred-and-ninth session) — #109: 20261010_1100 against the owner's score table — the four lost points, a still court, dug-never-set, the clock
 
@@ -528,15 +540,3 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - **Clock.** The play-by-play prints frame / average fps: up to +50 s off on 1100 (32j (3)); frame numbers, thumbnails and clips are unaffected.
 
 **Not done / owed.** The three fixes of 32j (cards, byte-identical neutrality on 1000 / 20260920 / e1–e7). Owner: real 1100 final score, f16535, contact sheets (`point_images/` written for both runs) before anything is published. Branch `status-108-two-more-matches` (STATUS + archive only).
-
-### 2026-10-10 (hundred-and-seventh session) — #107: attack clips on the player page
-
-**Asked (owner):** hover an attack and see a small gif of it, 1 s before the spike and 1.5 s after, not 1080, on the free stack; what it takes, how to make it better, the caveats; maybe keep only the last 3 matches. Then, on the three decisions put to them: "1. keep the same rules [a clip is seen by whoever reads that match's touches], 2. 640×480, 3. keep [the local rally copy]".
-
-**Measured first (20261010, real clips).** GIF 5.2–5.9 MB a clip (4 matches fill the 1 GB of Storage); H.264 MP4 0.2–0.3 MB (~90 matches): no "last 3 matches" limit needed. The crop: players + ball around an attack span the frame top (the set) to y ≈ 800, so the central 960 × 720 shown to the owner cuts the attacker in 4 of 41 clips and loses the ball in 6; a box three net heights tall centred on the net never cuts the attacker and loses the ball sideways in 5 (wide plays). A box holding the whole court is the whole frame.
-
-**Built.** `src/publish/clips.py`: `crop_box` (net-sized, from the calibration), `rallies.mp4` + `rallies.json` (every point −1 s / +2 s, one sequential cv2 pass piped to ffmpeg; the index maps copy frames to source frames), `clips/<frame>.mp4` cut from the copy in one more sequential pass, a manifest so nothing is cut twice. `bundle.py`: `extra.clip` on credited attacks only, no key without a clip (a run without clips builds the bundle it always did). `cli.py`: `--no-clips`, upload before the rows (content-named path, sent once), removal of the unnamed ones after a successful publish; `client.py`: `list_objects` / `remove_objects`. Migration `20261010100000_attack_clips`: `can_see_match_clip()` + storage read policy, `player_profile` → `landings[].clip` only for a caller who may read that match. Web: `Clip` in the attack map panel (250 ms rest before the fetch, muted loop, below the attack in the upper half of the map), `lib/clips.ts` link cache cleared on account change, CSP `media-src`, demo mirror with a DRAWN clip. AGENTS §13 bullet; design + deploy docs.
-
-**Verified.** Frame-accurate: synthetic video whose frames show their own number (copy, clips, a re-publish without the video, an early end); the contact is on clip frame 30 / 26 on both real matches (20260920 is VFR). Both matches end to end through `python -m src.publish --dry-run` on copies of the run directories: 41 / 41 clips (0.19–0.33 MB, 9.9 MB, copy 44 MB, 166 s) and 62 / 62 (0.13–0.23 MB, 11 MB, copy 39 MB, 134 s); second run 2 s, same bundle hash. Schema check on a scratch Postgres 17: 5 pass; the two rules mutated → the smoke fails. Web in headless Chrome (demo): hover plays, a quick sweep fetches nothing, tap plays inline on a phone viewport. pytest 1280 pass (+23), vitest 71 (+3), typecheck + lint clean.
-
-**Not done / owed.** Not deployed (Active next 1b). Hosted Storage list / delete never ran against Supabase (fake client only). No marker on the credited attacker in the clip. The ball leaves the picture sideways in 5 of 41 clips. Local rally copy 39–44 MB per match (the first estimate given to the owner was 27). `Makefile` untouched (it holds someone else's uncommitted `--start-frame`), so `--no-clips` is not in its comment.

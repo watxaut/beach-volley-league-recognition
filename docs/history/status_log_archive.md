@@ -7322,3 +7322,48 @@ The live overlay keeps the causal labels. Uncommitted in the tree and not this s
 **Not done / owed.** Blocks, P10, P21, P2 (Active next 2). f23222 is the agent's frame read, not the owner's. `make republish-all` once merged (labels and landings move on 20260920). Uncommitted and not this session's: `--start-frame` for `make run-live`.
 
 - 2026-09-09 **#12** — poke rule retuned ASCENT-ONLY (TOUCH_RISE_PX 57), level-exit vx rule deleted; eval merges GT overrides.
+
+## Archived 2026-10-11 (#110): the oldest Log session, the oldest Session index line, the #109 / #107 header paragraphs, Active-next item 0 (done) and open points 30 + 22 (solved) moved out of STATUS.md verbatim (Log ≤3 sessions; index, Active-next and Open-points budgets)
+
+### Header paragraphs (verbatim)
+
+Last updated: **2026-10-11 (109th session) — owner score table for 20261010_1100 (35 points, A 13 – B 22): the four lost points are found (35/35, 0 false, serving team 35/35, winners 34/35, switches exact);
+the owner's cue "the court is still at a serve" confirms serves the ball leaves open; dug-but-never-set = kill; longest-rally stat; the report prints the video's own clock. 20260920 + clips reconstruct as before.**
+#108 (two more videos run), #106 (20261010 = the owner's sequence), #105 (who is who post-run), #104 (second match, diagnosis), #102 (Feedback button), #101 (net-anchored court positions), #99 (reception vs defense), #98 / #97 (hard / touch), #96 (player page v2), #95 (unknown-player slots) and #90 (platform) lie underneath.
+Last updated: **2026-10-10 (107th session) — attack clips on the player page: pick an attack on the map and watch the second before the hit and the 1.5 s after it (640×480 MP4, ~0.2 MB each, cut by frame number).
+Deployed by the owner the same day (migration pushed, web redeployed, `make republish-all`): 20260920 shows its clips; 20261010 was published WITHOUT (the prod checkout had no link to its video) — its rally copy is now built, one more `make republish-all` puts the clips up.**
+#106 (20261010 = the owner's sequence), #105 (who is who post-run), #104 (second match, diagnosis), #102 (Feedback button), #101 (net-anchored court positions), #99 (reception vs defense), #98 / #97 (hard / touch), #96 (player page v2), #95 (unknown-player slots) and #90 (platform) lie underneath.
+
+### Active next, item 0 (verbatim)
+
+0. ✅ **Owner security follow-through DONE (2026-10-07):** `supabase db push` (4 migrations), deploy doc 2.4/2.9/4/8, stats pages reviewed.
+   Heights check done with the real heights: not good (V2 ±0.2 m stays FAIL; O3 would show relative heights only).
+   Next picks (§5): I3 → O3 (relative heights, V2), N10/O2, O1+I4, N7/N9, F1.
+
+### Open points 30 and 22 (verbatim)
+
+30. **Serve reliability.** Status: SOLVED POST-HOC (#87) — the post-run
+    layer finds every serve of the match (33/33, half + squad, frame 32/33)
+    and 5/5 on the practice clips; the causal stream stays near 8/16, far
+    0/17, 12 FP and is no longer the source of point starts. Next: nothing
+    causal (STOP list); SR4-FAR / SR3 are closed by supersession.
+22. **Far-side serves.** Status: SOLVED POST-HOC (#87) — a far serve has no
+    vertex (the tracker locks ~0.2 s after the hit), so its launch is the
+    BIRTH of the track: far 17/17 found, frame within ±15 f on 16 (P31 = GT
+    typo). Toss-tracked births read up to 15 f early. Next: none.
+
+### Session index line moved out of STATUS.md (verbatim)
+
+- 2026-09-19 **#13** — width-confirmed cross + own-side drive-block refutation (e7 0.625→0.75); f316 ruled a GT slip and folded.
+
+### 2026-10-10 (hundred-and-seventh session) — #107: attack clips on the player page
+
+**Asked (owner):** hover an attack and see a small gif of it, 1 s before the spike and 1.5 s after, not 1080, on the free stack; what it takes, how to make it better, the caveats; maybe keep only the last 3 matches. Then, on the three decisions put to them: "1. keep the same rules [a clip is seen by whoever reads that match's touches], 2. 640×480, 3. keep [the local rally copy]".
+
+**Measured first (20261010, real clips).** GIF 5.2–5.9 MB a clip (4 matches fill the 1 GB of Storage); H.264 MP4 0.2–0.3 MB (~90 matches): no "last 3 matches" limit needed. The crop: players + ball around an attack span the frame top (the set) to y ≈ 800, so the central 960 × 720 shown to the owner cuts the attacker in 4 of 41 clips and loses the ball in 6; a box three net heights tall centred on the net never cuts the attacker and loses the ball sideways in 5 (wide plays). A box holding the whole court is the whole frame.
+
+**Built.** `src/publish/clips.py`: `crop_box` (net-sized, from the calibration), `rallies.mp4` + `rallies.json` (every point −1 s / +2 s, one sequential cv2 pass piped to ffmpeg; the index maps copy frames to source frames), `clips/<frame>.mp4` cut from the copy in one more sequential pass, a manifest so nothing is cut twice. `bundle.py`: `extra.clip` on credited attacks only, no key without a clip (a run without clips builds the bundle it always did). `cli.py`: `--no-clips`, upload before the rows (content-named path, sent once), removal of the unnamed ones after a successful publish; `client.py`: `list_objects` / `remove_objects`. Migration `20261010100000_attack_clips`: `can_see_match_clip()` + storage read policy, `player_profile` → `landings[].clip` only for a caller who may read that match. Web: `Clip` in the attack map panel (250 ms rest before the fetch, muted loop, below the attack in the upper half of the map), `lib/clips.ts` link cache cleared on account change, CSP `media-src`, demo mirror with a DRAWN clip. AGENTS §13 bullet; design + deploy docs.
+
+**Verified.** Frame-accurate: synthetic video whose frames show their own number (copy, clips, a re-publish without the video, an early end); the contact is on clip frame 30 / 26 on both real matches (20260920 is VFR). Both matches end to end through `python -m src.publish --dry-run` on copies of the run directories: 41 / 41 clips (0.19–0.33 MB, 9.9 MB, copy 44 MB, 166 s) and 62 / 62 (0.13–0.23 MB, 11 MB, copy 39 MB, 134 s); second run 2 s, same bundle hash. Schema check on a scratch Postgres 17: 5 pass; the two rules mutated → the smoke fails. Web in headless Chrome (demo): hover plays, a quick sweep fetches nothing, tap plays inline on a phone viewport. pytest 1280 pass (+23), vitest 71 (+3), typecheck + lint clean.
+
+**Not done / owed.** Not deployed (Active next 1b). Hosted Storage list / delete never ran against Supabase (fake client only). No marker on the credited attacker in the clip. The ball leaves the picture sideways in 5 of 41 clips. Local rally copy 39–44 MB per match (the first estimate given to the owner was 27). `Makefile` untouched (it holds someone else's uncommitted `--start-frame`), so `--no-clips` is not in its comment.

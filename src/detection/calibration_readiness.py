@@ -92,6 +92,22 @@ def read_calibration_frame_dimensions(court_path: str) -> Tuple[int, int]:
     return tuple(dims) if dims else DEFAULT_CALIBRATION_FRAME_DIMENSIONS
 
 
+def read_calibration_origin(court_path: str) -> Optional[Dict[str, Any]]:
+    """Where an AUTOMATIC calibration came from (``court_autocalibration``):
+    its version and who accepted it. None for a clicked one, so a run on a
+    manual calibration reports exactly what it always did."""
+    try:
+        with open(court_path, "r") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if data.get("source") != "auto":
+        return None
+    auto = data.get("auto") or {}
+    return {"version": auto.get("version"), "accepted": auto.get("accepted"),
+            "accepted_by": auto.get("accepted_by")}
+
+
 def build_calibration_readiness(
     court_path: Optional[str],
     source_stem: str,
@@ -151,7 +167,10 @@ def build_calibration_readiness(
         aspect_ratio_match = abs(calib_ar - video_ar) / video_ar <= ASPECT_RATIO_TOLERANCE
 
     usable = bool(calib_dims) and dimensions_match and aspect_ratio_match
+    origin = read_calibration_origin(court_path) if court_path else None
     return {
+        # only an automatic calibration says so: nothing is added for a clicked one
+        **({"calibration_method": "auto", "calibration_auto": origin} if origin else {}),
         "calibration_path": court_path,
         "calibration_source": source,
         "source_stem": source_stem,
@@ -185,6 +204,10 @@ def format_readiness(readiness: Dict[str, Any]) -> str:
         "  rescaled to video: no -- calibration points are used verbatim",
         f"  usable           : {readiness['usable']}",
     ]
+    if readiness.get("calibration_method") == "auto":
+        auto = readiness.get("calibration_auto") or {}
+        lines.insert(2, f"  found by         : automatic calibration v{auto.get('version')}"
+                        f" (accepted by: {auto.get('accepted_by')})")
     if readiness["degraded_outputs"]:
         lines.append(
             "  DEGRADED outputs : " + ", ".join(readiness["degraded_outputs"])

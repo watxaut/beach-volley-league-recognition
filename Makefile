@@ -23,7 +23,7 @@ OUTPUT_DIR := output/$(VIDEO_NAME)
 VIZ_FLAG := $(if $(VIZ),,--skip-visualization)
 
 .PHONY: run run-video run-live run-match postrun point-images ingest ingest-all db-reset ui help \
-        calibrate process publish republish-all inbox backup feedback schema-check
+        calibrate autocalibrate process publish republish-all inbox backup feedback schema-check
 
 run:
 ifeq ($(strip $(VIDEO)),)
@@ -116,6 +116,17 @@ endif
 	$(PYTHON) scripts/check_video_name.py "$(VIDEO)"
 	$(PYTHON) scripts/test_court_calibration.py "$(VIDEO)"
 
+# Court calibration WITHOUT clicks: a proposal in output/<key>/calibration_auto/
+# (auto_points.jpg = the 8 points, zoomed). WRITE=1 also saves calibrations/<key>.json
+# when the detector accepted its own result and none exists (a manual one is never
+# overwritten). A proposal is taken or redone with `make calibrate` (A = accept it).
+autocalibrate:
+ifeq ($(strip $(VIDEO)),)
+	$(error VIDEO is not set. Usage: make autocalibrate VIDEO=resources/<key>.mp4 [WRITE=1])
+endif
+	$(PYTHON) scripts/check_video_name.py "$(VIDEO)"
+	$(PYTHON) scripts/auto_calibrate.py "$(VIDEO)" $(if $(WRITE),--write)
+
 # Full match -> draft on the web: run + post-run reconstruction + publish.
 process: run-match publish
 
@@ -172,6 +183,7 @@ help:
 	@echo "make db-reset                         Delete the DB (DB=$(DB))"
 	@echo "make ui                               Local web UI at http://127.0.0.1:8000"
 	@echo "make calibrate VIDEO=resources/<key>.mp4  Court calibration (8 clicks, once per video)"
+	@echo "make autocalibrate VIDEO=...  [WRITE=1]    Court calibration without clicks (a proposal; WRITE=1 saves it when its own checks pass)"
 	@echo "make process VIDEO=resources/<key>.mp4    run-match + publish as a draft"
 	@echo "make publish OUTPUT_DIR=output/<key>      Publish a finished run (DRY=1 to diff only)"
 	@echo "make republish-all                        Redo post-run + publish for every published match (DRY=1: list)"

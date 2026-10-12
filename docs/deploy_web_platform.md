@@ -302,7 +302,11 @@ played in it.
 
 **Check:** drop a video in the inbox and run `make inbox`.
 The file appears as `resources/YYYYMMDD_HHMM_<slug>.mp4` and a notification
-asks for its calibration.
+asks for its calibration. The court was looked for first: the proposal is in
+`output/<key>/calibration_auto/` (`auto_points.jpg` = the 8 points, zoomed).
+Once a few proposals have been right, set `VOLLEY_AUTO_CALIBRATION=accept` in
+`.env.publish` and a video whose court the detector is sure of runs without you
+(`docs/auto_calibration.md`).
 
 ---
 
@@ -348,7 +352,7 @@ The site is only as safe as the three accounts that can change it.
 |----------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
 | Record; upload to VolleyInbox                            | –                                                                                                                             |
 | Leave the Mac on, plugged in                             | `make inbox` downloads the video, names it `YYYYMMDD_HHMM_…` and notifies "needs calibration"                                 |
-| `make calibrate VIDEO=resources/<key>.mp4` (8 clicks)    | Next pass: `make run-match` (~0.8× the video length), publish as a **draft**, archive the file on Drive, notify "Draft ready" |
+| `make calibrate VIDEO=resources/<key>.mp4`: **A** takes the automatic proposal, **C** = 8 clicks (nothing to do in `accept` mode when the detector is sure) | Next pass: `make run-match` (~0.8× the video length), publish as a **draft**, archive the file on Drive, notify "Draft ready" |
 | Website → Admin → assign the 4 slots, check, **Publish** | Players see results, box score, fantasy and the league table                                                                  |
 
 **Corrections:**

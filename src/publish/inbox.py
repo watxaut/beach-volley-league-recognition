@@ -10,8 +10,14 @@ For every video in the shared Drive folder (rclone remote ``gdrive:VolleyInbox``
    from the file's ``creation_time``; a name that already conforms is kept,
    a ``YYYYMMDD_<slug>`` name only gains the time) -> ``resources/<key>.<ext>``
    and ``output/<key>/source.json`` (Drive link for the publication log);
-2. wait for ``calibrations/<key>.json`` -- the one manual step (the tripod
-   moves between videos): a notification says which command to run, once;
+2. the court calibration, ``calibrations/<key>.json`` (the tripod moves
+   between videos). ``scripts/auto_calibrate.py`` looks for the court first
+   (AGENTS.md §14) and leaves a proposal in ``output/<key>/calibration_auto/``;
+   what happens next is ``VOLLEY_AUTO_CALIBRATION``: ``propose`` (default) --
+   wait for the owner, who takes the proposal with one key or clicks
+   (``make calibrate``); ``accept`` -- a result the detector accepted itself is
+   used and the run goes on, anything else waits; ``off`` -- always wait. A
+   notification says what to do, once;
 3. ``make run-match`` (only on AC power, under ``caffeinate``);
 4. ``python -m src.publish output/<key>`` (lands as a DRAFT);
 5. move the Drive file to ``VolleyArchive/<key>.<ext>`` (a server-side move
@@ -45,6 +51,9 @@ VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".mkv", ".avi"}
 Runner = Callable[..., subprocess.CompletedProcess]
 
 ST_NEEDS_CALIBRATION = "needs_calibration"
+AUTO_CALIBRATION_MODES = ("off", "propose", "accept")
+#: scripts/auto_calibrate.py exit code -> what it found.
+AUTO_ACCEPTED, AUTO_PROPOSED, AUTO_FAILED = "accepted", "proposed", "failed"
 ST_FAILED = "failed"
 ST_ARCHIVED = "archived"
 
@@ -56,6 +65,7 @@ class InboxConfig:
     archive: str = "VolleyArchive"
     tz: str = "Europe/Madrid"
     require_ac: bool = True
+    auto_calibration: str = "propose"
     root: Path = Path(".")
     python: str = sys.executable
     make: str = "make"
@@ -87,6 +97,7 @@ class InboxConfig:
                    archive=env.get("VOLLEY_DRIVE_ARCHIVE", "VolleyArchive"),
                    tz=env.get("VOLLEY_TZ", "Europe/Madrid"),
                    require_ac=env.get("VOLLEY_REQUIRE_AC", "1") != "0",
+                   auto_calibration=_auto_mode(env.get("VOLLEY_AUTO_CALIBRATION", "propose")),
                    root=(root or Path.cwd()).resolve())
 
 
@@ -227,11 +238,19 @@ class Inbox:
         video = Path(rec["video"])
         run_dir = cfg.output / key
 
-        # 2. calibration (manual, once per video)
-        if not (cfg.calibrations / f"{key}.json").exists():
+        # 2. calibration (once per video): looked for in the picture first
+        calibration = cfg.calibrations / f"{key}.json"
+        if (not calibration.exists() and cfg.auto_calibration != "off"
+                and "auto_calibration" not in rec):
+            rec["auto_calibration"] = self._auto_calibrate(video)
+        if not calibration.exists():
             if rec.get("status") != ST_NEEDS_CALIBRATION:
                 rec["status"] = ST_NEEDS_CALIBRATION
-                self.notify(f"{key} needs its court calibration: "
+                sheet = f"output/{key}/calibration_auto/auto_points.jpg"
+                found = {AUTO_ACCEPTED: f" (found automatically: look at {sheet}, A = accept)",
+                         AUTO_PROPOSED: f" (the automatic one is unsure: see {sheet})"
+                         }.get(rec.get("auto_calibration"), "")
+                self.notify(f"{key} needs its court calibration{found}: "
                             f"make calibrate VIDEO={video.relative_to(cfg.root)}")
             return
 
@@ -265,13 +284,39 @@ class Inbox:
                               self._remote(cfg.archive, f"{key}{ext}")],
                              capture_output=True, text=True), "archive")
         rec["status"] = ST_ARCHIVED
-        self.notify(f"Draft ready to review: {key}  {rec.get('summary', '')}".strip())
+        court = ""
+        if cfg.auto_calibration == "accept" and rec.get("auto_calibration") == AUTO_ACCEPTED:
+            court = f"  [court found automatically: output/{key}/calibration_auto/auto_points.jpg]"
+        self.notify(f"Draft ready to review: {key}  {rec.get('summary', '')}".strip() + court)
+
+    def _auto_calibrate(self, video: Path) -> str:
+        """Look for the court in the picture (once per video). In ``accept``
+        mode an accepted result becomes ``calibrations/<key>.json``; in
+        ``propose`` mode nothing is written there. A crash is not an error of
+        the entry: the owner clicks, as before."""
+        cfg = self.cfg
+        cmd = [cfg.python, "scripts/auto_calibrate.py", str(video.relative_to(cfg.root))]
+        if cfg.auto_calibration == "accept":
+            cmd.append("--write")
+        self.say(f"{video.stem}: looking for the court")
+        res = self.run(cmd, cwd=cfg.root, capture_output=True, text=True)
+        outcome = {0: AUTO_ACCEPTED, 2: AUTO_PROPOSED}.get(res.returncode, AUTO_FAILED)
+        self.say(f"{video.stem}: automatic calibration {outcome}")
+        return outcome
 
     @staticmethod
     def _check(res: subprocess.CompletedProcess, what: str) -> None:
         if res.returncode != 0:
             err = (getattr(res, "stderr", "") or "").strip()[-300:]
             raise RuntimeError(f"{what} failed (exit {res.returncode}) {err}")
+
+
+def _auto_mode(raw: str) -> str:
+    mode = (raw or "").strip().lower()
+    if mode not in AUTO_CALIBRATION_MODES:
+        raise ValueError(f"VOLLEY_AUTO_CALIBRATION must be one of {AUTO_CALIBRATION_MODES}, "
+                         f"not {raw!r}")
+    return mode
 
 
 def _parse_utc(raw: str) -> datetime:

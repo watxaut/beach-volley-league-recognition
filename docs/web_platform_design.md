@@ -161,6 +161,11 @@ min, a 40-min video ~32 min. Post-run is ~3 s.
 so every video needs the interactive 8-point calibration (~1 min). The flow
 stops there and notifies; everything else is automatic.
 
+*Since #110 (2026-10-11):* the court is looked for in the picture first
+(`docs/auto_calibration.md`). By default the inbox still stops there with a
+proposal the owner takes with one key; with `VOLLEY_AUTO_CALIBRATION=accept` a
+video whose court the detector is sure of needs nobody.
+
 ### Local runner (no state database; every step checks its own output)
 
 ```
