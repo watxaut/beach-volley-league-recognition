@@ -597,6 +597,42 @@ byte-identical; bars as before (33/33, winners 33/33, P 0.976 / R 0.933, action
 52/52); sweep 157 moves, none loses a point or a winner. In-sample for these two
 rallies: the test is the next new match.
 
+## Fifth video, measured (2026-10-12, #112: 20261012_1130_masnou)
+
+A beach video the automatic calibration refused (calibration read by hand,
+`source: agent-read`); the owner's only number was the final, A 21 – B 15 = 36
+points. The first run read 31 (A 19 – B 11), switch blocks 4 / 7 / 6 / 7 / 6:
+the shortfalls (3 + 1 + 1) added up to the 5 missing. Causal actions outside
+every point + contact sheets (sequential decode) found two rallies, both a far
+serve the ball alone leaves open, received by a team that stood waiting:
+
+* **f2175, first seen at the tape and dug.** A birth 1 m past the net, 2.5 m up,
+  moving onto the near half, on a still court (sway 0.05), received by a dig.
+  `_serve_at_the_tape` (#111) asked the flight to END ON THE SAND; a dug ball
+  ends in a touch. It now takes either (`_received`); still court as before.
+* **f3425, a lob serve.** A far flight of 41 samples, 4.4 m peak, 8.3 m of
+  travel at 4.6 m/s (< `SERVE_MIN_SPEED_MS`, 5.5: "a lob back to the server"),
+  court sway 0.13 (not still). Receivers side by side (stagger 0.15 m, the
+  formation rule of #108) and play followed. `_lob_to_a_formation`: a slow flight
+  that gets over the tape (not at it: the tape stays the still court's), with a
+  tight formation read and play after it, is a serve (`confirmed_by:
+  formation`). The ball sent back between points lands on a team that is NOT in
+  formation (1.9 m on this video, f26020: a far player lobs it to the near team,
+  who pick it up — still refused).
+
+First version of the lob rule did not ask for the ball to clear the net and
+took the toss of a jump serve (20261010_1100 P19, f16504, a toss that travels
+5 m forward on its own half): the net condition is the fix, and 1100 is
+byte-identical again. Result: 33 points, A 19 – B 13, switches 6 / 13 / 19 / 26 /
+32, the last point undecided. The other twelve runs (20260920, 1000, 1100, 1200,
+1230, e1–e7): `match_reconstruction.json` byte-identical; 20260920 bars as before
+(33/33, winners 33/33, P 0.976 / R 0.933, action 0.988). In-sample for these two
+rallies. **Left (3 of 36):** f14445, a NEAR lob serve (toss at y 15.6, flight
+12.4 → 3.4 m at 3.1 m/s, sway 0.017 = a perfectly still court) dropped because
+the flight's own depth read starts at 12.4 m, short of `NEAR_SERVE_MIN_Y` (14 m)
+— the toss that fed it reads 15.6; and two more not located (the 56 s gap before
+P27 and one in the first six points).
+
 ## Known limits
 
 * **Players** are scored against the owner-ratified attribution of the

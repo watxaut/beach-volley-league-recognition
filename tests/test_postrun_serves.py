@@ -552,3 +552,56 @@ def test_score_table_pairs_points_by_serve_time():
     assert (score["matched"], score["false"], score["missed"]) == (3, [3], [4])
     assert score["serve_team_ok"] == 3
     assert (score["winners_ok"], score["winners_wrong"]) == (2, [3])
+
+
+# --------------------------------------------------------------------------- #
+# serves the ball alone leaves open, received by a team that waits for one
+# --------------------------------------------------------------------------- #
+
+def _first_seen_at_the_tape_and_dug(walking):
+    """A far serve whose flight is never seen: the ball is first tracked at
+    the tape, a metre past it, and the receivers dig it."""
+    b = sim.StreamBuilder(16.0)
+    tape = sim.Hit(1.7, None, 2.3, xy=(3.0, 8.0), accepted=False, seen=False)
+    frames = b.rally(sim.RallyScript(
+        start_s=2.0, serve_xy=(2.0, -0.6),
+        hits=[tape, sim.Hit(0.9, "P1A", sim.DIG_Z), sim.Hit(1.0, "P2A", sim.SET_Z),
+              sim.Hit(1.0, "P1A", sim.SPIKE_Z)],
+        landing=(4.0, 3.5), landing_dt=1.0))
+    b.hide(frames[0], frames[1] - 1)
+    b.put_players(frames[0] - 90, frames[1], sim.NEAR_A)
+    if walking:
+        _walk_about(b, frames[0] - 80, frames[1])
+    return frames, _segment(b)[1]
+
+
+def test_serve_first_seen_at_the_tape_and_dug_is_a_point_on_a_still_court():
+    frames, found = _first_seen_at_the_tape_and_dug(walking=False)
+    assert len(found) == 1
+    serve = found[0].serve
+    assert serve.side == "far" and not serve.observed
+    assert serve.confirmed_by == CONFIRMED_STILL
+    assert len(found[0].touches) >= 3
+    # a ball first seen there while the court moves is nobody's serve
+    _, found = _first_seen_at_the_tape_and_dug(walking=True)
+    assert found == []
+
+
+def _lob_serve(receivers):
+    b = sim.StreamBuilder(16.0)
+    script = sim.standard_rally(2.0, "far", receivers)
+    script.serve_xy = (2.0, 3.0)
+    script.hits[0].dt = 1.8                  # ~4.4 m/s over the net: a lob
+    frames = b.rally(script)
+    return frames, _segment(b)[1]
+
+
+def test_lob_serve_to_receivers_in_formation_is_a_serve():
+    frames, found = _lob_serve(sim.NEAR_A)
+    assert len(found) == 1
+    assert found[0].serve.side == "far"
+    assert found[0].serve.confirmed_by == rallies.CONFIRMED_FORMATION
+    # the same ball to a staggered pair is a ball sent back, not a serve
+    staggered = dict(sim.NEAR_A, P2A=(5.5, 14.0))
+    _, found = _lob_serve(staggered)
+    assert found == []

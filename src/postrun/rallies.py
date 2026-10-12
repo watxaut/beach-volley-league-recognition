@@ -95,6 +95,7 @@ FORMATION_NET_CLEAR_M = 1.0
 # a serve wherever the receivers stood.
 PLAYED_MIN_TOUCHES = 2
 REFUSED_FORMATION = "receivers_not_in_formation"
+CONFIRMED_FORMATION = "formation"
 
 # -- a still court ---------------------------------------------------------- #
 # Owner's observation (2026-10-11): at a serve everybody but the server stands
@@ -306,7 +307,8 @@ class RallySegmenter:
                 or not fl.start_height_m >= LIVE_MIN_PEAK_M):
             return None
         toward_net = 1.0 if fl.y_end > fl.y_start else -1.0
-        if toward_net * (fl.y_end - NET_Y_M) <= 0 or not self._ends_on_ground(index):
+        if toward_net * (fl.y_end - NET_Y_M) <= 0 or not (
+                self._ends_on_ground(index) or self._received(index)):
             return None                     # it never got past the tape / was not dropped
         if not self._court_still(e.frame):
             return None
@@ -361,10 +363,15 @@ class RallySegmenter:
         if not (reaches or into_net):
             # ... or that the tape stops and drops, on either side of the net
             # (the ball gets there slower than a serve that clears it).
-            if not (at_net and self._dropped_by_the_tape(index)
+            if (at_net and self._dropped_by_the_tape(index)
                     and self._court_still(e.frame)):
+                into_net, confirmed = True, CONFIRMED_STILL
+            elif (toward_net * travel >= SERVE_MIN_TRAVEL_M and toward_net * speed > 0
+                    and toward_net * (fl.y_end - NET_Y_M) > 0 and not at_net   # over the tape, and past it
+                    and self._lob_to_a_formation(index, e.frame, side)):
+                confirmed = CONFIRMED_FORMATION
+            else:
                 return None
-            into_net, confirmed = True, CONFIRMED_STILL
         frame, observed = e.frame, e.kind == EVENT_CONTACT
         if e.kind == EVENT_BIRTH:
             hit = self._hit_after_toss(fl)
@@ -392,6 +399,24 @@ class RallySegmenter:
         if landed is None or landed >= fl.end:
             return fl
         return self.tl.fit_span(fl.start, landed) or fl
+
+    def _received(self, index: int) -> bool:
+        """Does the flight leaving event ``index`` end in a touch (a dig)?"""
+        events = self.tl.events
+        if index + 1 >= len(events):
+            return False
+        nxt = events[index + 1]
+        return nxt.kind == EVENT_CONTACT and nxt.accepted
+
+    def _lob_to_a_formation(self, index: int, frame: int, side: str) -> bool:
+        """A slow serve (a lob, 4-5 m/s: not a ball sent back to the server,
+        which lands on a team that is not waiting): it reaches the other half
+        over the tape, the two receivers stand side by side as for a serve
+        (both read, ``FORMATION_MAX_STAGGER_M``) and play goes on."""
+        stagger = self._receivers_stagger_m(
+            ServeLaunch(frame=frame, side=side, event_index=index, observed=False))
+        return (stagger is not None and stagger <= FORMATION_MAX_STAGGER_M
+                and self._play_follows(index))
 
     def _own_toss(self, index: int) -> bool:
         """Is the "pass" that reached this launch the server's own toss? It
