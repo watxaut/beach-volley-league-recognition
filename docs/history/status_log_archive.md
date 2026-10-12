@@ -7367,3 +7367,20 @@ Deployed by the owner the same day (migration pushed, web redeployed, `make repu
 **Verified.** Frame-accurate: synthetic video whose frames show their own number (copy, clips, a re-publish without the video, an early end); the contact is on clip frame 30 / 26 on both real matches (20260920 is VFR). Both matches end to end through `python -m src.publish --dry-run` on copies of the run directories: 41 / 41 clips (0.19–0.33 MB, 9.9 MB, copy 44 MB, 166 s) and 62 / 62 (0.13–0.23 MB, 11 MB, copy 39 MB, 134 s); second run 2 s, same bundle hash. Schema check on a scratch Postgres 17: 5 pass; the two rules mutated → the smoke fails. Web in headless Chrome (demo): hover plays, a quick sweep fetches nothing, tap plays inline on a phone viewport. pytest 1280 pass (+23), vitest 71 (+3), typecheck + lint clean.
 
 **Not done / owed.** Not deployed (Active next 1b). Hosted Storage list / delete never ran against Supabase (fake client only). No marker on the credited attacker in the clip. The ball leaves the picture sideways in 5 of 41 clips. Local rally copy 39–44 MB per match (the first estimate given to the owner was 27). `Makefile` untouched (it holds someone else's uncommitted `--start-frame`), so `--no-clips` is not in its comment.
+
+### 2026-10-10 (hundred-and-eighth session) — two more videos of the morning (20261010_1100, _1200): run + checked by frames
+
+**Asked (owner):** "process them and check if they are sound" (the 1100 and 1200 videos; a 1230 video is on disk without a calibration and was not run).
+
+**Run.** `make run-match` per video (MPS, 13 frames/s with the dump: 1100 41 min, 1200 60 min). Calibrations were the owner's. 1100 is VFR (25 fps for 14 min, then 30; average 26.62 in a 1242 s file), 1200 is CFR 30.12.
+
+**Checked without GT (nothing in `src/` changed).** Reconstruction checks (points, score, blocks, `service_order`, flags, identity levels / slot margins), then FRAMES: the contact sheets of the long rallies (1100 P13 23 touches, P29 22, 1200 P40 25: all single continuous rallies), gap sheets for every gap with net crossings, and a probe of serve-shaped flights outside any point (`BallTimeline.flights` + `RallySegmenter._fed_by_pass`; scratch scripts, not kept).
+- **1200: sound.** 40 points, A 21 – B 19, the set closes at the end of the video; service order 37/37 for both teams; squads switch after 8 / 15 / 21 / 28 / 35 (every 7, the first two one late, the players' own count); identity levels +0.382 / −0.094, slot margins ≥ the match's. Gaps with play are 1v1 / mixed practice. Flags: P20 / P21 `line_call_overridden` (P20 is cut: the ball is still in the air at the "landing").
+- **1100: not sound.** 31 points, A 14 – B 17, nobody at 21, blocks 7 / 7 / 6 / 6, service order 83 % and `server_from_rotation` on P26–P30. Frames: a far jump serve at f16535 (P2B, pink partner on the court, A side by side to receive) is a whole point the layer drops (open point 32j (1)); P27 is a serve + ~6 touches the layer ends at the serve's "landing" (a dive-dig; 32j (2)); the 61 s gap after P12, the 48 s gap after P1 and the gaps after P11 / P25 are breaks and serve practice (correctly ignored). One more missing point is still needed for block 4 (6) and the set is open: the real final score is the owner's to give.
+- **Clock.** The play-by-play prints frame / average fps: up to +50 s off on 1100 (32j (3)); frame numbers, thumbnails and clips are unaffected.
+
+**Not done / owed.** The three fixes of 32j (cards, byte-identical neutrality on 1000 / 20260920 / e1–e7). Owner: real 1100 final score, f16535, contact sheets (`point_images/` written for both runs) before anything is published. Branch `status-108-two-more-matches` (STATUS + archive only).
+
+## [removed 2026-10-12, #111] Session index line moved out of STATUS.md (budget 100 lines), verbatim
+
+- 2026-09-23 **#14** — match intake: one-time sub-1080p ingest upscale (`ensure_1080`, ffmpeg Lanczos, parity-gated cache).

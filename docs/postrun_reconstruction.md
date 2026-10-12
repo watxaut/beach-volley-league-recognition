@@ -559,6 +559,44 @@ attack behind a block (P29: the owner says it is the setter's partner's; the
 layer still credits no touch it did not see -- 2 such attacks on four
 matches, both real).
 
+## Fourth video, measured (2026-10-12, #111: 20261010_1230)
+
+The owner's only number was the final: A 21 – B 19 = 40 points. The first run
+read 38 (A 21 – B 17, switches after 7 / 14 / 21 / 28 / **34**). A scan of every
+ball contact outside the points plus contact sheets (sequential decode) found
+four clusters: two of dead-time handling (a ball fed over the net to a diving
+player) and two rallies, both told by the owner afterwards:
+
+* **17:32 (f31700), a net-cord ace.** B serves, the ball touches the tape and
+  drops, A reaches it and the dig is hidden by the digger. No flight before the
+  tape: the track is BORN at y 8.0 m (the far-serve gate stops at 7.5 m), 2.1 m
+  up, 2.5 m/s, on a court that had stood still (sway 0.056). New last-resort
+  read `_serve_at_the_tape`: a birth within `NET_ZONE_M` of the net, ≥
+  `LIVE_MIN_PEAK_M` up, moving away from the net onto the other half and
+  ending on the sand, STILL COURT only; it runs after the flight test, so a
+  serve the flight already finds keeps its frame (the first version ran before
+  and moved two serve frames by 10 f).
+* **23:10 (f41879), a far serve read as a pass.** The tracker found the ball
+  five frames before the hit; that "feeder" vertex has a one-sample arriving
+  flight, and the toss moves 3 m along the axis the far end cannot measure, so
+  `_fed_by_pass` called it a pass; the court sway was 0.133 (> 0.10), too much
+  for `_own_toss`. A feeder the ball reached in fewer than `MIN_DEPTH_SAMPLES`
+  is the ball's first sight, not a touch (the 49 other serve-shaped launches
+  `_fed_by_pass` refused on the 12 runs have a feeder with ≥ 7 arriving samples,
+  the real attacks among them ≥ 15; the bar is 3).
+
+With the serve back, P37 (the previous point) is A's: its ball-death read
+(`fell_at_net`, B's overpass hit the net) was right and the next-serve read was
+wrong only because the serve after it was missing. Result: 40 points, switches
+7 / 14 / 21 / 28 / 35, A 21 – B 18 and the **last point undecided** (A's spike
+dies 0.9 m from the net, inside `LANDING_NET_MARGIN_M`, and with A already on 21
+both teams "close" the set; the owner: B's, so 21 – 19). The other eleven runs
+(20260920, 1000, 1100, 1200, e1–e7): reconstruction JSON and report
+byte-identical; bars as before (33/33, winners 33/33, P 0.976 / R 0.933, action
+0.988; 1100 35/35, serving team 35/35, winners 34/35; practice 5/5, 52/53,
+52/52); sweep 157 moves, none loses a point or a winner. In-sample for these two
+rallies: the test is the next new match.
+
 ## Known limits
 
 * **Players** are scored against the owner-ratified attribution of the

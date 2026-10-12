@@ -290,6 +290,31 @@ class RallySegmenter:
                            observed=hit is not None,
                            confirmed_by=None if firm else CONFIRMED_STILL)
 
+    def _serve_at_the_tape(self, index: int, e: BallEvent) -> Optional[ServeLaunch]:
+        """A serve whose whole flight went unseen and whose ball is first
+        picked up AT the tape, above what the sand can send up, moving away
+        from the net and down onto the other half: a net-cord serve (the far
+        ball is a few pixels wide, and the cord kills its speed). Nothing in
+        the ball says "serve" there -- it is a slow ball a metre past the
+        net -- so only a STILL COURT lets it through, never the ball alone."""
+        fl = e.flight_out
+        if e.kind != EVENT_BIRTH or fl is None:
+            return None
+        if (fl.n < SERVE_MIN_SAMPLES
+                or self.stream.seconds(fl.end - fl.start) < SERVE_MIN_FLIGHT_S
+                or abs(fl.y_start - NET_Y_M) > NET_ZONE_M
+                or not fl.start_height_m >= LIVE_MIN_PEAK_M):
+            return None
+        toward_net = 1.0 if fl.y_end > fl.y_start else -1.0
+        if toward_net * (fl.y_end - NET_Y_M) <= 0 or not self._ends_on_ground(index):
+            return None                     # it never got past the tape / was not dropped
+        if not self._court_still(e.frame):
+            return None
+        side = SIDE_FAR if toward_net > 0 else SIDE_NEAR
+        hit = max(0, e.frame - self.stream.frames(ORPHAN_SERVE_FLIGHT_S / 2))
+        return ServeLaunch(frame=hit, side=side, event_index=index, observed=False,
+                           confirmed_by=CONFIRMED_STILL)
+
     def _serve_launch(self, index: int, e: BallEvent) -> Optional[ServeLaunch]:
         fl = e.flight_out
         if fl is None or e.kind == EVENT_DEATH:
@@ -297,6 +322,14 @@ class RallySegmenter:
         past = self._serve_past_the_frame(index, e)
         if past is not None:
             return past
+        by_flight = self._serve_by_flight(index, e)
+        if by_flight is not None:
+            return by_flight
+        # Last resort, after the flight itself said "not a serve".
+        return self._serve_at_the_tape(index, e)
+
+    def _serve_by_flight(self, index: int, e: BallEvent) -> Optional[ServeLaunch]:
+        fl = e.flight_out
         fl = self._airborne(fl)
         if not np.isfinite(fl.peak_height_m) or fl.peak_height_m < SERVE_MIN_PEAK_M:
             return None
@@ -428,6 +461,12 @@ class RallySegmenter:
             return False
         feeder = events[index - 1]
         if feeder.kind != EVENT_CONTACT or feeder.frame != arriving.start:
+            return False
+        if feeder.flight_in is None or feeder.flight_in.n < MIN_DEPTH_SAMPLES:
+            # A pass reaches its toucher: the ball was seen coming. A "touch"
+            # the ball reached in fewer samples than a depth read needs is the
+            # first sight of the ball -- a toss released at the server's hand
+            # (20261010_1230 f41851: tracked 5 frames before the hit).
             return False
         if self.stream.seconds(arriving.end - arriving.start) > MAX_AIR_S:
             return False
