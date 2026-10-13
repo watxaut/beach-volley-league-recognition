@@ -242,6 +242,8 @@ def test_a_corrected_match_is_renumbered_rescored_and_restated():
     assert [p["score_after"] for p in out["points"]] == [
         {"A": 0, "B": 1}, {"A": 1, "B": 1}, {"A": 1, "B": 2}]
     assert out["points"][2]["serve"]["team"] == "A"          # the winner of the point before
+    review["missing_points"][1]["serve_team"] = "B"          # ... unless he says who served
+    assert apply_review(recon, review)[0]["points"][2]["serve"]["team"] == "B"
     assert out["checks"]["points"] == 3 and out["checks"]["final_score"] == {"A": 1, "B": 2}
     assert out["checks"]["flagged_points"] == {1: ["owner_added"], 3: ["owner_added"]}
     assert (report["corrected"], report["dropped"], report["added"]) == (1, 1, 2)

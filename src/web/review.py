@@ -483,6 +483,61 @@ def reviewed_score(points: Sequence[Dict[str, Any]], by_point: Dict[int, Dict[st
     return {"A": score["A"], "B": score["B"], "undecided": undecided}
 
 
+def sequence(points: Sequence[Dict[str, Any]], by_point: Dict[int, Dict[str, Any]],
+             missing: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The match as reviewed, one row per point in order: the run's points
+    (the owner's truth where he gave one, none for a rally that was no
+    point) and the points he added, each after the point it follows."""
+    rows: List[Dict[str, Any]] = []
+
+    def added(after: int) -> None:
+        for m in missing:
+            if (m.get("after_point") or 0) == after:
+                rows.append({"point": None, "after_point": after, "winner": m.get("winner"),
+                             "serve_team": m.get("serve_team"),
+                             "near_team": rows[-1]["near_team"] if rows else None})
+
+    added(0)
+    for p in points:
+        truth = (by_point.get(p["point"]) or {}).get("truth")
+        if truth is None or truth.get("is_point"):
+            src = truth or p
+            rows.append({"point": p["point"], "winner": src["winner"],
+                         "serve_team": src["serve_team"], "near_team": src["near_team"]})
+        added(p["point"])
+    return rows
+
+
+def consistency(rows: Sequence[Dict[str, Any]], switch_every: int = 7) -> List[str]:
+    """What the rules of the game say does not add up in a reviewed match:
+    the winner of a point serves the next one, and the teams change ends
+    every ``switch_every`` points. Hints for the owner's eyes -- the players'
+    own count can be off (AGENTS.md §11): never a reason to change a point."""
+    def name(row: Dict[str, Any]) -> str:
+        return (f"point {row['point']}" if row["point"] is not None
+                else f"the point you added after point {row['after_point']}"
+                if row["after_point"] else "the point you added before point 1")
+
+    out = []
+    for a, b in zip(rows, rows[1:]):
+        if a["winner"] and b["serve_team"] and a["winner"] != b["serve_team"]:
+            out.append(f"{name(b).capitalize()} is served by {b['serve_team']}, but "
+                       f"{name(a)} was won by {a['winner']}: one of the two is wrong, "
+                       f"or a point is missing between them.")
+    block, first = 0, rows[0] if rows else None
+    for a, b in zip(rows, rows[1:]):
+        block += 1
+        if a["near_team"] and b["near_team"] and a["near_team"] != b["near_team"]:
+            if block != switch_every:
+                out.append(f"{block} points between {name(first)} and the side switch after "
+                           f"{name(a)} ({switch_every} expected): "
+                           + ("a point may be missing there" if block < switch_every
+                              else "a rally there may be no point")
+                           + ", or the players changed ends on another point.")
+            block, first = 0, b
+    return out
+
+
 def clean_match_fields(raw: Dict[str, Any], points: Sequence[Dict[str, Any]]
                        ) -> Dict[str, Any]:
     """The match-level part of a review: the owner's final score and the
@@ -507,6 +562,10 @@ def clean_match_fields(raw: Dict[str, Any], points: Sequence[Dict[str, Any]]
                "note": str(m.get("note") or "").strip()[:NOTE_MAX]}
         if m.get("at_frame") is not None:      # where in the dead time the owner saw it
             row["at_frame"] = int(m["at_frame"])
+        if m.get("serve_team") is not None:    # who served it, when he said so
+            if m["serve_team"] not in TEAMS:
+                raise ValueError("a missing point is served by A or B")
+            row["serve_team"] = m["serve_team"]
         missing.append(row)
     return {"owner_final_score": final,
             "missing_points": sorted(missing, key=lambda m: m["after_frame"])}
@@ -601,6 +660,8 @@ def create_router(output_root: Path = Path("output"),
         by_point, orphans = attach(review, view["points"])
         return {"verdicts": by_point, "orphans": orphans,
                 "gaps": gap_states(review, view.get("gaps") or []),
+                "warnings": consistency(sequence(view["points"], by_point,
+                                                 review["missing_points"])),
                 "missing_points": review["missing_points"],
                 "owner_final_score": review["owner_final_score"],
                 "reviewed_score": reviewed_score(view["points"], by_point,
