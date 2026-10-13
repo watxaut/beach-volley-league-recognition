@@ -1,0 +1,19 @@
+ground_truth/20261010_1000_vall_dhebron_jesus_sara_joan_loida_review.json
+  s_9ed08fada71d0a::t_54afb1f971404f 1-2493
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "49e9dd949e748fcc658bd8cc364e765c83815c5f",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
