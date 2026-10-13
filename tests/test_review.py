@@ -334,6 +334,19 @@ def test_a_checked_gap_stays_checked_when_its_edges_move(points):
     assert review["gaps"] == [] and R.gap_states(review, gaps) == {}
 
 
+def test_a_gap_can_be_the_rest_of_the_point_before_it(points):
+    """The run ended a rally too early: what plays on in the dead time is the
+    same point, not a missing one."""
+    review = R.empty_review("k")
+    gaps = _gaps(points)
+    R.put_gap(review, gaps[1], True, tail_frame=300)
+    assert review["gaps"] == [{"first": 251, "last": 374, "status": "tail",
+                               "rally_goes_on_to": 300}]
+    assert R.gap_states(review, gaps) == {1: "tail"}
+    R.put_gap(review, gaps[1], True)                             # changed his mind
+    assert R.gap_states(review, gaps) == {1: "checked"}
+
+
 def test_a_missing_point_keeps_the_frame_the_owner_marked(points):
     out = R.clean_match_fields({"missing_points": [
         {"after_point": 1, "winner": "A", "at_frame": 300.0}]}, points)
@@ -393,6 +406,9 @@ def test_saving_a_point_writes_the_owner_file_and_undo_removes_it(tmp_path):
     assert save_gap(run.name, 1, {"checked": True})["gaps"] == {1: "checked"}
     assert json.loads(R.review_path(gt, run.name).read_text())["gaps"] == [
         {"first": 251, "last": 374, "status": "checked"}]
+    assert save_gap(run.name, 1, {"checked": True, "tail_frame": 300})["gaps"] == {1: "tail"}
+    with pytest.raises(HTTPException):
+        save_gap(run.name, 1, {"checked": True, "tail_frame": 9999})    # not in that gap
     assert save_gap(run.name, 1, {"checked": False})["gaps"] == {}
     with pytest.raises(HTTPException):
         save_gap(run.name, 7, {"checked": True})

@@ -243,27 +243,35 @@ def gaps_view(points: Sequence[Dict[str, Any]], n_frames: Optional[int], fps: fl
 
 
 def gap_states(review: Dict[str, Any], gaps: Sequence[Dict[str, Any]]) -> Dict[int, str]:
-    """``after_point`` -> ``checked`` for every gap the owner watched (what he
-    found there, if anything, is in ``missing_points``): a stored stretch
-    covers at least ``ATTACH_MIN_OVERLAP`` of it (the stretches move a little
-    when a rules change moves a rally)."""
+    """``after_point`` -> ``checked`` for every gap the owner watched (a point
+    he found there is in ``missing_points``), ``tail`` when what he saw is
+    the REST of the point before it -- the run ended that rally too early, so
+    it is one point, not two. A stored stretch covers at least
+    ``ATTACH_MIN_OVERLAP`` of the gap (the stretches move a little when a
+    rules change moves a rally)."""
     out = {}
     for g in gaps:
         length = g["last"] - g["first"] + 1
         for seen in review.get("gaps") or []:
             share = (min(seen["last"], g["last"]) - max(seen["first"], g["first"]) + 1) / length
-            if seen.get("status") == "checked" and share >= ATTACH_MIN_OVERLAP:
-                out[g["after_point"]] = "checked"
+            if seen.get("status") in ("checked", "tail") and share >= ATTACH_MIN_OVERLAP:
+                out[g["after_point"]] = seen["status"]
     return out
 
 
-def put_gap(review: Dict[str, Any], gap: Dict[str, Any], checked: bool) -> None:
-    """Store (or forget) that the owner watched a gap."""
+def put_gap(review: Dict[str, Any], gap: Dict[str, Any], checked: bool,
+            tail_frame: Optional[int] = None) -> None:
+    """Store (or forget) that the owner watched a gap. ``tail_frame``: the
+    rally of the point before it goes on in this gap, up to about that
+    frame."""
     length = gap["last"] - gap["first"] + 1
     kept = [seen for seen in review.get("gaps") or []
             if (min(seen["last"], gap["last"]) - max(seen["first"], gap["first"]) + 1) / length
             < ATTACH_MIN_OVERLAP]
-    if checked:
+    if checked and tail_frame is not None:
+        kept.append({"first": gap["first"], "last": gap["last"], "status": "tail",
+                     "rally_goes_on_to": int(tail_frame)})
+    elif checked:
         kept.append({"first": gap["first"], "last": gap["last"], "status": "checked"})
     review["gaps"] = sorted(kept, key=lambda g: g["first"])
 
@@ -702,7 +710,11 @@ def create_router(output_root: Path = Path("output"),
             raise HTTPException(status_code=404, detail="no such gap")
         path = review_path(gt_root, run["key"])
         review = load_review(path, run["key"])
-        put_gap(review, gap, bool(raw.get("checked")))
+        tail = raw.get("tail_frame")
+        if tail is not None and (not after_point
+                                 or not gap["first"] <= int(tail) <= gap["last"]):
+            raise HTTPException(status_code=400, detail="no rally to go on here")
+        put_gap(review, gap, bool(raw.get("checked")), tail)
         save_review(path, review)
         return state_of(run, view)
 

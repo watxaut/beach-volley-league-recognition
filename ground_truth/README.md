@@ -137,8 +137,10 @@ web is the match as reviewed here.
   `at_frame` when the owner marked it while watching the dead time: a frame
   with the missed rally on the picture (the place to look when fixing it).
 - `gaps[]` — the stretches of dead time the owner watched (`first`, `last`,
-  `status: checked`); what he found there, if anything, is in
-  `missing_points`. A gap not listed was not watched: no claim about it.
+  `status: checked`); a point he found there is in `missing_points`.
+  `status: tail` + `rally_goes_on_to` (a frame): what plays there is the REST
+  of the point before it — the run ended that rally too early. It is one
+  point, never a missing one, and its touches after the cut are unknown. A gap not listed was not watched: no claim about it.
 - `points[]` — one verdict per reviewed point:
   - `start_frame` / `end_frame` — the rally as the run had it. A verdict
     belongs to the point that covers at least half of these frames, so it

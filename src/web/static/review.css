@@ -34,6 +34,7 @@
 .rv .rv-gap.flagged { color: var(--fix); }
 .rv .rv-gap.ok { color: var(--ok); }
 .rv .rv-gap.missing { color: var(--out); }
+.rv .rv-gap.tail { color: var(--a); }
 .rv .rv-gap.current { background: var(--ink); color: var(--bg); }
 
 .rv-main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 20px; padding: 14px 20px 30px; max-width: none; }

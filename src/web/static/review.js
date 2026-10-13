@@ -151,10 +151,11 @@
   function gapChip(g, i) {
     if (!g || !g.segment) return "";
     const missing = R.missing_points.filter((m) => m.after_point === g.after_point).length;
-    const state = missing ? "missing" : (R.gaps || {})[g.after_point] === "checked" ? "ok" : g.flagged ? "flagged" : "";
+    const seen = (R.gaps || {})[g.after_point];
+    const state = missing ? "missing" : seen === "tail" ? "tail" : seen === "checked" ? "ok" : g.flagged ? "flagged" : "";
     const title = `Dead time ${g.after_point ? `after point ${g.after_point}` : "before the first point"} · ` +
       `${Math.round(g.seconds)} s` + (g.why.length ? ` · ${g.why.join(", ")}` : "") +
-      (missing ? ` · ${missing} point(s) missing` : "");
+      (missing ? ` · ${missing} point(s) missing` : "") + (seen === "tail" ? " · the rest of the point before it" : "");
     return `<button class="rv-gap ${state} ${i === gapAt ? "current" : ""}" data-g="${i}" title="${esc(title)}">` +
       `${missing ? "+" : "·"}</button>`;
   }
@@ -185,7 +186,7 @@
        <button data-act="drop-missing">✕</button></div>`)).join("");
 
   function renderGapPanel() {
-    const g = gap(), clear = (R.gaps || {})[g.after_point] === "checked";
+    const g = gap(), seen = (R.gaps || {})[g.after_point], clear = seen === "checked" || seen === "tail";
     const found = R.missing_points.some((m) => m.after_point === g.after_point);
     const where = !g.after_point ? "Before point 1" : g.before_point == null ? `After point ${g.after_point}`
       : `Between point ${g.after_point} and ${g.before_point}`;
@@ -193,7 +194,7 @@
       <div class="rv-card">
         <div class="rv-head">
           <span class="n">Dead time</span><span class="rv-muted">${where}</span>
-          <span class="rv-state ${clear ? "ok" : ""}">${clear ? "✓ checked" : "not checked"}</span>
+          <span class="rv-state ${clear ? "ok" : ""}">${seen === "tail" ? `✓ the rest of point ${g.after_point}` : clear ? "✓ checked" : "not checked"}</span>
         </div>
         <p class="rv-facts"><b>${Math.round(g.seconds)} s</b>, shown ${g.segment.step}× faster ·
           the ball was played <b>${g.contacts ?? "?"}</b> times</p>
@@ -202,9 +203,11 @@
         <div class="rv-row" style="margin-top:10px">
           <button class="primary" data-act="ok">${found ? "Done, next" : "Nothing here, next"} (Enter)</button>
           <button data-act="add-missing">A point is missing here (M)</button>
+          ${g.after_point ? `<button data-act="gap-tail">It is the rest of point ${g.after_point} (R)</button>` : ""}
         </div>
         ${missingRows(g.after_point)}
-        <p class="rv-facts">Press M while the missing rally is on the picture: the frame is kept.</p>
+        <p class="rv-facts">A NEW rally starts with a serve. Play that goes on from the point before (the picture of that
+          point stopped too early) is the same point: press R, do not add a point. M and R keep the frame on the picture.</p>
       </div>`;
     redraw();
   }
@@ -238,7 +241,8 @@
     const g = after < 0 ? null : gaps()[after];
     const gapLine = !g ? "" : `<p class="rv-facts">Dead time until the next point: <b>${Math.round(g.seconds)} s</b>` +
       (g.contacts != null ? `, the ball played ${g.contacts} times` : "") +
-      ((R.gaps || {})[g.after_point] === "checked" ? " · ✓ checked" : "") +
+      ((R.gaps || {})[g.after_point] === "tail" ? " · ✓ THIS point goes on there (the run cut it short)"
+        : (R.gaps || {})[g.after_point] === "checked" ? " · ✓ checked" : "") +
       (g.segment ? ` <button data-act="open-gap" data-g="${after}">Watch it (G)</button>`
                  : ` · no picture (run <code>make review-gaps</code>)`) + `</p>`;
 
@@ -517,11 +521,13 @@
     gvid.play().catch(() => {});
   }
 
-  function gapDone() {
+  function gapDone(tail = false) {
     const g = gap();
-    saving = saving.then(() => api(`/gap/${g.after_point}`, { checked: true })).then(applyState).catch(fail);
+    if (tail && !g.after_point) return;
+    const body = tail ? { checked: true, tail_frame: curSrc() } : { checked: true };
+    saving = saving.then(() => api(`/gap/${g.after_point}`, body)).then(applyState).catch(fail);
     const next = M.points.findIndex((p) => p.point === g.before_point);
-    if (next >= 0) openPoint(next); else { gvid.pause(); R.gaps = { ...(R.gaps || {}), [g.after_point]: "checked" }; renderPanel(); }
+    if (next >= 0) openPoint(next); else { gvid.pause(); R.gaps = { ...(R.gaps || {}), [g.after_point]: tail ? "tail" : "checked" }; renderPanel(); }
   }
 
   async function openPoint(i) {
@@ -567,7 +573,7 @@
     // nobody looked yet; any other gap is one tap away (its dot, or G).
     const after = gaps().findIndex((g) => g.after_point === point().point);
     const g = after < 0 ? null : gaps()[after];
-    if (g && g.segment && g.flagged && (R.gaps || {})[g.after_point] !== "checked") openGap(after);
+    if (g && g.segment && g.flagged && !(R.gaps || {})[g.after_point]) openGap(after);
     else if (cur + 1 < M.points.length) openPoint(cur + 1);
     else { renderPanel(); video.pause(); }
   }
@@ -661,6 +667,7 @@
     else if (act === "add-touch") addTouch();
     else if (act === "add-missing") addMissing();
     else if (act === "open-gap") openGap(Number(b.dataset.g));
+    else if (act === "gap-tail") gapDone(true);
     else if (act === "drop-missing") {
       R.missing_points.splice(Number(b.closest("[data-missing]").dataset.missing), 1);
       saveMatch();
@@ -750,7 +757,7 @@
       Enter: allRight, " ": playPause, ArrowLeft: () => step(-1), ArrowRight: () => step(1),
       m: addMissing, s: toggleSpeed,
     };
-    const keys = gapAt != null ? { ...always, "[": () => leaveGap(-1), "]": () => leaveGap(1) } : {
+    const keys = gapAt != null ? { ...always, "[": () => leaveGap(-1), "]": () => leaveGap(1), r: () => gapDone(true) } : {
       ...always,
       ArrowUp: () => jumpTouch(-1), ArrowDown: () => jumpTouch(1),
       "[": () => openPoint(cur - 1), "]": () => openPoint(cur + 1),
