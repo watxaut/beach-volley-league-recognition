@@ -148,10 +148,27 @@ export function pointFantasy(touches: Touch[], pointsFor: (t: Touch, assist: boo
   }).sort((a, b) => a.point_no - b.point_no || a.slot.localeCompare(b.slot))
 }
 
+/** Every credited serve of the player over the seats, oldest first: what
+ * became of it and who took it (the credited first touch of the other team).
+ * The database adds where it came down (`analytics.serves`). */
+export function serveRows(seats: Seat[]): { r: 'ace' | 'error' | 'in'; to: string | null; d: string }[] {
+  return seats.flatMap((seat) => seat.touches
+    .filter((t) => t.slot === seat.slot && t.action === 'serve')
+    .sort((a, b) => a.point_no - b.point_no || a.seq - b.seq)
+    .map((t) => {
+      const point = seat.points.find((p) => p.point_no === t.point_no)
+      const recv = point ? receiverOf(point, seat.touches) : null
+      return {
+        r: t.outcome === 'ace' ? 'ace' as const : t.outcome === 'error' ? 'error' as const : 'in' as const,
+        to: recv?.slot ? seat.who(recv.slot).display_name : null, d: seat.date,
+      }
+    }))
+}
+
 const ratio = (k: number, n: number) => (n ? Math.round((k / n) * 1000) / 1000 : null)
 
 /** N1-N4 and the progress series of one player over the seats in a window. */
-export function playerAnalytics(seats: Seat[]): Omit<PlayerAnalytics, 'attack_zones' | 'landings' | 'touch_depths' | 'passes'> {
+export function playerAnalytics(seats: Seat[]): Omit<PlayerAnalytics, 'attack_zones' | 'landings' | 'touch_depths' | 'passes' | 'serves'> {
   const out = {
     n_attacks: 0, n_kills: 0, n_attack_errors: 0, n_serves: 0, n_aces: 0, n_serve_errors: 0,
     hit: { reception: tally(), transition: tally() },

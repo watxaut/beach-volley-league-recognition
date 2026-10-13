@@ -3,7 +3,7 @@ import { useApp } from '../app/state'
 import { CLIP_DWELL_MS } from '../lib/clips'
 import { formatDate } from '../lib/format'
 import {
-  LANDING_LABEL, landingError, shots, type LandingKind, type Phase, type Shot, type ShotGroup,
+  GROUP, LANDING_LABEL, landingError, shots, type LandingKind, type Phase, type Shot, type ShotGroup,
 } from '../lib/landings'
 import type { Landing, ShotKey } from '../lib/types'
 import { Segmented, type Option } from './ui'
@@ -57,6 +57,7 @@ function ShotLine({ shot, width = 26 }: { shot: ShotKey; width?: number }) {
 }
 
 const GROUP_LABEL: Record<Exclude<ShotGroup, 'other'>, string> = { kill: 'Kills', dug: 'Dug', error: 'Errors' }
+const GROUP_WORDS: Record<ShotGroup | 'all', string> = { kill: 'kills', dug: 'dug attacks', error: 'attack errors', other: 'attacks', all: 'attacks' }
 const PHASE_LABEL: Record<Phase, string> = { reception: 'Off the reception', transition: 'In transition' }
 const LEGEND: { kind: LandingKind; label: string }[] = [
   { kind: 'kill', label: 'Kill' }, { kind: 'dug', label: 'Dug' }, { kind: 'out', label: 'Error (out, net)' },
@@ -104,14 +105,15 @@ function Clip({ path, play }: { path: string; play: boolean }) {
 
 const lessMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
-/** Every attack as a line from where the ball was hit to where it came down
- * or was dug. Colour and the mark at the end say what became of it; the line
- * says how it was sent (hard, touch, free ball). Positions are best effort
- * from one low camera, so the
- * attack under the pointer (or the tapped one) shows the area each end may
- * really be in: depth is the weak axis. */
+/** Attacks as lines from where the ball was hit to where it came down or was
+ * dug. It opens on the kills: every attack at once is a thicket, and the
+ * kills are what the map is read for; the other outcomes are one tap away.
+ * Colour and the mark at the end say what became of an attack; the line says
+ * how it was sent (hard, touch, free ball). Positions are best effort from
+ * one low camera, so the attack under the pointer (or the tapped one) shows
+ * the area each end may really be in: depth is the weak axis. */
 export function AttackMap({ landings }: { landings: Landing[] }) {
-  const [group, setGroup] = useState<ShotGroup | 'all'>('all')
+  const [group, setGroup] = useState<ShotGroup | 'all'>('kill')
   const [phase, setPhase] = useState<Phase | 'all'>('all')
   const [pickedShot, setShot] = useState<'hard' | 'touch' | 'all'>('all')
   const [hover, setHover] = useState<number | null>(null)
@@ -126,25 +128,31 @@ export function AttackMap({ landings }: { landings: Landing[] }) {
   // each filter counts what the other one leaves
   const ofShot = inPhase.filter((s) => shot === 'all' || s.shot === shot)
   const ofGroup = inPhase.filter((s) => group === 'all' || s.group === group)
-  const shown = ofShot.filter((s) => (group === 'all' || s.group === group) && (s.start || s.end))
+  const inView = ofShot.filter((s) => group === 'all' || s.group === group)
+  const shown = inView.filter((s) => s.start || s.end)
+  const drawn = (k: ShotKey) => shown.some((s) => s.shot === k)
   const count = (g: ShotGroup) => ofShot.filter((s) => s.group === g).length
   const countShot = (k: ShotKey) => ofGroup.filter((s) => s.shot === k).length
   const active = hover ?? picked
   const tip = active === null ? null : shown[active] ?? null
   const anyPhase = all.some((s) => s.phase !== null)
-  const nowhere = all.filter((s) => !s.start && !s.end).length
-  const noLine = all.filter((s) => (s.start || s.end) && !(s.start && s.end)).length
+  // what the notes under the map count: the attacks of this view
+  const nowhere = inView.length - shown.length
+  const noLine = shown.filter((s) => !(s.start && s.end)).length
 
   const reset = () => {
     setHover(null)
     setPicked(null)
   }
   const groups: Option<ShotGroup | 'all'>[] = [
-    { key: 'all', label: <>All <span className="num muted">{ofShot.length}</span></> },
     ...(['kill', 'dug', 'error'] as const).map((g) => ({
-      key: g, label: <>{GROUP_LABEL[g]} <span className="num muted">{count(g)}</span></>, disabled: count(g) === 0,
+      key: g, label: <>{GROUP_LABEL[g]} <span className="num muted">{count(g)}</span></>, disabled: count(g) === 0 && group !== g,
     })),
+    { key: 'all', label: <>All <span className="num muted">{ofShot.length}</span></> },
   ]
+  const filtered = shot !== 'all' || phase !== 'all'
+  const empty = `No ${GROUP_WORDS[group]} ${filtered ? 'with these filters' : group === 'all' ? 'with a position yet' : 'in this view'}`
+  const legend = LEGEND.filter(({ kind }) => group === 'all' || GROUP[kind] === group)
   const kinds: Option<'hard' | 'touch' | 'all'>[] = [
     { key: 'all', label: 'Any shot' },
     ...(['hard', 'touch'] as const).map((k) => ({
@@ -184,12 +192,13 @@ export function AttackMap({ landings }: { landings: Landing[] }) {
       </div>
       <div className="chart court">
         <svg viewBox={`0 0 ${W} ${H}`} role="img" tabIndex={0} onKeyDown={keys} onClick={reset}
-             aria-label={`${shown.length} attacks drawn from where the ball was hit to where it came down${anyTyped ? '; a heavy line is a hard spike, a dotted one a touch shot' : ''}. Arrow keys step through them.`}>
+             aria-label={`${shown.length} ${GROUP_WORDS[group]} drawn from where the ball was hit to where it came down${anyTyped ? '; a heavy line is a hard spike, a dotted one a touch shot' : ''}. Arrow keys step through them.`}>
           <rect x={px(0)} y={py(16)} width={8 * S} height={16 * S} rx={2} fill="var(--surface-2)" stroke="var(--axis)" />
           <rect x={px(0) - 6} y={py(NET_Y) - 2} width={8 * S + 12} height={4} rx={2} fill="var(--ink-2)" />
           <text x={px(8) + 12} y={py(NET_Y) + 4}>net</text>
           <text x={px(4)} y={py(16) - 8} textAnchor="middle">their side</text>
           <text x={px(4)} y={py(0) + 15} textAnchor="middle">attacker's side</text>
+          {shown.length === 0 && <text x={px(4)} y={py(12)} textAnchor="middle" className="court-empty">{empty}</text>}
           {tip && tip.start && tip.l.sex != null && tip.l.sey != null && (
             <ellipse cx={px(tip.start.x)} cy={py(tip.start.y)} rx={tip.l.sex * S} ry={tip.l.sey * S} fill={KIND_COLOR[tip.kind]} opacity={0.18} />
           )}
@@ -243,7 +252,7 @@ export function AttackMap({ landings }: { landings: Landing[] }) {
         )}
       </div>
       <div className="legend">
-        {LEGEND.map(({ kind, label }) => (
+        {legend.map(({ kind, label }) => (
           <span key={kind}>
             <svg width={14} height={14} viewBox="0 0 14 14" style={{ marginRight: 5, verticalAlign: -2 }} aria-hidden="true">
               <Glyph kind={kind} x={7} y={7} />
@@ -251,12 +260,12 @@ export function AttackMap({ landings }: { landings: Landing[] }) {
           </span>
         ))}
       </div>
-      {/* the line styles, only the ones on this map; one kind of line needs no key */}
-      {(anyTyped || has('free')) && (
+      {/* the line styles, only the ones drawn now; one kind of line needs no key */}
+      {(['hard', 'touch', 'unread', 'free'] as const).filter(drawn).length > 1 && (
         <div className="legend">
-          {(['hard', 'touch'] as const).filter(has).map((k) => <span key={k}><ShotLine shot={k} />{k}</span>)}
-          {has('unread') && <span><ShotLine shot="unread" />{anyTyped ? 'spike, type not read' : 'spike'}</span>}
-          {has('free') && <span><ShotLine shot="free" />free ball</span>}
+          {(['hard', 'touch'] as const).filter(drawn).map((k) => <span key={k}><ShotLine shot={k} />{k}</span>)}
+          {drawn('unread') && <span><ShotLine shot="unread" />{anyTyped ? 'spike, type not read' : 'spike'}</span>}
+          {drawn('free') && <span><ShotLine shot="free" />free ball</span>}
         </div>
       )}
       {anyClip && (
@@ -267,7 +276,7 @@ export function AttackMap({ landings }: { landings: Landing[] }) {
       {(noLine > 0 || nowhere > 0) && (
         <p className="muted small" style={{ margin: '6px 0 0' }}>
           {noLine > 0 && <>{noLine} with one end only: a mark where the ball was hit, or where it came down. </>}
-          {nowhere > 0 && <>{nowhere} of {all.length} without any position are not drawn.</>}
+          {nowhere > 0 && <>{nowhere} of {inView.length} without any position are not drawn.</>}
         </p>
       )}
       <details className="table-view">

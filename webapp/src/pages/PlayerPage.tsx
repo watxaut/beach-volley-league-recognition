@@ -1,26 +1,34 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useApp, useLoad } from '../app/state'
 import { useTabKey, useWindowKey } from '../app/window'
 import { RollingChart, Sparkline, StackBar, type Segment } from '../components/Charts'
 import { Compare, type CompareMode } from '../components/Compare'
 import { AttackMap } from '../components/Court'
+import { GapNote } from '../components/Gap'
 import { PassMap } from '../components/PassMap'
 import { HittingTile, RateTile } from '../components/Rate'
+import { ServeMap } from '../components/ServeMap'
 import { Approx, Card, ErrorBox, Loading, Segmented, StatInfo, Tabs, Tile } from '../components/ui'
 import { WindowPicker } from '../components/WindowPicker'
-import { compare, MIN_PEERS, RECENT, splitEarlier, sumHistory, type CompareRow } from '../lib/compare'
+import {
+  compare, compareByKey, gapOf, MIN_PEERS, MIN_POINTS, RECENT, splitEarlier, sumHistory, type CompareRow, type Peer, type Sample,
+} from '../lib/compare'
 import { formatDate, matchLabel, signed } from '../lib/format'
 import { passPoints, summarize, type PassKind, PASS_LABEL } from '../lib/passes'
 import { hitText, hitting, MIN_N, pct, rate, ROLLING_WINDOW, rolling } from '../lib/stats'
 import type { HistoryRow, LeaderRow, PlayerAnalytics, PlayerProfile, ShotKey } from '../lib/types'
 import { ALL_TIME, windowLabel, windowParams } from '../lib/window'
 
-// Overview and Matches are league tier (every member); Attack and Serve &
-// receive are the player's analytics tier.
-const TABS = ['overview', 'attack', 'serve', 'matches'] as const
+// Overview and Matches are league tier (every member); Attack, Serve and
+// Receive & defense are the player's analytics tier.
+const TABS = ['overview', 'attack', 'serve', 'receive', 'matches'] as const
 type TabKey = typeof TABS[number]
-const TAB_LABEL: Record<TabKey, string> = { overview: 'Overview', attack: 'Attack', serve: 'Serve & receive', matches: 'Matches' }
+const TAB_LABEL: Record<TabKey, string> = {
+  overview: 'Overview', attack: 'Attack', serve: 'Serve', receive: 'Receive & defense', matches: 'Matches',
+}
+/** A tab's headline stats read against the league, by key (lib/compare.ts). */
+type Vs = Record<string, CompareRow>
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
@@ -46,6 +54,13 @@ export function PlayerPage() {
   const rank = rows.findIndex((r) => r.player_id === player.id) + 1
   const who = player.is_me ? 'You' : player.display_name
   const privateNote = <div className="notice">{player.display_name} keeps detailed analytics private.</div>
+  const others: Peer[] = rows.filter((r) => r.player_id !== player.id)
+    .map((r) => ({ id: r.player_id, name: r.display_name, sample: r }))
+  // The tiles of a tab against everyone else: the player's side is counted
+  // from the numbers the tiles show, so a tile and its gap cannot disagree.
+  const shownAnalytics = can_see_analytics ? analytics : null
+  const vs: Vs = shownAnalytics ? compareByKey(tileSample(t, shownAnalytics), others) : {}
+  const vsNote = (keys: string[]) => <VsNote rows={keys.map((k) => vs[k])} scope={leagueScope(key)} />
 
   return (
     <>
@@ -83,11 +98,15 @@ export function PlayerPage() {
 
       <div role="tabpanel" aria-label={TAB_LABEL[tab]} style={{ opacity: data.loading ? 0.6 : 1 }}>
         {tab === 'overview' && (
-          <Overview data={data.data} board={rows} boardError={board.error} windowKey={key} who={who}
+          <Overview data={data.data} board={rows} others={others} boardError={board.error} windowKey={key} who={who}
                     allHistory={key === 'all' ? history : whole.data?.history ?? null} />
         )}
-        {tab === 'attack' && (can_see_analytics && analytics ? <Attack a={analytics} /> : privateNote)}
-        {tab === 'serve' && (can_see_analytics && analytics ? <Serve a={analytics} who={who} /> : privateNote)}
+        {tab === 'attack' && (shownAnalytics
+          ? <Attack a={shownAnalytics} vs={vs} note={vsNote(['hitting', 'kill', 'attack_err'])} /> : privateNote)}
+        {tab === 'serve' && (shownAnalytics
+          ? <Serve a={shownAnalytics} who={who} vs={vs} note={vsNote(['ace', 'serve_err', 'break_pt'])} /> : privateNote)}
+        {tab === 'receive' && (shownAnalytics
+          ? <Receive a={shownAnalytics} who={who} vs={vs} note={vsNote(['side_out', 'digs'])} /> : privateNote)}
         {tab === 'matches' && <Matches history={history} />}
       </div>
 
@@ -107,15 +126,39 @@ function leagueScope(key: string): string {
   return key.startsWith('s:') ? `in ${windowLabel(key)}` : `over the ${windowLabel(key)}`
 }
 
-function Overview({ data, board, boardError, windowKey, who, allHistory }: {
-  data: PlayerProfile; board: LeaderRow[]; boardError: string | null; windowKey: string; who: string
+/** What the tiles of the Attack, Serve and Receive tabs count, as one sample. */
+function tileSample(t: PlayerProfile['totals'], a: PlayerAnalytics): Sample {
+  return {
+    fantasy: t.fantasy, kills: a.n_kills, attacks: a.n_attacks, attack_errors: a.n_attack_errors, aces: a.n_aces,
+    serves: a.n_serves, serve_errors: a.n_serve_errors, digs: t.digs, assists: t.assists, errors: t.errors,
+    points_played: t.points_played, recv_points: a.rally.team_receiving.n, recv_won: a.rally.team_receiving.won,
+    serve_points: a.rally.team_serving.n, serve_won: a.rally.team_serving.won,
+  }
+}
+
+/** Under a tab's tiles: what the arrows are read against, or why none show. */
+function VsNote({ rows, scope }: { rows: (CompareRow | undefined)[]; scope: string }) {
+  const known = rows.filter((r): r is CompareRow => !!r)
+  if (known.length === 0) return null
+  if (known.every((r) => r.ref === null)) {
+    return <p className="vs-note">The league average appears once {MIN_PEERS} other players have played in this view.</p>
+  }
+  if (!known.some((r) => gapOf(r))) return null
+  return (
+    <p className="vs-note">
+      Arrows: against everyone else in the league, {scope}. Blue is better, orange is worse; pale could be chance.
+      <StatInfo term="compare" />
+    </p>
+  )
+}
+
+function Overview({ data, board, others, boardError, windowKey, who, allHistory }: {
+  data: PlayerProfile; board: LeaderRow[]; others: Peer[]; boardError: string | null; windowKey: string; who: string
   allHistory: HistoryRow[] | null
 }) {
   const [mode, setMode] = useState<CompareMode>('league')
   const { player, totals: t, history } = data
   const mine = board.find((r) => r.player_id === player.id)
-  const others = board.filter((r) => r.player_id !== player.id)
-    .map((r) => ({ id: r.player_id, name: r.display_name, sample: r }))
   const { now, before } = splitEarlier(allHistory ?? [], windowKey === 'all' ? null : history.map((h) => h.match_id))
   const hasEarlier = now.length > 0 && before.length > 0
   const shown: CompareMode = mode === 'earlier' && !hasEarlier ? 'league' : mode
@@ -157,7 +200,7 @@ function Overview({ data, board, boardError, windowKey, who, allHistory }: {
                 ? <>Against everyone else, {leagueScope(windowKey)}.</>
                 : <>{windowKey === 'all' ? `The newest ${plural(now.length, 'match', 'matches')}` : `The ${plural(now.length, 'match', 'matches')} of this period`} against
                   the {before.length} before.</>}
-              {noReference && shown === 'league' && <> The league average appears once {MIN_PEERS} other players have played in this view; until then every bar starts at zero.</>}
+              {noReference && shown === 'league' && <> The league average appears once {MIN_PEERS} other players have played in this view.</>}
             </p>
             <Compare rows={rows} mode={shown} who={who} refName={shown === 'league' ? 'League' : 'Before'} />
           </>
@@ -167,7 +210,7 @@ function Overview({ data, board, boardError, windowKey, who, allHistory }: {
   )
 }
 
-function Attack({ a }: { a: PlayerAnalytics }) {
+function Attack({ a, vs, note }: { a: PlayerAnalytics; vs: Vs; note: ReactNode }) {
   const hitAll = { n: a.n_attacks, kills: a.n_kills, errors: a.n_attack_errors }
   // Before migration 20261009110000 the database has no `shots`, and the type
   // on a landing is still the causal guess: draw no type at all until then.
@@ -176,10 +219,11 @@ function Attack({ a }: { a: PlayerAnalytics }) {
     <>
       <Card>
         <div className="tiles tiles-3">
-          <HittingTile t={hitAll} />
-          <RateTile label="Kill %" k={a.n_kills} n={a.n_attacks} term="kill_rate" unit="attacks" />
-          <RateTile label="Attack errors" k={a.n_attack_errors} n={a.n_attacks} term="attack_errors" unit="attacks" />
+          <HittingTile t={hitAll} vs={vs.hitting} />
+          <RateTile label="Kill %" k={a.n_kills} n={a.n_attacks} term="kill_rate" unit="attacks" vs={vs.kill} />
+          <RateTile label="Attack errors" k={a.n_attack_errors} n={a.n_attacks} term="attack_errors" unit="attacks" vs={vs.attack_err} />
         </div>
+        {note}
       </Card>
 
       <div className="grid grid-2">
@@ -252,62 +296,94 @@ function ByShot({ shots }: { shots: NonNullable<PlayerAnalytics['shots']> }) {
   )
 }
 
-function Serve({ a, who }: { a: PlayerAnalytics; who: string }) {
-  const { own_serve: own, team_serving: serving, team_receiving: receiving } = a.rally
+function Serve({ a, who, vs, note }: { a: PlayerAnalytics; who: string; vs: Vs; note: ReactNode }) {
+  const { own_serve: own, team_serving: serving } = a.rally
   return (
     <>
       <Card>
-        <div className="tiles">
-          <RateTile label="Ace %" k={a.n_aces} n={a.n_serves} term="ace_rate" unit="serves" />
-          <RateTile label="Serve errors" k={a.n_serve_errors} n={a.n_serves} term="serve_errors" unit="serves" />
-          <RateTile label={who === 'You' ? 'Your serve won' : 'Serve won'} k={own.won} n={own.n} term="own_serve" unit="serves"
-                    note={`The team won ${serving.won} of ${serving.n} points while serving.`} />
-          <RateTile label="Side-out %" k={receiving.won} n={receiving.n} term="side_out" unit="points" />
+        <div className="tiles tiles-4">
+          <RateTile label="Ace %" k={a.n_aces} n={a.n_serves} term="ace_rate" unit="serves" vs={vs.ace} />
+          <RateTile label="Serve errors" k={a.n_serve_errors} n={a.n_serves} term="serve_errors" unit="serves" vs={vs.serve_err} />
+          <RateTile label={who === 'You' ? 'Your serve won' : 'Serve won'} k={own.won} n={own.n} term="own_serve" unit="serves" />
+          <RateTile label="Break-point %" k={serving.won} n={serving.n} term="break_point" unit="points" vs={vs.break_pt} />
         </div>
+        {note}
       </Card>
       <div className="grid grid-2">
-        <ServeTargeting a={a} who={who} />
-        <ReceptionOutcome a={a} />
+        {/* a database without the serve_map migration has no `serves` at all */}
+        {a.serves !== undefined && (
+          <Card title={<>Where the serves landed<StatInfo term="serve_map" /> <Approx grade="B" /></>}>
+            {a.serves.length
+              ? <ServeMap serves={a.serves} />
+              : <p className="muted" style={{ margin: 0 }}>No serves credited yet.</p>}
+          </Card>
+        )}
+        <div>
+          <ServeTakers a={a} who={who} />
+          <Trend title="Serves in play" unit="serve" hits={a.serve_series.map((s) => s.r !== 'error')}
+                 dates={a.serve_series.map((s) => s.d)} />
+        </div>
       </div>
-      <PassCard a={a} />
-      <Trend title="Serves in play" unit="serve" hits={a.serve_series.map((s) => s.r !== 'error')}
-             dates={a.serve_series.map((s) => s.d)} />
     </>
   )
 }
 
-function ServeTargeting({ a, who }: { a: PlayerAnalytics; who: string }) {
-  const { serve_in: i, serve_out: o } = a
+/** Who took the player's serves: the credited first touch of the other pair. */
+function ServeTakers({ a, who }: { a: PlayerAnalytics; who: string }) {
+  const o = a.serve_out
+  const shades = ['var(--heat-3)', 'var(--heat-1)', 'var(--heat-2)', 'var(--heat-0)']
+  const segments: Segment[] = [
+    ...o.to.map((r, idx) => ({ label: r.display_name, n: r.n, color: shades[idx % shades.length] })),
+    { label: 'not seen', n: o.unseen, color: 'var(--axis)', hint: 'an ace, an error, or nobody credited with the first touch' },
+  ]
+  return (
+    <Card title={<>Who took {who === 'You' ? 'your' : 'their'} serves<StatInfo term="serve_out" /></>}>
+      {o.serves === 0 ? <p className="muted" style={{ margin: 0 }}>No serves yet.</p>
+        : <StackBar segments={segments} label="Who received the serves" />}
+    </Card>
+  )
+}
+
+function Receive({ a, who, vs, note }: { a: PlayerAnalytics; who: string; vs: Vs; note: ReactNode }) {
+  const receiving = a.rally.team_receiving
+  const digs = vs.digs
+  return (
+    <>
+      <Card>
+        <div className="tiles tiles-3">
+          <RateTile label="Side-out %" k={receiving.won} n={receiving.n} term="side_out" unit="points" vs={vs.side_out} />
+          <RateTile label="Reception to attack" k={a.reception.spike} n={a.reception.n} term="reception_attack" unit="receptions" />
+          {digs && (
+            <Tile label="Digs / 21 pts" quiet={digs.value === null} value={digs.value === null ? digs.k : digs.value.toFixed(1)}
+                  sub={digs.value === null ? `needs ${MIN_POINTS} points` : `${digs.k} in ${digs.n} pts`}
+                  info={<StatInfo term="digs_21" />} foot={<GapNote row={digs} />} />
+          )}
+        </div>
+        {note}
+      </Card>
+      <div className="grid grid-2">
+        <ServeTargets a={a} who={who} />
+        <ReceptionOutcome a={a} />
+      </div>
+      <PassCard a={a} />
+    </>
+  )
+}
+
+/** Of the serves aimed at the pair, how many the player took. */
+function ServeTargets({ a, who }: { a: PlayerAnalytics; who: string }) {
+  const i = a.serve_in
   const partner = Math.max(0, i.team_credited - i.mine)
   const unseen = Math.max(0, i.opp_serves - i.team_credited)
-  const inSegments: Segment[] = [
+  const segments: Segment[] = [
     { label: who.toLowerCase() === 'you' ? 'you' : who, n: i.mine, color: 'var(--accent)' },
     { label: 'partner', n: partner, color: 'var(--heat-1)' },
     { label: 'not seen', n: unseen, color: 'var(--axis)', hint: 'an ace, or nobody credited with the first touch' },
   ]
-  const shades = ['var(--heat-3)', 'var(--heat-1)', 'var(--heat-2)', 'var(--heat-0)']
-  const outSegments: Segment[] = [
-    ...o.to.map((r, idx) => ({ label: r.display_name, n: r.n, color: shades[idx % shades.length] })),
-    { label: 'not seen', n: o.unseen, color: 'var(--axis)' },
-  ]
   return (
-    <Card title={<>Serve targeting<StatInfo term="serve_in" /></>}>
-      {i.opp_serves + o.serves === 0 ? <p className="muted" style={{ margin: 0 }}>No serves yet.</p> : (
-        <div className="stack">
-          {i.opp_serves > 0 && (
-            <div>
-              <h3>Who they serve</h3>
-              <StackBar segments={inSegments} label="Serves aimed at the team, by who took them" />
-            </div>
-          )}
-          {o.serves > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <h3>Who took {who === 'You' ? 'your' : 'their'} serves</h3>
-              <StackBar segments={outSegments} label="Who received the serves" />
-            </div>
-          )}
-        </div>
-      )}
+    <Card title={<>Who they serve<StatInfo term="serve_in" /></>}>
+      {i.opp_serves === 0 ? <p className="muted" style={{ margin: 0 }}>No serves received yet.</p>
+        : <StackBar segments={segments} label="Serves aimed at the team, by who took them" />}
     </Card>
   )
 }

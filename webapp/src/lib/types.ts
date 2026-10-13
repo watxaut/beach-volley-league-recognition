@@ -222,6 +222,9 @@ export interface PlayerAnalytics {
   /** Receptions and defenses with where the ball went next. Missing until the
    * database has migration 20261009120000. */
   passes?: Pass[]
+  /** Every serve with where it came down. Missing until the database has
+   * migration 20261013100000. */
+  serves?: Serve[]
 }
 
 export interface PlayerProfile {
@@ -335,6 +338,25 @@ export interface Pass {
   ex?: number | null
   ey?: number | null
   to: 'set' | 'spike' | 'overpass' | null
+  d: string | null
+}
+
+/** One serve of the player and where it came down, in the SERVER's frame: x
+ * 0..8 from their left sideline, y 8 = net .. 16 = the opponents' baseline.
+ * The spot is where the receiver played the ball (`src` reception) or, when
+ * nobody touched it, where it came down (`src` ground, with the line call
+ * `in`); null when neither was seen. Where the server stood is not measured.
+ * `to` is the credited receiver, `ex` / `ey` about one sigma in metres across
+ * / along. */
+export interface Serve {
+  r: 'ace' | 'error' | 'in'
+  x: number | null
+  y: number | null
+  ex?: number | null
+  ey?: number | null
+  src: 'reception' | 'ground' | null
+  in: boolean | null
+  to: string | null
   d: string | null
 }
 

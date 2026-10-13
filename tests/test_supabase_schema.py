@@ -149,7 +149,7 @@ def _recount(bundle):
                "serve_to": defaultdict(int), "serve_unseen": 0,
                "shots": {k: {"n": 0, "kills": 0, "errors": 0}
                          for k in ("hard", "touch", "free", "unread")},
-               "passes": []} for s in team_of}
+               "passes": [], "serves": []} for s in team_of}
     for pt in bundle["points"]:
         acts = sorted(by_point[pt["point_no"]], key=lambda a: a["seq"])
         possession, poss_of = 0, {}
@@ -203,6 +203,27 @@ def _recount(bundle):
                     _spot(a.get("own_x_m"), a.get("own_y_m")),
                     _spot(nxt["own_x_m"], nxt["own_y_m"]) if went else (None, None),
                     nxt["action"] if went else None))
+        # serve_map: a credited serve came down where the other team's SEEN next
+        # touch played it (their own frame, turned round), else where the ball
+        # stopped when nobody touched it (camera frame, through the server's half)
+        for i, a in enumerate(acts):
+            if not (a["slot"] and a["action"] == "serve"):
+                continue
+            nxt = acts[i + 1] if i + 1 < len(acts) else None
+            kind = a["outcome"] if a["outcome"] in ("ace", "error") else "in"
+            taker = nxt["slot"] if nxt is not None and nxt["team"] != a["team"] else None
+            if (nxt is not None and nxt["team"] != a["team"] and nxt["observed"]
+                    and nxt.get("own_x_m") is not None and nxt.get("own_y_m") is not None):
+                spot, src = _spot(8 - nxt["own_x_m"], 16 - nxt["own_y_m"]), "reception"
+            elif (nxt is None and pt.get("end_kind") == "ground" and a.get("side") in ("near", "far")
+                  and pt.get("end_x_m") is not None and pt.get("end_y_m") is not None):
+                near = a["side"] == "near"
+                spot = _spot(pt["end_x_m"] if near else 8 - pt["end_x_m"],
+                             16 - pt["end_y_m"] if near else pt["end_y_m"])
+                src = "ground"
+            else:
+                spot, src = (None, None), None
+            out[a["slot"]]["serves"].append((kind, spot, src, taker))
         if receiver is not None:
             first = [a for a in acts if poss_of[a["seq"]] == 1]
             spike = any(a["action"] == "spike" for a in first)
@@ -338,3 +359,9 @@ rollback;
         # pass_map: every credited reception / defense, with where it went next
         assert sorted(((p["k"], _spot(p["sx"], p["sy"]), _spot(p["x"], p["y"]), p["to"])
                        for p in got["passes"]), key=str) == sorted(ref["passes"], key=str), slot
+        # serve_map: every credited serve, where it came down and who took it
+        assert len(got["serves"]) == got["n_serves"], slot
+        assert sorted(((v["r"], _spot(v["x"], v["y"]), v["src"], v["to"])
+                       for v in got["serves"]), key=str) == \
+            sorted(((kind, spot, src, names.get(taker)) for kind, spot, src, taker in ref["serves"]),
+                   key=str), slot

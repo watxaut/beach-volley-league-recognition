@@ -14,14 +14,17 @@ export function ErrorBox({ error }: { error: string | null }) {
 
 /** `quiet`: the value is a count standing in for a rate that cannot be shown
  * yet ("1/8"), so it is set smaller than a real headline number. */
-export function Tile({ label, value, hint, sub, info, quiet }: {
+export function Tile({ label, value, hint, sub, info, quiet, foot }: {
   label: string; value: ReactNode; hint?: string; sub?: ReactNode; info?: ReactNode; quiet?: boolean
+  /** A line under the count: where the number sits against the league. */
+  foot?: ReactNode
 }) {
   return (
     <div className="tile" title={hint}>
       <div className={`tile-value${quiet ? ' tile-value-quiet' : ''}`}>{value}</div>
       <div className="tile-label">{label}{info}</div>
       {sub && <div className="tile-sub">{sub}</div>}
+      {foot}
     </div>
   )
 }

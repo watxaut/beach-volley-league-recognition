@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  barScale, compare, countText, GAP_ZONE, gapScale, highlights, ordinal, rangeTextOf, splitEarlier, sumHistory, valueText, type Peer, type Sample,
+  compare, compareByKey, countText, gapOf, gapTint, gapWords, highlights, ordinal, rangeTextOf, splitEarlier, sumHistory, tally, valueText, type Peer, type Sample,
 } from './compare'
 import type { HistoryRow } from './types'
 
@@ -87,58 +87,89 @@ describe('reading the rows', () => {
     expect(highlights(compare(sample(), peers({}, {}, {})))).toEqual({ best: null, worst: null })
   })
 
-  it('draws more to the right on every row, the reference in the centre', () => {
-    const kill = row(rows, 'kill')
-    const g = gapScale(kill)!
-    expect(g.x(kill.ref!)).toBe(50)
-    expect(g.x(kill.value!)).toBeGreaterThan(50)
-    const err = row(rows, 'errors')
-    const ge = gapScale(err)!
-    expect(ge.x(err.value!)).toBeGreaterThan(50)               // more errors = further right, though fewer is better
-    expect(err.verdict).toBe('worse')
-    for (const p of err.peers) expect(Math.abs(ge.x(p.value) - 50)).toBeLessThanOrEqual(46)
+  it('reads which way the number goes, and whether that is good', () => {
+    const kill = gapOf(row(rows, 'kill'))!
+    expect([kill.dir, kill.good, kill.clear, kill.sure]).toEqual(['up', true, true, 1])
+    expect(kill.size).toBe('50 pts')                          // 75% against 25%, as both are shown
+    const err = gapOf(row(rows, 'errors'))!                   // more errors is up, though fewer is better
+    expect([err.dir, err.good, err.clear]).toEqual(['up', false, true])
+    const few = gapOf(row(compare(sample({ errors: 5 }), peers({ errors: 30 }, { errors: 30 }, { errors: 30 })), 'errors'))!
+    expect([few.dir, few.good]).toEqual(['down', true])
   })
 
-  it('leaves the "too close to call" zone exactly when a verdict is called', () => {
+  it('sizes a gap from the two numbers as they are shown', () => {
+    const others = peers({}, {}, {})                           // 25% kills, .225 hitting, 7.5 digs
+    const r = compare(sample({ kills: 11, attacks: 40, attack_errors: 2, digs: 36 }), others)
+    expect(gapOf(row(r, 'kill'))!.size).toBe('3 pts')         // 28% (27.5) against 25%
+    expect(gapOf(row(r, 'hitting'))!.size).toBe('.075')
+    expect(gapOf(row(r, 'digs'))!.size).toBe('1.5')
+    expect(gapOf(row(compare(sample({ kills: 10, attacks: 39 }), others), 'kill'))!.size).toBe('1 pt')
+    // the same number on both sides is level: no direction, no colour
+    const level = gapOf(row(compare(sample(), others), 'kill'))!
+    expect([level.dir, level.good, level.clear, level.sure]).toEqual(['level', null, false, 0])
+  })
+
+  it('is clear exactly when a verdict is called, and less sure the smaller the gap', () => {
     const others = peers({}, {}, {})
     const seen = new Set<string>()
+    let last = Infinity
     for (let kills = 0; kills <= 40; kills++) {
       const r = row(compare(sample({ kills, attacks: 40 }), others), 'kill')
-      const g = gapScale(r)!
-      expect(g.zone).toBe(GAP_ZONE)
-      expect(Math.abs(g.x(r.value!) - 50) > GAP_ZONE, `${kills}/40`).toBe(r.verdict !== 'same')
+      const g = gapOf(r)!
+      expect(g.clear, `${kills}/40`).toBe(r.verdict !== 'same')
+      expect(g.sure === 1, `${kills}/40`).toBe(g.clear)
+      if (kills <= 10) {                                      // towards the reference the colour fades
+        expect(g.sure!).toBeLessThanOrEqual(last)
+        last = g.sure!
+      }
       seen.add(r.verdict!)
     }
     expect([...seen].sort()).toEqual(['better', 'same', 'worse'])
     for (let errors = 0; errors <= 80; errors += 4) {            // a count per 21 points, fewer is better
       const r = row(compare(sample({ errors }), others), 'errors')
-      expect(Math.abs(gapScale(r)!.x(r.value!) - 50) > GAP_ZONE, `${errors} errors`).toBe(r.verdict !== 'same')
+      expect(gapOf(r)!.clear, `${errors} errors`).toBe(r.verdict !== 'same')
     }
   })
 
-  it('judges no zone where there is no verdict to call', () => {
-    const f = gapScale(row(rows, 'fantasy'))!
-    expect(f.zone).toBeNull()
-    expect(f.x(row(rows, 'fantasy').ref!)).toBe(50)
-    const few = row(compare(sample({ kills: 3, attacks: 9 }), peers({}, {}, {})), 'kill')
-    expect(gapScale(few)!.zone).toBeNull()                      // the player is below the minimum
-    const xf = gapScale(few)!.x                                 // the others keep the scale of the league's own range
-    expect(xf(few.refRange!.hi)).toBeCloseTo(50 + (GAP_ZONE * (few.refRange!.hi - few.ref!)) / Math.max(few.refRange!.hi - few.ref!, few.ref! - few.refRange!.lo))
-    expect(Math.max(...[few.refRange!.lo, few.refRange!.hi].map((v) => Math.abs(xf(v) - 50)))).toBeCloseTo(GAP_ZONE)
-    expect(gapScale(row(compare(sample(), peers({}, {})), 'kill'))).toBeNull()   // no reference yet
+  it('has no gap without both sides, and no certainty where there is no chance range', () => {
+    expect(gapOf(row(compare(sample({ kills: 3, attacks: 9 }), peers({}, {}, {})), 'kill'))).toBeNull()   // below the minimum
+    expect(gapOf(row(compare(sample(), peers({}, {})), 'kill'))).toBeNull()                               // no reference yet
+    const f = gapOf(row(rows, 'fantasy'))!
+    expect([f.clear, f.sure]).toEqual([false, null])
   })
 
-  it('draws a row without a reference as bars from zero', () => {
-    const lonely = row(compare(sample({ kills: 2, attack_errors: 9 }), peers({}, {})), 'hitting')
-    expect(lonely.ref).toBeNull()
-    const x = barScale(lonely, 62)
-    expect(x(lonely.value!)).toBeLessThan(x(0))                 // a negative hitting % goes left of zero
-    expect(x(lonely.peers[0].value)).toBeGreaterThan(x(0))
-    expect(x(lonely.range!.lo)).toBe(2)
-    expect(Math.max(...lonely.peers.map((p) => x(p.value)), x(lonely.range!.hi))).toBe(64)
-    const kill = row(compare(sample(), peers({}, {})), 'kill')
-    expect(barScale(kill)(0)).toBe(2)
-    expect(barScale(kill)(kill.range!.hi)).toBe(98)
+  it('says a gap in words, and colours it by how sure it is', () => {
+    const others = peers({ errors: 30 }, { errors: 30 }, { errors: 30 })
+    const kill = row(compare(sample({ kills: 11, attacks: 40 }), others), 'kill')
+    expect(gapWords(kill, gapOf(kill)!, 'league')).toEqual(['3 pts above', ' league'])
+    const err = row(compare(sample({ errors: 5 }), others), 'errors')        // fewer is better
+    expect(gapWords(err, gapOf(err)!, 'league')).toEqual(['6.2 fewer', ' than league'])   // 1.3 against 7.5, as shown
+    expect(gapWords(kill, { ...gapOf(kill)!, dir: 'level' }, 'league')).toEqual(['level', ' with league'])
+    // pale blue while it could be chance, the full wash once clear; nothing when level
+    expect(gapTint(gapOf(kill))!.background).toMatch(/--gap-better\) (\d+)%/)
+    const pale = Number(/(\d+)%/.exec(gapTint(gapOf(kill))!.background)![1])
+    expect(pale).toBeGreaterThanOrEqual(5)
+    expect(pale).toBeLessThan(24)
+    expect(gapTint(gapOf(err))!.background).toContain('--gap-better) 40%')
+    const bad = row(compare(sample({ errors: 70 }), others), 'errors')
+    expect(gapTint(gapOf(bad))!.background).toContain('--gap-worse) 40%')
+    expect(gapTint(gapOf(row(compare(sample(), peers({}, {}, {})), 'kill')))).toBeUndefined()
+    expect(gapTint(gapOf(row(compare(sample({ fantasy: 40 }), peers({}, {}, {})), 'fantasy')))).toBeUndefined()   // no chance range
+  })
+
+  it('counts the rows that read better, worse and level, fantasy apart', () => {
+    expect(tally(rows)).toEqual({ better: 2, worse: 1, level: 3, of: 6 })   // hitting + kill, errors, the rest untouched
+    expect(tally(compare(sample(), peers({}, {})))).toEqual({ better: 0, worse: 0, level: 0, of: 0 })
+  })
+
+  it('reads the stats only a tab shows, by key', () => {
+    const vs = compareByKey(sample({ serve_points: 40, serve_won: 24 }), peers(...[1, 2, 3].map(() => ({ attack_errors: 12, serve_points: 40, serve_won: 16 }))))
+    expect(vs.attack_err.value).toBeCloseTo(0.1)
+    expect([gapOf(vs.attack_err)!.dir, gapOf(vs.attack_err)!.good, gapOf(vs.attack_err)!.size]).toEqual(['down', true, '20 pts'])
+    expect(gapOf(vs.break_pt)!.size).toBe('20 pts')
+    expect(Object.keys(vs)).toContain('kill')
+    // the overview list keeps to its own rows
+    expect(compare(sample({ serve_points: 40, serve_won: 24 }), peers({}, {}, {})).map((r) => r.key)).not.toContain('attack_err')
   })
 
   it('formats each kind the way its stat reads', () => {
