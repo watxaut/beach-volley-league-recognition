@@ -1,0 +1,98 @@
+/* Match review (src/web/review.py). Builds on style.css's tokens. */
+
+:root {
+  --p1a: #ffd166;
+  --p2a: #ff8c42;
+  --p1b: #4cc9f0;
+  --p2b: #c39bff;
+  --ok: #69db7c;
+  --fix: #ffb454;
+}
+
+.rv-muted { color: var(--muted); }
+.rv header { gap: 16px; }
+.rv-key { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-scores { margin-left: auto; display: flex; gap: 14px; align-items: center; font-size: 13px; white-space: nowrap; }
+.rv-scores b { color: var(--ink-strong); font-variant-numeric: tabular-nums; }
+.rv-scores input { width: 44px; padding: 3px 4px; text-align: center; background: var(--card); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+.rv-scores .rv-off { color: var(--out); }
+
+.rv-chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 20px 0; }
+.rv-chip { min-width: 30px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--card);
+  color: var(--muted); font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; }
+.rv-chip.ok { color: var(--ok); border-color: rgba(105, 219, 124, 0.45); }
+.rv-chip.corrected { color: var(--fix); border-color: rgba(255, 180, 84, 0.55); }
+.rv-chip.changed { text-decoration: underline wavy var(--out); }
+.rv-chip.current { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.rv-chip.switch { margin-right: 10px; }
+.rv-chip.gap::after { content: " +"; color: var(--out); }
+
+.rv-main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 20px; padding: 14px 20px 30px; max-width: none; }
+@media (max-width: 1100px) { .rv-main { grid-template-columns: 1fr; } }
+
+/* As wide as the column, never taller than two thirds of the window (--ar = the copy's width / height). */
+.rv-video { position: relative; background: #000; border-radius: var(--radius); overflow: hidden; line-height: 0;
+  width: min(100%, calc(62vh * var(--ar, 1.44))); margin: 0 auto; }
+.rv-video video { width: 100%; height: auto; display: block; }
+.rv-video canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.rv-touchnow { position: absolute; left: 10px; bottom: 10px; padding: 4px 9px; border-radius: 6px; line-height: 1.3;
+  background: rgba(0, 0, 0, 0.78); color: #fff; font-size: 14px; font-weight: 600; }
+
+.rv-timeline { position: relative; height: 26px; margin-top: 8px; border-radius: 6px; background: var(--card);
+  border: 1px solid var(--line); cursor: pointer; }
+.rv-timeline .rv-rally { position: absolute; top: 0; bottom: 0; background: rgba(255, 255, 255, 0.05); }
+.rv-tick { position: absolute; top: 3px; bottom: 3px; width: 3px; margin-left: -1px; border-radius: 2px; background: var(--muted); }
+.rv-tick.added { background: var(--fix); }
+.rv-tick.removed { opacity: 0.25; }
+.rv-cursor { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink-strong); pointer-events: none; }
+
+.rv-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.rv button, .rv select, .rv textarea { font: inherit; color: var(--ink); background: var(--card-2);
+  border: 1px solid var(--line); border-radius: 7px; }
+.rv button { padding: 5px 10px; cursor: pointer; }
+.rv button:hover { border-color: var(--muted); }
+.rv button.on { background: var(--fix); color: #1a0f04; border-color: var(--fix); }
+.rv button.primary { background: var(--ok); color: #06210c; border-color: var(--ok); font-weight: 600; }
+.rv select { padding: 3px 4px; }
+.rv select.fixed { border-color: var(--fix); color: var(--fix); }
+
+.rv-legend { display: flex; gap: 12px; margin-top: 12px; align-items: flex-end; }
+.rv-legend .rv-muted { font-size: 12px; max-width: 320px; }
+.rv-who { margin: 0; text-align: center; font-size: 12px; font-weight: 700; }
+.rv-who img { display: block; height: 96px; border-radius: 6px; border: 2px solid var(--line); }
+.rv-who[data-player="P1A"] { color: var(--p1a); } .rv-who[data-player="P1A"] img { border-color: var(--p1a); }
+.rv-who[data-player="P2A"] { color: var(--p2a); } .rv-who[data-player="P2A"] img { border-color: var(--p2a); }
+.rv-who[data-player="P1B"] { color: var(--p1b); } .rv-who[data-player="P1B"] img { border-color: var(--p1b); }
+.rv-who[data-player="P2B"] { color: var(--p2b); } .rv-who[data-player="P2B"] img { border-color: var(--p2b); }
+
+.rv-keys { margin-top: 12px; color: var(--muted); font-size: 12px; line-height: 2; }
+.rv-keys kbd { padding: 1px 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+  color: var(--ink); font: inherit; font-size: 11px; }
+
+.rv-panel { display: flex; flex-direction: column; gap: 12px; }
+.rv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+.rv-card h2 { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.rv-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.rv-head .n { font-size: 22px; font-weight: 700; color: var(--ink-strong); }
+.rv-head .score { font-variant-numeric: tabular-nums; }
+.rv-state { margin-left: auto; font-size: 12px; font-weight: 700; }
+.rv-state.ok { color: var(--ok); } .rv-state.corrected { color: var(--fix); }
+.rv-facts { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+.rv-facts b { color: var(--ink); }
+.rv-warn { margin-top: 8px; color: var(--out); font-size: 13px; }
+.rv-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rv-row + .rv-row { margin-top: 6px; }
+
+.rv-touches { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rv-touches td { padding: 4px 4px; border-top: 1px solid var(--line-soft); vertical-align: middle; }
+.rv-touches tr { cursor: pointer; }
+.rv-touches tr.now td { background: rgba(255, 255, 255, 0.07); }
+.rv-touches tr.removed td { opacity: 0.4; text-decoration: line-through; }
+.rv-touches .t { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rv-touches .rv-tag { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.rv-touches button { padding: 1px 7px; }
+.rv textarea { width: 100%; min-height: 56px; padding: 6px 8px; resize: vertical; }
+.rv-missing { display: flex; gap: 6px; align-items: center; margin-top: 6px; font-size: 13px; }
+.rv-missing input { flex: 1; min-width: 0; padding: 3px 6px; font: inherit; color: var(--ink); background: var(--card-2);
+  border: 1px solid var(--line); border-radius: 7px; }

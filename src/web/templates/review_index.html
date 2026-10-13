@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Match review</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ style_ver }}">
+  <link rel="stylesheet" href="/static/review.css?v={{ review_ver }}">
+</head>
+<body>
+  <header><a class="brand" href="/review">🏐 Match review</a></header>
+  <main>
+    <h1>Matches to review</h1>
+    {% if runs %}
+    <table class="list">
+      <thead>
+        <tr><th>Match</th><th>Points</th><th>Reviewed</th><th>Corrected</th>
+            <th>Run score</th><th>Your final</th></tr>
+      </thead>
+      <tbody>
+      {% for r in runs %}
+        <tr>
+          <td>{% if r.reviewable %}<a href="/review/{{ r.key }}">{{ r.key }}</a>
+              {% else %}{{ r.key }}
+              <span class="rv-muted">— no {{ "rally copy" if not r.has_copy else "diag dump" }}</span>
+              {% endif %}
+              {% if r.error %}<span class="warn">{{ r.error }}</span>{% endif %}</td>
+          <td class="num">{{ r.points if r.points is defined else "—" }}</td>
+          <td class="num">{% if r.points is defined %}{{ r.reviewed }} / {{ r.points }}{% endif %}</td>
+          <td class="num">{{ r.corrected if r.corrected is defined else "" }}</td>
+          <td class="num">{% if r.run_score %}A {{ r.run_score.A }} – B {{ r.run_score.B }}{% endif %}</td>
+          <td class="num">{% if r.owner_score %}A {{ r.owner_score.A }} – B {{ r.owner_score.B }}{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="rv-muted">A match needs its rally copy (<code>rallies.mp4</code>, written by
+      <code>make publish</code> while the video is on disk) and its diag dump.</p>
+    {% else %}
+    <p>No run with a <code>match_reconstruction.json</code> under the output folder.</p>
+    {% endif %}
+  </main>
+</body>
+</html>

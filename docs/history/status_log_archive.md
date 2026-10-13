@@ -7418,3 +7418,23 @@ Deployed by the owner the same day (migration pushed, web redeployed, `make repu
 ## [removed 2026-10-13, #113] Session index line moved out of STATUS.md (budget 100 lines), verbatim
 
 - 2026-09-24 **#16** — calibration auto-detect fixed for cached `_up1080` files (`resolve_source_stem`).
+
+## [moved 2026-10-13, #114] Log entry moved out of STATUS.md (Log keeps 3 sessions), verbatim
+
+### 2026-10-12 (hundred-and-eleventh session) — #111: 20261010_1230 run and checked: two rallies the post-run dropped (a net-cord ace first seen at the tape, a serve whose toss was read as a pass)
+
+**Asked (owner):** run the pipeline on 20261010_1230 before publishing and check it makes sense ("one team arrives to 21, the other 19"); then, after the diagnosis, a post-run-only fix, showing anything that changes.
+
+**Run.** `make run-match` (the owner's manual calibration, MPS, 15 f/s, ~48 min): 38 points, A 21 – B 17, switches after 7 / 14 / 21 / 28 / 34 (35 expected), net 2.33 m. The 1230 video had never been through the causal pass.
+
+**Diagnosed first (sequential decode, contact sheets).** Two gaps were 2× the median (70 s before P21, 69 s before P38); a scan of every ball contact outside the points (`BallTimeline`) found four clusters: two are dead-time handling (f9018, f22256 — the pink man feeds a ball, a far player dives for it), two are rallies. Owner's reading of them: **17:32 (f31700)** B serves, the ball touches the net and falls, A reaches it, the dig is hidden by the digger = B's ace; **23:10 (f41879)** after P37 (B's overpass hits the net, B loses it → A) A serves, B digs / sets / spikes, the spike hits the net and falls on A's court → B's point. Why each was dropped: the first has no flight before the tape (born at y 8.0 m, `FAR_SERVE_MAX_Y` 7.5, 2.5 m/s, peak 2.1 m); in the second the toss "feeder" is a vertex five frames after the track's birth (arriving flight 1 sample), the toss moves 3 m along the axis the far end cannot measure → `_fed_by_pass`, and the court sway read 0.133 (> 0.10) so `_own_toss` refused. P37's ball death read A (`fell_at_net`); the next-serve rule had overridden it to B only because the serve after it was missing.
+
+**Built (`src/postrun/rallies.py` only).** (1) `_fed_by_pass`: a feeder the ball reached in fewer than `MIN_DEPTH_SAMPLES` is the ball's first sight (the toss release), not a touch. (2) `_serve_at_the_tape`: LAST-RESORT serve read, after the flight said "not a serve": a track BIRTH within `NET_ZONE_M` of the net, first seen at ≥ `LIVE_MIN_PEAK_M`, ≥ 6 samples / 0.45 s, moving away from the net onto the other half and ending on the sand, on a STILL COURT (never alone); launch = birth − half a serve flight. No new constant. First version ran BEFORE the flight test and moved two existing serve frames by 10 f (20260920 P4, 1230 P2) — made a fallback, then every other run byte-identical. `tests/test_postrun_serves.py` +2 (both fail on the old rules).
+
+**Measured.** 1230: 40 points, A 21 – B 18 + the last point undecided (owner's: 21 – 19), switches 7 / 14 / 21 / 28 / 35, P37 → A (`B overpass ERROR`), P30 (17:31) B ace, P39 (23:10) B's. The other 11 runs (20260920, 1000, 1100, 1200, e1–e7): `match_reconstruction.json` + `.txt` byte-identical. Bars: 20260920 33/33, winners 33/33, 21–12, P 0.976 / R 0.933, action 0.988; 1100 35/35, serving team 35/35, winners 34/35; practice 5/5, 52/53, 52/52; sweep 157 moves, none loses a point or a winner (worst P 0.965, action 0.970). Suite 1346 (1341 pass, 5 skipped).
+
+**Not done / owed.** The last point (P40, f42686): B serves, A digs, sets, spikes, the ball dies 0.9 m from the net on A's half (inside `LANDING_NET_MARGIN_M`), and with A already on 21 both teams "close" the set, so it stays undecided (owner: B's, final 21 – 19; the play went on after A's 21st at P38). B's near-half players are `T1` / `T4` on P39 (identity read withheld). Owner: contact sheet per rally (AGENTS §11) before publishing. Nothing published; no causal re-run. Branch `fix/postrun-1230-lost-points`.
+
+## [removed 2026-10-13, #114] Session index line moved out of STATUS.md (budget 100 lines), verbatim
+
+- 2026-09-24 **#17** — match GT transcribed (33 points) + `evaluate_match_points` (baseline 14/33); bg-stratified ball probe indicts the 0.4 conf floor; conf-floor mechanism SHIPPED (actions 74→90 — …(log archive 2026-10-06)

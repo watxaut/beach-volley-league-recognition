@@ -43,6 +43,7 @@ make run-match VIDEO=...                             # run + --diag-dump sidecar
 make postrun OUTPUT_DIR=output/<dir>                 # reconstruction only over an existing run (~3 s, no decode)
 make autocalibrate VIDEO=...                         # court calibration without clicks: a proposal (WRITE=1 saves it when accepted) -- §14
 make ui                                              # local web UI over data/volley.db
+make review                                          # owner review of a reconstructed match, rally by rally (:8001/review) -- §11
 make ingest-all                                      # (re)ingest output/*/pipeline_output.json into SQLite
 make db-reset                                        # DELETES the DB incl. owner player labels — ask first
 venv/bin/python -m pytest tests/ -o addopts=""       # cov addopts break w/o pytest-cov
@@ -449,6 +450,20 @@ causal and untouched. Owner rules it encodes — keep them when changing it:
   behind a block (the owner offered "assume the setter's partner"; that
   needs the credit rule changed here, in `player_stats` and in the
   publisher together).
+
+* **The owner's check of a new match is the review page (#114, `make review`,
+  `src/web/review.py`), not contact sheets.** Each rally plays from the run's
+  rally copy with the labels the reconstruction credited drawn on the bodies;
+  the verdicts go to `ground_truth/<match_key>_review.json` (format:
+  `ground_truth/README.md`). Rules to keep: the page shows the SAME read the
+  reconstruction made (`identity.relabel` over the reconstruction's own
+  rallies -- never a second identity logic); the file is owner feedback and is
+  only ever written by the page, on the owner's key press; nothing in the
+  pipeline, the post-run layer or the publisher reads it (a correction reaches
+  a published match only through an admin-owned override, §13, never by
+  editing a reconstruction); a verdict keeps what the run read when it was
+  given, so a rules change never silently turns an old "all right" into a
+  claim about a new read.
 
 Validation protocol for any change: `score_postrun.py` on the 20260920 match
 (the bar: 33/33 points, 0 false, winners 33/33, score A 21 – B 12, touch
