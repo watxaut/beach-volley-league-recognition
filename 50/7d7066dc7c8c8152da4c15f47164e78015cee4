@@ -1,0 +1,29 @@
+STATUS.md
+  s_9ed08fada71d0a::t_8b128386db3872 131,528-530
+ground_truth/README.md
+  s_9ed08fada71d0a::t_c170fd8cb7d23e 140-143
+src/web/review.py
+  s_9ed08fada71d0a::t_dd6da55511ab82 246-251,257-258,262-266,271-274,713-717
+src/web/static/review.css
+  s_9ed08fada71d0a::t_7e51e0802d4339 37
+src/web/static/review.js
+  s_9ed08fada71d0a::t_8bf1fe86314ca2 154-155,158,189,197,206,209-210,244-245,524,526-528,530,576,670,760
+tests/test_review.py
+  s_9ed08fada71d0a::t_72139a02dea227 337-349,409-411
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "507d7066dc7c8c8152da4c15f47164e78015cee4",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
