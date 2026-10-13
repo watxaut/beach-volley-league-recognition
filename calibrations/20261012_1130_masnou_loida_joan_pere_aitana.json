@@ -1,0 +1,46 @@
+{
+  "court_corners": [
+    [
+      632,
+      794
+    ],
+    [
+      1205,
+      797
+    ],
+    [
+      1712,
+      989
+    ],
+    [
+      104,
+      1009
+    ]
+  ],
+  "midcourt_points": [
+    [
+      498,
+      849
+    ],
+    [
+      1343,
+      849
+    ]
+  ],
+  "net_top_points": [
+    [
+      498,
+      601
+    ],
+    [
+      1343,
+      612
+    ]
+  ],
+  "frame_dimensions": [
+    1080,
+    1920
+  ],
+  "source": "agent-read",
+  "note": "auto-calibration refused (no court found, beach); corners/net read by hand on the median plate; midcourt = homography midpoints, net top = top edge of the net tape"
+}
