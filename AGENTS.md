@@ -554,8 +554,9 @@ Pages). Rules that keep it correct:
   review and names the points the run now reads differently); a touch he
   added or named counts as seen and has no position; ace / kill / error are
   derived again only where he changed the end of a point, with the post-run
-  semantics and without its perception guards; a point the run missed is a
-  point without touches; `match_reconstruction.json` and every GT score stay
+  semantics and without its perception guards; a rally he marked as cut
+  short by the run (it goes on in the dead time) carries no ace / kill /
+  error at all; a point the run missed is a point without touches; `match_reconstruction.json` and every GT score stay
   about the PIPELINE, never the reviewed match. The review files are in git:
   merge them before publishing from the prod worktree.
 * **A block scores only when it wins the point (owner, 2026-10-14).** A block

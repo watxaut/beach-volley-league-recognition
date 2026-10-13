@@ -265,6 +265,31 @@ def test_a_kill_block_scores_and_a_soft_block_does_not():
     assert soft["player_stats"]["P1B"]["fantasy"] == 1.0     # the dig alone
 
 
+def test_a_rally_the_run_cut_short_charges_nobody():
+    """The owner saw the rally go on in the dead time: the last touch on
+    record is not the last touch, so the run's ace is no ace and a set he
+    added is no handling error."""
+    recon = _recon()
+    review = _review(recon, {2: {"status": "ok"}})
+    review["gaps"] = [{"first": 700, "last": 900, "status": "tail", "rally_goes_on_to": 760}]
+    out, report = apply_review(recon, review)
+    assert recon["points"][1]["touches"][0]["outcome"] == "ace"           # the run's read
+    assert [t["outcome"] for t in out["points"][1]["touches"]] == [None, None]
+    assert out["points"][1]["serve"]["outcome"] is None and out["points"][1]["winner"] == "A"
+    assert report["cut_short"] == 1 and report["corrected"] == 1
+    assert out["points"][0] == recon["points"][0]
+
+    raw = {"status": "corrected", "added": [{"frame": 660, "action": "set", "player": "P2B"}]}
+    review = _review(recon, {2: raw})
+    # as the last touch of a lost point it would be B's handling error ...
+    assert apply_review(recon, review)[0]["points"][1]["touches"][-1]["outcome"] == "error"
+    # ... but the rally went on
+    review["gaps"] = [{"first": 700, "last": 900, "status": "tail", "rally_goes_on_to": 760}]
+    out, report = apply_review(recon, review)
+    assert [t["outcome"] for t in out["points"][1]["touches"]] == [None, None, None]
+    assert report["cut_short"] == 1 and report["corrected"] == 1
+
+
 def test_a_verdict_that_fits_no_rally_is_reported_not_applied():
     recon = _recon()
     review = _review(recon, {1: BLOCK})

@@ -26,6 +26,9 @@ Rules:
   semantics (src/postrun/match.py ``_outcomes``) and without its perception
   guards: he watched the rally. A block that wins the point is a kill; any
   other block has no outcome (owner rule: only a kill block scores).
+* **A rally the run cut short** (the owner saw it go on in the dead time:
+  ``gaps[].status == "tail"``) has no ace / kill / error at all: its last
+  touch on record is not its last touch, and nothing may be charged to it.
 * **A point the run missed** is a point without touches: it counts in the
   score, the winner of the point before it serves it.
 * ``match_reconstruction.json`` is never written: the pipeline's scores stay
@@ -227,6 +230,17 @@ def _shape(touches: List[Dict[str, Any]], winner: Optional[str]) -> Dict[str, in
     return rally_shape(touches, winner)
 
 
+def _no_outcomes(point: Dict[str, Any]) -> bool:
+    """Take every ace / kill / error off a point (True when there was one)."""
+    had = any(t.get("outcome") for t in point["touches"]) or bool(
+        (point.get("serve") or {}).get("outcome"))
+    for t in point["touches"]:
+        t["outcome"] = None
+    if point.get("serve"):
+        point["serve"]["outcome"] = None
+    return had
+
+
 def missing_point(m: Dict[str, Any], before: Optional[Dict[str, Any]],
                   after: Optional[Dict[str, Any]], fps: float = 30.0) -> Dict[str, Any]:
     """A point the run did not find, as the owner gave it: a winner, no
@@ -339,10 +353,18 @@ def apply_review(recon: Dict[str, Any], review: Optional[Dict[str, Any]]
     missing: Dict[int, List[Dict[str, Any]]] = {}
     for m in review.get("missing_points") or []:
         missing.setdefault(after_of(m), []).append(m)
+    # Points whose rally goes on after the run ended it: the last one that
+    # starts before the stretch of dead time the owner marked.
+    cut = set()
+    for g in review.get("gaps") or []:
+        earlier = [n for s, n in starts if s <= g["first"]]
+        if g.get("status") == "tail" and earlier:
+            cut.add(earlier[-1])
 
     points: List[Dict[str, Any]] = []
     renumbered: Dict[int, int] = {}
     totals = {"reviewed": 0, "corrected": 0, "dropped": 0, "added": 0, "run_moved": 0,
+              "cut_short": 0,
               "touches_changed": 0, "touches_added": 0, "touches_removed": 0,
               "winner_changed": 0, "sides_changed": 0}
 
@@ -371,6 +393,10 @@ def apply_review(recon: Dict[str, Any], review: Optional[Dict[str, Any]]
             for name, n in changes.items():
                 totals[name] += n
             points.append(new)
+        if pt["point"] in cut:
+            totals["cut_short"] += 1
+            if _no_outcomes(points[-1]):
+                totals["corrected"] += verdict is None or not any(changes.values())
         renumbered[pt["point"]] = len(points)
         add_missing(pt["point"], source[k + 1] if k + 1 < len(source) else None)
 
@@ -417,6 +443,7 @@ def describe(report: Dict[str, Any]) -> str:
              f"({report['corrected']} corrected, {report['unreviewed']} not reviewed)"]
     for name, text in (("added", "missing points added"), ("dropped", "rallies that were no point"),
                        ("winner_changed", "winners changed"), ("sides_changed", "sides put right"),
+                       ("cut_short", "rallies the run cut short (no ace / kill / error on them)"),
                        ("touches_changed", "touches renamed"), ("touches_added", "touches added"),
                        ("touches_removed", "touches removed")):
         if report.get(name):
