@@ -1,0 +1,33 @@
+STATUS.md
+  s_9ed08fada71d0a::t_96d8878348638d 106,530-531
+ground_truth/README.md
+  s_9ed08fada71d0a::t_6fcdb5ad916b63 138-139
+src/publish/reviewed.py
+  s_9ed08fada71d0a::t_59a03df8478268 263
+src/web/review.py
+  s_9ed08fada71d0a::t_14f15efcfac2b1 486-540,565-568,663-664
+src/web/static/review.css
+  s_9ed08fada71d0a::t_947a35a54ff97c 114-116
+src/web/static/review.js
+  s_9ed08fada71d0a::t_2d1b562a175e1f 123-135,197-198,707,709-711,797
+tests/test_publish_reviewed.py
+  s_9ed08fada71d0a::t_cbd721d2566a2b 245-246
+tests/test_review.py
+  s_9ed08fada71d0a::t_ca1929a945836d 257-294,390,392-394
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "42b2312cc660db62a62efb1e3a6effed84b84c9b",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
