@@ -35,9 +35,14 @@
 .rv-video { position: relative; background: #000; border-radius: var(--radius); overflow: hidden; line-height: 0;
   width: min(100%, calc(62vh * var(--ar, 1.44))); margin: 0 auto; }
 .rv-video video { width: 100%; height: auto; display: block; }
-.rv-video canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.rv-touchnow { position: absolute; left: 10px; bottom: 10px; padding: 4px 9px; border-radius: 6px; line-height: 1.3;
-  background: rgba(0, 0, 0, 0.78); color: #fff; font-size: 14px; font-weight: 600; }
+.rv-video canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.rv-touchnow { z-index: 2; }
+.rv-touchnow { position: absolute; left: 10px; bottom: 10px; padding: 5px 11px; border-radius: 7px; line-height: 1.3;
+  background: rgba(0, 0, 0, 0.72); color: #cfd5df; font-size: 15px; border: 2px solid transparent; }
+.rv-touchnow .n { display: inline-block; min-width: 20px; padding: 0 5px; margin-right: 4px; border-radius: 10px;
+  background: #fff; color: #000; font-weight: 700; text-align: center; }
+.rv-touchnow b { text-transform: uppercase; letter-spacing: 0.03em; }
+.rv-touchnow.fresh { background: rgba(0, 0, 0, 0.9); color: #fff; border-color: #fff; font-size: 18px; }
 
 .rv-timeline { position: relative; height: 26px; margin-top: 8px; border-radius: 6px; background: var(--card);
   border: 1px solid var(--line); cursor: pointer; }

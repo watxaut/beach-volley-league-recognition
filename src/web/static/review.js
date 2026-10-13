@@ -10,7 +10,9 @@
   const COLORS = { P1A: "#ffd166", P2A: "#ff8c42", P1B: "#4cc9f0", P2B: "#c39bff" };
   const FIXES = [["near_swapped", "1", "Near pair swapped"], ["far_swapped", "2", "Far pair swapped"],
                  ["sides_swapped", "3", "Squads on the wrong halves"], ["other", "4", "Labels wrong, other"]];
-  const TOUCH_FLASH = 6;          // frames around a touch its caption stays up
+  const TOUCH_HOLD_S = 1.0;       // a touch stays marked on the picture this long
+  const TOUCH_LEAD = 2;           // ... and shows this many frames before its contact
+  const BALL_TRAIL = 10;          // frames of ball path drawn behind the ball
 
   let M = null;                   // the match as the run read it
   let R = null;                   // the review as stored
@@ -88,7 +90,7 @@
     save();
     if (render) renderPanel();
     renderTimeline();
-    draw(lastCopyFrame);
+    redraw();
   }
 
   function save() {
@@ -110,7 +112,7 @@
 
   function fail(err) {
     console.error(err);
-    $("scores").innerHTML = `<span class="rv-off">NOT SAVED — ${esc(err.message)}</span>`;
+    $("scores").innerHTML = `<span class="rv-off">ERROR — ${esc(err.message)} (reload the page)</span>`;
   }
 
   // ------------------------------------------------------------------ header
@@ -232,7 +234,7 @@
         ${missing}
         <div class="rv-row"><button data-act="add-missing">+ a point is missing after this one (M)</button></div>
       </div>`;
-    markNow(lastCopyFrame);
+    redraw();
   }
 
   function renderTimeline() {
@@ -263,57 +265,99 @@
     return dpr;
   }
 
-  function markNow(copyFrame) {
-    if (!seg() || copyFrame < 0) return;
-    const src = srcOf(copyFrame);
-    let now = null;
-    for (const t of touches()) if (!t.removed && t.frame <= src) now = t;
+  // The touch the rally is at: the last one played (a touch shows from
+  // TOUCH_LEAD frames before its contact), and how many frames ago it was.
+  function touchAt(src) {
+    let now = null, n = 0, i = 0;
+    for (const t of touches()) {
+      if (t.removed) continue;
+      i += 1;
+      if (t.frame <= src + TOUCH_LEAD) { now = t; n = i; }
+    }
+    return now ? { touch: now, n, age: src - now.frame } : null;
+  }
+
+  function markNow(src) {
+    const at = touchAt(src), hold = Math.round(M.fps * TOUCH_HOLD_S);
     $("panel").querySelectorAll(".rv-touches tr").forEach((tr) =>
-      tr.classList.toggle("now", now != null && Number(tr.dataset.seek) === now.frame));
-    const near = now && src - now.frame <= TOUCH_FLASH ? now : null;
-    $("touchNow").hidden = !near;
-    if (near) $("touchNow").textContent = `${near.action} · ${near.player ?? "nobody"}`;
-    return near;
+      tr.classList.toggle("now", at != null && Number(tr.dataset.seek) === at.touch.frame));
+    const bar = $("touchNow");
+    bar.hidden = !at;
+    if (at) {
+      const who = at.touch.player ?? "nobody";
+      bar.innerHTML = `<span class="n">${at.n}</span> <b>${esc(at.touch.action)}</b> · ` +
+        `<span style="color:${COLORS[who] || "#fff"}">${esc(who)}</span>`;
+      bar.classList.toggle("fresh", at.age <= hold);
+    }
+    return at && at.age <= hold ? { ...at, hold } : null;
+  }
+
+  function plate(text, cx0, top, color, dpr, size = 13) {
+    const W = canvas.width, H = canvas.height;
+    ctx.font = `700 ${size * dpr}px -apple-system, "Segoe UI", sans-serif`;
+    const tw = ctx.measureText(text).width + 10 * dpr, th = (size + 6) * dpr;
+    const px = Math.min(Math.max(cx0 - tw / 2, 0), W - tw), py = Math.min(Math.max(top - th, 0), H - th);
+    ctx.fillStyle = "rgba(0,0,0,0.82)";
+    ctx.fillRect(px, py, tw, th);
+    ctx.fillStyle = color;
+    ctx.fillText(text, px + 5 * dpr, py + th / 2 + dpr);
+    return py;
   }
 
   function draw(copyFrame) {
     const dpr = sizeCanvas();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!seg() || copyFrame < 0) return;
+    if (!M || !draft || !seg() || copyFrame < 0) return;
     const src = srcOf(copyFrame), s = seg();
     $("cursor").style.left = `${(100 * (src - s.first)) / Math.max(1, s.last - s.first)}%`;
     $("clock").textContent = `frame ${src}`;
-    const near = markNow(copyFrame);
+    const hit = markNow(src);
     if (!trk || src < trk.first || src - trk.first >= trk.bodies.length) return;
     const [cx, cy, cw, ch] = M.crop, sx = canvas.width / cw, sy = canvas.height / ch;
-    const names = labelMap(), W = canvas.width, H = canvas.height;
-    ctx.font = `700 ${13 * dpr}px -apple-system, "Segoe UI", sans-serif`;
+    const names = labelMap(), H = canvas.height, k = src - trk.first;
+    const X = (x) => (x - cx) * sx, Y = (y) => (y - cy) * sy;
     ctx.textBaseline = "middle";
-    for (const [label, x1, y1, x2, y2, track] of trk.bodies[src - trk.first]) {
+
+    // The ball: where it is, and where it came from.
+    for (let back = BALL_TRAIL; back >= 1; back--) {
+      const b = trk.ball[k - back];
+      if (!b) continue;
+      ctx.fillStyle = `rgba(255,255,255,${0.55 * (1 - back / (BALL_TRAIL + 1))})`;
+      ctx.beginPath(); ctx.arc(X(b[0]), Y(b[1]), 2.5 * dpr, 0, 2 * Math.PI); ctx.fill();
+    }
+    const ball = trk.ball[k];
+    if (ball) {
+      ctx.lineWidth = 2 * dpr; ctx.strokeStyle = "rgba(255,255,255,0.9)";
+      ctx.beginPath(); ctx.arc(X(ball[0]), Y(ball[1]), 9 * dpr, 0, 2 * Math.PI); ctx.stroke();
+    }
+
+    let toucher = null;
+    for (const [label, x1, y1, x2, y2, track] of trk.bodies[k]) {
       const name = names[label ?? `T${track}`] ?? label ?? `T${track}`;
       const color = COLORS[name] || "#ffffff";
-      const bx1 = (x1 - cx) * sx, by1 = (y1 - cy) * sy, bx2 = (x2 - cx) * sx, by2 = (y2 - cy) * sy;
-      if (boxes) {
-        ctx.lineWidth = 4.5 * dpr; ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.strokeRect(bx1, by1, bx2 - bx1, by2 - by1);
-        ctx.lineWidth = 2.5 * dpr; ctx.strokeStyle = color; ctx.strokeRect(bx1, by1, bx2 - bx1, by2 - by1);
+      const bx1 = X(x1), by1 = Y(y1), bx2 = X(x2), by2 = Y(y2);
+      const isToucher = hit != null && hit.touch.player === name;
+      if (boxes || isToucher) {
+        const w = isToucher ? 4 : 2.5;
+        ctx.lineWidth = (w + 2) * dpr; ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.strokeRect(bx1, by1, bx2 - bx1, by2 - by1);
+        ctx.lineWidth = w * dpr; ctx.strokeStyle = color; ctx.strokeRect(bx1, by1, bx2 - bx1, by2 - by1);
       }
-      const below = by1 > H - 4 * dpr;
-      const text = below ? `${name} ↓` : name;
-      const tw = ctx.measureText(text).width + 10 * dpr, th = 19 * dpr;
-      const px = Math.min(Math.max((bx1 + bx2) / 2 - tw / 2, 0), W - tw);
-      const py = Math.min(Math.max(by1 - th - 3 * dpr, 0), H - th);
-      ctx.fillStyle = "rgba(0,0,0,0.82)";
-      ctx.fillRect(px, py, tw, th);
-      ctx.fillStyle = color;
-      ctx.fillText(text, px + 5 * dpr, py + th / 2 + dpr);
+      const top = plate(by1 > H - 4 * dpr ? `${name} ↓` : name, (bx1 + bx2) / 2, by1 - 3 * dpr, color, dpr);
+      if (isToucher) toucher = { x: (bx1 + bx2) / 2, top, color };
     }
-    const ball = trk.ball[src - trk.first];
-    if (near && ball) {
-      ctx.strokeStyle = COLORS[near.player] || "#ffffff";
-      ctx.lineWidth = 2.5 * dpr;
-      ctx.beginPath();
-      ctx.arc((ball[0] - cx) * sx, (ball[1] - cy) * sy, 16 * dpr, 0, 2 * Math.PI);
-      ctx.stroke();
+
+    // The touch itself: the action over the player who made it (over the
+    // ball when nobody is credited or the player is out of the picture).
+    if (hit) {
+      const word = hit.touch.action.toUpperCase() + (hit.touch.player ? "" : " · nobody");
+      const color = COLORS[hit.touch.player] || "#ffffff";
+      if (toucher) plate(word, toucher.x, toucher.top - 3 * dpr, color, dpr, 17);
+      else if (ball) plate(word, X(ball[0]), Y(ball[1]) - 16 * dpr, color, dpr, 17);
+      else plate(word, canvas.width / 2, 30 * dpr, color, dpr, 17);
+      if (ball) {
+        ctx.lineWidth = 3 * dpr; ctx.strokeStyle = color;
+        ctx.beginPath(); ctx.arc(X(ball[0]), Y(ball[1]), 15 * dpr, 0, 2 * Math.PI); ctx.stroke();
+      }
     }
   }
 
@@ -342,15 +386,34 @@
     if (next != null) { video.pause(); seek(next); }
   }
 
+  // One loop for the whole page: every screen refresh, show the frame the
+  // video is on. The exact frame comes from the video's own frame callback
+  // where the browser has one; the clock is the fallback. A failure in one
+  // frame is shown and never stops the loop.
+  let exact = -1, exactAt = 0, shown = -1, dirty = false;
   if (video.requestVideoFrameCallback) {
-    const onFrame = (_now, meta) => { tick(frameOf(meta.mediaTime)); video.requestVideoFrameCallback(onFrame); };
+    const onFrame = (now, meta) => {
+      video.requestVideoFrameCallback(onFrame);
+      exact = frameOf(meta.mediaTime);
+      exactAt = now;
+    };
     video.requestVideoFrameCallback(onFrame);
-  } else {
-    const loop = () => { tick(frameOf(video.currentTime)); requestAnimationFrame(loop); };
-    requestAnimationFrame(loop);
   }
+  const loop = (now) => {
+    requestAnimationFrame(loop);
+    if (!M || !draft) return;
+    const byClock = frameOf(video.currentTime);
+    const frame = now - exactAt < 150 && Math.abs(exact - byClock) <= 2 ? exact : byClock;
+    if (frame === shown && !dirty) return;
+    shown = frame;
+    dirty = false;
+    try { tick(frame); } catch (err) { fail(err); }
+  };
+  requestAnimationFrame(loop);
+  const redraw = () => { dirty = true; };
   video.addEventListener("ended", () => { if (seg()) { seek(seg().first); video.play(); } });
-  window.addEventListener("resize", () => draw(lastCopyFrame));
+  window.addEventListener("resize", redraw);
+  window.addEventListener("error", (e) => fail(e.error || new Error(e.message)));
 
   // ------------------------------------------------------------------ points
   async function openPoint(i) {
@@ -363,6 +426,7 @@
     reviewed = !!v;
     trk = null;
     lastCopyFrame = -1;
+    redraw();
     renderChips();
     renderPanel();
     renderTimeline();
@@ -378,7 +442,7 @@
     }
     try {
       const loaded = await trackCache.get(number);
-      if (point().point === number) { trk = loaded; draw(lastCopyFrame); }
+      if (point().point === number) { trk = loaded; redraw(); }
     } catch (err) { trackCache.delete(number); fail(err); }
   }
 
@@ -525,7 +589,7 @@
     boxes = !boxes;
     $("btnBoxes").textContent = boxes ? "Boxes on" : "Boxes off";
     $("btnBoxes").classList.toggle("on", boxes);
-    draw(lastCopyFrame);
+    redraw();
   }
 
   // A clicked button keeps the keyboard focus, and the browser then presses it
