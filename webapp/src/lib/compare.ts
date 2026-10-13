@@ -4,9 +4,10 @@
 // so a comparison never shows more about another player than the league table
 // already does.
 //
-// Samples are small on both sides, so a gap is called only when the player's
-// 95 % range and the reference's 95 % range do not overlap; anything else reads
-// "too close to call".
+// Samples are small on both sides, so every gap is read twice: which way it
+// goes (always shown), and whether chance alone could explain it. It is a
+// CLEAR gap only when the player's 95 % range and the reference's 95 % range do
+// not overlap; anything else is drawn pale, as "could be chance".
 import { signed } from './format'
 import type { TermKey } from './glossary'
 import { hitText, hittingRange, MIN_N, pct, poissonRange, rangeText, wilson, type Range } from './stats'
@@ -29,6 +30,8 @@ export interface Sample {
   serve_errors?: number | null
   recv_points?: number | null
   recv_won?: number | null
+  serve_points?: number | null
+  serve_won?: number | null
 }
 
 /** Other players needed before "the league" is a reference. */
@@ -52,13 +55,17 @@ interface Def {
   n: (s: Sample) => number | null | undefined
   /** Errors, for hitting %. */
   e?: (s: Sample) => number
+  /** Shown beside a tile of its own tab only, not in the overview list. */
+  tabOnly?: boolean
 }
 
 const DEFS: Def[] = [
   { key: 'hitting', term: 'hitting', kind: 'hitting', better: 'high', unit: 'attacks', k: (s) => s.kills, n: (s) => s.attacks, e: (s) => s.attack_errors },
   { key: 'kill', term: 'kill_rate', kind: 'share', better: 'high', unit: 'attacks', k: (s) => s.kills, n: (s) => s.attacks },
+  { key: 'attack_err', term: 'attack_errors', kind: 'share', better: 'low', unit: 'attacks', k: (s) => s.attack_errors, n: (s) => s.attacks, tabOnly: true },
   { key: 'ace', term: 'ace_rate', kind: 'share', better: 'high', unit: 'serves', k: (s) => s.aces, n: (s) => s.serves },
   { key: 'serve_err', term: 'serve_errors', kind: 'share', better: 'low', unit: 'serves', k: (s) => s.serve_errors, n: (s) => s.serves },
+  { key: 'break_pt', term: 'break_point', kind: 'share', better: 'high', unit: 'points served', k: (s) => s.serve_won, n: (s) => s.serve_points, tabOnly: true },
   { key: 'side_out', term: 'side_out', kind: 'share', better: 'high', unit: 'points received', k: (s) => s.recv_won, n: (s) => s.recv_points },
   { key: 'digs', term: 'digs_21', kind: 'per21', better: 'high', unit: 'points', k: (s) => s.digs, n: (s) => s.points_played },
   { key: 'assists', term: 'assists_21', kind: 'per21', better: 'high', unit: 'points', k: (s) => s.assists, n: (s) => s.points_played },
@@ -126,7 +133,17 @@ export interface CompareRow extends Measured {
  * `minPeers` of them with any attempt and a pooled count above the minimum.
  * Fantasy is ranked among players, so not against a single earlier period. */
 export function compare(you: Sample, others: Peer[], minPeers = MIN_PEERS): CompareRow[] {
-  return DEFS.filter((d) => has(d, you)).map((d): CompareRow => {
+  return rowsOf(DEFS.filter((d) => !d.tabOnly), you, others, minPeers)
+}
+
+/** Every stat with a league reference, by key: what a tab's tiles are read
+ * against (the overview list, plus the stats that only a tab shows). */
+export function compareByKey(you: Sample, others: Peer[], minPeers = MIN_PEERS): Record<string, CompareRow> {
+  return Object.fromEntries(rowsOf(DEFS, you, others, minPeers).map((r) => [r.key, r]))
+}
+
+function rowsOf(defs: Def[], you: Sample, others: Peer[], minPeers: number): CompareRow[] {
+  return defs.filter((d) => has(d, you)).map((d): CompareRow => {
     const mine = measure(d, d.k(you) as number, d.n(you) as number, d.e?.(you) ?? 0)
     const usable = others.filter((o) => has(d, o.sample) && (d.n(o.sample) as number) > 0)
     const sum = (f: (s: Sample) => number) => usable.reduce((t, o) => t + f(o.sample), 0)
@@ -164,49 +181,78 @@ export function highlights(rows: CompareRow[]): { best: CompareRow | null; worst
   return { best: top('better'), worst: top('worse') }
 }
 
-/** Half the width of the "too close to call" zone, in % of the lane. */
-export const GAP_ZONE = 20
-/** How far from the centre a gap is drawn at most, in % of the lane. */
-const GAP_REACH = 46
-
-export interface GapScale {
-  /** Where a value sits, 0..100 from the left: the reference is 50. */
-  x: (v: number) => number
-  /** Half-width of the zone a gap must leave to be called; null for a row
-   * that is not judged (fantasy, or the player below the minimum). */
-  zone: number | null
+/** A value in the units it is shown in, rounded as it is shown: 25 (%), 141
+ * (thousandths of a hitting %), 94 (tenths). A gap is the difference of what
+ * the reader sees: 25% against 22% is 3 points, never 2 or 4. */
+function shown(kind: Kind, v: number): number {
+  if (kind === 'share') return Number((v * 100).toFixed(0))
+  if (kind === 'hitting') return Math.sign(v) * Math.round(Number(Math.abs(v).toFixed(3)) * 1000)
+  return Math.round(Number(v.toFixed(1)) * 10)
 }
 
-/** A row drawn as its gap to the reference. MORE is to the right whatever
- * the stat: a "fewer is better" stat is judged by its verdict, never by
- * flipping the axis. The row is scaled so that the gap at which the two 95 %
- * ranges stop overlapping sits `GAP_ZONE` from the centre on every row: a bar
- * leaves the zone exactly when a verdict is called, and its length reads the
- * same on every row. Null without a reference. */
-export function gapScale(r: CompareRow): GapScale | null {
-  if (r.ref === null) return null
-  const ref = r.ref
-  const clamp = (t: number) => 50 + Math.min(GAP_REACH, Math.max(-GAP_REACH, t))
-  if (r.value !== null && r.range && r.refRange) {
-    const noise = r.value >= ref ? (r.refRange.hi - ref) + (r.value - r.range.lo) : (ref - r.refRange.lo) + (r.range.hi - r.value)
-    if (noise > 0) return { x: (v) => clamp(((v - ref) / noise) * GAP_ZONE), zone: GAP_ZONE }
+export interface Gap {
+  /** Where the player's number sits against the reference, as displayed. More
+   * is `up` whatever the stat: whether that is good is `good`. */
+  dir: 'up' | 'down' | 'level'
+  /** The direction is the good one for this stat; null when level. */
+  good: boolean | null
+  /** The two 95 % ranges do not overlap: chance alone does not explain it. */
+  clear: boolean
+  /** How far towards a clear gap, 0..1 (1 = clear): what the strength of the
+   * colour follows. Null where the stat has no chance range (fantasy). */
+  sure: number | null
+  /** The size as it reads, unsigned: "3 pts", ".118", "1.9". */
+  size: string
+}
+
+/** The gap of a row to its reference; null while either side is missing. */
+export function gapOf(r: CompareRow): Gap | null {
+  if (r.value === null || r.ref === null) return null
+  const d = shown(r.kind, r.value) - shown(r.kind, r.ref)
+  const size = r.kind === 'share' ? `${Math.abs(d)} ${Math.abs(d) === 1 ? 'pt' : 'pts'}`
+    : r.kind === 'hitting' ? hitText(Math.abs(d) / 1000) : (Math.abs(d) / 10).toFixed(1)
+  if (d === 0) return { dir: 'level', good: null, clear: false, sure: r.range && r.refRange ? 0 : null, size }
+  const clear = r.verdict === 'better' || r.verdict === 'worse'
+  let sure: number | null = null
+  if (r.range && r.refRange) {
+    // the gap at which the two ranges stop overlapping, from this side
+    const noise = r.value >= r.ref ? (r.refRange.hi - r.ref) + (r.value - r.range.lo) : (r.ref - r.refRange.lo) + (r.range.hi - r.value)
+    sure = clear ? 1 : noise > 0 ? Math.min(1, Math.abs(r.value - r.ref) / noise) : 0
   }
-  // nothing of the player's to judge: the others keep the scale of the reference's own range
-  const spread = r.refRange ? Math.max(r.refRange.hi - ref, ref - r.refRange.lo) : 0
-  if (spread > 0) return { x: (v) => clamp(((v - ref) / spread) * GAP_ZONE), zone: null }
-  // fantasy has no range on either side: the row fits what it draws
-  const reach = Math.max(0, ...[r.value, ...r.peers.map((p) => p.value)].filter((v): v is number => v != null).map((v) => Math.abs(v - ref)))
-  return { x: (v) => clamp(reach === 0 ? 0 : ((v - ref) / reach) * GAP_REACH), zone: null }
+  return { dir: d > 0 ? 'up' : 'down', good: (d > 0) === (r.better === 'high'), clear, sure, size }
 }
 
-/** A row without a reference, drawn as plain bars from zero: where a value
- * sits, 0..100 from the left, more to the right. `span` is the share of the
- * lane the bars may use (less when names follow them). */
-export function barScale(r: CompareRow, span = 96): (v: number) => number {
-  const all = [0, r.value, r.range?.lo, r.range?.hi, ...r.peers.map((p) => p.value)].filter((v): v is number => v != null)
-  const lo = Math.min(...all)
-  const hi = Math.max(...all)
-  return (v) => 2 + (hi === lo ? 0 : (Math.min(Math.max(v, lo), hi) - lo) / (hi - lo)) * span
+/** The wash behind a gap, as a style: blue for better and orange for worse,
+ * stronger the surer the gap is and strongest once clear. None when level,
+ * and none where nothing says how sure the gap is (fantasy has no chance
+ * range): there the arrow alone carries the direction. */
+export function gapTint(g: Gap | null): { background: string } | undefined {
+  if (!g || g.good === null || g.sure === null) return undefined
+  const share = g.clear ? 40 : Math.round(5 + 19 * g.sure)
+  return { background: `color-mix(in srgb, var(${g.good ? '--gap-better' : '--gap-worse'}) ${share}%, transparent)` }
+}
+
+/** The gap in words: "3 pts above", "9 pts fewer" where fewer is the good
+ * direction, and what follows to name the reference (" league", " than league"). */
+export function gapWords(r: Pick<CompareRow, 'better'>, g: Gap, ref: string): [string, string] {
+  if (g.dir === 'level') return ['level', ` with ${ref}`]
+  if (r.better === 'low') return [`${g.size} ${g.dir === 'up' ? 'more' : 'fewer'}`, ` than ${ref}`]
+  return [`${g.size} ${g.dir === 'up' ? 'above' : 'below'}`, ` ${ref}`]
+}
+
+/** How many rows read better, worse and level against the reference. Fantasy
+ * is the total of the others, so it is not counted with them. */
+export function tally(rows: CompareRow[]): { better: number; worse: number; level: number; of: number } {
+  const out = { better: 0, worse: 0, level: 0, of: 0 }
+  for (const r of rows) {
+    const g = r.kind === 'fantasy' ? null : gapOf(r)
+    if (!g) continue
+    out.of++
+    if (g.good === null) out.level++
+    else if (g.good) out.better++
+    else out.worse++
+  }
+  return out
 }
 
 /** A value the way its stat reads: "13%", ".250", "8.9", "+6.4". */

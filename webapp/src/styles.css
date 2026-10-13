@@ -286,77 +286,53 @@ tr.clickable:hover td.sticky-col { background: var(--surface-2); }
 .seg button[aria-pressed='true'] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--ring); }
 .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 
-.cmp-chips { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 10px; }
-.cmp-head, .cmp-row { display: grid; grid-template-columns: minmax(170px, 1.1fr) 62px 62px minmax(160px, 2fr) 128px; align-items: center; gap: 2px 14px; }
+.cmp-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin: 0 0 12px; }
+.cmp-head, .cmp-row { display: grid; grid-template-columns: minmax(180px, 1.6fr) 76px 76px minmax(150px, 1fr); align-items: center; gap: 2px 16px; padding: 0 12px; }
 .cmp-head { padding-bottom: 6px; font-size: 0.78rem; font-weight: 600; color: var(--ink-2); }
-.cmp-head-who { grid-column: 1 / 3; text-align: right; }
-.cmp-head-ref { text-align: right; white-space: nowrap; }
-.cmp-head-axis { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; }
-.cmp-head-axis span:first-child, .cmp-head-axis span:last-child { color: var(--muted); font-weight: 400; }
-.cmp-head-axis span:last-child { text-align: right; }
-.cmp-row { padding: 7px 0; border-top: 1px solid var(--grid); }
-.cmp-total { border-top: 2px solid var(--axis); margin-top: 4px; padding-top: 9px; }
+.cmp-head-num { text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmp { display: grid; gap: 3px; }
+/* each row is a band; its wash says better / worse and how sure (components/Gap.tsx) */
+.cmp-row { padding-top: 8px; padding-bottom: 8px; border-radius: 8px; background: color-mix(in srgb, var(--ink-2) 5%, transparent); }
+.cmp-total { margin-top: 8px; }
 .cmp-label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
-.cmp-low { display: block; font-size: 0.74rem; color: var(--muted); }
-.cmp-count { color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cmp-low { display: block; font-size: 0.74rem; color: var(--ink-2); }
+.cmp-count { color: var(--ink-2); font-size: 0.8rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cmp-value { font-weight: 700; font-size: 1.05rem; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cmp-ref { text-align: right; font-size: 0.95rem; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.cmp-verdict { font-size: 0.85rem; color: var(--ink-2); white-space: nowrap; }
+.cmp-gap { font-size: 0.9rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cmp-clear .cmp-gap { font-weight: 700; }
 .cmp-explain { margin: 8px 0 0; font-size: 0.82rem; color: var(--muted); max-width: 82ch; }
-.verdict-mark { font-size: 0.75em; }
-.verdict-better { color: var(--gap-better); }
-.verdict-worse { color: var(--gap-worse); }
-.verdict-same { color: var(--muted); }
-.lane { position: relative; border-radius: 4px; }
-.lane:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.lane > span { position: absolute; }
-/* the gap to the reference: axis and zone run through the row padding, so they join from row to row */
-.gap-lane { align-self: stretch; min-height: 28px; }
-.gap-axis { left: 50%; top: -8px; bottom: -8px; width: 2px; margin-left: -1px; background: var(--ink-2); z-index: 1; }
-.cmp-total .gap-axis { top: -15px; }
-.gap-zone { top: -8px; bottom: -8px; background: color-mix(in srgb, var(--ink-2) 9%, transparent); }
-.gap-bar { top: calc(50% - 6px); height: 12px; border-radius: 0 3px 3px 0; }
-.gap-bar.gap-left { border-radius: 3px 0 0 3px; }
-.gap-better { background: var(--gap-better); }
-.gap-worse { background: var(--gap-worse); }
-.gap-plain { background: var(--ink-2); }
-.gap-same { background: color-mix(in srgb, var(--ink-2) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink-2) 55%, transparent); }
-.gap-peer { top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: var(--surface); border: 2px solid var(--ink-2); z-index: 2; }
-/* no reference yet: plain bars from zero */
-.bar-zero { top: 1px; bottom: 1px; width: 1px; margin-left: -0.5px; background: var(--axis); }
-.bar-you { top: 4px; height: 12px; background: var(--accent); border-radius: 0 3px 3px 0; }
-.bar-peer { height: 8px; background: var(--muted); border-radius: 0 3px 3px 0; }
-.bar-you.bar-neg, .bar-peer.bar-neg { border-radius: 3px 0 0 3px; }
-.bar-whisk { top: 9px; height: 2px; background: var(--ink); border-radius: 1px; }
-.bar-whisk::before, .bar-whisk::after { content: ''; position: absolute; top: -4px; width: 2px; height: 10px; background: var(--ink); border-radius: 1px; }
-.bar-whisk::before { left: 0; }
-.bar-whisk::after { right: 0; }
-.bar-note { top: 1px; font-size: 0.76rem; color: var(--muted); white-space: nowrap; }
-.bar-name { right: 0; font-size: 0.76rem; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gap-arrow { display: inline-block; width: 1.1em; font-size: 0.8em; text-align: center; }
+.gap-good { color: var(--gap-better); }
+.gap-bad { color: var(--gap-worse); }
+.gap-level { color: var(--muted); }
+/* on the full wash of a clear gap the arrow is ink: its own colour would sink into the band */
+.cmp-clear .gap-arrow, .gap-clear .gap-arrow { color: var(--ink); }
+.gap-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink-2); }
+/* the same read under a tile */
+.gap-note { display: inline-block; margin-top: 6px; padding: 2px 8px 2px 4px; border-radius: 6px; font-size: 0.78rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+.gap-note:not([style]) { padding-left: 0; color: var(--ink-2); }
+.gap-clear { font-weight: 700; }
+.vs-note { margin: 10px 0 0; font-size: 0.8rem; color: var(--muted); }
 .tooltip-wrap { white-space: normal; width: max-content; max-width: 240px; z-index: 4; }
 .tooltip-below { transform: translate(-50%, 14px); }
 /* the clip of an attack: a fixed 4:3 box, so the panel does not jump when the video arrives */
 .clip { width: 218px; max-width: 100%; aspect-ratio: 4 / 3; margin-top: 6px; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
 .clip video { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; }
-.key { display: inline-block; vertical-align: middle; margin-right: 6px; }
-.key-better { width: 18px; height: 10px; border-radius: 0 3px 3px 0; background: var(--gap-better); }
-.key-worse { width: 18px; height: 10px; border-radius: 3px 0 0 3px; background: var(--gap-worse); }
-.key-zone { width: 18px; height: 14px; border-radius: 2px; background: color-mix(in srgb, var(--ink-2) 16%, transparent); }
-.key-axis { width: 2px; height: 14px; background: var(--ink-2); }
-.key-peer { width: 9px; height: 9px; border-radius: 50%; background: var(--surface); border: 2px solid var(--ink-2); }
-.key-you { width: 18px; height: 10px; border-radius: 0 3px 3px 0; background: var(--accent); }
-.key-other { width: 18px; height: 7px; border-radius: 0 3px 3px 0; background: var(--muted); }
-.key-whisk { width: 20px; height: 10px; border-inline: 2px solid var(--ink); background: linear-gradient(var(--ink), var(--ink)) center / 100% 2px no-repeat; }
+.key { display: inline-block; vertical-align: middle; margin-right: 6px; width: 14px; height: 14px; border-radius: 3px; }
+.key-better { background: color-mix(in srgb, var(--gap-better) 60%, transparent); }
+.key-worse { background: color-mix(in srgb, var(--gap-worse) 60%, transparent); }
+.key-better.key-pale { background: color-mix(in srgb, var(--gap-better) 14%, transparent); margin-right: 2px; }
+.key-worse.key-pale { background: color-mix(in srgb, var(--gap-worse) 14%, transparent); margin-right: 2px; }
 @media (max-width: 640px) {
-  /* phones: the numbers on one line, the chart below, the verdict under it */
-  .cmp-head, .cmp-row { grid-template-columns: 1fr 58px 58px; gap: 4px 10px; }
-  .cmp-head-who { grid-column: 1 / 3; }
-  .cmp-head-axis { grid-column: 1 / -1; grid-row: 2; }
-  .cmp-row .lane { grid-column: 1 / -1; grid-row: 2; }
-  .cmp-row .cmp-verdict { grid-column: 1 / -1; grid-row: 3; }
-  .cmp-verdict:empty, .cmp-head-end { display: none; }
+  /* phones: the two numbers beside the stat, the gap on its own line under them */
+  .cmp-head, .cmp-row { grid-template-columns: 1fr 58px 58px; gap: 2px 10px; padding-left: 10px; padding-right: 10px; }
+  .cmp-head > :last-child { display: none; }
+  .cmp-gap { grid-column: 1 / -1; }
+  .cmp-gap:empty { display: none; }
   .cmp-label { flex-direction: column; gap: 0; }
-  .gap-axis, .cmp-total .gap-axis, .gap-zone { top: 0; bottom: 0; }
+  /* three tiles share a phone's width: "3 pts above", the note under them names the league */
+  .gap-ref { display: none; }
 }
 
 .hero-side { text-align: right; margin-left: auto; }
@@ -373,6 +349,9 @@ tr.clickable:hover td.sticky-col { background: var(--surface-2); }
 
 .attack-map .court { max-width: 340px; margin: 0 auto; }
 .pass-map .court { max-width: 520px; margin: 0 auto; }
+.serve-map .court { max-width: 400px; margin: 0 auto; }
+/* said on the court itself when a filter leaves nothing to draw */
+.chart text.court-empty { fill: var(--ink-2); font-size: 14px; font-weight: 600; }
 .tiles-4 { grid-template-columns: repeat(4, 1fr); }
 @media (max-width: 640px) { .tiles-4 { grid-template-columns: repeat(2, 1fr); } }
 .trend-wait { margin: 0 0 16px; }

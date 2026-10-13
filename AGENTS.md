@@ -618,16 +618,31 @@ Pages). Rules that keep it correct:
 * **Comparing players (#96).** A comparison uses league-tier numbers only (what
   the league table already shows: `leaderboard` rows, a profile's match
   history), never another player's analytics tier. The reference is the pooled
-  rate of everyone else, from 3 other players, and a gap is called only when
-  the two 95 % ranges do not overlap. A stat view holds at most ~5 tiles plus
-  its charts; more goes behind a tab.
-* **Reading a comparison (owner, 2026-10-09, #99).** More is to the right on
-  every row: a stat where fewer is better is tagged on its row and judged by
-  its verdict, never drawn on a flipped axis. The reference is a full-size mark
-  with its number beside the player's, never a tick. The chart says "too close
-  to call" and "likely range"; "95 %" stays in the hint and on `/measure`. A
-  called gap is blue / orange (`--gap-better` / `--gap-worse`), never green /
-  red: that pair fails the colour-blind check. Fantasy closes the list.
+  rate of everyone else, from 3 other players, and a gap is called CLEAR only
+  when the two 95 % ranges do not overlap. A stat view holds at most ~5 tiles
+  plus its charts; more goes behind a tab.
+* **Reading a comparison (owner, 2026-10-13, #113; replaces the #99 gap chart,
+  which the owner could not read at a glance).** A comparison is the two
+  numbers side by side and the gap between them, never a chart. The direction
+  is ALWAYS shown: an arrow for which way the number goes (more is up on every
+  stat; a stat where fewer is better is tagged and worded "fewer" / "more",
+  never flipped) and blue / orange for better / worse (`--gap-better` /
+  `--gap-worse`; never green / red: that pair fails the colour-blind check,
+  owner re-confirmed). How sure the gap is = the strength of the colour: pale
+  while chance alone could explain it, strong plus the word "clear" only when
+  the two 95 % ranges do not overlap -- never the full colour on a gap that
+  could be chance. The size is the difference of the two numbers AS SHOWN.
+  Fantasy has no chance range: arrow and rank, no wash, and it closes the
+  list. The same read sits under the tiles of a tab, the player's side counted
+  from the tile's own numbers (with a last-N filter the leaderboard's window
+  is the league's, not the player's). "95 %" stays in the hint and on
+  `/measure`.
+* **A map opens on what it is read for (owner, 2026-10-13, #113).** The attack
+  map opens on the kills (every attack at once is a thicket), the other
+  outcomes one tap away; a filter that leaves nothing says so ON the court. A
+  serve has no measured start, so the serve map marks where serves came down
+  and never draws a line; its marks are the attack map's (point won = filled
+  accent dot, kept in play = neutral ring, error = red cross).
 
 ### 14. Automatic court calibration (owner-asked 2026-10-11, #110)
 

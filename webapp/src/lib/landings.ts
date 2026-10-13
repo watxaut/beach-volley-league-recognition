@@ -42,7 +42,7 @@ export interface Shot {
   end: { x: number; y: number; short: boolean } | null
 }
 
-const GROUP: Record<LandingKind, ShotGroup> = {
+export const GROUP: Record<LandingKind, ShotGroup> = {
   kill: 'kill', dug: 'dug', out: 'error', net: 'error', error: 'error', unresolved: 'other',
 }
 

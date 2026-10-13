@@ -487,6 +487,12 @@ begin
     '[{"k": "reception", "sx": 2.0, "sy": 3.5, "sex": null, "sey": null,
        "x": 4.5, "y": 6.0, "ex": 0.4, "ey": 0.7, "to": "set", "d": "2026-09-20"}]'::jsonb,
     'her reception, and where it went';
+  -- serve_map: her one serve stayed in play and Opp1 took it, but that dig
+  -- has no position, so the serve has no spot
+  assert (v_prof -> 'analytics' -> 'serves') =
+    '[{"r": "in", "x": null, "y": null, "ex": null, "ey": null, "src": null, "in": null,
+       "to": "Check Opp1", "d": "2026-09-20"}]'::jsonb,
+    'her serve, who took it, and no spot without a seen reception';
   assert (v_prof -> 'analytics' -> 'attack_series' -> 0 ->> 'r') = 'kill'
      and (v_prof -> 'analytics' -> 'serve_series' -> 0 ->> 'r') = 'other', 'progress series';
   -- the four players read the whole report of their match (they can count
@@ -560,11 +566,63 @@ begin
     '{"k": "reception", "sx": null, "sy": null, "sex": null, "sey": null, "x": null, "y": null,
       "ex": null, "ey": null, "to": null, "d": "2026-09-20"}'::jsonb,
     'a reception whose next touch has no position keeps its place with no destination';
+  -- serve_map: Opp1's serve was received by Ari at (2.0, 3.5) in HER frame,
+  -- which is (6.0, 12.5) seen from the server: across the net, mirrored
+  assert (v_prof -> 'analytics' -> 'serves') =
+    '[{"r": "in", "x": 6.0, "y": 12.5, "ex": null, "ey": null, "src": "reception", "in": null,
+       "to": "Check Ari", "d": "2026-09-20"}]'::jsonb,
+    'a serve is marked where the receiver played it, in the server''s frame';
 end $$;
 reset role;
 delete from public.actions where point_no = 1 and seq = 5;
 update public.actions set slot = null, observed = false, own_x_m = null, own_y_m = null
  where point_no = 1 and seq = 4;
+
+-- serve_map: a serve nobody touched is marked where the ball came down,
+-- through the half the server stood on. Point 2 becomes Ari's service error,
+-- the ball 1 m wide of the camera-frame court, 3 m from the far baseline.
+savepoint serve_ground;
+delete from public.actions where point_no = 2 and seq > 0;
+update public.actions set side = 'near', outcome = 'error' where point_no = 2 and seq = 0;
+update public.points set end_kind = 'ground', end_x_m = 9.0, end_y_m = 3.0, end_in_court = false
+ where point_no = 2;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+do $$
+declare v_prof jsonb;
+begin
+  v_prof := public.player_profile((select id from public.players where display_name = 'Check Ari'));
+  assert (v_prof -> 'analytics' -> 'serves') =
+    '[{"r": "error", "x": 9.0, "y": 13.0, "ex": null, "ey": null, "src": "ground", "in": false,
+       "to": null, "d": "2026-09-20"}]'::jsonb,
+    'served from the near half: the ball-death spot, 13 m from her baseline, called out';
+  assert jsonb_array_length(v_prof -> 'analytics' -> 'serves') = (v_prof -> 'analytics' ->> 'n_serves')::int,
+    'the map lists the serves the tiles count';
+end $$;
+reset role;
+update public.actions set side = 'far' where point_no = 2 and seq = 0;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+do $$
+declare v_prof jsonb;
+begin
+  v_prof := public.player_profile((select id from public.players where display_name = 'Check Ari'));
+  assert (v_prof -> 'analytics' -> 'serves' -> 0) @> '{"x": -1.0, "y": 3.0, "src": "ground"}'::jsonb,
+    'served from the far half: the same spot is on her own side of the net, never over';
+end $$;
+reset role;
+update public.actions set side = null where point_no = 2 and seq = 0;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+do $$
+declare v_prof jsonb;
+begin
+  v_prof := public.player_profile((select id from public.players where display_name = 'Check Ari'));
+  assert (v_prof -> 'analytics' -> 'serves' -> 0) @> '{"r": "error", "x": null, "y": null, "src": null, "in": null}'::jsonb,
+    'without the half the server stood on there is no spot (never a guess)';
+end $$;
+reset role;
+rollback to savepoint serve_ground;
 
 -- bob again: ari's analytics are now public; the touches are still not
 set local role authenticated;

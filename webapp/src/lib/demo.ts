@@ -4,10 +4,10 @@
 // privacy tiers) mirror the SQL so the pages behave like production.
 import type { Api } from './api'
 import { blobDataUrl } from './feedback'
-import { hitSplit, longestRally, playerAnalytics, pointFantasy, serveTargets, teamRally, type Seat, type Touch } from './analytics'
+import { hitSplit, longestRally, playerAnalytics, pointFantasy, serveRows, serveTargets, teamRally, type Seat, type Touch } from './analytics'
 import type {
   ActionName, ActionRow, BoxRow, FantasyRule, Feedback, LeaderRow, Match, PointRow, Participant,
-  Pass, Player, PlayerProfile, Profile, Publication, ReportPlayer, Ruleset, Session, Slot, Team, WindowParams,
+  Pass, Player, PlayerProfile, Profile, Publication, ReportPlayer, Ruleset, Serve, Session, Slot, Team, WindowParams,
 } from './types'
 
 
@@ -360,6 +360,22 @@ export function demoApi(): Api {
               to: went ? (r() > 0.85 ? 'spike' : 'set') : null,
               d: seats.length ? seats[i % seats.length].date : null,
             }
+          }),
+          // the serves the tiles count, each with a drawn spot: an ace falls deep
+          // or on a line, an error past the baseline, wide or in the net, and
+          // about one serve in ten has a receiver nobody saw
+          serves: serveRows(seats).map((sv): Serve => {
+            const k = r()
+            const across = 0.6 + r() * 6.8
+            if (sv.r === 'error') {
+              const spot = k < 0.4 ? { x: across, y: 16.4 + r() * 0.9 } : k < 0.7 ? { x: r() > 0.5 ? 8.7 : -0.6, y: 10 + r() * 5 } : { x: across, y: 7.6 }
+              return { ...sv, ...spot, ex: null, ey: null, src: 'ground', in: false }
+            }
+            if (sv.r === 'ace') {
+              return { ...sv, x: r() > 0.5 ? 0.5 + r() : 6.5 + r(), y: 13 + r() * 2.6, ex: null, ey: null, src: sv.to ? 'reception' : 'ground', in: sv.to ? null : true }
+            }
+            if (k < 0.1 || !sv.to) return { ...sv, x: null, y: null, ex: null, ey: null, src: null, in: null }
+            return { ...sv, x: across, y: 10.5 + r() * 4.5, ex: 0.4, ey: 0.9, src: 'reception', in: null }
           }),
         } : null,
       }

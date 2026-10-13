@@ -1,7 +1,7 @@
 // The same two-point fixture rls_smoke.sql uses, with the same expectations:
 // the browser's copy of the definitions and the database's must not drift.
 import { describe, expect, it } from 'vitest'
-import { bestPoint, cumulative, hitSplit, longestRally, mvps, playerAnalytics, serveTargets, teamRally, type Seat, type Touch } from './analytics'
+import { bestPoint, cumulative, hitSplit, longestRally, mvps, playerAnalytics, serveRows, serveTargets, teamRally, type Seat, type Touch } from './analytics'
 import type { PointRow, Slot, Team } from './types'
 
 const pt = (n: number, serving: Team, server: Slot, winner: Team): PointRow => ({
@@ -43,6 +43,11 @@ describe('playerAnalytics (the smoke-check fixture)', () => {
     expect(a.serve_in).toEqual({ opp_serves: 1, team_credited: 1, mine: 1 })
     expect(a.serve_out.to).toEqual([{ player_id: null, display_name: 'Check Opp1', n: 1 }])
     expect(a.serve_out.unseen).toBe(0)
+  })
+  it('lists every serve with what became of it and who took it (the serve map)', () => {
+    expect(serveRows([ari])).toEqual([{ r: 'in', to: 'Check Opp1', d: '2026-09-20' }])
+    const opp: Seat = { ...ari, slot: 'P1B', team: 'B' }
+    expect(serveRows([opp])).toEqual([{ r: 'in', to: 'Check Ari', d: '2026-09-20' }])
   })
   it('reception outcome', () => {
     expect(a.reception).toEqual({ n: 1, spike: 1, overpass: 0, error: 0, none: 0, first_ball_kills: 1 })
