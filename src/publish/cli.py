@@ -191,6 +191,21 @@ def build_from_run(args: argparse.Namespace) -> Dict[str, Any]:
     recon = json.loads(recon_path.read_text())
     key = args.match_key or default_match_key(run_dir, pipeline)
     checked_match_key(key)  # refuse a non-conforming name before hashing / decoding
+
+    # The match as the owner reviewed it (make review): his verdicts replace
+    # the run's read of the points he looked at, before anything is built.
+    from .reviewed import apply_review, describe, load_review_for
+
+    review = None if args.no_review else load_review_for(key, args.ground_truth)
+    recon, review_report = apply_review(recon, review)
+    print(describe(review_report), flush=True)
+    for name in ("match_reviewed.json", "match_reviewed.txt"):
+        (run_dir / name).unlink(missing_ok=True)
+    if recon.get("review"):
+        from ..postrun.reconstruct import format_report
+
+        (run_dir / "match_reviewed.json").write_text(json.dumps(recon, indent=1))
+        (run_dir / "match_reviewed.txt").write_text(format_report(recon))
     decoded = (pipeline.get("video") or {}).get("path")
 
     from .thumbs import find_source_video, make_slot_thumbnails
@@ -233,12 +248,12 @@ def build_from_run(args: argparse.Namespace) -> Dict[str, Any]:
 
     provenance = {**git_state(), "diag_schema": _diag_schema(diag) if diag.exists() else None,
                   "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                  "host": socket.gethostname()}
+                  "host": socket.gethostname(), "owner_review": review_report}
     return build_bundle(run_dir, match_key=key, video_url=args.video_url,
                         video_sha256=ident["sha256"], video_filename=ident["filename"],
                         thumb_paths=thumb_paths, clip_paths=clip_paths,
                         provenance=provenance, note=args.note,
-                        replace_video=args.replace_video)
+                        replace_video=args.replace_video, recon=recon)
 
 
 def summarize(bundle: Dict[str, Any]) -> str:
@@ -314,6 +329,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-clips", action="store_true",
                    help="publish without attack clips (the ones in storage are removed)")
     p.add_argument("--no-video-hash", action="store_true", help="skip hashing the source video")
+    p.add_argument("--no-review", action="store_true",
+                   help="publish the run as it reads, without the owner's review")
+    p.add_argument("--ground-truth", type=Path, default=Path("ground_truth"),
+                   help="where <match_key>_review.json is")
     p.add_argument("--env", type=Path, default=DEFAULT_ENV_FILE, help="credentials file")
     p.add_argument("--log", type=Path, default=DEFAULT_LOG, help="local publish log (JSONL)")
     return p

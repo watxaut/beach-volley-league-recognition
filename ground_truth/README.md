@@ -126,8 +126,9 @@ changes against this file at the GT frame tolerance (±15 f).
 Written by the review page (`make review`, `src/web/review.py`): the owner
 watches each rally of a reconstructed match with the post-run labels drawn on
 the bodies and says "all right" or what is wrong. Never edit it by hand while
-the page is open; nothing in the pipeline, the post-run layer or the publisher
-reads it.
+the page is open. Nothing in the pipeline or the post-run layer reads it; the
+publisher applies it (`src/publish/reviewed.py`, AGENTS §13): what goes to the
+web is the match as reviewed here.
 
 - `owner_final_score` — the score the owner remembers (`{"A": 21, "B": 15}`).
 - `missing_points[]` — a point the run did not find: `after_point` (the run's

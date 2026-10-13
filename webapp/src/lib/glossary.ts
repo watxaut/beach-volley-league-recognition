@@ -26,7 +26,7 @@ export const GLOSSARY = {
     how: LOWER_BOUND, grade: 'A' },
   assists: { label: 'Assists', what: 'Sets that the next touch turned into a kill.', how: LOWER_BOUND, grade: 'A' },
   errors: { label: 'Errors', what: 'Service errors, attack errors, and a set or dig that ended the rally.',
-    how: 'Blocks and ball-handling faults are not measured, so none are counted.', grade: 'A' },
+    how: 'Ball-handling faults are not measured, so none are counted. A block is counted only in a match reviewed by hand, and scores only when it wins the point.', grade: 'A' },
   hitting: { label: 'Hitting %', what: '(kills − errors) / attacks, the standard attack efficiency.',
     how: `Reads like a batting average. Shows from ${MIN_N} attacks.`, grade: 'A' },
   kill_rate: { label: 'Kill %', what: 'Kills / attacks.', how: FROM_MIN, grade: 'A' },

@@ -29,7 +29,7 @@ const G1: Omit<FantasyRule, 'ruleset_id'>[] = [
   { rule_key: 'ace', label: 'Ace', actions: ['serve'], outcome: 'ace', assist_only: false, points: 1, sort_order: 20 },
   { rule_key: 'dig', label: 'Dig', actions: ['dig'], outcome: null, assist_only: false, points: 1, sort_order: 30 },
   { rule_key: 'assist', label: 'Assist', actions: ['set'], outcome: null, assist_only: true, points: 0.5, sort_order: 40 },
-  { rule_key: 'block', label: 'Block', actions: ['block'], outcome: null, assist_only: false, points: 1, sort_order: 50 },
+  { rule_key: 'block', label: 'Kill block', actions: ['block'], outcome: 'kill', assist_only: false, points: 1, sort_order: 50 },
   { rule_key: 'serve_error', label: 'Service error', actions: ['serve'], outcome: 'error', assist_only: false, points: -1, sort_order: 60 },
   { rule_key: 'attack_error', label: 'Attack error', actions: ['spike', 'overpass'], outcome: 'error', assist_only: false, points: -1, sort_order: 70 },
   { rule_key: 'handling_error', label: 'Ball handling', actions: ['set', 'dig', 'ball_handling'], outcome: 'error', assist_only: false, points: -1, sort_order: 80 },

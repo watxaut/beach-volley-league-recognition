@@ -16,8 +16,9 @@ carries the point's frames and what the run read when it was given, so it
 re-attaches after a rules change and says when the run moved under it; its
 ``truth`` is the point as the owner left it, independent of any later run.
 
-Nothing here feeds the pipeline, the post-run layer or the publisher: the
-file is owner feedback to score and fix against.
+Nothing here feeds the pipeline or the post-run layer. The publisher applies
+the file (src/publish/reviewed.py): what is published is the match as the
+owner reviewed it.
 """
 
 from __future__ import annotations

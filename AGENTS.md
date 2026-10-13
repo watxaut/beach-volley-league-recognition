@@ -45,6 +45,7 @@ make autocalibrate VIDEO=...                         # court calibration without
 make ui                                              # local web UI over data/volley.db
 make review                                          # owner review of a reconstructed match, rally by rally (:8001/review) -- §11
 make review-gaps                                     # dead-time copies for the review page (gaps.mp4, needs the videos; RUN=output/<key>)
+venv/bin/python -m src.publish.reviewed output/<key>  # what the owner's review changes in what a publish would send (§13)
 make ingest-all                                      # (re)ingest output/*/pipeline_output.json into SQLite
 make db-reset                                        # DELETES the DB incl. owner player labels — ask first
 venv/bin/python -m pytest tests/ -o addopts=""       # cov addopts break w/o pytest-cov
@@ -460,9 +461,9 @@ causal and untouched. Owner rules it encodes — keep them when changing it:
   reconstruction made (`identity.relabel` over the reconstruction's own
   rallies -- never a second identity logic); the file is owner feedback and is
   only ever written by the page, on the owner's key press; nothing in the
-  pipeline, the post-run layer or the publisher reads it (a correction reaches
-  a published match only through an admin-owned override, §13, never by
-  editing a reconstruction); a verdict keeps what the run read when it was
+  pipeline or the post-run layer reads it, and `match_reconstruction.json` is
+  never edited from it -- the PUBLISHER applies it (§13, "What is published is
+  the match as the owner reviewed it"); a verdict keeps what the run read when it was
   given, so a rules change never silently turns an old "all right" into a
   claim about a new read. A missed point is only visible in the DEAD
   TIME: `make review-gaps` (`src/publish/gaps.py`) writes it next to the rally
@@ -539,9 +540,34 @@ Pages). Rules that keep it correct:
   ranking. Keep it that way: never aggregate by slot across matches. Re-tag = give
   the slot a player (admin -> Players -> Unknown players); the publisher never touches
   the flag.
+* **What is published is the match as the owner reviewed it (owner,
+  2026-10-13; `src/publish/reviewed.py`).** The publisher applies
+  `ground_truth/<match_key>_review.json` to the reconstruction IN MEMORY
+  before the bundle, the credits and the clips are built (`--no-review`
+  publishes the run as it reads; `python -m src.publish.reviewed <run_dir>`
+  shows what a publish would change; the run directory gets
+  `match_reviewed.json` + `.txt`). Rules to keep: only what the owner changed
+  changes -- an unreviewed or "all right" point is the run's, and a review
+  that corrects nothing gives the SAME bundle hash; a reviewed point is his
+  also after a rules change (the run's measurements follow a touch only where
+  the run still has one at that frame; `make republish-all` re-applies the
+  review and names the points the run now reads differently); a touch he
+  added or named counts as seen and has no position; ace / kill / error are
+  derived again only where he changed the end of a point, with the post-run
+  semantics and without its perception guards; a point the run missed is a
+  point without touches; `match_reconstruction.json` and every GT score stay
+  about the PIPELINE, never the reviewed match. The review files are in git:
+  merge them before publishing from the prod worktree.
+* **A block scores only when it wins the point (owner, 2026-10-14).** A block
+  exists only through a review (it is not a post-run label); it is published
+  with outcome `kill` when it ends the point for the blocker's team, and the
+  fantasy rule `block` asks for that outcome (migration
+  `20261014100000_block_kill_only`, mirrored in `src/publish/fantasy.py` and
+  the demo mode). A soft block is counted as a block and scores nothing.
 * **Credit parity.** An action carries a `slot` exactly when
-  `postrun.player_stats` credits it, and every SQL stat counts `slot IS NOT
-  NULL` only (precision first, §11). A change to the post-run stats rules
+  `postrun.player_stats` credits it (over the REVIEWED points when the match
+  has a review; `tests/test_publish_reviewed.py`), and every SQL stat counts
+  `slot IS NOT NULL` only (precision first, §11). A change to the post-run stats rules
   changes `src/publish/bundle.py` with it; `tests/test_publish.py` pins the
   parity.
 * **Fantasy values live in the database** (`fantasy_rulesets` +
