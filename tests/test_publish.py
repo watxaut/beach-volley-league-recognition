@@ -76,6 +76,10 @@ def test_g1_rules_mirror_the_migration_seed():
     seeded = {r[0]: {"label": r[1], "actions": re.findall(r"'(\w+)'", r[2]),
                      "outcome": None if r[3] == "null" else r[3].strip("'"),
                      "assist_only": r[4] == "true", "points": float(r[5])} for r in rows}
+    # ... as later migrations left it: a block scores only when it wins the point
+    later = (REPO / "supabase/migrations/20261014100000_block_kill_only.sql").read_text()
+    assert re.search(r"set outcome = 'kill', label = 'Kill block'\s+where rule_key = 'block'", later)
+    seeded["block"].update(outcome="kill", label="Kill block")
     assert seeded == {r["rule_key"]: {k: r[k] for k in
                                       ("label", "actions", "outcome", "assist_only", "points")}
                       for r in G1_RULES}

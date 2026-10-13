@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Review · {{ key }}</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ style_ver }}">
+  <link rel="stylesheet" href="/static/review.css?v={{ review_ver }}">
+</head>
+<body class="rv">
+  <header>
+    <a class="brand" href="/review">🏐 Match review</a>
+    <span class="rv-key">{{ key }}</span>
+    <span class="rv-scores" id="scores"></span>
+  </header>
+
+  <div class="rv-chips" id="chips"></div>
+
+  <main class="rv-main">
+    <section class="rv-stage">
+      <div class="rv-video" id="videoBox">
+        <video id="video" src="/review/{{ key }}/video" muted playsinline preload="auto"></video>
+        <canvas id="overlay"></canvas>
+        <div class="rv-touchnow" id="touchNow" hidden></div>
+      </div>
+      <div class="rv-timeline" id="timeline"><div class="rv-cursor" id="cursor"></div></div>
+      <div class="rv-controls">
+        <button id="btnPlay" title="Space">Play / pause</button>
+        <button id="btnBack" title="←">◀ frame</button>
+        <button id="btnFwd" title="→">frame ▶</button>
+        <button id="btnSpeed" title="S">Speed 1×</button>
+        <button id="btnBoxes" title="B">Boxes off</button>
+        <span class="rv-muted" id="clock"></span>
+      </div>
+      <div class="rv-legend">
+        {% for p in thumbs %}
+        <figure class="rv-who" data-player="{{ p }}">
+          <img src="/review/{{ key }}/thumb/{{ p }}.jpg" alt="{{ p }}">
+          <figcaption>{{ p }}</figcaption>
+        </figure>
+        {% endfor %}
+        {% if thumbs %}<span class="rv-muted">Who each label is meant to be (the run's enrolment picture).
+          A label is right when it sits on that person.</span>{% endif %}
+      </div>
+      <p class="rv-keys">
+        <kbd>Enter</kbd> all right, next · <kbd>Space</kbd> play · <kbd>←</kbd><kbd>→</kbd> frame ·
+        <kbd>↑</kbd><kbd>↓</kbd> touch · <kbd>[</kbd><kbd>]</kbd> point ·
+        <kbd>1</kbd> near pair swapped · <kbd>2</kbd> far pair swapped · <kbd>3</kbd> squads on the wrong halves ·
+        <kbd>4</kbd> labels wrong, other · <kbd>W</kbd> winner · <kbd>X</kbd> not a point ·
+        <kbd>T</kbd> add a touch here · <kbd>M</kbd> a point is missing after this one ·
+        <kbd>G</kbd> watch the dead time after this point (dots between the points; orange = worth a look) ·
+        <kbd>N</kbd> note · <kbd>U</kbd> undo my review of this point
+      </p>
+    </section>
+
+    <aside class="rv-panel" id="panel"></aside>
+  </main>
+
+  <script>window.REVIEW_KEY = {{ key | tojson }};</script>
+  <script src="/static/review.js?v={{ review_ver }}"></script>
+</body>
+</html>

@@ -121,6 +121,52 @@ attributions (`by_alternation`, `by_service_order`, `unseen`,
 servers + 1 unseen spike): those carry no claim. Score future attribution
 changes against this file at the GT frame tolerance (±15 f).
 
+## Owner match review (`<match_key>_review.json`, match-review-v1)
+
+Written by the review page (`make review`, `src/web/review.py`): the owner
+watches each rally of a reconstructed match with the post-run labels drawn on
+the bodies and says "all right" or what is wrong. Never edit it by hand while
+the page is open. Nothing in the pipeline or the post-run layer reads it; the
+publisher applies it (`src/publish/reviewed.py`, AGENTS §13): what goes to the
+web is the match as reviewed here.
+
+- `owner_final_score` — the score the owner remembers (`{"A": 21, "B": 15}`).
+- `missing_points[]` — a point the run did not find: `after_point` (the run's
+  number when it was said, 0 = before the first), `after_frame` (that point's
+  serve frame), `winner` (A / B / null), `note`.
+  `at_frame` when the owner marked it while watching the dead time: a frame
+  with the missed rally on the picture (the place to look when fixing it).
+- `gaps[]` — the stretches of dead time the owner watched (`first`, `last`,
+  `status: checked`); a point he found there is in `missing_points`.
+  `status: tail` + `rally_goes_on_to` (a frame): what plays there is the REST
+  of the point before it — the run ended that rally too early. It is one
+  point, never a missing one, and its touches after the cut are unknown. A gap not listed was not watched: no claim about it.
+- `points[]` — one verdict per reviewed point:
+  - `start_frame` / `end_frame` — the rally as the run had it. A verdict
+    belongs to the point that covers at least half of these frames, so it
+    survives a rules change that renumbers the points.
+  - `status` — `ok` (nothing to correct) or `corrected`.
+  - `labels` — `near_swapped` / `far_swapped` (the two teammates on that half
+    carry each other's label; the half as it really is), `sides_swapped` (the
+    run has the squads on the wrong halves), `other` (wrong in a way the note
+    says).
+  - `names` — a body the run left unnamed (`T4` = track 4) named by the owner.
+  - `winner` — `A` / `B` / `none` when the run's winner is wrong, else null;
+    `not_a_point` — dead-time handling the run took for a rally.
+  - `touches` — by frame of the run's touch: `action`, `player` (null =
+    nobody) or `remove` (no touch there); `added[]` — touches the run missed
+    (`block` is allowed: it is not a post-run label yet).
+  - `run` — what the run read when the owner looked (winner, serving team,
+    near team, every touch). When the current run differs, the page flags the
+    point "look again".
+  - `truth` — **the point as the owner left it**: `is_point`, `winner`,
+    `near_team`, `serve_team`, `labels_unclear`, `touches[]` (`frame`,
+    `action`, `player`). This is the part to score a run against; `ok` points
+    carry the run's read as confirmed truth.
+
+Team letters are squads (A = the squad near at the start), as everywhere in
+the post-run layer. Frames are the run's frames (the processed video).
+
 ## Match Points Ground Truth (`<stem>_match_points.json`, match-points-v1)
 
 For full-match videos the owner dictates a plain-text GT

@@ -34,8 +34,10 @@ G1_RULES: List[Rule] = [
      "outcome": None, "assist_only": False, "points": 1.0},
     {"rule_key": "assist", "label": "Assist", "actions": ["set"],
      "outcome": None, "assist_only": True, "points": 0.5},
-    {"rule_key": "block", "label": "Block", "actions": ["block"],
-     "outcome": None, "assist_only": False, "points": 1.0},
+    # Only a block that wins the point (owner, 2026-10-14; migration
+    # 20261014100000_block_kill_only): a soft block scores nothing.
+    {"rule_key": "block", "label": "Kill block", "actions": ["block"],
+     "outcome": "kill", "assist_only": False, "points": 1.0},
     {"rule_key": "serve_error", "label": "Service error", "actions": ["serve"],
      "outcome": "error", "assist_only": False, "points": -1.0},
     {"rule_key": "attack_error", "label": "Attack error", "actions": ["spike", "overpass"],

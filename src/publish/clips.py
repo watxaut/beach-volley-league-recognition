@@ -133,6 +133,16 @@ class RallyCopy:
     crop: Box
     spans: List[Tuple[int, int]]
 
+    def position(self, frame: int) -> Optional[int]:
+        """Where source ``frame`` sits IN THE COPY; None when the copy does
+        not hold it."""
+        offset = 0
+        for first, last in self.spans:
+            if first <= frame <= last:
+                return offset + frame - first
+            offset += last - first + 1
+        return None
+
     def window(self, frame: int) -> Optional[Tuple[int, int]]:
         """First and last position IN THE COPY of the clip of an attack at
         source ``frame``; None when the copy does not hold that frame. A clip

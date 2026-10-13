@@ -319,9 +319,14 @@ def build_bundle(run_dir: Path, *, match_key: Optional[str] = None,
                  thumb_paths: Optional[Dict[str, str]] = None,
                  clip_paths: Optional[Dict[int, str]] = None,
                  provenance: Optional[Dict[str, Any]] = None,
-                 note: Optional[str] = None, replace_video: bool = False) -> Dict[str, Any]:
+                 note: Optional[str] = None, replace_video: bool = False,
+                 recon: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """``recon``: the match to publish when it is not the file as it lies on
+    disk -- the reconstruction with the owner's review applied
+    (src/publish/reviewed.py)."""
     run_dir = Path(run_dir)
-    recon = _load(run_dir / "match_reconstruction.json")
+    if recon is None:
+        recon = _load(run_dir / "match_reconstruction.json")
     if recon is None:
         raise BundleError(f"{run_dir}/match_reconstruction.json not found "
                           f"(run `make run-match` or `make postrun` first)")

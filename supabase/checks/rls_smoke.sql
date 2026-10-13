@@ -196,6 +196,13 @@ begin
     'P2B fantasy: a set error is a ball-handling error (-1)';
 end $$;
 
+-- a block scores only when it wins the point (20261014100000_block_kill_only)
+do $$
+begin
+  assert (select outcome from public.fantasy_rules r join public.fantasy_rulesets s on s.id = r.ruleset_id
+          where s.name = 'G1' and r.rule_key = 'block') = 'kill', 'the block rule needs a kill';
+end $$;
+
 -- editing one rule rescores history; a second active rule set is refused
 update public.fantasy_rules set points = 2.0
 where rule_key = 'dig' and ruleset_id = (select id from public.fantasy_rulesets where is_active);
