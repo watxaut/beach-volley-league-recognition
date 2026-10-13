@@ -293,7 +293,10 @@
       const name = names[label ?? `T${track}`] ?? label ?? `T${track}`;
       const color = COLORS[name] || "#ffffff";
       const bx1 = (x1 - cx) * sx, by1 = (y1 - cy) * sy, bx2 = (x2 - cx) * sx, by2 = (y2 - cy) * sy;
-      if (boxes) { ctx.strokeStyle = color; ctx.lineWidth = 1.5 * dpr; ctx.strokeRect(bx1, by1, bx2 - bx1, by2 - by1); }
+      if (boxes) {
+        ctx.lineWidth = 4.5 * dpr; ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.strokeRect(bx1, by1, bx2 - bx1, by2 - by1);
+        ctx.lineWidth = 2.5 * dpr; ctx.strokeStyle = color; ctx.strokeRect(bx1, by1, bx2 - bx1, by2 - by1);
+      }
       const below = by1 > H - 4 * dpr;
       const text = below ? `${name} ↓` : name;
       const tw = ctx.measureText(text).width + 10 * dpr, th = 19 * dpr;
@@ -521,8 +524,17 @@
   function toggleBoxes() {
     boxes = !boxes;
     $("btnBoxes").textContent = boxes ? "Boxes on" : "Boxes off";
+    $("btnBoxes").classList.toggle("on", boxes);
     draw(lastCopyFrame);
   }
+
+  // A clicked button keeps the keyboard focus, and the browser then presses it
+  // again on the next Space / Enter: the key meant for the video would undo
+  // the click. Buttons here never keep the focus.
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (b) b.blur();
+  });
 
   document.addEventListener("keydown", (e) => {
     if (!M || e.metaKey || e.ctrlKey || e.altKey) return;
