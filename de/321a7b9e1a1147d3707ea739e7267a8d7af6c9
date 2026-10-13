@@ -1,0 +1,45 @@
+AGENTS.md
+  s_9ed08fada71d0a::t_61eb4b7d37fe72 48,464-466,543-566,568-570
+STATUS.md
+  s_9ed08fada71d0a::t_c263e36cd3efe0 95,106,131,524-526
+ground_truth/README.md
+  s_9ed08fada71d0a::t_6872a85427d08e 129-131
+src/publish/bundle.py
+  s_9ed08fada71d0a::t_e4a1549d461ca8 322-326,328-329
+src/publish/cli.py
+  s_9ed08fada71d0a::t_855015cd71f912 194-208,251,256,332-335
+src/publish/fantasy.py
+  s_9ed08fada71d0a::t_b6ee6e97c361fe 37-40
+src/publish/reviewed.py
+  s_9ed08fada71d0a::t_47bdb22378431b 1-462
+src/web/review.py
+  s_9ed08fada71d0a::t_b1e37780ddfe5a 19-21
+supabase/checks/rls_smoke.sql
+  s_9ed08fada71d0a::t_60d6aabc3521ef 199-205
+supabase/migrations/20261014100000_block_kill_only.sql
+  s_9ed08fada71d0a::t_954b06842af080 1-17
+tests/test_publish.py
+  s_9ed08fada71d0a::t_215f22f3f48183 79-82
+tests/test_publish_reviewed.py
+  s_9ed08fada71d0a::t_b3f4da84c4e9cd 1-342
+webapp/src/lib/demo.ts
+  s_9ed08fada71d0a::t_0a28bd7e818670 32
+webapp/src/lib/glossary.ts
+  s_9ed08fada71d0a::t_11ff527e26c31e 29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "de321a7b9e1a1147d3707ea739e7267a8d7af6c9",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
