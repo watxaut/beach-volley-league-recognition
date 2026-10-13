@@ -38,6 +38,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from ..publish.clips import RALLY_PAD_S, RallyCopy, load_rally_copy
+from ..publish.gaps import GAPS_NAME, GapCopy, load_gap_copy
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,11 @@ LABEL_FIXES = ("near_swapped", "far_swapped", "sides_swapped", "other")
 #: A saved verdict belongs to the point that covers at least this share of it.
 ATTACH_MIN_OVERLAP = 0.5
 NOTE_MAX = 2000
+#: A stretch of dead time is worth a look ("flagged") when the ball was played
+#: in it this many times, or when it lasted this many times the usual pause
+#: between two points. A hint for the owner's eyes, never a decision.
+GAP_FLAG_CONTACTS = 3
+GAP_FLAG_PAUSE_RATIO = 1.6
 
 THUMB_NAME = re.compile(r"^P[12][AB]\.jpg$")
 #: A body the identity read gave no name: the post-run layer calls it by its
@@ -91,7 +97,7 @@ def review_path(gt_root: Path, key: str) -> Path:
 
 def empty_review(key: str) -> Dict[str, Any]:
     return {"format": REVIEW_FORMAT, "match_key": key, "owner_final_score": None,
-            "points": [], "missing_points": []}
+            "points": [], "missing_points": [], "gaps": []}
 
 
 def load_review(path: Path, key: str) -> Dict[str, Any]:
@@ -182,6 +188,83 @@ def match_view(recon: Dict[str, Any], copy: Optional[RallyCopy]) -> Dict[str, An
                 "undecided": checks.get("undecided_points")},
         "actions": list(ACTIONS), "players": list(PLAYERS),
     }
+
+
+def gaps_view(points: Sequence[Dict[str, Any]], n_frames: Optional[int], fps: float,
+              copy: Optional[GapCopy] = None,
+              contacts: Optional[Sequence[int]] = None) -> List[Dict[str, Any]]:
+    """The dead time around the points: before the first, between each two,
+    after the last. A point the run missed is in one of them.
+
+    ``contacts``: frames where the causal stream saw the ball played. A gap
+    is ``flagged`` when the ball was played in it ``GAP_FLAG_CONTACTS`` times
+    or it lasted ``GAP_FLAG_PAUSE_RATIO`` times the usual pause between two
+    points -- where a missed rally is likeliest, not a claim that there is
+    one. ``segment`` is its part of the dead-time copy (None: no picture).
+    """
+    def edge(p, key, frame_key):
+        return (p.get("segment") or {}).get(key, p[frame_key])
+
+    gaps = []
+    bounds = [None, *points, None]
+    for before, after in zip(bounds, bounds[1:]):
+        first = 0 if before is None else edge(before, "last", "end_frame") + 1
+        if after is None:
+            if n_frames is None:
+                continue
+            last = int(n_frames) - 1
+        else:
+            last = edge(after, "first", "start_frame") - 1
+        if last < first:
+            continue
+        seg = copy.segment(first, last) if copy else None
+        played = None if contacts is None else sum(first <= f <= last for f in contacts)
+        gaps.append({
+            "after_point": 0 if before is None else before["point"],
+            "before_point": None if after is None else after["point"],
+            "first": first, "last": last,
+            "seconds": round((last - first + 1) / fps, 1) if fps else None,
+            "contacts": played, "flagged": False, "why": [],
+            "segment": None if seg is None else
+            {"first": seg[0], "copy_first": seg[1], "n": seg[2], "step": copy.step},
+        })
+    between = sorted(g["seconds"] for g in gaps
+                     if g["after_point"] and g["before_point"] and g["seconds"])
+    usual = between[len(between) // 2] if between else None
+    for g in gaps:
+        if g["contacts"] is not None and g["contacts"] >= GAP_FLAG_CONTACTS:
+            g["why"].append(f"the ball was played {g['contacts']} times")
+        if (usual and g["after_point"] and g["before_point"]
+                and g["seconds"] >= GAP_FLAG_PAUSE_RATIO * usual):
+            g["why"].append(f"{g['seconds']:.0f} s, the usual pause is {usual:.0f} s")
+        g["flagged"] = bool(g["why"])
+    return gaps
+
+
+def gap_states(review: Dict[str, Any], gaps: Sequence[Dict[str, Any]]) -> Dict[int, str]:
+    """``after_point`` -> ``checked`` for every gap the owner watched (what he
+    found there, if anything, is in ``missing_points``): a stored stretch
+    covers at least ``ATTACH_MIN_OVERLAP`` of it (the stretches move a little
+    when a rules change moves a rally)."""
+    out = {}
+    for g in gaps:
+        length = g["last"] - g["first"] + 1
+        for seen in review.get("gaps") or []:
+            share = (min(seen["last"], g["last"]) - max(seen["first"], g["first"]) + 1) / length
+            if seen.get("status") == "checked" and share >= ATTACH_MIN_OVERLAP:
+                out[g["after_point"]] = "checked"
+    return out
+
+
+def put_gap(review: Dict[str, Any], gap: Dict[str, Any], checked: bool) -> None:
+    """Store (or forget) that the owner watched a gap."""
+    length = gap["last"] - gap["first"] + 1
+    kept = [seen for seen in review.get("gaps") or []
+            if (min(seen["last"], gap["last"]) - max(seen["first"], gap["first"]) + 1) / length
+            < ATTACH_MIN_OVERLAP]
+    if checked:
+        kept.append({"first": gap["first"], "last": gap["last"], "status": "checked"})
+    review["gaps"] = sorted(kept, key=lambda g: g["first"])
 
 
 # --------------------------------------------------------------------------- #
@@ -395,7 +478,8 @@ def clean_match_fields(raw: Dict[str, Any], points: Sequence[Dict[str, Any]]
                        ) -> Dict[str, Any]:
     """The match-level part of a review: the owner's final score and the
     points the run missed (each after a point of the run, 0 = before the
-    first)."""
+    first; ``at_frame`` when the owner marked it while watching the dead
+    time)."""
     final = raw.get("owner_final_score")
     if final is not None:
         final = {t: int(final[t]) for t in TEAMS}
@@ -409,9 +493,12 @@ def clean_match_fields(raw: Dict[str, Any], points: Sequence[Dict[str, Any]]
             raise ValueError(f"no point {after}")
         if m.get("winner") not in (None, "A", "B"):
             raise ValueError("a missing point's winner is A, B or unknown")
-        missing.append({"after_point": after, "after_frame": starts.get(after, 0),
-                        "winner": m.get("winner"),
-                        "note": str(m.get("note") or "").strip()[:NOTE_MAX]})
+        row = {"after_point": after, "after_frame": starts.get(after, 0),
+               "winner": m.get("winner"),
+               "note": str(m.get("note") or "").strip()[:NOTE_MAX]}
+        if m.get("at_frame") is not None:      # where in the dead time the owner saw it
+            row["at_frame"] = int(m["at_frame"])
+        missing.append(row)
     return {"owner_final_score": final,
             "missing_points": sorted(missing, key=lambda m: m["after_frame"])}
 
@@ -449,6 +536,16 @@ def labelled_stream(run_dir: Path):
     return _labelled_stream(str(diag), diag.stat().st_mtime, str(recon), recon.stat().st_mtime)
 
 
+def ball_contacts(run_dir: Path) -> Optional[List[int]]:
+    """Frames where the causal stream saw the ball played (None: the dump
+    cannot be read -- the gaps are then flagged by their length alone)."""
+    try:
+        return sorted(c.frame for c in labelled_stream(run_dir).candidates if c.accepted)
+    except Exception as exc:                    # a hint only: never fail the page
+        logger.warning("no ball contacts for %s: %s", Path(run_dir).name, exc)
+        return None
+
+
 def tracks(stream, first: int, last: int) -> Dict[str, Any]:
     """Bodies (label, box, track id) and the ball on every frame of a stretch,
     in the frame's own pixels. A body without a label is one the identity
@@ -482,14 +579,19 @@ def create_router(output_root: Path = Path("output"),
             raise HTTPException(status_code=404, detail="no such run")
         return run
 
-    def view_of(run: Dict[str, Any]) -> Dict[str, Any]:
+    def view_of(run: Dict[str, Any], gaps: bool = False) -> Dict[str, Any]:
         recon = json.loads((run["path"] / RECON_NAME).read_text())
-        return match_view(recon, load_rally_copy(run["path"]))
+        view = match_view(recon, load_rally_copy(run["path"]))
+        if gaps:
+            view["gaps"] = gaps_view(view["points"], recon.get("n_frames"), view["fps"],
+                                     load_gap_copy(run["path"]), ball_contacts(run["path"]))
+        return view
 
     def state_of(run: Dict[str, Any], view: Dict[str, Any]) -> Dict[str, Any]:
         review = load_review(review_path(gt_root, run["key"]), run["key"])
         by_point, orphans = attach(review, view["points"])
         return {"verdicts": by_point, "orphans": orphans,
+                "gaps": gap_states(review, view.get("gaps") or []),
                 "missing_points": review["missing_points"],
                 "owner_final_score": review["owner_final_score"],
                 "reviewed_score": reviewed_score(view["points"], by_point,
@@ -524,7 +626,7 @@ def create_router(output_root: Path = Path("output"),
     @router.get("/{key}/data")
     def data(key: str):
         run = run_of(key)
-        view = view_of(run)
+        view = view_of(run, gaps=True)
         return {"key": run["key"], "match": view, "review": state_of(run, view)}
 
     @router.get("/{key}/tracks")
@@ -538,6 +640,13 @@ def create_router(output_root: Path = Path("output"),
     def video(key: str):
         return FileResponse(run_of(key)["path"] / "rallies.mp4", media_type="video/mp4")
 
+    @router.get("/{key}/gaps-video")
+    def gaps_video(key: str):
+        path = run_of(key)["path"] / GAPS_NAME
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="no dead-time copy")
+        return FileResponse(path, media_type="video/mp4")
+
     @router.get("/{key}/thumb/{name}")
     def thumb(key: str, name: str):
         path = run_of(key)["path"] / "thumbs" / name
@@ -549,7 +658,7 @@ def create_router(output_root: Path = Path("output"),
     def save_point(key: str, number: int, raw: Dict[str, Any] = Body(...)):
         """Store the verdict of one point (``status: null`` forgets it)."""
         run = run_of(key)
-        view = view_of(run)
+        view = view_of(run, gaps=True)
         point = next((p for p in view["points"] if p["point"] == number), None)
         if point is None:
             raise HTTPException(status_code=404, detail="no such point")
@@ -571,13 +680,28 @@ def create_router(output_root: Path = Path("output"),
     def save_match(key: str, raw: Dict[str, Any] = Body(...)):
         """Store the owner's final score and the points the run missed."""
         run = run_of(key)
-        view = view_of(run)
+        view = view_of(run, gaps=True)
         path = review_path(gt_root, run["key"])
         review = load_review(path, run["key"])
         try:
             review.update(clean_match_fields(raw, view["points"]))
         except (ValueError, KeyError, TypeError) as exc:
             raise HTTPException(status_code=400, detail=str(exc))
+        save_review(path, review)
+        return state_of(run, view)
+
+    @router.post("/{key}/gap/{after_point}")
+    def save_gap(key: str, after_point: int, raw: Dict[str, Any] = Body(...)):
+        """Store that the owner watched the dead time after a point
+        (``checked``: true), or forget it."""
+        run = run_of(key)
+        view = view_of(run, gaps=True)
+        gap = next((g for g in view["gaps"] if g["after_point"] == after_point), None)
+        if gap is None:
+            raise HTTPException(status_code=404, detail="no such gap")
+        path = review_path(gt_root, run["key"])
+        review = load_review(path, run["key"])
+        put_gap(review, gap, bool(raw.get("checked")))
         save_review(path, review)
         return state_of(run, view)
 

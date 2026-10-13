@@ -44,6 +44,7 @@ make postrun OUTPUT_DIR=output/<dir>                 # reconstruction only over 
 make autocalibrate VIDEO=...                         # court calibration without clicks: a proposal (WRITE=1 saves it when accepted) -- §14
 make ui                                              # local web UI over data/volley.db
 make review                                          # owner review of a reconstructed match, rally by rally (:8001/review) -- §11
+make review-gaps                                     # dead-time copies for the review page (gaps.mp4, needs the videos; RUN=output/<key>)
 make ingest-all                                      # (re)ingest output/*/pipeline_output.json into SQLite
 make db-reset                                        # DELETES the DB incl. owner player labels — ask first
 venv/bin/python -m pytest tests/ -o addopts=""       # cov addopts break w/o pytest-cov
@@ -463,7 +464,11 @@ causal and untouched. Owner rules it encodes — keep them when changing it:
   a published match only through an admin-owned override, §13, never by
   editing a reconstruction); a verdict keeps what the run read when it was
   given, so a rules change never silently turns an old "all right" into a
-  claim about a new read.
+  claim about a new read. A missed point is only visible in the DEAD
+  TIME: `make review-gaps` (`src/publish/gaps.py`) writes it next to the rally
+  copy while the video is on disk (sequential decode, §9); which gaps are
+  flagged is a hint for the owner's eyes (seconds and a count), never an
+  input to a decision, and an unwatched gap is no claim that nothing is there.
 
 Validation protocol for any change: `score_postrun.py` on the 20260920 match
 (the bar: 33/33 points, 0 false, winners 33/33, score A 21 – B 12, touch

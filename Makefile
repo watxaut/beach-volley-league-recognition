@@ -22,7 +22,7 @@ OUTPUT_DIR := output/$(VIDEO_NAME)
 # Skip visualization unless VIZ is set.
 VIZ_FLAG := $(if $(VIZ),,--skip-visualization)
 
-.PHONY: run run-video run-live run-match postrun point-images ingest ingest-all db-reset ui review help \
+.PHONY: run run-video run-live run-match postrun point-images ingest ingest-all db-reset ui review review-gaps help \
         calibrate autocalibrate process publish republish-all inbox backup feedback schema-check
 
 run:
@@ -110,6 +110,12 @@ REVIEW_PORT ?= 8001
 review:
 	$(PYTHON) -m src.web.review --port $(REVIEW_PORT)
 
+# The dead time of every run whose video is still in resources/full_videos, for
+# the review page's "is a point missing?" (gaps.mp4 + gaps.json in the run
+# directory, ~10 MB, one sequential decode per video). RUN=output/<key> for one.
+review-gaps:
+	$(PYTHON) -m src.publish.gaps $(if $(RUN),"$(RUN)",--all)
+
 # --------------------------------------------------------------------------
 # Web platform (docs/web_platform_design.md; deployment: docs/deploy_web_platform.md)
 # Match key = video name: YYYYMMDD_HHMM_<venue>_<text> (make inbox names files for you).
@@ -190,6 +196,7 @@ help:
 	@echo "make db-reset                         Delete the DB (DB=$(DB))"
 	@echo "make ui                               Local web UI at http://127.0.0.1:8000"
 	@echo "make review                           Review a match rally by rally (http://127.0.0.1:8001/review)"
+	@echo "make review-gaps                      Dead-time copies for the review page (needs the videos; RUN=output/<key> for one)"
 	@echo "make calibrate VIDEO=resources/<key>.mp4  Court calibration (8 clicks, once per video)"
 	@echo "make autocalibrate VIDEO=...  [WRITE=1]    Court calibration without clicks (a proposal; WRITE=1 saves it when its own checks pass)"
 	@echo "make process VIDEO=resources/<key>.mp4    run-match + publish as a draft"

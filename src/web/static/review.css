@@ -18,15 +18,23 @@
   border: 1px solid var(--line); border-radius: 6px; font: inherit; }
 .rv-scores .rv-off { color: var(--out); }
 
-.rv-chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 20px 0; }
+.rv-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 10px 20px 0; }
 .rv-chip { min-width: 30px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--card);
   color: var(--muted); font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; }
 .rv-chip.ok { color: var(--ok); border-color: rgba(105, 219, 124, 0.45); }
 .rv-chip.corrected { color: var(--fix); border-color: rgba(255, 180, 84, 0.55); }
 .rv-chip.changed { text-decoration: underline wavy var(--out); }
 .rv-chip.current { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.rv-chip.switch { margin-right: 10px; }
-.rv-chip.gap::after { content: " +"; color: var(--out); }
+.rv-switch { display: inline-block; width: 2px; height: 22px; margin: 0 6px; background: var(--muted); border-radius: 1px; align-self: center; }
+/* The dead time between two points: a dot, loud only where a look is worth it. */
+.rv-gap { width: 14px; padding: 3px 0; border: 0; border-radius: 6px; background: none; color: var(--muted);
+  font: inherit; font-size: 14px; font-weight: 700; line-height: 1; cursor: pointer; }
+.rv .rv-gap { background: none; border: 0; padding: 3px 0; }
+.rv .rv-gap:hover { color: var(--ink); }
+.rv .rv-gap.flagged { color: var(--fix); }
+.rv .rv-gap.ok { color: var(--ok); }
+.rv .rv-gap.missing { color: var(--out); }
+.rv .rv-gap.current { background: var(--ink); color: var(--bg); }
 
 .rv-main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 20px; padding: 14px 20px 30px; max-width: none; }
 @media (max-width: 1100px) { .rv-main { grid-template-columns: 1fr; } }
@@ -101,3 +109,4 @@
 .rv-missing { display: flex; gap: 6px; align-items: center; margin-top: 6px; font-size: 13px; }
 .rv-missing input { flex: 1; min-width: 0; padding: 3px 6px; font: inherit; color: var(--ink); background: var(--card-2);
   border: 1px solid var(--line); border-radius: 7px; }
+.rv-video video[hidden] { display: none; }

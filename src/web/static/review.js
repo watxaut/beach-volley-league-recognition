@@ -19,6 +19,8 @@
   let cur = 0;                    // index into M.points
   let draft = null;               // the verdict being edited
   let reviewed = false;           // the open point had (or got) a verdict
+  let gapAt = null;               // index into M.gaps while the dead time is watched
+  let gvid = null;                // the dead-time copy's <video>, made on first use
   let trk = null;                 // bodies + ball of the open point
   let boxes = false, speed = 1, lastCopyFrame = -1;
   const trackCache = new Map();
@@ -31,11 +33,21 @@
   const clock = (s) => (s == null ? "" :
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`);
   const point = () => M.points[cur];
-  const seg = () => point().segment;
+  const gaps = () => M.gaps || [];
+  const gap = () => (gapAt == null ? null : gaps()[gapAt]);
+  // What is playing: a point's stretch of the rally copy, or a gap's stretch
+  // of the dead-time copy (one frame kept in `step`).
+  const seg = () => {
+    const g = gap();
+    if (!g) return point().segment;
+    const c = g.segment;
+    return c && { first: c.first, last: c.first + (c.n - 1) * c.step, copy_first: c.copy_first, step: c.step };
+  };
+  const vid = () => (gapAt == null ? video : gvid);
   const frameOf = (t) => Math.floor(t * M.fps + 0.01);
-  const copyPos = (src) => seg().copy_first + (src - seg().first);
-  const srcOf = (copyFrame) => seg().first + (copyFrame - seg().copy_first);
-  const curSrc = () => srcOf(frameOf(video.currentTime));
+  const copyPos = (src) => seg().copy_first + Math.floor((src - seg().first) / (seg().step || 1));
+  const srcOf = (copyFrame) => seg().first + (copyFrame - seg().copy_first) * (seg().step || 1);
+  const curSrc = () => srcOf(frameOf(vid().currentTime));
   const other = (team) => (team === "A" ? "B" : "A");
 
   async function api(path, body) {
@@ -136,22 +148,69 @@
     }
   }
 
+  function gapChip(g, i) {
+    if (!g || !g.segment) return "";
+    const missing = R.missing_points.filter((m) => m.after_point === g.after_point).length;
+    const state = missing ? "missing" : (R.gaps || {})[g.after_point] === "checked" ? "ok" : g.flagged ? "flagged" : "";
+    const title = `Dead time ${g.after_point ? `after point ${g.after_point}` : "before the first point"} · ` +
+      `${Math.round(g.seconds)} s` + (g.why.length ? ` · ${g.why.join(", ")}` : "") +
+      (missing ? ` · ${missing} point(s) missing` : "");
+    return `<button class="rv-gap ${state} ${i === gapAt ? "current" : ""}" data-g="${i}" title="${esc(title)}">` +
+      `${missing ? "+" : "·"}</button>`;
+  }
+
   function renderChips() {
     const switches = new Set(M.run.switch_after || []);
-    const gaps = new Set(R.missing_points.map((m) => m.after_point));
-    $("chips").innerHTML = M.points.map((p, i) => {
+    const gapAfter = new Map(gaps().map((g, i) => [g.after_point, i]));
+    const chipOf = (n) => (gapAfter.has(n) ? gapChip(gaps()[gapAfter.get(n)], gapAfter.get(n)) : "");
+    $("chips").innerHTML = chipOf(0) + M.points.map((p, i) => {
       const v = R.verdicts[p.point];
       const cls = ["rv-chip", v ? v.status : "", v && v.run_changed ? "changed" : "",
-                   i === cur ? "current" : "", switches.has(p.point) ? "switch" : "",
-                   gaps.has(p.point) ? "gap" : ""].filter(Boolean).join(" ");
+                   i === cur && gapAt == null ? "current" : ""].filter(Boolean).join(" ");
       const title = `Point ${p.point} · ${clock(p.start_time_s)} · winner ${p.winner ?? "?"}` +
         (v && v.run_changed ? " · the run changed since your review" : "");
-      return `<button class="${cls}" data-i="${i}" title="${esc(title)}">${p.point}</button>`;
+      return `<button class="${cls}" data-i="${i}" title="${esc(title)}">${p.point}</button>` +
+        chipOf(p.point) + (switches.has(p.point) ? `<span class="rv-switch" title="Side switch"></span>` : "");
     }).join("");
   }
 
   // ------------------------------------------------------------------ panel
+  const winnerOptions = (sel) => [["", "?"], ["A", "A"], ["B", "B"]].map(([val, txt]) =>
+    `<option value="${val}"${(sel ?? "") === val ? " selected" : ""}>${txt}</option>`).join("");
+
+  const missingRows = (afterPoint) => R.missing_points.map((m, i) => (m.after_point !== afterPoint ? "" :
+    `<div class="rv-missing" data-missing="${i}">a point${m.at_frame != null ? ` (frame ${m.at_frame})` : ""}, won by
+       <select data-f="m-winner">${winnerOptions(m.winner)}</select>
+       <input data-f="m-note" placeholder="what happened" value="${esc(m.note)}">
+       <button data-act="drop-missing">✕</button></div>`)).join("");
+
+  function renderGapPanel() {
+    const g = gap(), clear = (R.gaps || {})[g.after_point] === "checked";
+    const found = R.missing_points.some((m) => m.after_point === g.after_point);
+    const where = !g.after_point ? "Before point 1" : g.before_point == null ? `After point ${g.after_point}`
+      : `Between point ${g.after_point} and ${g.before_point}`;
+    $("panel").innerHTML = `
+      <div class="rv-card">
+        <div class="rv-head">
+          <span class="n">Dead time</span><span class="rv-muted">${where}</span>
+          <span class="rv-state ${clear ? "ok" : ""}">${clear ? "✓ checked" : "not checked"}</span>
+        </div>
+        <p class="rv-facts"><b>${Math.round(g.seconds)} s</b>, shown ${g.segment.step}× faster ·
+          the ball was played <b>${g.contacts ?? "?"}</b> times</p>
+        ${g.why.length ? `<p class="rv-warn">Worth a look: ${g.why.map(esc).join("; ")}.</p>` : ""}
+        <p class="rv-facts">Is there a rally here that should be a point (a serve, play, the ball down)?</p>
+        <div class="rv-row" style="margin-top:10px">
+          <button class="primary" data-act="ok">${found ? "Done, next" : "Nothing here, next"} (Enter)</button>
+          <button data-act="add-missing">A point is missing here (M)</button>
+        </div>
+        ${missingRows(g.after_point)}
+        <p class="rv-facts">Press M while the missing rally is on the picture: the frame is kept.</p>
+      </div>`;
+    redraw();
+  }
+
   function renderPanel() {
+    if (gapAt != null) { renderGapPanel(); return; }
     const p = point(), v = R.verdicts[p.point];
     const state = draft.status === "ok" ? "✓ all right" : draft.status === "corrected" ? "● corrected" : "not reviewed";
     const effWinner = draft.winner == null ? p.winner : (draft.winner === "none" ? null : draft.winner);
@@ -174,12 +233,14 @@
       </tr>`;
     }).join("");
 
-    const missing = R.missing_points.map((m, i) => (m.after_point !== p.point ? "" :
-      `<div class="rv-missing" data-missing="${i}">a point, won by
-         <select data-f="m-winner">${[["", "?"], ["A", "A"], ["B", "B"]].map(([val, txt]) =>
-           `<option value="${val}"${(m.winner ?? "") === val ? " selected" : ""}>${txt}</option>`).join("")}</select>
-         <input data-f="m-note" placeholder="what happened" value="${esc(m.note)}">
-         <button data-act="drop-missing">✕</button></div>`)).join("");
+    const missing = missingRows(p.point);
+    const after = gaps().findIndex((g) => g.after_point === p.point);
+    const g = after < 0 ? null : gaps()[after];
+    const gapLine = !g ? "" : `<p class="rv-facts">Dead time until the next point: <b>${Math.round(g.seconds)} s</b>` +
+      (g.contacts != null ? `, the ball played ${g.contacts} times` : "") +
+      ((R.gaps || {})[g.after_point] === "checked" ? " · ✓ checked" : "") +
+      (g.segment ? ` <button data-act="open-gap" data-g="${after}">Watch it (G)</button>`
+                 : ` · no picture (run <code>make review-gaps</code>)`) + `</p>`;
 
     // Bodies the run gave no name (a half whose two players it could not tell apart).
     const unnamed = [...new Set(p.touches.map((t) => t.player).filter((x) => /^T\d+$/.test(x || "")))].sort();
@@ -231,6 +292,7 @@
       </div>
       <div class="rv-card">
         <h2>After this point</h2>
+        ${gapLine}
         ${missing}
         <div class="rv-row"><button data-act="add-missing">+ a point is missing after this one (M)</button></div>
       </div>`;
@@ -242,6 +304,7 @@
     tl.querySelectorAll(".rv-tick, .rv-rally").forEach((n) => n.remove());
     if (!s) return;
     const span = Math.max(1, s.last - s.first), at = (f) => `${(100 * (f - s.first)) / span}%`;
+    if (gapAt != null) return;
     const p = point(), rally = document.createElement("div");
     rally.className = "rv-rally";
     rally.style.left = at(p.start_frame);
@@ -311,6 +374,7 @@
     const src = srcOf(copyFrame), s = seg();
     $("cursor").style.left = `${(100 * (src - s.first)) / Math.max(1, s.last - s.first)}%`;
     $("clock").textContent = `frame ${src}`;
+    if (gapAt != null) { $("touchNow").hidden = true; return; }
     const hit = markNow(src);
     if (!trk || src < trk.first || src - trk.first >= trk.bodies.length) return;
     const [cx, cy, cw, ch] = M.crop, sx = canvas.width / cw, sy = canvas.height / ch;
@@ -364,7 +428,7 @@
   function tick(copyFrame) {
     if (!M || !seg()) return;
     lastCopyFrame = copyFrame;
-    if (!video.paused && (copyFrame >= copyPos(seg().last) || copyFrame < seg().copy_first)) {
+    if (!vid().paused && (copyFrame >= copyPos(seg().last) || copyFrame < seg().copy_first)) {
       seek(seg().first);
       return;
     }
@@ -375,10 +439,10 @@
     const s = seg();
     if (!s) return;
     src = Math.min(Math.max(src, s.first), s.last);
-    video.currentTime = (copyPos(src) + 0.5) / M.fps;
+    vid().currentTime = (copyPos(src) + 0.5) / M.fps;
   }
 
-  function step(n) { video.pause(); seek(curSrc() + n); }
+  function step(n) { vid().pause(); seek(curSrc() + n * (seg().step || 1)); }
 
   function jumpTouch(dir) {
     const frames = touches().filter((t) => !t.removed).map((t) => t.frame), src = curSrc();
@@ -394,6 +458,7 @@
   if (video.requestVideoFrameCallback) {
     const onFrame = (now, meta) => {
       video.requestVideoFrameCallback(onFrame);
+      if (!M) return;
       exact = frameOf(meta.mediaTime);
       exactAt = now;
     };
@@ -402,8 +467,8 @@
   const loop = (now) => {
     requestAnimationFrame(loop);
     if (!M || !draft) return;
-    const byClock = frameOf(video.currentTime);
-    const frame = now - exactAt < 150 && Math.abs(exact - byClock) <= 2 ? exact : byClock;
+    const byClock = frameOf(vid().currentTime);
+    const frame = gapAt == null && now - exactAt < 150 && Math.abs(exact - byClock) <= 2 ? exact : byClock;
     if (frame === shown && !dirty) return;
     shown = frame;
     dirty = false;
@@ -411,14 +476,60 @@
   };
   requestAnimationFrame(loop);
   const redraw = () => { dirty = true; };
-  video.addEventListener("ended", () => { if (seg()) { seek(seg().first); video.play(); } });
+  const replay = () => { if (seg()) { seek(seg().first); vid().play(); } };
+  video.addEventListener("ended", replay);
   window.addEventListener("resize", redraw);
   window.addEventListener("error", (e) => fail(e.error || new Error(e.message)));
 
   // ------------------------------------------------------------------ points
+  function showVideo(which, size) {
+    video.hidden = which !== video;
+    if (gvid) gvid.hidden = which !== gvid;
+    if (size) $("videoBox").style.setProperty("--ar", String(size[0] / size[1]));
+  }
+
+  function openGap(i) {
+    const g = gaps()[i];
+    if (!g || !g.segment) return;
+    flushNote();
+    if (!gvid) {
+      gvid = document.createElement("video");
+      gvid.muted = true; gvid.playsInline = true; gvid.preload = "auto";
+      gvid.src = `${BASE}/gaps-video`;
+      gvid.addEventListener("ended", replay);
+      gvid.addEventListener("loadedmetadata", () => {
+        if (gapAt != null) { showVideo(gvid, [gvid.videoWidth, gvid.videoHeight]); seek(seg().first); }
+      });
+      $("videoBox").prepend(gvid);
+    }
+    video.pause();
+    gapAt = i;
+    trk = null;
+    lastCopyFrame = -1;
+    $("videoBox").style.visibility = "visible";
+    showVideo(gvid, gvid.videoWidth ? [gvid.videoWidth, gvid.videoHeight] : null);
+    renderChips();
+    renderPanel();
+    renderTimeline();
+    redraw();
+    if (gvid.readyState >= 1) seek(seg().first);
+    gvid.playbackRate = speed;
+    gvid.play().catch(() => {});
+  }
+
+  function gapDone() {
+    const g = gap();
+    saving = saving.then(() => api(`/gap/${g.after_point}`, { checked: true })).then(applyState).catch(fail);
+    const next = M.points.findIndex((p) => p.point === g.before_point);
+    if (next >= 0) openPoint(next); else { gvid.pause(); R.gaps = { ...(R.gaps || {}), [g.after_point]: "checked" }; renderPanel(); }
+  }
+
   async function openPoint(i) {
     if (i < 0 || i >= M.points.length) return;
     flushNote();
+    if (gvid) gvid.pause();
+    gapAt = null;
+    showVideo(video, M.size);
     cur = i;
     const v = R.verdicts[point().point];
     draft = blank();
@@ -447,11 +558,29 @@
   }
 
   function allRight() {
+    if (gapAt != null) { gapDone(); return; }
     flushNote();
     draft.status = hasCorrections(draft) ? "corrected" : "ok";
     reviewed = true;
     save();
-    if (cur + 1 < M.points.length) openPoint(cur + 1); else { renderPanel(); video.pause(); }
+    // The dead time after this point comes next when it is worth a look and
+    // nobody looked yet; any other gap is one tap away (its dot, or G).
+    const after = gaps().findIndex((g) => g.after_point === point().point);
+    const g = after < 0 ? null : gaps()[after];
+    if (g && g.segment && g.flagged && (R.gaps || {})[g.after_point] !== "checked") openGap(after);
+    else if (cur + 1 < M.points.length) openPoint(cur + 1);
+    else { renderPanel(); video.pause(); }
+  }
+
+  function watchGap() {
+    const after = gaps().findIndex((g) => g.after_point === point().point);
+    if (gapAt == null && after >= 0) openGap(after);
+  }
+
+  function leaveGap(dir) {
+    const g = gap(), n = dir < 0 ? g.after_point : g.before_point;
+    const i = M.points.findIndex((p) => p.point === n);
+    if (i >= 0) openPoint(i);
   }
 
   function undo() {
@@ -484,8 +613,14 @@
   }
 
   function addMissing() {
-    R.missing_points.push({ after_point: point().point, winner: null, note: "" });
+    if (gapAt != null) {
+      vid().pause();
+      R.missing_points.push({ after_point: gap().after_point, at_frame: curSrc(), winner: null, note: "" });
+    } else {
+      R.missing_points.push({ after_point: point().point, winner: null, note: "" });
+    }
     saveMatch();
+    renderChips();
     renderPanel();
   }
 
@@ -498,8 +633,9 @@
 
   // ------------------------------------------------------------------ events
   $("chips").addEventListener("click", (e) => {
-    const b = e.target.closest("[data-i]");
-    if (b) openPoint(Number(b.dataset.i));
+    const g = e.target.closest("[data-g]"), b = e.target.closest("[data-i]");
+    if (g) openGap(Number(g.dataset.g));
+    else if (b) openPoint(Number(b.dataset.i));
   });
 
   $("timeline").addEventListener("click", (e) => {
@@ -524,9 +660,11 @@
     else if (act === "not-a-point") { draft.not_a_point = !draft.not_a_point; edited(); }
     else if (act === "add-touch") addTouch();
     else if (act === "add-missing") addMissing();
+    else if (act === "open-gap") openGap(Number(b.dataset.g));
     else if (act === "drop-missing") {
       R.missing_points.splice(Number(b.closest("[data-missing]").dataset.missing), 1);
       saveMatch();
+      renderChips();
       renderPanel();
     } else if (act === "drop-added") { draft.added.splice(Number(tr.dataset.added), 1); edited(); }
     else if (act === "toggle-remove") {
@@ -573,7 +711,8 @@
     noteTimer = setTimeout(() => { noteTimer = null; edited(false); }, 600);
   });
 
-  $("btnPlay").addEventListener("click", () => (video.paused ? video.play() : video.pause()));
+  const playPause = () => (vid().paused ? vid().play() : vid().pause());
+  $("btnPlay").addEventListener("click", playPause);
   $("btnBack").addEventListener("click", () => step(-1));
   $("btnFwd").addEventListener("click", () => step(1));
   $("btnSpeed").addEventListener("click", toggleSpeed);
@@ -581,7 +720,7 @@
 
   function toggleSpeed() {
     speed = speed === 1 ? 0.5 : speed === 0.5 ? 0.25 : 1;
-    video.playbackRate = speed;
+    vid().playbackRate = speed;
     $("btnSpeed").textContent = `Speed ${speed}×`;
   }
 
@@ -607,15 +746,18 @@
       return;
     }
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    const keys = {
-      Enter: allRight, " ": () => (video.paused ? video.play() : video.pause()),
-      ArrowLeft: () => step(-1), ArrowRight: () => step(1),
+    const always = {
+      Enter: allRight, " ": playPause, ArrowLeft: () => step(-1), ArrowRight: () => step(1),
+      m: addMissing, s: toggleSpeed,
+    };
+    const keys = gapAt != null ? { ...always, "[": () => leaveGap(-1), "]": () => leaveGap(1) } : {
+      ...always,
       ArrowUp: () => jumpTouch(-1), ArrowDown: () => jumpTouch(1),
       "[": () => openPoint(cur - 1), "]": () => openPoint(cur + 1),
       1: () => toggleFix("near_swapped"), 2: () => toggleFix("far_swapped"),
       3: () => toggleFix("sides_swapped"), 4: () => toggleFix("other"),
       w: cycleWinner, x: () => { draft.not_a_point = !draft.not_a_point; edited(); },
-      t: addTouch, m: addMissing, u: undo, s: toggleSpeed, b: toggleBoxes,
+      t: addTouch, u: undo, b: toggleBoxes, g: watchGap,
       n: () => $("note").focus(),
     };
     if (keys[k]) { e.preventDefault(); keys[k](); }

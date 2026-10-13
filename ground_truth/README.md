@@ -133,6 +133,11 @@ reads it.
 - `missing_points[]` — a point the run did not find: `after_point` (the run's
   number when it was said, 0 = before the first), `after_frame` (that point's
   serve frame), `winner` (A / B / null), `note`.
+  `at_frame` when the owner marked it while watching the dead time: a frame
+  with the missed rally on the picture (the place to look when fixing it).
+- `gaps[]` — the stretches of dead time the owner watched (`first`, `last`,
+  `status: checked`); what he found there, if anything, is in
+  `missing_points`. A gap not listed was not watched: no claim about it.
 - `points[]` — one verdict per reviewed point:
   - `start_frame` / `end_frame` — the rally as the run had it. A verdict
     belongs to the point that covers at least half of these frames, so it

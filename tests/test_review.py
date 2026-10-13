@@ -12,6 +12,7 @@ import pytest
 from fastapi import HTTPException
 
 from src.publish.clips import RallyCopy
+from src.publish.gaps import GapCopy, dead_spans
 from src.web import review as R
 
 
@@ -267,6 +268,79 @@ def test_match_fields(points):
 
 
 # --------------------------------------------------------------------------- #
+# the dead time: is a point missing?
+# --------------------------------------------------------------------------- #
+
+def test_dead_spans_are_what_the_rally_copy_leaves_out():
+    assert dead_spans([(75, 250), (375, 510)]) == [(0, 74), (251, 374), (511, None)]
+    assert dead_spans([(0, 10), (11, 20)]) == [(21, None)]       # rallies that touch
+
+
+def test_a_gap_copy_knows_which_frame_each_of_its_frames_is():
+    gaps = GapCopy(path=Path("gaps.mp4"), fps=25.0, size=(640, 360), step=3,
+                   spans=[(0, 72), (251, 374), (511, 598)])      # kept: 0, 3 ... 72 | 251 ...
+    assert gaps.segment(0, 74) == (0, 0, 25)
+    assert gaps.segment(251, 374) == (251, 25, 42)               # 25 frames before it
+    assert gaps.segment(260, 270) == (260, 28, 4)                # 260, 263, 266, 269
+    assert gaps.segment(100, 200) is None                        # inside a rally
+    assert gaps.to_json()["frames"] == 25 + 42 + 30
+
+
+def _gaps(points, contacts=None, copy=None):
+    return R.gaps_view(points, n_frames=600, fps=25.0, copy=copy, contacts=contacts)
+
+
+def test_gaps_are_the_stretches_around_the_points(points):
+    gaps = _gaps(points)
+    assert [(g["after_point"], g["before_point"], g["first"], g["last"]) for g in gaps] == [
+        (0, 1, 0, 74), (1, 2, 251, 374), (2, None, 511, 599)]
+    assert gaps[1]["seconds"] == 5.0 and gaps[1]["segment"] is None
+    assert not any(g["flagged"] for g in gaps)
+
+
+def test_a_gap_is_flagged_where_the_ball_was_played(points):
+    gaps = _gaps(points, contacts=[20, 300, 310, 320, 560])
+    assert [g["contacts"] for g in gaps] == [1, 3, 1]
+    assert [g["flagged"] for g in gaps] == [False, True, False]
+    assert "played 3 times" in gaps[1]["why"][0]
+
+
+def test_a_gap_is_flagged_when_the_pause_is_much_longer_than_usual():
+    recon = _recon()
+    base = recon["points"][1]
+    recon["points"] += [{**base, "point": 3, "start_frame": 600, "end_frame": 650},
+                        {**base, "point": 4, "start_frame": 1500, "end_frame": 1550},
+                        {**base, "point": 5, "start_frame": 1700, "end_frame": 1750}]
+    gaps = R.gaps_view(R.match_view(recon, None)["points"], 2000, 25.0)
+    assert [g["after_point"] for g in gaps if g["flagged"]] == [3]     # 34 s against 8 s
+    assert not gaps[0]["flagged"] and not gaps[-1]["flagged"]          # the ends are no pause
+
+
+def test_a_gap_gets_its_picture_from_the_gap_copy(points):
+    copy = GapCopy(path=Path("gaps.mp4"), fps=25.0, size=(640, 360), step=3,
+                   spans=[(0, 72), (251, 374), (511, 598)])
+    assert _gaps(points, copy=copy)[1]["segment"] == {
+        "first": 251, "copy_first": 25, "n": 42, "step": 3}
+
+
+def test_a_checked_gap_stays_checked_when_its_edges_move(points):
+    review = R.empty_review("k")
+    gaps = _gaps(points)
+    R.put_gap(review, gaps[1], True)
+    assert R.gap_states(review, gaps) == {1: "checked"}
+    moved = dict(gaps[1], first=262, last=380)                   # a rules change moved a serve
+    assert R.gap_states(review, [gaps[0], moved, gaps[2]]) == {1: "checked"}
+    R.put_gap(review, moved, False)
+    assert review["gaps"] == [] and R.gap_states(review, gaps) == {}
+
+
+def test_a_missing_point_keeps_the_frame_the_owner_marked(points):
+    out = R.clean_match_fields({"missing_points": [
+        {"after_point": 1, "winner": "A", "at_frame": 300.0}]}, points)
+    assert out["missing_points"][0]["at_frame"] == 300
+
+
+# --------------------------------------------------------------------------- #
 # on disk, through the routes
 # --------------------------------------------------------------------------- #
 
@@ -314,6 +388,14 @@ def test_saving_a_point_writes_the_owner_file_and_undo_removes_it(tmp_path):
     assert [v["start_frame"] for v in stored["points"]] == [100, 400]
     assert stored["points"][1]["truth"]["winner"] == "A"
     assert not list(gt.glob("*.tmp"))
+
+    save_gap = _endpoint(router, "save_gap")
+    assert save_gap(run.name, 1, {"checked": True})["gaps"] == {1: "checked"}
+    assert json.loads(R.review_path(gt, run.name).read_text())["gaps"] == [
+        {"first": 251, "last": 374, "status": "checked"}]
+    assert save_gap(run.name, 1, {"checked": False})["gaps"] == {}
+    with pytest.raises(HTTPException):
+        save_gap(run.name, 7, {"checked": True})
 
     state = save_point(run.name, 1, {"status": None})
     assert sorted(state["verdicts"]) == [2]
