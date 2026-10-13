@@ -1,0 +1,41 @@
+AGENTS.md
+  s_9ed08fada71d0a::t_960112b57b1e93 46,454-467
+Makefile
+  s_9ed08fada71d0a::t_7fc7b3b9326d2d 25,106-112,192
+STATUS.md
+  s_9ed08fada71d0a::t_5f643f148ef809 21-22,95,106,111,129,131,406,508-521
+docs/history/status_log_archive.md
+  s_9ed08fada71d0a::t_e3ee282001a5eb 7421-7440
+ground_truth/README.md
+  s_9ed08fada71d0a::t_3f08d9512f2c5f 124-161
+src/publish/clips.py
+  s_9ed08fada71d0a::t_c570f3f321a5db 136-145
+src/web/review.py
+  s_9ed08fada71d0a::t_7a73ed95f60c44 1-611
+src/web/static/review.css
+  s_9ed08fada71d0a::t_ca41a8729b45a3 1-98
+src/web/static/review.js
+  s_9ed08fada71d0a::t_83fd3dce19bfa0 1-560
+src/web/templates/review.html
+  s_9ed08fada71d0a::t_8ac05fb1eb2863 1-60
+src/web/templates/review_index.html
+  s_9ed08fada71d0a::t_f385ae92c19602 1-43
+tests/test_review.py
+  s_9ed08fada71d0a::t_484ff6c2227c17 1-337
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "2fa66a89512e125b198b6bd4fea4d76dff5edea5",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
