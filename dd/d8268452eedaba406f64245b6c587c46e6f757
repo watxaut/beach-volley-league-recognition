@@ -1,0 +1,21 @@
+STATUS.md
+  s_9ed08fada71d0a::t_a52cb64ffa6400 21,95,131
+ground_truth/20261012_1130_masnou_loida_joan_pere_aitana_review.json
+  s_9ed08fada71d0a::t_c975e45e5370a2 1-3116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "ddd8268452eedaba406f64245b6c587c46e6f757",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
