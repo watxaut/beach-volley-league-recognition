@@ -7,7 +7,6 @@ import { AdminLayout, AdminMatches } from './pages/admin/AdminHome'
 import { AdminMatch } from './pages/admin/AdminMatch'
 import { AdminPlayers } from './pages/admin/AdminPlayers'
 import { AdminScoring } from './pages/admin/AdminScoring'
-import { Home } from './pages/Home'
 import { League } from './pages/League'
 import { Login } from './pages/Login'
 import { MatchPage } from './pages/MatchPage'
@@ -15,6 +14,13 @@ import { Matches } from './pages/Matches'
 import { Measure } from './pages/Measure'
 import { PlayerPage } from './pages/PlayerPage'
 import { Settings } from './pages/Settings'
+
+/** There is no home page: a member lands on their own player page, an account
+ * not linked to a player yet on the league table. */
+function Start() {
+  const { me } = useApp()
+  return <Navigate to={me ? `/players/${me.id}` : '/league'} replace />
+}
 
 export function App() {
   const { ready, session } = useApp()
@@ -24,7 +30,7 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
-          <Route index element={<Home />} />
+          <Route index element={<Start />} />
           <Route path="league" element={<League />} />
           <Route path="matches" element={<Matches />} />
           <Route path="matches/:key" element={<MatchPage />} />

@@ -7454,3 +7454,23 @@ Deployed by the owner the same day (migration pushed, web redeployed, `make repu
 ## [removed 2026-10-14, #115] Session index line moved out of STATUS.md (budget 100 lines), verbatim
 
 - 2026-09-25/26 **#18** — retrain-mining staged (500 stratified frames); owner GT landed (486 frames, pre-labels mostly wrong — diagnostic correction); dataset merged + zipped (1091) — …(log archive 2026-10-06)
+
+## [removed 2026-10-14, #116] Session index line moved out of STATUS.md (budget 100 lines), verbatim
+
+- 2026-09-26 **#19** — round-2 rebalanced mining (350 frames); v3 four-leg gate → **ADOPTED as production**; far-side serve feedback → point 22.
+
+## [moved 2026-10-14, #116] Log entry moved out of STATUS.md (Log keeps 3 sessions), verbatim
+
+### 2026-10-13 (hundred-and-thirteenth session) — #113: web player page v3 — the comparison in colour, kills first, Serve and Receive apart, a serve map
+
+**Asked (owner, two screenshots of the real page):** "I am not able to grasp at the first glance" the you-vs-the-league widget: remove the graph, colour the background; the attack map is "very clouded": prefilter by kills, a message on the field when there are none; split Serve and Receive into two tabs, add a map of where the serves landed with aces in another colour, keep "where the pass went"; on every tab the main metrics on top with a small coloured arrow saying above / below the league. "Feel free to challenge."
+
+**Diagnosed first.** (1) Every row of the screenshot read "too close to call": a gap was coloured only when the two 95 % ranges do not overlap (#96), which with ~64 attacks almost never happens — honest, and it says nothing. (2) A serve touch has NO position in any reconstruction (0 of 33, 0 of 35), so a serve map cannot draw a line; the end is known for 26 of 33 / 26 of 35 (the receiver's seen touch) plus the ground end of an untouched ball. (3) The stats with a league-tier reference are hitting %, kill %, attack errors, ace %, serve errors, break-point %, side-out % and digs / 21; "your serve won" and the reception stats are analytics tier and get no arrow.
+
+**Owner decisions (asked before building, AGENTS §13 updated):** direction always shown, colour pale while chance could explain the gap and strong once clear (over "always full colour" and "only clear gaps"); blue / orange kept (over green / red); the attack map opens on kills with the other outcomes one tap away.
+
+**Built (web + one migration; no post-run change, no re-publish).** `lib/compare.ts`: `gapOf` (direction and size from the two numbers AS SHOWN, good / bad, `clear` = the old verdict, `sure` 0..1 = how far towards a clear gap), `gapTint`, `gapWords`, `tally`, `compareByKey` + two tab-only stats (`attack_err`, `break_pt`); `gapScale` / `barScale` and the lane chart are gone. `Compare.tsx` = a table (You / League / gap, a summary line "better on N of M", ranges and other players in the details); `Gap.tsx` = the same read under a tile. A tab's gap takes the player's side from the tile's own counts and only the reference from `leaderboard` (with a last-N filter the two windows differ). Attack map: opens on Kills, on-court message when a filter leaves nothing, legend = what is drawn. Tabs: Serve (ace %, serve errors, own serve won, break-point %; serve map; who took the serves; trend) and Receive & defense (side-out %, reception to attack, digs / 21; who they serve; after the reception; where the pass went). Serve map (`ServeMap.tsx`, `lib/serves.ts`): the opponents' half from the server's side, ace = the kill's blue dot, in play = the dug ring, error = the red cross, hint with who took it. SQL `analytics.serves` (`20261013100000_serve_map`, analytics tier): next touch of the other team seen with a position → turned into the server's frame; else the point's ground end through the serve's `side`; else no spot.
+
+**Checked.** pytest 1343 passed / 5 skipped; vitest 84 (gap read, words, tint, serve points; the smoke fixture's serve rows in `analytics.test.ts`), `tsc`, oxlint, `vite build`; `make schema-check` 5 passed on a throwaway Postgres (rls_smoke: a received serve, a ground end from both halves, no half = no spot; the Python recount equals SQL on the simulated and the real 20260920 bundle); every tab looked at in dark, light and 500 px (demo data). NOT looked at: the real league's page — the migration is not pushed.
+
+**Not done / owed.** Owner: merge, `supabase db push`, redeploy, then look at the real page. The demo has no clear gap, so the strong colour was checked by forcing one. Ideas not built: a short / deep or left / middle / right split of the serves; the receiver's name on the map legend.

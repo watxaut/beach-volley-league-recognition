@@ -12,12 +12,13 @@ import { ServeMap } from '../components/ServeMap'
 import { Approx, Card, ErrorBox, Loading, Segmented, StatInfo, Tabs, Tile } from '../components/ui'
 import { WindowPicker } from '../components/WindowPicker'
 import {
-  compare, compareByKey, gapOf, MIN_PEERS, MIN_POINTS, RECENT, splitEarlier, sumHistory, type CompareRow, type Peer, type Sample,
+  compare, compareByKey, gapOf, MIN_PEERS, MIN_POINTS, RECENT, splitEarlier, sumHistory, typesPlayed, type CompareRow, type Peer,
+  type Sample,
 } from '../lib/compare'
-import { formatDate, matchLabel, signed } from '../lib/format'
+import { formatDate, MATCH_TYPE_LABEL, matchLabel, signed } from '../lib/format'
 import { passPoints, summarize, type PassKind, PASS_LABEL } from '../lib/passes'
 import { hitText, hitting, MIN_N, pct, rate, ROLLING_WINDOW, rolling } from '../lib/stats'
-import type { HistoryRow, LeaderRow, PlayerAnalytics, PlayerProfile, ShotKey } from '../lib/types'
+import type { HistoryRow, LeaderRow, MatchType, PlayerAnalytics, PlayerProfile, ShotKey } from '../lib/types'
 import { ALL_TIME, windowLabel, windowParams } from '../lib/window'
 
 // Overview and Matches are league tier (every member); Attack, Serve and
@@ -43,6 +44,9 @@ export function PlayerPage() {
   // time" the profile above already is that
   const whole = useLoad(() => (key === 'all' ? Promise.resolve(null) : api.playerProfile(Number(id), ALL_TIME)), [id, key === 'all'])
   const seasons = useLoad(() => api.seasons(), [])
+  // each match's type (set by an admin), for "against the same match type"
+  const matchList = useLoad(() => api.matches(), [])
+  const typeById = new Map((matchList.data ?? []).map((m) => [m.id, m.match_type]))
 
   if (data.loading && !data.data) return <Loading />
   if (data.error) return <ErrorBox error={data.error} />
@@ -54,8 +58,7 @@ export function PlayerPage() {
   const rank = rows.findIndex((r) => r.player_id === player.id) + 1
   const who = player.is_me ? 'You' : player.display_name
   const privateNote = <div className="notice">{player.display_name} keeps detailed analytics private.</div>
-  const others: Peer[] = rows.filter((r) => r.player_id !== player.id)
-    .map((r) => ({ id: r.player_id, name: r.display_name, sample: r }))
+  const others = peersOf(rows, player.id)
   // The tiles of a tab against everyone else: the player's side is counted
   // from the numbers the tiles show, so a tile and its gap cannot disagree.
   const shownAnalytics = can_see_analytics ? analytics : null
@@ -99,7 +102,8 @@ export function PlayerPage() {
       <div role="tabpanel" aria-label={TAB_LABEL[tab]} style={{ opacity: data.loading ? 0.6 : 1 }}>
         {tab === 'overview' && (
           <Overview data={data.data} board={rows} others={others} boardError={board.error} windowKey={key} who={who}
-                    allHistory={key === 'all' ? history : whole.data?.history ?? null} />
+                    allHistory={key === 'all' ? history : whole.data?.history ?? null}
+                    typeOf={(matchId) => typeById.get(matchId)} />
         )}
         {tab === 'attack' && (shownAnalytics
           ? <Attack a={shownAnalytics} vs={vs} note={vsNote(['hitting', 'kill', 'attack_err'])} /> : privateNote)}
@@ -152,22 +156,44 @@ function VsNote({ rows, scope }: { rows: (CompareRow | undefined)[]; scope: stri
   )
 }
 
-function Overview({ data, board, others, boardError, windowKey, who, allHistory }: {
+/** Everyone in a leaderboard but the player, as comparison peers. */
+const peersOf = (board: LeaderRow[], playerId: number): Peer[] => board.filter((r) => r.player_id !== playerId)
+  .map((r) => ({ id: r.player_id, name: r.display_name, sample: r }))
+
+function Overview({ data, board, others, boardError, windowKey, who, allHistory, typeOf }: {
   data: PlayerProfile; board: LeaderRow[]; others: Peer[]; boardError: string | null; windowKey: string; who: string
   allHistory: HistoryRow[] | null
+  /** A match's type as the admin set it (null / undefined: not set). */
+  typeOf: (matchId: number) => MatchType | null | undefined
 }) {
+  const { api } = useApp()
   const [mode, setMode] = useState<CompareMode>('league')
+  const [pickedType, setPickedType] = useState<MatchType | null>(null)
   const { player, totals: t, history } = data
   const mine = board.find((r) => r.player_id === player.id)
   const { now, before } = splitEarlier(allHistory ?? [], windowKey === 'all' ? null : history.map((h) => h.match_id))
   const hasEarlier = now.length > 0 && before.length > 0
-  const shown: CompareMode = mode === 'earlier' && !hasEarlier ? 'league' : mode
+  // "the same match type": the types of the player's matches in view, most
+  // played first; the reference is everyone else in matches of that type
+  const types = typesPlayed(history.map((h) => h.match_id), typeOf)
+  const type = types.find((x) => x.type === pickedType)?.type ?? types[0]?.type ?? null
+  const shown: CompareMode = (mode === 'earlier' && !hasEarlier) || (mode === 'type' && !type) ? 'league' : mode
+  const typeKey = shown === 'type' && type ? `${windowKey}:${type}` : null
+  const typeBoard = useLoad(async () => (typeKey && type
+    ? { key: typeKey, board: await api.leaderboard(windowParams(windowKey), type) } : null), [typeKey])
+  const typeReady = shown !== 'type' || typeBoard.data?.key === typeKey
+  const typeName = type ? MATCH_TYPE_LABEL[type].toLowerCase() : ''
 
-  const rows: CompareRow[] = shown === 'league'
-    ? (mine ? compare(mine, others) : [])
-    : compare(sumHistory(now), [{ id: 0, name: 'Before', sample: sumHistory(before) }], 1)
+  let rows: CompareRow[] = []
+  if (shown === 'league') rows = mine ? compare(mine, others) : []
+  else if (shown === 'earlier') rows = compare(sumHistory(now), [{ id: 0, name: 'Before', sample: sumHistory(before) }], 1)
+  else if (typeReady && typeBoard.data) {
+    const mineOfType = typeBoard.data.board.find((r) => r.player_id === player.id)
+    rows = mineOfType ? compare(mineOfType, peersOf(typeBoard.data.board, player.id)) : []
+  }
   const noReference = rows.length > 0 && rows.every((r) => r.ref === null)
   const whose = player.is_me ? 'your' : 'their'
+  const title = shown === 'league' ? 'the league' : shown === 'type' ? `others in ${typeName} matches` : `${whose} earlier matches`
 
   return (
     <>
@@ -182,27 +208,48 @@ function Overview({ data, board, others, boardError, windowKey, who, allHistory 
       </Card>
 
       <Card
-        title={<>{who} vs {shown === 'league' ? 'the league' : `${whose} earlier matches`}<StatInfo term="compare" /></>}
+        title={<>{who} vs {title}<StatInfo term="compare" /></>}
         action={(
           <Segmented<CompareMode> label="Compare with" value={shown} onChange={setMode} options={[
             { key: 'league', label: 'League' },
+            { key: 'type', label: 'Same type', disabled: !type,
+              title: type ? 'Everyone else in matches of the same type (male, female or mixed)'
+                : 'None of the matches in this view has a match type yet' },
             { key: 'earlier', label: 'Earlier matches', disabled: !hasEarlier,
               title: hasEarlier ? undefined : windowKey === 'all'
                 ? `Needs matches before ${whose} newest ${RECENT}` : `Needs matches before this period`,
             },
           ]} />
         )}>
-        <ErrorBox error={boardError} />
-        {rows.length === 0 ? <p className="muted" style={{ margin: 0 }}>No published matches in this view.</p> : (
+        <ErrorBox error={shown === 'type' ? typeBoard.error : boardError} />
+        {shown === 'type' && types.length > 1 && (
+          <label className="row small type-pick">
+            <span className="muted">Match type</span>
+            <select value={type ?? ''} onChange={(e) => setPickedType(e.target.value as MatchType)}>
+              {types.map((x) => (
+                <option key={x.type} value={x.type}>{MATCH_TYPE_LABEL[x.type]} ({plural(x.n, 'match', 'matches')})</option>
+              ))}
+            </select>
+          </label>
+        )}
+        {!typeReady ? <Loading /> : rows.length === 0 ? (
+          <p className="muted" style={{ margin: 0 }}>
+            {shown === 'type' ? `No ${typeName} match of ${whose} in this view.` : 'No published matches in this view.'}
+          </p>
+        ) : (
           <>
             <p className="muted small">
-              {shown === 'league'
-                ? <>Against everyone else, {leagueScope(windowKey)}.</>
-                : <>{windowKey === 'all' ? `The newest ${plural(now.length, 'match', 'matches')}` : `The ${plural(now.length, 'match', 'matches')} of this period`} against
-                  the {before.length} before.</>}
+              {shown === 'league' && <>Against everyone else, {leagueScope(windowKey)}.</>}
+              {shown === 'type' && <>{player.is_me ? 'Your' : `${player.display_name}'s`} {typeName} matches against everyone
+                else&apos;s {typeName} matches, {leagueScope(windowKey)}.</>}
+              {shown === 'earlier' && <>{windowKey === 'all' ? `The newest ${plural(now.length, 'match', 'matches')}` : `The ${plural(now.length, 'match', 'matches')} of this period`} against
+                the {before.length} before.</>}
               {noReference && shown === 'league' && <> The league average appears once {MIN_PEERS} other players have played in this view.</>}
+              {noReference && shown === 'type' && <> The reference appears once {MIN_PEERS} other players have played {typeName} matches in this view.</>}
             </p>
-            <Compare rows={rows} mode={shown} who={who} refName={shown === 'league' ? 'League' : 'Before'} />
+            <Compare rows={rows} mode={shown} who={who}
+                     refName={shown === 'league' ? 'League' : shown === 'type' && type ? MATCH_TYPE_LABEL[type] : 'Before'}
+                     against={shown === 'league' ? 'the league' : shown === 'type' ? `others in ${typeName} matches` : 'before'} />
           </>
         )}
       </Card>

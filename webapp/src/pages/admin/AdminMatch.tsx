@@ -4,8 +4,10 @@ import { useApp, useLoad } from '../../app/state'
 import { PlayByPlay } from '../../components/PlayByPlay'
 import { Card, ErrorBox, Loading, StatusBadge } from '../../components/ui'
 import { explainError } from '../../lib/api'
-import { formatDate, matchLabel, slotNames, teamName } from '../../lib/format'
-import type { Match, MatchPatch, MatchStatus, Slot, Team } from '../../lib/types'
+import {
+  formatDate, MATCH_TYPE_LABEL, MATCH_TYPES, matchLabel, slotNames, teamName, TOURNAMENT_LEVEL_LABEL, TOURNAMENT_LEVELS,
+} from '../../lib/format'
+import type { Match, MatchPatch, MatchStatus, MatchType, Slot, Team, TournamentLevel } from '../../lib/types'
 
 const SLOTS: Slot[] = ['P1A', 'P2A', 'P1B', 'P2B']
 /** The select value for "someone outside the league" (player ids are numbers). */
@@ -19,30 +21,38 @@ export function AdminMatch() {
   const data = useLoad(async () => {
     const match = await api.match(key)
     if (!match) return null
-    const [participants, players, source, pubs, points, actions] = await Promise.all([
+    const [participants, players, source, pubs, points, actions, venues] = await Promise.all([
       api.participants([match.id]), api.players(), api.matchSource(match.id),
-      api.publications(match.id), api.points(match.id), api.actions(match.id)])
+      api.publications(match.id), api.points(match.id), api.actions(match.id), api.venues()])
     const thumbs = await api.thumbUrls(participants.map((p) => p.thumb_path).filter((p): p is string => !!p))
-    return { match, participants, players, source, pubs, points, actions, thumbs }
+    return { match, participants, players, source, pubs, points, actions, venues, thumbs }
   }, [key])
 
   if (data.loading) return <Loading />
   if (!data.data) return <><ErrorBox error={data.error} /><p>Match not found.</p></>
-  const { match: m, participants, players, source, pubs, points, actions, thumbs } = data.data
+  const { match: m, participants, players, source, pubs, points, actions, venues, thumbs } = data.data
 
-  async function run(fn: () => Promise<unknown>) {
+  /** Runs one admin write, then reloads the page; false when it failed. */
+  async function run(fn: () => Promise<unknown>): Promise<boolean> {
     setError(null)
     try {
       await fn()
       data.reload()
+      return true
     } catch (err) {
       setError(explainError(err))
+      return false
     }
   }
   const assign = (slot: Slot, value: string) => run(() => value === UNKNOWN
     ? api.assignSlot(m.id, slot, null, true)
     : api.assignSlot(m.id, slot, value ? Number(value) : null))
   const setStatus = (status: MatchStatus) => run(() => api.updateMatch(m.id, { status }))
+  const saveDetails = (patch: MatchPatch) => run(() => api.updateMatch(m.id, patch))
+  const addVenue = (name: string) => run(async () => {
+    await api.addVenue(name)
+    await api.updateMatch(m.id, { venue: name })
+  })
   const addPlayer = () => run(async () => {
     if (newName.trim()) await api.createPlayer(newName.trim())
     setNewName('')
@@ -127,22 +137,23 @@ export function AdminMatch() {
         </details>
       </Card>
 
-      <Card title="3 · Publish">
-        <div className="grid grid-2">
-          <DetailsForm key={`${m.id}:${m.updated_at}:${m.title}:${m.venue}:${m.season}`} match={m}
-                       onSave={(patch) => run(() => api.updateMatch(m.id, patch))} />
-          <div className="stack">
-            <label className="switch">
-              <input type="checkbox" checked={m.detail_public} onChange={(e) => run(() => api.updateMatch(m.id, { detail_public: e.target.checked }))} />
-              <span>Everyone can see the play-by-play (default: only its 4 players)</span>
-            </label>
-            {unassigned > 0 && m.status === 'draft' && <p className="muted small">{unassigned} slot(s) still unassigned.</p>}
-            <div className="row">
-              {m.status !== 'published' && <button className="primary" onClick={() => setStatus('published')} disabled={unassigned > 0}>Publish</button>}
-              {m.status === 'published' && <button onClick={() => setStatus('draft')}>Back to draft</button>}
-              {m.status !== 'hidden' && <button className="danger" onClick={() => setStatus('hidden')}>Hide</button>}
-              {m.status === 'hidden' && <button onClick={() => setStatus('draft')}>Unhide (draft)</button>}
-            </div>
+      <Card title="3 · Match details" action={<span className="muted small">Saved as you pick</span>}>
+        <MatchDetails match={m} venues={venues} onSave={saveDetails} onAddVenue={addVenue} />
+        <DetailsForm key={`${m.id}:${m.title}:${m.season}`} match={m} onSave={saveDetails} />
+      </Card>
+
+      <Card title="4 · Publish">
+        <div className="stack">
+          <label className="switch">
+            <input type="checkbox" checked={m.detail_public} onChange={(e) => run(() => api.updateMatch(m.id, { detail_public: e.target.checked }))} />
+            <span>Everyone can see the play-by-play (default: only its 4 players)</span>
+          </label>
+          {unassigned > 0 && m.status === 'draft' && <p className="muted small">{unassigned} slot(s) still unassigned.</p>}
+          <div className="row">
+            {m.status !== 'published' && <button className="primary" onClick={() => setStatus('published')} disabled={unassigned > 0}>Publish</button>}
+            {m.status === 'published' && <button onClick={() => setStatus('draft')}>Back to draft</button>}
+            {m.status !== 'hidden' && <button className="danger" onClick={() => setStatus('hidden')}>Hide</button>}
+            {m.status === 'hidden' && <button onClick={() => setStatus('draft')}>Unhide (draft)</button>}
           </div>
         </div>
       </Card>
@@ -176,20 +187,87 @@ export function AdminMatch() {
   )
 }
 
-/** Admin-owned match details; keyed by the saved values, so it re-seeds
- * from the server after every save instead of syncing state in an effect. */
-function DetailsForm({ match: m, onSave }: { match: Match; onSave: (p: MatchPatch) => void }) {
-  const [form, setForm] = useState<MatchPatch>({ title: m.title, venue: m.venue, season: m.season })
+/** The select value that opens the "new venue" input (venue names are text). */
+const NEW_VENUE = '+new'
+
+/** The dropdowns of a match's details (admin-owned, 20261014120000): picked
+ * from fixed lists so every match is tagged the same way, each saved as it is
+ * picked. Pro / amateur is part of a tournament's level. */
+function MatchDetails({ match: m, venues, onSave, onAddVenue }: {
+  match: Match
+  venues: string[]
+  onSave: (p: MatchPatch) => void
+  onAddVenue: (name: string) => Promise<boolean>
+}) {
+  const [adding, setAdding] = useState(false)
+  const [name, setName] = useState('')
+  const add = async () => {
+    if (await onAddVenue(name.trim())) {
+      setAdding(false)
+      setName('')
+    }
+  }
+  const tournament = m.is_tournament === null ? '' : m.is_tournament ? 'yes' : 'no'
   return (
-    <div>
+    <div className="details-grid">
+      <label className="field"><span>Venue</span>
+        <select value={adding ? NEW_VENUE : m.venue ?? ''} onChange={(e) => {
+          if (e.target.value === NEW_VENUE) return setAdding(true)
+          setAdding(false)
+          onSave({ venue: e.target.value || null })
+        }}>
+          <option value="">— not set —</option>
+          {venues.map((v) => <option key={v} value={v}>{v}</option>)}
+          <option value={NEW_VENUE}>+ Add venue…</option>
+        </select>
+      </label>
+      <label className="field"><span>Match type</span>
+        <select value={m.match_type ?? ''} onChange={(e) => onSave({ match_type: (e.target.value || null) as MatchType | null })}>
+          <option value="">— not set —</option>
+          {MATCH_TYPES.map((t) => <option key={t} value={t}>{MATCH_TYPE_LABEL[t]}</option>)}
+        </select>
+      </label>
+      <label className="field"><span>Tournament</span>
+        <select value={tournament} onChange={(e) => onSave(e.target.value === 'yes'
+          ? { is_tournament: true }
+          : { is_tournament: e.target.value === 'no' ? false : null, tournament_level: null })}>
+          <option value="">— not set —</option>
+          <option value="no">No</option>
+          <option value="yes">Yes</option>
+        </select>
+      </label>
+      {m.is_tournament && (
+        <label className="field"><span>Level</span>
+          <select value={m.tournament_level ?? ''}
+                  onChange={(e) => onSave({ tournament_level: (e.target.value || null) as TournamentLevel | null })}>
+            <option value="">— not set —</option>
+            {TOURNAMENT_LEVELS.map((l) => <option key={l} value={l}>{TOURNAMENT_LEVEL_LABEL[l]}</option>)}
+          </select>
+        </label>
+      )}
+      {adding && (
+        <form className="row details-new" onSubmit={(e) => { e.preventDefault(); if (name.trim()) void add() }}>
+          <input autoFocus placeholder="New venue" aria-label="New venue" value={name} onChange={(e) => setName(e.target.value)} />
+          <button type="submit" disabled={!name.trim()}>Add venue</button>
+          <button type="button" className="link" onClick={() => { setAdding(false); setName('') }}>Cancel</button>
+        </form>
+      )}
+    </div>
+  )
+}
+
+/** The free-text details; keyed by the saved values, so it re-seeds from the
+ * server after every save instead of syncing state in an effect. */
+function DetailsForm({ match: m, onSave }: { match: Match; onSave: (p: MatchPatch) => void }) {
+  const [form, setForm] = useState<MatchPatch>({ title: m.title, season: m.season })
+  return (
+    <div className="details-grid">
       <label className="field"><span>Title (optional)</span>
         <input value={form.title ?? ''} onChange={(e) => setForm({ ...form, title: e.target.value || null })} /></label>
-      <label className="field"><span>Venue</span>
-        <input value={form.venue ?? ''} onChange={(e) => setForm({ ...form, venue: e.target.value || null })} /></label>
       <label className="field"><span>Season</span>
         <input value={form.season ?? ''} placeholder="e.g. 2026 Autumn"
                onChange={(e) => setForm({ ...form, season: e.target.value || null })} /></label>
-      <button onClick={() => onSave(form)}>Save details</button>
+      <div className="details-save"><button onClick={() => onSave(form)}>Save title &amp; season</button></div>
     </div>
   )
 }

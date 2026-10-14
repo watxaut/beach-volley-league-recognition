@@ -8,7 +8,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { linkCache } from './clips'
 import type {
-  ActionRow, BoxRow, FantasyRule, Feedback, FeedbackStatus, LeaderRow, Match, MatchPatch, MatchReport, MatchSource,
+  ActionRow, BoxRow, FantasyRule, Feedback, FeedbackStatus, LeaderRow, Match, MatchPatch, MatchReport, MatchSource, MatchType,
   NewFeedback, Participant, Player, PlayerPatch, PlayerProfile, PointRow, Profile, Publication, Role, Ruleset,
   Session, Slot, WindowParams,
 } from './types'
@@ -35,7 +35,8 @@ export interface Api {
   boxScore(matchId: number): Promise<BoxRow[]>
   points(matchId: number): Promise<PointRow[]>
   actions(matchId: number): Promise<ActionRow[]>
-  leaderboard(window: WindowParams): Promise<LeaderRow[]>
+  /** The league table; with a match type, over the matches of that type only. */
+  leaderboard(window: WindowParams, matchType?: MatchType | null): Promise<LeaderRow[]>
   seasons(): Promise<string[]>
   playerProfile(playerId: number, window: WindowParams): Promise<PlayerProfile | null>
   /** A short-lived link to the clip of an attack (`Landing.clip`); null when it cannot be read. */
@@ -43,6 +44,9 @@ export interface Api {
   matchReport(matchId: number): Promise<MatchReport | null>
   // admin
   updateMatch(matchId: number, patch: MatchPatch): Promise<void>
+  /** The venue list of the admin dropdown; an admin adds to it. */
+  venues(): Promise<string[]>
+  addVenue(name: string): Promise<void>
   /** A real player, `null` to clear the slot, or `unknown: true` for someone outside the league. */
   assignSlot(matchId: number, slot: Slot, playerId: number | null, unknown?: boolean): Promise<void>
   createPlayer(name: string): Promise<Player>
@@ -82,6 +86,8 @@ export function explainError(err: unknown): string {
       'opened in time. Ask a league admin to send the invite (again).'
   if (/token has expired|invalid/i.test(msg) && /otp|token/i.test(msg))
     return 'That code is wrong or expired. Request a new one.'
+  if (/venues_pkey|venues_name_ci/i.test(msg)) return 'That venue is already in the list.'
+  if (/matches_venue_fkey/i.test(msg)) return 'Pick the venue from the list, or add it first.'
   if (/match_participants_match_id_player_id_key|duplicate key/i.test(msg))
     return 'That player already has another slot in this match.'
   if (/rate limit/i.test(msg)) return 'Too many emails requested. Wait a minute and try again.'
@@ -98,7 +104,8 @@ const FEEDBACK_COLUMNS = 'id,user_id,kind,message,page,context,screenshots,statu
 
 const MATCH_COLUMNS =
   'id,match_key,title,venue,season,status,detail_public,match_date,start_time,points_to_win,' +
-  'score_a,score_b,winner_team,n_points,set_complete,duration_s,checks,updated_at'
+  'score_a,score_b,winner_team,n_points,set_complete,duration_s,checks,updated_at,' +
+  'match_type,is_tournament,tournament_level'
 
 export function supabaseApi(url: string, publishableKey: string): Api {
   const sb: SupabaseClient = createClient(url, publishableKey, {
@@ -212,9 +219,10 @@ export function supabaseApi(url: string, publishableKey: string): Api {
         .select('match_id,point_no,seq,frame,slot,team,action,outcome,is_assist,observed')
         .eq('match_id', matchId).order('point_no').order('seq'))
     },
-    async leaderboard(w) {
+    async leaderboard(w, matchType) {
       return must(await sb.rpc('leaderboard', {
-        p_season: w.season, p_from: w.from, p_to: w.to, p_last_n: w.lastN }))
+        p_season: w.season, p_from: w.from, p_to: w.to, p_last_n: w.lastN,
+        ...(matchType ? { p_match_type: matchType } : {}) }))
     },
     async seasons() {
       const rows: { season: string | null }[] =
@@ -231,6 +239,13 @@ export function supabaseApi(url: string, publishableKey: string): Api {
 
     async updateMatch(matchId, patch) {
       must(await sb.from('matches').update(patch).eq('id', matchId))
+    },
+    async venues() {
+      const rows: { name: string }[] = must(await sb.from('venues').select('name').order('name'))
+      return rows.map((r) => r.name)
+    },
+    async addVenue(name) {
+      must(await sb.from('venues').insert({ name }))
     },
     async assignSlot(matchId, slot, playerId, unknown = false) {
       must(await sb.from('match_participants')

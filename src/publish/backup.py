@@ -5,7 +5,7 @@
 
 Pipeline-owned rows (points, touches, scores) are reproducible from the
 bundles in Storage and the local output/ folders; players, accounts, slot
-assignments, match titles/status and the fantasy rules are not -- the free
+assignments, match titles/status/details, the venue list and the fantasy rules are not -- the free
 Supabase plan keeps no downloadable backups, so this runs weekly (launchd)
 and copies the file off the laptop to ``gdrive:VolleyBackups`` when rclone
 is configured.
@@ -26,7 +26,9 @@ from .client import DEFAULT_ENV_FILE, SupabaseClient, SupabaseError, load_env_fi
 ADMIN_TABLES = {
     "profiles": "user_id,email,role,display_name,created_at",
     "players": "*",
-    "matches": "id,match_key,title,venue,season,status,detail_public",
+    "matches": "id,match_key,title,venue,season,status,detail_public,match_type,is_tournament,tournament_level",
+    # the venue list of the admin dropdown (20261014120000)
+    "venues": "*",
     "match_participants": "match_id,slot,player_id,is_unknown,assigned_by,assigned_at",
     "fantasy_rulesets": "*",
     "fantasy_rules": "*",

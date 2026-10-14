@@ -1,4 +1,4 @@
-import type { LongestRally, Match, Participant, Player, Slot, Team } from './types'
+import type { LongestRally, Match, MatchType, Participant, Player, Slot, Team, TournamentLevel } from './types'
 
 export function formatDate(isoDate: string, time?: string | null): string {
   const d = new Date(`${isoDate}T${time ?? '12:00:00'}`)
@@ -61,6 +61,15 @@ export const ACTION_LABEL: Record<string, string> = {
 }
 
 export const OUTCOME_LABEL: Record<string, string> = { ace: 'ACE', kill: 'KILL', error: 'ERROR' }
+
+/** The admin dropdowns of a match's details, in menu order. A match type is
+ * the match's division: it describes the match, never a player. */
+export const MATCH_TYPES: MatchType[] = ['male', 'female', 'mixed']
+export const MATCH_TYPE_LABEL: Record<MatchType, string> = { male: 'Male', female: 'Female', mixed: 'Mixed' }
+export const TOURNAMENT_LEVELS: TournamentLevel[] = ['local_amateur', 'local_pro', 'regional', 'national']
+export const TOURNAMENT_LEVEL_LABEL: Record<TournamentLevel, string> = {
+  local_amateur: 'Local – amateur', local_pro: 'Local – pro', regional: 'Regional', national: 'National',
+}
 
 /** "23 touches · over the net 9 times · point 14": the longest rally in words. */
 export function rallyText(r: LongestRally): string {

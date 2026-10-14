@@ -6,6 +6,10 @@ export type Team = 'A' | 'B'
 export type Slot = 'P1A' | 'P2A' | 'P1B' | 'P2B'
 export type MatchStatus = 'draft' | 'published' | 'hidden'
 export type Role = 'admin' | 'viewer'
+/** The match's division (20261014120000): it describes the match, never a player. */
+export type MatchType = 'male' | 'female' | 'mixed'
+/** A tournament's level; pro / amateur is part of it. */
+export type TournamentLevel = 'local_amateur' | 'local_pro' | 'regional' | 'national'
 
 export interface Profile {
   user_id: string
@@ -43,6 +47,10 @@ export interface Match {
   duration_s: number | null
   checks: MatchChecks | null
   updated_at: string
+  // admin-owned details, set from the dropdowns of the admin match page
+  match_type: MatchType | null
+  is_tournament: boolean | null
+  tournament_level: TournamentLevel | null
 }
 
 export interface MatchChecks {
@@ -440,7 +448,8 @@ export interface FantasyRule {
   sort_order: number
 }
 
-export type MatchPatch = Partial<Pick<Match, 'title' | 'venue' | 'season' | 'status' | 'detail_public'>>
+export type MatchPatch = Partial<Pick<Match,
+  'title' | 'venue' | 'season' | 'status' | 'detail_public' | 'match_type' | 'is_tournament' | 'tournament_level'>>
 export type PlayerPatch = Partial<Pick<Player, 'display_name' | 'user_id' | 'handedness' |
   'preferred_side' | 'active'>>
 

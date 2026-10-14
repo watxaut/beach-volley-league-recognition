@@ -71,8 +71,8 @@ export const GLOSSARY = {
   shot_type: { label: 'Hard or touch', what: 'Hard = the ball was driven. Touch = it was placed: a lob, a poke, a slow drop. Read from the flight after the hit: a ball that leaves steeply upward (25° or more) or slowly (under 5 m/s) is a touch, the rest are hard.',
     how: `Right on 26 of 29 spikes of the reference match, the match its two thresholds were chosen on. A flat poke can read as hard: the camera sees the flight, not the swing. About 1 spike in 10 gets no type. Share and hitting % show from ${MIN_N} attacks.`,
     grade: 'B' },
-  compare: { label: 'Comparison', what: 'The player\'s number beside the reference: everyone else pooled, or the player\'s own earlier matches. The arrow says which way the number goes, more is up on every row. Blue is better, orange is worse; fewer is better where the row says so.',
-    how: `Pale means chance alone could explain the gap: with ${MIN_N}–20 attempts most gaps are. Strong colour and "clear" mean the two 95% ranges no longer overlap. The league average needs 3 other players.`, grade: 'A' },
+  compare: { label: 'Comparison', what: 'The player\'s number beside the reference: everyone else pooled, everyone else in matches of the same type (male, female or mixed: the player\'s own numbers then count only those matches), or the player\'s own earlier matches. The arrow says which way the number goes, more is up on every row. Blue is better, orange is worse; fewer is better where the row says so.',
+    how: `Pale means chance alone could explain the gap: with ${MIN_N}–20 attempts most gaps are. Strong colour and "clear" mean the two 95% ranges no longer overlap. The league average, and the same-type one, need 3 other players.`, grade: 'A' },
 } satisfies Record<string, Term>
 
 export type TermKey = keyof typeof GLOSSARY

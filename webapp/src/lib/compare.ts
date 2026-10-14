@@ -8,10 +8,10 @@
 // goes (always shown), and whether chance alone could explain it. It is a
 // CLEAR gap only when the player's 95 % range and the reference's 95 % range do
 // not overlap; anything else is drawn pale, as "could be chance".
-import { signed } from './format'
+import { MATCH_TYPES, signed } from './format'
 import type { TermKey } from './glossary'
 import { hitText, hittingRange, MIN_N, pct, poissonRange, rangeText, wilson, type Range } from './stats'
-import type { HistoryRow } from './types'
+import type { HistoryRow, MatchType } from './types'
 
 /** One player's numbers over a set of matches: a leaderboard row, a profile's
  * totals, or a sum of history rows. The optional fields are missing on a
@@ -308,4 +308,18 @@ export function splitEarlier(all: HistoryRow[], windowIds: number[] | null, rece
   const keep = new Set(windowIds)
   const last = all.reduce((at, h, i) => (keep.has(h.match_id) ? i : at), -1)
   return { now: all.filter((h) => keep.has(h.match_id)), before: last < 0 ? [] : all.slice(last + 1) }
+}
+
+/** The match types a player played, most played first: what "the same match
+ * type" can be read against. `typeOf` maps a match to its type; a match the
+ * admin has not typed yet counts for none. */
+export function typesPlayed(matchIds: number[], typeOf: (matchId: number) => MatchType | null | undefined):
+  { type: MatchType; n: number }[] {
+  const n = new Map<MatchType, number>()
+  for (const id of matchIds) {
+    const t = typeOf(id)
+    if (t) n.set(t, (n.get(t) ?? 0) + 1)
+  }
+  return MATCH_TYPES.filter((t) => n.has(t)).map((type) => ({ type, n: n.get(type)! }))
+    .sort((a, b) => b.n - a.n)
 }
