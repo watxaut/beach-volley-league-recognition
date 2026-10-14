@@ -254,6 +254,44 @@ def test_the_score_follows_the_corrections(points):
     assert R.reviewed_score(points, {}, []) == {"A": 1, "B": 1, "undecided": 0}
 
 
+def _rows(*rows):
+    return [{"point": n, "after_point": after, "serve_team": s, "winner": w, "near_team": near}
+            for n, after, s, w, near in rows]
+
+
+def test_the_reviewed_sequence_holds_added_and_dropped_points(points):
+    review = _review(points, {"status": "corrected", "winner": "B"},
+                     {"status": "corrected", "not_a_point": True})
+    by_point, _ = R.attach(review, points)
+    rows = R.sequence(points, by_point, [{"after_point": 1, "winner": "A", "serve_team": "B"},
+                                         {"after_point": 0, "winner": None}])
+    assert [(r["point"], r["winner"], r["serve_team"]) for r in rows] == [
+        (None, None, None), (1, "B", "B"), (None, "A", "B")]
+    assert rows[2]["near_team"] == "A"                  # an added point is played where the last was
+
+
+def test_the_winner_of_a_point_serves_the_next_one():
+    rows = _rows((1, 0, "A", "A", "A"), (2, 0, "A", "B", "A"), (3, 0, "A", "A", "A"),
+                 (None, 3, "B", "A", "A"), (4, 0, "A", None, "A"))
+    assert R.consistency(rows) == [
+        "Point 3 is served by A, but point 2 was won by B: one of the two is wrong, "
+        "or a point is missing between them.",
+        "The point you added after point 3 is served by B, but point 3 was won by A: "
+        "one of the two is wrong, or a point is missing between them."]
+
+
+def test_the_ends_change_every_seven_points():
+    def block(first, n, near):
+        return [(first + i, 0, None, None, near) for i in range(n)]
+    assert R.consistency(_rows(*block(1, 7, "A"), *block(8, 7, "B"), *block(15, 3, "A"))) == []
+    short = R.consistency(_rows(*block(1, 6, "A"), *block(7, 8, "B"), *block(15, 3, "A")))
+    assert short == [
+        "6 points between point 1 and the side switch after point 6 (7 expected): "
+        "a point may be missing there, or the players changed ends on another point.",
+        "8 points between point 7 and the side switch after point 14 (7 expected): "
+        "a rally there may be no point, or the players changed ends on another point."]
+
+
 def test_match_fields(points):
     out = R.clean_match_fields(
         {"owner_final_score": {"A": "21", "B": 15},
@@ -349,8 +387,11 @@ def test_a_gap_can_be_the_rest_of_the_point_before_it(points):
 
 def test_a_missing_point_keeps_the_frame_the_owner_marked(points):
     out = R.clean_match_fields({"missing_points": [
-        {"after_point": 1, "winner": "A", "at_frame": 300.0}]}, points)
+        {"after_point": 1, "winner": "A", "at_frame": 300.0, "serve_team": "B"}]}, points)
     assert out["missing_points"][0]["at_frame"] == 300
+    assert out["missing_points"][0]["serve_team"] == "B"
+    with pytest.raises(ValueError):
+        R.clean_match_fields({"missing_points": [{"after_point": 1, "serve_team": "C"}]}, points)
 
 
 # --------------------------------------------------------------------------- #

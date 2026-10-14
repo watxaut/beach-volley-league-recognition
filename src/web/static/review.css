@@ -111,3 +111,6 @@
 .rv-missing input { flex: 1; min-width: 0; padding: 3px 6px; font: inherit; color: var(--ink); background: var(--card-2);
   border: 1px solid var(--line); border-radius: 7px; }
 .rv-video video[hidden] { display: none; }
+.rv-warnings { padding: 6px 20px 0; color: var(--fix); font-size: 13px; }
+.rv-warnings p { margin: 2px 0; }
+.rv-missing { flex-wrap: wrap; }

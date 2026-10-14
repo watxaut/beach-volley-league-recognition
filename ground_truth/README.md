@@ -135,7 +135,8 @@ web is the match as reviewed here.
   number when it was said, 0 = before the first), `after_frame` (that point's
   serve frame), `winner` (A / B / null), `note`.
   `at_frame` when the owner marked it while watching the dead time: a frame
-  with the missed rally on the picture (the place to look when fixing it).
+  with the missed rally on the picture (the place to look when fixing it);
+  `serve_team` when he said who served it.
 - `gaps[]` — the stretches of dead time the owner watched (`first`, `last`,
   `status: checked`); a point he found there is in `missing_points`.
   `status: tail` + `rally_goes_on_to` (a frame): what plays there is the REST

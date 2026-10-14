@@ -120,6 +120,19 @@
     R = state;
     renderChips();
     renderScores();
+    renderWarnings();
+  }
+
+  // What the rules of the game say does not add up (who serves, ends every 7).
+  function renderWarnings() {
+    let box = $("warnings");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "warnings";
+      box.className = "rv-warnings";
+      $("chips").after(box);
+    }
+    box.innerHTML = (R.warnings || []).map((w) => `<p>⚠ ${esc(w)}</p>`).join("");
   }
 
   function fail(err) {
@@ -181,7 +194,8 @@
 
   const missingRows = (afterPoint) => R.missing_points.map((m, i) => (m.after_point !== afterPoint ? "" :
     `<div class="rv-missing" data-missing="${i}">a point${m.at_frame != null ? ` (frame ${m.at_frame})` : ""}, won by
-       <select data-f="m-winner">${winnerOptions(m.winner)}</select>
+       <select data-f="m-winner">${winnerOptions(m.winner)}</select> served by
+       <select data-f="m-serve">${winnerOptions(m.serve_team)}</select>
        <input data-f="m-note" placeholder="what happened" value="${esc(m.note)}">
        <button data-act="drop-missing">✕</button></div>`)).join("");
 
@@ -690,9 +704,11 @@
       edited();
       return;
     }
-    if (f === "m-winner" || f === "m-note") {
+    if (f === "m-winner" || f === "m-note" || f === "m-serve") {
       const m = R.missing_points[Number(el.closest("[data-missing]").dataset.missing)];
-      if (f === "m-winner") m.winner = el.value || null; else m.note = el.value;
+      if (f === "m-winner") m.winner = el.value || null;
+      else if (f === "m-serve") m.serve_team = el.value || null;
+      else m.note = el.value;
       saveMatch();
       return;
     }
@@ -778,6 +794,7 @@
     R = d.review;
     if (M.size) $("videoBox").style.setProperty("--ar", String(M.size[0] / M.size[1]));
     renderScores();
+    renderWarnings();
     const first = M.points.findIndex((p) => !R.verdicts[p.point]);
     const start = () => openPoint(first < 0 ? 0 : first);
     if (video.readyState >= 1) start(); else video.addEventListener("loadedmetadata", start, { once: true });
