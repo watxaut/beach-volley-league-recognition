@@ -87,10 +87,10 @@ begin
     'service_role must be able to publish';
   assert not has_function_privilege('authenticated', 'public.ingest_match_bundle(jsonb,text,text)', 'execute'),
     'authenticated must NOT be able to publish';
-  assert not has_function_privilege('anon', 'public.leaderboard(text,date,date,int)', 'execute'),
+  assert not has_function_privilege('anon', 'public.leaderboard(text,date,date,int,text)', 'execute'),
     'anon must not read the leaderboard';
-  assert has_function_privilege('authenticated', 'public.leaderboard(text,date,date,int)', 'execute'),
-    'members read the leaderboard (recreated in player_page_v2)';
+  assert has_function_privilege('authenticated', 'public.leaderboard(text,date,date,int,text)', 'execute'),
+    'members read the leaderboard (recreated in match_details)';
   assert not has_function_privilege('anon', 'public.player_profile(bigint,text,date,date,int)', 'execute'),
     'anon must not read profiles';
   assert not has_function_privilege('anon', 'public.match_report(bigint)', 'execute'),
@@ -98,7 +98,7 @@ begin
   assert has_function_privilege('authenticated', 'public.match_report(bigint)', 'execute'),
     'members read reports';
   assert not has_function_privilege('authenticated',
-    'public.window_matches(text,date,date,int,bigint,boolean)', 'execute'),
+    'public.window_matches(text,date,date,int,bigint,boolean,text)', 'execute'),
     'the window helper is internal';
   assert has_function_privilege('anon', 'public.ping()', 'execute'), 'anon must reach ping()';
   assert not has_function_privilege('anon', 'public.can_see_match_clip(text)', 'execute')
@@ -131,6 +131,16 @@ begin
      and not has_column_privilege('authenticated', 'public.match_participants', 'thumb_path', 'update')
      and not has_column_privilege('authenticated', 'public.profiles', 'email', 'update'),
     'only the admin-owned columns are writable through the API';
+  assert has_column_privilege('authenticated', 'public.matches', 'venue', 'update')
+     and has_column_privilege('authenticated', 'public.matches', 'match_type', 'update')
+     and has_column_privilege('authenticated', 'public.matches', 'is_tournament', 'update')
+     and has_column_privilege('authenticated', 'public.matches', 'tournament_level', 'update'),
+    'the match details are admin-owned (20261014120000)';
+  assert has_table_privilege('authenticated', 'public.venues', 'select, insert')
+     and not has_table_privilege('authenticated', 'public.venues', 'update')
+     and not has_table_privilege('authenticated', 'public.venues', 'delete')
+     and has_table_privilege('service_role', 'public.venues', 'select'),
+    'venues: read by members, added to by admins, exported by the backup';
   assert has_table_privilege('service_role', 'public.players', 'select')
      and not has_table_privilege('service_role', 'public.players', 'insert, update, delete')
      and not has_table_privilege('service_role', 'public.actions', 'insert, update, delete'),
@@ -232,6 +242,36 @@ begin
   delete from public.players where display_name = 'Check New';
   update public.matches set title = 'Check title' where id = v_id;
   assert (select title from public.matches where id = v_id) = 'Check title', 'admin edits the match details';
+  -- the dropdowns (20261014120000): a venue from the list, type, tournament, level
+  insert into public.venues (name) values ('Check Beach');
+  update public.matches set venue = 'Check Beach', match_type = 'mixed', is_tournament = true,
+                            tournament_level = 'regional' where id = v_id;
+  assert (select venue = 'Check Beach' and match_type = 'mixed' and tournament_level = 'regional'
+          from public.matches where id = v_id), 'admin tags the match';
+  begin
+    update public.matches set venue = 'Nowhere' where id = v_id;
+    assert false, 'a venue must come from the list';
+  exception when foreign_key_violation then
+    null;
+  end;
+  begin
+    insert into public.venues (name) values ('check beach');
+    assert false, 'one spelling per venue';
+  exception when unique_violation then
+    null;
+  end;
+  begin
+    update public.matches set is_tournament = false where id = v_id;
+    assert false, 'a level needs a tournament';
+  exception when check_violation then
+    null;
+  end;
+  begin
+    update public.matches set match_type = 'men' where id = v_id;
+    assert false, 'match type is male / female / mixed';
+  exception when check_violation then
+    null;
+  end;
   update public.match_participants set player_id = null where match_id = v_id and slot = 'P2B';
   update public.match_participants set player_id = v_opp2 where match_id = v_id and slot = 'P2B';
   assert (select assigned_by from public.match_participants where match_id = v_id and slot = 'P2B')
@@ -396,6 +436,20 @@ begin
     'fantasy per 21 points: 2.0 over 2 points';
   assert (public.player_profile((select id from public.players where display_name = 'Check Ari'))
           -> 'form' ->> 'n')::int = 2, 'form counts all matches, window or not';
+  -- the same-match-type reference (20261014120000): the first match is mixed,
+  -- the newer one has no type; last N counts within the type
+  assert (select count(*) from public.leaderboard(p_match_type => 'mixed')) = 4, 'mixed: 4 players';
+  assert (select count(*) from public.leaderboard(p_match_type => 'female')) = 0, 'no female match';
+  assert (select fantasy from public.leaderboard(p_last_n => 1, p_match_type => 'mixed')
+          where display_name = 'Check Ari') = 2.0, 'the last mixed match is the older one';
+  -- venues: every member reads the list, only an admin adds to it
+  assert (select count(*) from public.venues where name = 'Check Beach') = 1, 'members read the venues';
+  begin
+    insert into public.venues (name) values ('Bob Beach');
+    assert false, 'a viewer must not add a venue';
+  exception when insufficient_privilege then
+    null;
+  end;
 
   -- match report for a non-participant: the league tier only (box-score
   -- lines, team side-out / break); nobody shares analytics yet

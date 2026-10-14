@@ -53,6 +53,12 @@ export function League() {
         <span className="spacer" />
         <WindowPicker value={key} onChange={setKey} seasons={seasons.data ?? []} />
       </div>
+      {!me && (
+        <div className="notice">
+          Your account isn't linked to a player yet. A league admin links accounts to players after your
+          first recorded match. Meanwhile you can browse the league.
+        </div>
+      )}
       <Card>
         <ErrorBox error={board.error} />
         {board.loading && !board.data ? <Loading /> : rows.length === 0 ? <p className="muted">No published matches in this view.</p> : (

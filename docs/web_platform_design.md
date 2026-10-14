@@ -376,9 +376,9 @@ subtraction.
 ### Pages
 
 **Viewer**
-1. **Home — "My season":** fantasy total and league rank, stat tiles (kills,
-   aces, digs, assists, errors), last 5 matches as cards (score, W/L, my
-   points, MVP badge).
+1. **No home page (owner, 2026-10-14):** `/` opens the member's own Player page
+   ("My stats" in the menu); an account not linked to a player lands on the League.
+   An admin's drafts waiting for review show as a count on the Admin link.
 2. **League:** fantasy leaderboard with season and date filters and sortable
    counts.
 3. **Matches:** list with scores, then a match page with score header,
@@ -388,19 +388,24 @@ subtraction.
    URL. *Overview* (league tier): five count tiles and "you vs the league / vs your earlier matches",
    a table of the two numbers and the gap between them (arrow = which way, blue / orange = better /
    worse, pale = could be chance, strong = clear), counted from `leaderboard` rows and the profile's
-   match history. *Attack*, *Serve* and *Receive & defense* (analytics tier, "private" notice
+   match history. A third reference, *Same type* (2026-10-14), reads the player's matches of one
+   match type against everyone else's matches of that type (`leaderboard(p_match_type)`; a picker
+   when the player has played several types). *Attack*, *Serve* and *Receive & defense* (analytics tier, "private" notice
    otherwise): rate tiles with the same gap line under them, then the attack map (opens on kills; a
    line per attack from where the ball was hit to where it came down), reception vs transition and
    hard / touch; the serve map (where each serve was received or came down: ace, in play, error) and
    who took the serves; who they serve, what the receptions became and where the passes went.
    *Matches*: the history table. Every stat explains itself in an "i" hint (`lib/glossary.ts`).
-5. **Settings:** display name, "share my detailed stats with the league".
+5. **Settings** (the gear button at the top right): display name, "share my detailed stats with the league".
 
 **Admin** (extra menu)
 6. **Review queue (drafts):** checks (`set_complete`, score, flags, uncredited
    touches), the play-by-play like `match_reconstruction.txt`, the 4 slot
    thumbnails with a player dropdown each (a player can't take two slots, enforced by the DB),
-   the Drive video link, then **Publish**. This is the STATUS "rollout gate =
+   the Drive video link, the **match details** (dropdowns saved as picked: venue from
+   an admin-extendable list, match type male / female / mixed, tournament yes / no and its
+   level Local – amateur / Local – pro / Regional / National;
+   `20261014120000_match_details.sql`), then **Publish**. This is the STATUS "rollout gate =
    fast human review".
 7. **Players:** create, edit, link to an account, invite. **Unknown players:** a slot
    can be marked *Unknown player* instead of assigned (an opponent or guest the league

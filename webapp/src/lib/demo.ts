@@ -6,7 +6,7 @@ import type { Api } from './api'
 import { blobDataUrl } from './feedback'
 import { hitSplit, longestRally, playerAnalytics, pointFantasy, serveRows, serveTargets, teamRally, type Seat, type Touch } from './analytics'
 import type {
-  ActionName, ActionRow, BoxRow, FantasyRule, Feedback, LeaderRow, Match, PointRow, Participant,
+  ActionName, ActionRow, BoxRow, FantasyRule, Feedback, LeaderRow, Match, MatchType, PointRow, Participant,
   Pass, Player, PlayerProfile, Profile, Publication, ReportPlayer, Ruleset, Serve, Session, Slot, Team, WindowParams,
 } from './types'
 
@@ -121,10 +121,13 @@ function simulate(id: number, seed: number, finalA: number, finalB: number): { p
   return { points, actions }
 }
 
-function makeMatch(id: number, key: string, venue: string, status: Match['status'], a: number, b: number): Match {
+function makeMatch(id: number, key: string, venue: string, status: Match['status'], a: number, b: number,
+                   type: MatchType | null): Match {
   const [d, t] = key.split('_')
   return {
     id, match_key: key, title: null, venue, season: '2026 Autumn', status, detail_public: false,
+    match_type: type, is_tournament: type === null ? null : id === 1,
+    tournament_level: id === 1 ? 'regional' : null,
     match_date: `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`, start_time: `${t.slice(0, 2)}:${t.slice(2)}:00`,
     points_to_win: 21, score_a: a, score_b: b, winner_team: a > b ? 'A' : 'B', n_points: a + b,
     set_complete: true, duration_s: 1500 + (a + b) * 20,
@@ -145,18 +148,20 @@ export function demoApi(): Api {
   ]
   const rulesets: Ruleset[] = [{ id: 1, name: 'G1', description: 'Owner-ratified 2026-09-27', is_active: true }]
   let rules: FantasyRule[] = G1.map((r) => ({ ...r, ruleset_id: 1 }))
-  const defs: [string, string, Match['status'], number, number, Record<Slot, number | null>, Slot[]?][] = [
-    ['20260920_1830_bogatell_ari_joan', 'Bogatell', 'published', 21, 12, { P1A: 1, P2A: 2, P1B: 3, P2B: 4 }],
-    ['20260927_1900_bogatell_laia_nil', 'Bogatell', 'published', 19, 21, { P1A: 5, P2A: 6, P1B: 1, P2B: 2 }],
-    ['20261004_1805_vall_dhebron', "Vall d'Hebron", 'draft', 21, 17, { P1A: null, P2A: null, P1B: null, P2B: null }],
-    ['20260906_1000_bogatell_ari_marc', 'Bogatell', 'published', 21, 15, { P1A: 1, P2A: 3, P1B: 2, P2B: 4 }],
-    ['20260913_1730_bogatell_joan_pau', 'Bogatell', 'published', 17, 21, { P1A: 2, P2A: 4, P1B: 1, P2B: null }, ['P2B']],
+  type Def = [string, string, Match['status'], number, number, MatchType | null, Record<Slot, number | null>, Slot[]?]
+  const defs: Def[] = [
+    ['20260920_1830_bogatell_ari_joan', 'Bogatell', 'published', 21, 12, 'mixed', { P1A: 1, P2A: 2, P1B: 3, P2B: 4 }],
+    ['20260927_1900_bogatell_laia_nil', 'Bogatell', 'published', 19, 21, 'mixed', { P1A: 5, P2A: 6, P1B: 1, P2B: 2 }],
+    ['20261004_1805_vall_dhebron', "Vall d'Hebron", 'draft', 21, 17, null, { P1A: null, P2A: null, P1B: null, P2B: null }],
+    ['20260906_1000_bogatell_ari_marc', 'Bogatell', 'published', 21, 15, 'male', { P1A: 1, P2A: 3, P1B: 2, P2B: 4 }],
+    ['20260913_1730_bogatell_joan_pau', 'Bogatell', 'published', 17, 21, null, { P1A: 2, P2A: 4, P1B: 1, P2B: null }, ['P2B']],
   ]
-  const matches: DemoMatch[] = defs.map(([key, venue, status, a, b, slots, unknown = []], i) => {
+  const venues = [...new Set(defs.map((d) => d[1]))]
+  const matches: DemoMatch[] = defs.map(([key, venue, status, a, b, type, slots, unknown = []], i) => {
     const id = i + 1
     const sim = simulate(id, 7 + i * 13, a, b)
     return {
-      match: makeMatch(id, key, venue, status, a, b), slots, unknown, ...sim,
+      match: makeMatch(id, key, venue, status, a, b, type), slots, unknown, ...sim,
       publications: [{
         id: id * 10, match_id: id, revision: 1, result: 'applied', content_sha256: `${key.length}f3a9c2e81b7d`.padEnd(64, '0'),
         pipeline_version: '78844e5', git_dirty: false, bundle_path: `match-bundles/${key}/demo.json`,
@@ -208,10 +213,10 @@ export function demoApi(): Api {
 
   const byId = (id: number) => matches.find((m) => m.match.id === id)
   /** The matches a window keeps, newest first (the SQL `window_matches`). */
-  const windowed = (list: DemoMatch[], w: WindowParams) => {
+  const windowed = (list: DemoMatch[], w: WindowParams, type: MatchType | null = null) => {
     const kept = list
       .filter((m) => (!w.season || m.match.season === w.season) && (!w.from || m.match.match_date >= w.from)
-        && (!w.to || m.match.match_date <= w.to))
+        && (!w.to || m.match.match_date <= w.to) && (!type || m.match.match_type === type))
       .sort((a, b) => `${b.match.match_date}${b.match.start_time}`.localeCompare(`${a.match.match_date}${a.match.start_time}`))
     return w.lastN ? kept.slice(0, w.lastN) : kept
   }
@@ -247,9 +252,9 @@ export function demoApi(): Api {
     boxScore: (id) => delay(byId(id) && visible(byId(id)!) ? box(byId(id)!) : []),
     points: (id) => delay(byId(id) && canDetail(byId(id)!) ? byId(id)!.points : []),
     actions: (id) => delay(byId(id) && canDetail(byId(id)!) ? byId(id)!.actions : []),
-    leaderboard(w) {
+    leaderboard(w, type) {
       const rows = new Map<number, Required<LeaderRow>>()
-      for (const m of windowed(matches.filter((x) => x.match.status === 'published'), w)) {
+      for (const m of windowed(matches.filter((x) => x.match.status === 'published'), w, type ?? null)) {
         for (const b of box(m)) {
           if (!b.player_id) continue
           const r: Required<LeaderRow> = rows.get(b.player_id) ?? { player_id: b.player_id, display_name: b.display_name ?? '?', matches: 0, wins: 0, fantasy: 0, kills: 0, aces: 0, digs: 0, assists: 0, blocks: 0, errors: 0, attacks: 0, attack_errors: 0, serves: 0, points_played: 0, fantasy_per_21: null, serve_errors: 0, recv_points: 0, recv_won: 0, serve_points: 0, serve_won: 0 }
@@ -425,7 +430,17 @@ export function demoApi(): Api {
         longest_rally: longestRally(m.points, m.actions) })
     },
     async updateMatch(id, patch) {
+      const next = { ...byId(id)!.match, ...patch }
+      // the checks of 20261014120000
+      if (next.venue !== null && !venues.includes(next.venue)) throw new Error('matches_venue_fkey')
+      if (next.tournament_level !== null && !next.is_tournament) throw new Error('matches_level_needs_tournament')
       Object.assign(byId(id)!.match, patch)
+    },
+    venues: () => delay([...venues].sort((a, b) => a.localeCompare(b))),
+    async addVenue(name) {
+      if (!isAdmin()) throw new Error('new row violates row-level security policy for table "venues"')
+      if (venues.some((v) => v.toLowerCase() === name.toLowerCase())) throw new Error('venues_name_ci')
+      venues.push(name)
     },
     async assignSlot(id, slot, playerId, unknown = false) {
       const m = byId(id)!

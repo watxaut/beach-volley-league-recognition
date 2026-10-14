@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  compare, compareByKey, countText, gapOf, gapTint, gapWords, highlights, ordinal, rangeTextOf, splitEarlier, sumHistory, tally, valueText, type Peer, type Sample,
+  compare, compareByKey, countText, gapOf, gapTint, gapWords, highlights, ordinal, rangeTextOf, splitEarlier, sumHistory, tally, typesPlayed, valueText, type Peer, type Sample,
 } from './compare'
 import type { HistoryRow } from './types'
 
@@ -212,5 +212,16 @@ describe('you vs your earlier matches', () => {
   it('sums match rows into one sample', () => {
     const s = sumHistory([h(1), h(2, { n_points: null })])
     expect([s.kills, s.attacks, s.serve_errors, s.points_played, s.fantasy]).toEqual([6, 24, 2, 33, 5])
+  })
+})
+
+describe('typesPlayed', () => {
+  const types: Record<number, 'male' | 'female' | 'mixed' | null> = { 1: 'mixed', 2: 'female', 3: 'mixed', 4: null, 5: 'female', 6: 'mixed' }
+  it('counts the typed matches, most played first, an untyped match in none', () => {
+    expect(typesPlayed([1, 2, 3, 4, 5, 6], (id) => types[id])).toEqual([{ type: 'mixed', n: 3 }, { type: 'female', n: 2 }])
+  })
+  it('keeps the menu order on a tie, and reads nothing from untyped or unknown matches', () => {
+    expect(typesPlayed([1, 2], (id) => types[id])).toEqual([{ type: 'female', n: 1 }, { type: 'mixed', n: 1 }])
+    expect(typesPlayed([4, 99], (id) => types[id])).toEqual([])
   })
 })

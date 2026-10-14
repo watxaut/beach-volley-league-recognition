@@ -540,6 +540,15 @@ Pages). Rules that keep it correct:
   ranking. Keep it that way: never aggregate by slot across matches. Re-tag = give
   the slot a player (admin -> Players -> Unknown players); the publisher never touches
   the flag.
+* **Match details (owner, 2026-10-14; `20261014120000_match_details`).** Venue, match
+  type (male / female / mixed), tournament yes / no and its level (local amateur / local
+  pro / regional / national: pro / amateur is part of the level) are ADMIN-OWNED columns
+  set from dropdowns on the admin match page; `venues` is an admin add-only list that
+  `matches.venue` references (FK), so every match spells a place the same way. The
+  publisher never writes them and `make backup` exports them. A match type is the
+  match's DIVISION: never add a gender to `players`, never show one per player -- "players
+  like you" is always read from the matches (the player page's *Same type* reference,
+  `leaderboard(p_match_type)`, league tier like the rest of the leaderboard).
 * **What is published is the match as the owner reviewed it (owner,
   2026-10-13; `src/publish/reviewed.py`).** The publisher applies
   `ground_truth/<match_key>_review.json` to the reconstruction IN MEMORY

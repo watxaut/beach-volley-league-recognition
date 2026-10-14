@@ -1,5 +1,5 @@
-// A player beside a reference (everyone else pooled, or the player's own
-// earlier matches), one row per stat: the two numbers side by side and the gap
+// A player beside a reference (everyone else pooled, everyone else in the same
+// match type, or the player's own earlier matches), one row per stat: the two numbers side by side and the gap
 // between them. The arrow says which way the number goes (more is up on every
 // row, a stat where fewer is better says so); the colour says whether that is
 // good or bad, and its strength how sure the gap is: pale while chance alone
@@ -11,7 +11,7 @@ import { GLOSSARY } from '../lib/glossary'
 import { GapArrow } from './Gap'
 import { StatInfo } from './ui'
 
-export type CompareMode = 'league' | 'earlier'
+export type CompareMode = 'league' | 'type' | 'earlier'
 
 /** A row named in a sentence: "kill %", "digs", and "few errors" where fewer
  * is the good direction. */
@@ -42,19 +42,20 @@ function GapCell({ r, g }: { r: CompareRow; g: Gap | null }) {
   )
 }
 
-export function Compare({ rows, mode, who, refName }: {
+export function Compare({ rows, mode, who, refName, against }: {
   rows: CompareRow[]
   mode: CompareMode
   /** "You", or the player's name on someone else's page. */
   who: string
-  /** What the player is read against, in a column heading: "League", "Before". */
+  /** What the player is read against, in a column heading: "League", "Mixed", "Before". */
   refName: string
+  /** The same in a sentence: "Better than {against} on 3 of 7". */
+  against: string
 }) {
   const { best, worst } = highlights(rows)
   const sum = tally(rows)
   const anyRef = rows.some((r) => r.ref !== null)
-  const anyPeers = mode === 'league' && rows.some((r) => r.peers.length > 0)
-  const against = mode === 'league' ? 'the league' : 'before'
+  const anyPeers = mode !== 'earlier' && rows.some((r) => r.peers.length > 0)
   // one real row says what "by chance" means: 3 in 18 attacks is anywhere from 6% to 39%
   const example = rows.find((r) => r.key === 'kill' && r.value !== null && r.range) ?? rows.find((r) => r.kind === 'share' && r.value !== null && r.range)
   return (

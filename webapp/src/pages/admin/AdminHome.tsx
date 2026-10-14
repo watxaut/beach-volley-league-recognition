@@ -1,7 +1,7 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useApp, useLoad, useMatchList } from '../../app/state'
 import { Card, ErrorBox, Loading, StatusBadge } from '../../components/ui'
-import { formatDate, matchLabel } from '../../lib/format'
+import { formatDate, MATCH_TYPE_LABEL, matchLabel } from '../../lib/format'
 
 export function AdminLayout() {
   const { api, isAdmin } = useApp()
@@ -38,6 +38,7 @@ export function AdminMatches() {
               <th className="left">Date</th>
               <th className="left">Match</th>
               <th>Score</th>
+              <th className="left" title="The match's division, set under Match details">Type</th>
               <th title="Slots still without a player">Unassigned</th>
               <th title="Points the reconstruction flagged for a look">Flags</th>
             </tr>
@@ -52,6 +53,7 @@ export function AdminMatches() {
                   <td className="left">{formatDate(m.match_date, m.start_time)}</td>
                   <td className="left"><Link to={`/admin/matches/${m.match_key}`}>{matchLabel(m)}</Link></td>
                   <td>{m.score_a}–{m.score_b}</td>
+                  <td className="left">{m.match_type ? MATCH_TYPE_LABEL[m.match_type] : <span className="muted">not set</span>}</td>
                   <td className={open ? 'strong' : undefined}>{open || '–'}</td>
                   <td>{flags || '–'}</td>
                 </tr>

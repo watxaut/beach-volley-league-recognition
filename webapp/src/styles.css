@@ -118,12 +118,17 @@ p { margin: 0 0 0.75rem; }
 .nav a { padding: 8px 12px; border-radius: 999px; color: var(--ink-2); white-space: nowrap; font-weight: 500; }
 .nav a:hover { background: var(--surface-2); text-decoration: none; }
 .nav a.active { background: var(--ink); color: var(--surface); }
-.userchip { color: var(--ink-2); white-space: nowrap; font-size: 0.9rem; }
+.settings-button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--ring); border-radius: 999px; color: var(--ink-2); font-size: 0.9rem; font-weight: 600; white-space: nowrap; }
+.settings-button:hover { background: var(--surface-2); text-decoration: none; }
+.settings-button.active { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.settings-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 @media (max-width: 640px) {
-  /* phones: brand + user on the first row, the full nav on its own row */
+  /* phones: brand + feedback + settings on the first row, the full nav on its own row */
   .topbar-inner { flex-wrap: wrap; height: auto; padding-top: 8px; padding-bottom: 6px; row-gap: 4px; }
   .nav { order: 3; flex-basis: 100%; }
   .feedback-open { margin-left: auto; }
+  .settings-button { padding: 7px; }
+  .settings-label { display: none; }
   .scoreboard .big { font-size: 2rem; }
 }
 main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 64px; }
@@ -167,6 +172,13 @@ input, select, textarea { font: inherit; color: var(--ink); background: var(--su
 input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 label.field { display: block; margin-bottom: 12px; }
 label.field > span { display: block; font-size: 0.85rem; color: var(--ink-2); margin-bottom: 4px; }
+.details-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0 16px; align-items: end; }
+.details-grid select, .details-grid input { width: 100%; }
+.details-new { grid-column: 1 / -1; margin-bottom: 12px; }
+.details-new input { width: auto; flex: 1; min-width: 0; max-width: 320px; }
+.details-save { margin-bottom: 12px; }
+.type-pick { margin-bottom: 10px; }
+.type-pick select { min-height: 32px; padding: 4px 10px; }
 .code-input { font-size: 1.6rem; letter-spacing: 0.4em; text-align: center; width: 18ch; max-width: 100%; font-variant-numeric: tabular-nums; }
 .switch { display: flex; align-items: center; gap: 10px; cursor: pointer; }
 .switch input { width: 20px; height: 20px; min-height: 0; }
