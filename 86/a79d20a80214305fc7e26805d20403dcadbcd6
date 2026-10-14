@@ -1,0 +1,61 @@
+AGENTS.md
+  s_9ed08fada71d0a::t_0b4a96b336c536 543-551
+STATUS.md
+  s_9ed08fada71d0a::t_a94572e9a737b8 21-22,85,129,406,508-519
+docs/history/status_log_archive.md
+  s_9ed08fada71d0a::t_68d1017d8b0c15 7457-7476
+docs/web_platform_design.md
+  s_9ed08fada71d0a::t_1cecf6efdf2f96 379-381,391-393,399,405-408
+src/publish/backup.py
+  s_9ed08fada71d0a::t_565d77f0322857 8,29-31
+supabase/checks/rls_smoke.sql
+  s_9ed08fada71d0a::t_ffa51f737b4508 90,92-93,101,134-143,245-274,439-452
+supabase/migrations/20261014120000_match_details.sql
+  s_9ed08fada71d0a::t_bee83ed50eb83e 1-143
+webapp/src/App.tsx
+  s_9ed08fada71d0a::t_df1aaedd78e9ad 18-24,33
+webapp/src/components/Compare.tsx
+  s_9ed08fada71d0a::t_47d99f0a470d76 1-2,14,45,50,52-53,58
+webapp/src/components/Layout.tsx
+  s_9ed08fada71d0a::t_66c3c8f47eb454 1-2,6-11,20,24-29,32-36,45-54
+webapp/src/lib/api.ts
+  s_9ed08fada71d0a::t_1063d0b68f54d0 11,38-39,47-49,89-90,107-108,222,224-225,243-249
+webapp/src/lib/compare.test.ts
+  s_9ed08fada71d0a::t_f3650a94af3dab 3,217-227
+webapp/src/lib/compare.ts
+  s_9ed08fada71d0a::t_3c9891767b339e 11,14,312-325
+webapp/src/lib/demo.ts
+  s_9ed08fada71d0a::t_18f6f833f55e5e 9,124-125,129-130,151-157,159-160,164,216,219,255,257,433-436,439-444
+webapp/src/lib/format.ts
+  s_9ed08fada71d0a::t_5ab34ee5bf106d 1,65-73
+webapp/src/lib/glossary.ts
+  s_9ed08fada71d0a::t_db13bf67811ef3 74-75
+webapp/src/lib/types.ts
+  s_9ed08fada71d0a::t_fd8b4bfeb64eb7 9-12,50-53,451-452
+webapp/src/pages/League.tsx
+  s_9ed08fada71d0a::t_04925660b48631 56-61
+webapp/src/pages/PlayerPage.tsx
+  s_9ed08fada71d0a::t_b251f4b5818a26 15-16,18,21,47-49,61,105-106,159-163,166-167,169,171,176-185,187-193,196,211,215-217,224-239,242-246,248,250-252
+webapp/src/pages/admin/AdminHome.tsx
+  s_9ed08fada71d0a::t_0187ca05533e23 4,41,56
+webapp/src/pages/admin/AdminMatch.tsx
+  s_9ed08fada71d0a::t_ddfc22e12232ba 7-10,24,26,28,33,35-36,41,44,51-55,140-156,190-260,262,264,270
+webapp/src/styles.css
+  s_9ed08fada71d0a::t_fcaacaa3d47b28 121-124,126,130-131,175-181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "86a79d20a80214305fc7e26805d20403dcadbcd6",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
