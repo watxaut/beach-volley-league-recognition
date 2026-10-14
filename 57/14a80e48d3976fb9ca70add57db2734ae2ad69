@@ -1,0 +1,23 @@
+STATUS.md
+  s_9ed08fada71d0a::t_e78802146605e6 21,95,131,532-533
+ground_truth/20261010_1200_vall_dhebron_jesus_sara_joan_loida_review.json
+  s_9ed08fada71d0a::t_10cd4415315c43 1-3757
+ground_truth/20261010_1230_vall_dhebron_jesus_sara_joan_loida_review.json
+  s_9ed08fada71d0a::t_85f3e2f903c321 1-3452
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "5714a80e48d3976fb9ca70add57db2734ae2ad69",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
