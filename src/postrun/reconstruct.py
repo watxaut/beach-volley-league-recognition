@@ -110,8 +110,8 @@ def reconstruct(stream: MatchStream, geometry: CourtGeometry,
     }
 
 
-#: Owner-ratified fantasy values (STATUS north-star G1). A block is not a
-#: post-run label yet. Errors = service fault + attack error + ball handling
+#: Owner-ratified fantasy values (STATUS north-star G1). A block is a
+#: post-run label (#115) but a hidden, uncredited one. Errors = service fault + attack error + ball handling
 #: (a set or dig the layer marks ``error``, e.g. P6 f3229 -- open point 32f).
 #: The web platform scores from its own rule table (supabase/migrations,
 #: ``fantasy_rules``); ``src/publish/fantasy.py`` mirrors this G1 set.

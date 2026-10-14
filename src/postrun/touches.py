@@ -43,6 +43,7 @@ ACTION_DIG = "dig"
 ACTION_SET = "set"
 ACTION_SPIKE = "spike"
 ACTION_OVERPASS = "overpass"
+ACTION_BLOCK = "block"
 
 # Touch.player_source: how a touch got its player.
 SOURCE_REACH = "reach"              # the player's body was at the ball
@@ -133,6 +134,22 @@ STANDING_MIN_SEEN_S = 0.7
 # Without a player to measure against, the old ruler: contact height under
 # the net tape (20260920: every attack above 2.2 m at the vertex).
 ATTACK_BELOW_TAPE_M = 0.28
+# A BLOCK: the attack and the block are 2-6 frames apart (owner reviews of
+# 20261010_1000 / 1100 / 1200), one vertex for the tracker, and the ball's
+# depth at the net reads +-1.5 m, so no reversal can be read off the ball.
+# What a block leaves is the RALLY: a ball hit above the tape at the net
+# comes back to the hitter's own half well inside one crossing's time
+# (0.4-1.1 s to the next touch on the 6 reviewed blocks; a crossing is
+# ``CROSS_INTERVAL_S``) and the same team starts a new possession. That
+# return is a step of the path: the block is a HIDDEN touch of the other
+# half (never credited), the touch after it is touch 1 again. Somebody must
+# be there to block: a player of the other half standing at the net (the
+# reviewed blockers stood 0.7-1.3 m from it; a dig taken at the net after a
+# spike that crossed had nobody closer than 4.5 m when the ball was hit).
+BLOCK_NET_ZONE_M = 1.5             # vertex depth read this close to the net
+BLOCKER_NET_M = 1.5                # blocker's stance this close to the net
+BLOCK_RETURN_S = (0.75, 0.35)      # attack -> the hitter's team's next touch
+BLOCK_COST = 1.0
 
 
 @dataclass
@@ -303,6 +320,7 @@ State = Tuple[str, int, int]           # (side, touch number, player index)
 class _Step:
     cost: float
     hidden: List[Tuple[str, int]]      # (side, touch number) of hidden touches, in order
+    block: bool = False                # hidden[0] is a block (``_transition``)
 
 
 class TouchSolver:
@@ -338,6 +356,7 @@ class TouchSolver:
                 for e in events]
         skip_prefix = np.concatenate([[0.0], np.cumsum(skip)])
         gaps = self._gap_prefix(rally)
+        at_net = [self._blockable(e, roster) for e in events]
 
         INF = float("inf")
         best = [[INF] * len(states) for _ in range(n)]
@@ -361,7 +380,7 @@ class TouchSolver:
                     for yi, y in enumerate(states):
                         if best[j][yi] >= INF:
                             continue
-                        step = self._transition(y, x, dt, has_gap)
+                        step = self._transition(y, x, dt, has_gap, y[0] in at_net[j])
                         if step is None:
                             continue
                         c = best[j][yi] + skipped + step.cost + emis[i][xi]
@@ -398,9 +417,13 @@ class TouchSolver:
             e = events[i]
             for h, (hs, hk) in enumerate(step.hidden):
                 frac = (h + 1) / (len(step.hidden) + 1)
+                frame = int(round(prev_frame + frac * (e.frame - prev_frame)))
+                block = step.block and h == 0
+                if block:               # right after the attack it stopped
+                    frame = prev_frame + max(1, int(round(0.1 * self.stream.fps)))
                 touches.append(Touch(
-                    frame=int(round(prev_frame + frac * (e.frame - prev_frame))),
-                    side=hs, touch_number=hk, action="", observed=False,
+                    frame=frame, side=hs, touch_number=hk,
+                    action=ACTION_BLOCK if block else "", observed=False,
                     squad=roster.squad_on(hs)))
             touches.append(self._observed_touch(e, side, k, p, roster))
             prev_frame = e.frame
@@ -500,17 +523,44 @@ class TouchSolver:
         return _Step(cost=t + hidden_cost * n,
                      hidden=[(side, q) for q in range(1, k)])
 
-    def _transition(self, y: State, x: State, dt: float, has_gap: bool
-                    ) -> Optional[_Step]:
+    def _blockable(self, e: BallEvent, roster: RallyRoster) -> Tuple[str, ...]:
+        """Halves a hit at this vertex could have been blocked FROM: the ball
+        was above the tape at the net and the other half had a player
+        standing at the net."""
+        y = e.court_y()
+        if y is None or abs(y - NET_Y_M) > BLOCK_NET_ZONE_M or not np.isfinite(e.u):
+            return ()
+        if self.geometry.ball_world(e.u, e.v, y)[2] < self.attack_min_height_m:
+            return ()
+        sides = []
+        for side in (SIDE_NEAR, SIDE_FAR):
+            for key in roster.by_side.get(other_side(side), []):
+                stance = roster.stance_depth(key, e.frame, self.geometry)
+                if stance is not None and abs(stance - NET_Y_M) <= BLOCKER_NET_M:
+                    sides.append(side)
+                    break
+        return tuple(sides)
+
+    def _transition(self, y: State, x: State, dt: float, has_gap: bool,
+                    blockable: bool = False) -> Optional[_Step]:
         (s0, k0, p0), (s1, k1, p1) = y, x
         hidden_cost = HIDDEN_COST_GAP if has_gap else HIDDEN_COST_TRACKED
         best: Optional[_Step] = None
 
-        def consider(cost: Optional[float], hidden: List[Tuple[str, int]]) -> None:
+        def consider(cost: Optional[float], hidden: List[Tuple[str, int]],
+                     block: bool = False) -> None:
             nonlocal best
             if cost is not None and (best is None or cost < best.cost):
-                best = _Step(cost=cost, hidden=hidden)
+                best = _Step(cost=cost, hidden=hidden, block=block)
 
+        if s1 == s0 and blockable:
+            # Blocked: back to the hitter's half, a new possession there.
+            n = k1 - 1
+            t = self._timing(dt, [BLOCK_RETURN_S] + [SAME_SIDE_INTERVAL_S] * n)
+            if t is not None:
+                consider(t + BLOCK_COST + hidden_cost * n,
+                         [(other_side(s0), 1)] + [(s1, q) for q in range(1, k1)],
+                         block=True)
         if s1 == s0:
             # Same possession: h hidden touches in between, players alternate.
             h = k1 - k0 - 1
@@ -652,6 +702,9 @@ class TouchSolver:
             if t.touch_number == 0:
                 continue
             nxt = touches[i + 1] if i + 1 < len(touches) else None
+            if t.action == ACTION_BLOCK:
+                t.ends_possession = True
+                continue
             stays = nxt is not None and nxt.side == t.side
             t.ends_possession = not stays
             attack = self._is_attack(t)

@@ -560,7 +560,8 @@ Pages). Rules that keep it correct:
   about the PIPELINE, never the reviewed match. The review files are in git:
   merge them before publishing from the prod worktree.
 * **A block scores only when it wins the point (owner, 2026-10-14).** A block
-  exists only through a review (it is not a post-run label); it is published
+  is credited only through a review (the post-run layer reads blocks since #115
+  but as hidden, uncredited touches the bundle does not send); it is published
   with outcome `kill` when it ends the point for the blocker's team, and the
   fantasy rule `block` asks for that outcome (migration
   `20261014100000_block_kill_only`, mirrored in `src/publish/fantasy.py` and

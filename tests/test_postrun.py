@@ -399,6 +399,39 @@ def test_low_third_touch_over_the_net_is_an_overpass_not_a_spike():
     assert actions == ["serve", "dig", "set", "overpass", "dig"]
 
 
+def _blocked_rally(blocker_at_net):
+    """B attacks at the net, the ball comes straight back to B's half and B
+    plays a new possession (dig, set, attack)."""
+    positions = dict(sim.NEAR_A)
+    positions["P1B"] = (2.5, 7.0)                    # the attacker, at the net
+    if blocker_at_net:
+        positions["P1A"] = (2.5, 8.8)                # her blocker, across it
+    b = sim.StreamBuilder(16.0)
+    hits = [sim.Hit(1.15, "P2B", sim.DIG_Z, xy=(5.5, 5.0)),
+            sim.Hit(1.6, "P1B", sim.SET_Z, xy=(3.0, 6.0)),
+            sim.Hit(1.6, "P2B", sim.SPIKE_Z, xy=(2.8, 7.4)),
+            sim.Hit(0.7, "P1B", sim.DIG_Z, xy=(3.5, 5.0)),
+            sim.Hit(1.6, "P2B", sim.SET_Z, xy=(5.0, 6.5)),
+            sim.Hit(1.6, "P1B", sim.SPIKE_Z, xy=(3.0, 7.2))]
+    b.rally(sim.RallyScript(start_s=2.0, serve_xy=(6.0, 16.8), hits=hits,
+                            landing=(4.0, 13.0), positions=positions))
+    return _reconstruct(b)["points"][0]
+
+
+def test_attack_that_comes_straight_back_was_blocked():
+    point = _blocked_rally(blocker_at_net=True)
+    assert [(s, k, a) for s, k, a, _ in _actions(point)][3:] == [
+        ("far", 3, "spike"), ("near", 1, "block"), ("far", 1, "dig"),
+        ("far", 2, "set"), ("far", 3, "spike")]
+    block = point["touches"][4]
+    assert block["player"] is None and not block["observed"]   # never credited
+
+
+def test_no_block_without_a_player_at_the_net():
+    point = _blocked_rally(blocker_at_net=False)
+    assert all(t["action"] != "block" for t in point["touches"])
+
+
 def _third_touch(height_m, z, vertex_early=0):
     """dig, set and a third touch at ``z`` by P1B, who stands ``height_m`` tall."""
     b = sim.StreamBuilder(14.0)
