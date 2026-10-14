@@ -7438,3 +7438,19 @@ Deployed by the owner the same day (migration pushed, web redeployed, `make repu
 ## [removed 2026-10-13, #114] Session index line moved out of STATUS.md (budget 100 lines), verbatim
 
 - 2026-09-24 **#17** — match GT transcribed (33 points) + `evaluate_match_points` (baseline 14/33); bg-stratified ball probe indicts the 0.4 conf floor; conf-floor mechanism SHIPPED (actions 74→90 — …(log archive 2026-10-06)
+
+### 2026-10-12 (hundred-and-twelfth session) — #112: 20261012_1130_masnou (new beach video): calibrated by hand after the automatic one refused, run + post-run
+
+**Asked (owner):** calibrate the new video (`resources/full_videos/20261012_1130_masnou_loida_joan_pere_aitana.mp4`) yourself and run until the post-run; "the result is 21 (wins the team with the boy in yellow tshirt) – 15".
+
+**Calibration.** `make autocalibrate` first (§14 held-out discipline: before any manual file): REFUSED, "no court: near baseline + two sidelines not found" (plate clean: black tape on pale sand, yellow net with a 1 m band, trees and a promenade behind it). So the points were read by hand on `calibration_auto/plate.png` with 3–5× crops: far corners at the ends of the sidelines' tape (632,794 / 1205,797), near corners where baseline and sidelines meet (104,1009 / 1712,989); midcourt = the homography midpoints (498,849 / 1343,849 — they sit on the sideline tape, 10–15 px inside the post bases); net top = the upper edge of the net's yellow top tape, fitted over the whole span (y = 0.01246 x + 595.2). Checks: net 2.29 m through `CourtGeometry`, camera f 1790 px (the other views' prior 1879, 4.7 %), 1.55 m up, 8.7 m behind the baseline; 1/scale at near / net / far is linear (201 / 105 / 72 px per m). `calibrations/20261012_1130_….json` (`source: agent-read`); overlay `output/<key>/calibration_auto/agent_read_overlay.png`. Not an owner click: `make calibrate` can redo it. It joins the focal prior of the next automatic calibrations (median 1879 → 1889 px).
+
+**Run.** `make run-match` (MPS, 13.1 f/s, 36 min; 28181 frames, 1102.7 s = 25.56 fps average; native 1920x1080): 31 points, A 19 – B 11, P31 undecided, switches after 4 / 11 / 17 / 24 / 30 (blocks 4 / 7 / 6 / 7 / 6). A = the yellow-bib team (frames f1132 / f3047), so the direction agrees with the owner's final; 31 + 5 = 36 = 21 + 15, and the block shortfalls (3 + 1 + 1) add up to the same 5.
+
+**Where the 5 are, and the fix.** Causal actions outside every point + contact sheets found two rallies, both a far serve the ball alone leaves open: f2175 (born 1 m past the net, dug; `_serve_at_the_tape` wanted the ball to end on the sand → `_received`) and f3425 (lob, 4.6 m/s < 5.5, receivers 0.15 m apart, play follows → `_lob_to_a_formation`). The first version of the lob rule took the toss of 1100's jump serve (P19, f16504): it now needs the flight over the tape and not at it. Result 33 points, A 19 – B 13, switches 6 / 13 / 19 / 26 / 32; the other 12 runs byte-identical, 20260920 bars unchanged, `tests/test_postrun_serves.py` +2 (both fail on the old rules), suite 1343 pass / 5 skipped. Left: f14445 (a near lob serve, flight depth 12.4 m < `NEAR_SERVE_MIN_Y`, court perfectly still) and two unlocated.
+
+**Not done / owed.** The three points left (open point 37); the beach refusal (open point 36 g); owner: confirm the hand-read calibration (overlay) and say which rallies are the missing ones if the count is wanted exact; nothing published, `calibrations/` file + owner-feedback file committed on branch `run/20261012-1130-masnou`.
+
+## [removed 2026-10-14, #115] Session index line moved out of STATUS.md (budget 100 lines), verbatim
+
+- 2026-09-25/26 **#18** — retrain-mining staged (500 stratified frames); owner GT landed (486 frames, pre-labels mostly wrong — diagnostic correction); dataset merged + zipped (1091) — …(log archive 2026-10-06)
