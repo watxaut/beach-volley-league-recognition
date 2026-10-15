@@ -18,6 +18,7 @@
   let R = null;                   // the review as stored
   let cur = 0;                    // index into M.points
   let draft = null;               // the verdict being edited
+  let suggested = null;           // [frame, run's server] of a server the service order moved
   let reviewed = false;           // the open point had (or got) a verdict
   let gapAt = null;               // index into M.gaps while the dead time is watched
   let gvid = null;                // the dead-time copy's <video>, made on first use
@@ -260,6 +261,11 @@
       (g.segment ? ` <button data-act="open-gap" data-g="${after}">Watch it (G)</button>`
                  : ` · no picture (run <code>make review-gaps</code>)`) + `</p>`;
 
+    const serveRow = p.touches[0], sugg = suggested && serveRow && suggested[0] === serveRow.frame
+      && (draft.touches[serveRow.frame] || {}).player === R.servers[p.point] ? R.servers[p.point] : null;
+    const serverLine = !sugg ? "" : `<p class="rv-warn">Server by the service order after your corrections: <b>${esc(sugg)}</b>` +
+      ` (the run had ${esc(suggested[1] ?? "nobody")}). Enter keeps it; change it in the table if it is wrong.</p>`;
+
     // Bodies the run gave no name (a half whose two players it could not tell apart).
     const unnamed = [...new Set(p.touches.map((t) => t.player).filter((x) => /^T\d+$/.test(x || "")))].sort();
     const naming = unnamed.map((u) => `<label>${u} is <select data-f="name" data-u="${u}" class="${draft.names[u] ? "fixed" : ""}">${
@@ -279,6 +285,7 @@
           ends: ${esc(p.end_kind ?? "?")} · near half: <b>${esc(p.near_team ?? "?")}</b></p>
         ${p.flags.length ? `<p class="rv-facts">Flags: ${p.flags.map(esc).join(", ")}</p>` : ""}
         ${v && v.run_changed ? `<p class="rv-warn">The run reads this point differently than when you reviewed it. Look again.</p>` : ""}
+        ${serverLine}
         ${seg() ? "" : `<p class="rv-warn">This rally is not in the rally copy (the copy is older than the reconstruction): no picture.</p>`}
         <div class="rv-row" style="margin-top:10px">
           <button class="primary" data-act="ok">${hasCorrections(draft) ? "Done, next" : "All right, next"} (Enter)</button>
@@ -555,6 +562,7 @@
     draft = blank();
     if (v) for (const k of Object.keys(draft)) if (v[k] != null) draft[k] = JSON.parse(JSON.stringify(v[k]));
     reviewed = !!v;
+    suggestServer();
     trk = null;
     lastCopyFrame = -1;
     redraw();
@@ -575,6 +583,32 @@
       const loaded = await trackCache.get(number);
       if (point().point === number) { trk = loaded; redraw(); }
     } catch (err) { trackCache.delete(number); fail(err); }
+  }
+
+  // A point added, a winner or the labels changed move the service order:
+  // the server it names now goes in as a correction, shown, for Enter to keep.
+  function suggestServer() {
+    suggested = null;
+    const server = (R.servers || {})[point().point], serve = point().touches[0];
+    if (!server || !serve || serve.action !== "serve") return;
+    const fix = draft.touches[serve.frame] || {};
+    if ("player" in fix || fix.remove) return;
+    suggested = [serve.frame, labelMap()[serve.player] ?? serve.player];
+    draft.touches[serve.frame] = { ...fix, player: server };
+  }
+
+  // Naming an unnamed body (T4) on one touch names it for the whole rally,
+  // and the other unnamed body on that half is the teammate.
+  function nameBody(run, value) {
+    draft.names[run.player] = value;
+    const fix = { ...(draft.touches[run.frame] || {}) };
+    delete fix.player;
+    if (Object.keys(fix).length) draft.touches[run.frame] = fix; else delete draft.touches[run.frame];
+    const others = [...new Set(point().touches.filter((t) => t.team === run.team && /^T\d+$/.test(t.player || "")
+      && t.player !== run.player).map((t) => t.player))];
+    if (others.length === 1 && !draft.names[others[0]] && value[2] === run.team) {
+      draft.names[others[0]] = `P${value[1] === "1" ? "2" : "1"}${value[2]}`;
+    }
   }
 
   function allRight() {
@@ -700,7 +734,9 @@
     const el = e.target, f = el.dataset.f;
     if (!f) return;
     if (f === "name") {
-      if (el.value) draft.names[el.dataset.u] = el.value; else delete draft.names[el.dataset.u];
+      const body = point().touches.find((t) => t.player === el.dataset.u);
+      if (el.value) nameBody({ player: el.dataset.u, team: body && body.team, frame: null }, el.value);
+      else delete draft.names[el.dataset.u];
       edited();
       return;
     }
@@ -717,6 +753,11 @@
       draft.added[Number(tr.dataset.added)][f] = value;
     } else {
       const frame = tr.dataset.frame, run = point().touches.find((t) => String(t.frame) === frame);
+      if (f === "player" && /^T\d+$/.test(run.player || "") && value && M.players.includes(value)) {
+        nameBody(run, value);
+        edited();
+        return;
+      }
       const fix = { ...(draft.touches[frame] || {}) };
       delete fix.remove;
       // A choice equal to what the page would show anyway is no correction.

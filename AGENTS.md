@@ -469,7 +469,11 @@ causal and untouched. Owner rules it encodes — keep them when changing it:
   TIME: `make review-gaps` (`src/publish/gaps.py`) writes it next to the rally
   copy while the video is on disk (sequential decode, §9); which gaps are
   flagged is a hint for the owner's eyes (seconds and a count), never an
-  input to a decision, and an unwatched gap is no claim that nothing is there.
+  input to a decision, and an unwatched gap is no claim that nothing is there. What the page
+  derives from his corrections (a body he named naming its rally's teammate, the
+  servers the service order moves after a point he added or a winner he changed,
+  #117 -- `postrun.match._serving_order` itself, never a second rotation) is a
+  SUGGESTION drawn on the page and saved only on his key press.
 
 Validation protocol for any change: `score_postrun.py` on the 20260920 match
 (the bar: 33/33 points, 0 false, winners 33/33, score A 21 – B 12, touch

@@ -474,3 +474,51 @@ def test_a_file_that_is_not_a_review_is_never_overwritten(tmp_path):
     with pytest.raises(ValueError):
         _endpoint(router, "save_point")(run.name, 1, {"status": "ok"})
     assert json.loads(R.review_path(gt, run.name).read_text()) == {"format": "something-else"}
+
+
+# --------------------------------------------------------------------------- #
+# the service order after the owner's corrections
+# --------------------------------------------------------------------------- #
+
+def _served(rows):
+    """Points of (serving team, server as the run names it, server seen, winner)."""
+    points = []
+    for i, (team, player, seen, winner) in enumerate(rows):
+        start = 100 + 100 * i
+        flags = [f"server_from_rotation:{seen}->{player}"] if seen != player else []
+        points.append({"point": i + 1, "start_frame": start, "end_frame": start + 50,
+                       "near_team": "A", "serve": {"team": team, "player": player},
+                       "end": {"kind": "ground"}, "winner": winner, "winner_source": "next_serve",
+                       "score_after": {"A": 0, "B": 0}, "flags": flags,
+                       "touches": [_touch(start, "serve", player)]})
+    return R.match_view({"fps": 25.0, "checks": {}, "points": points}, None)["points"]
+
+
+def _missed_point_match():
+    # Point 5 was B's (the run says A's) and a point B served is missing after
+    # it: A serves 6 and 7 in a NEW turn, by the teammate the camera saw.
+    return _served([("A", "P1A", "P1A", "B"), ("B", "P1B", "P1B", "A"),
+                    ("A", "P2A", "P2A", "B"), ("B", "P2B", "P2B", "A"),
+                    ("A", "P1A", "P1A", "A"), ("A", "P1A", "P2A", "A"),
+                    ("A", "P1A", "P2A", "B"), ("B", "P1B", "P1B", "A")])
+
+
+def test_a_point_the_owner_adds_moves_the_servers_after_it():
+    points = _missed_point_match()
+    assert R.rotation_servers(points, {}, []) == {}            # nothing corrected: nothing moves
+    review = R.empty_review("k")
+    R.put_verdict(review, R.clean_verdict({"status": "corrected", "winner": "B"}, points[4]), 500)
+    by_point, _ = R.attach(review, points)
+    missing = [{"after_point": 5, "winner": "A"}]           # served by B, the winner of point 5
+    assert R.rotation_servers(points, by_point, missing) == {6: "P2A", 7: "P2A"}
+
+
+def test_a_server_the_owner_named_is_never_suggested_over():
+    points = _missed_point_match()
+    review = R.empty_review("k")
+    R.put_verdict(review, R.clean_verdict({"status": "corrected", "winner": "B"}, points[4]), 500)
+    R.put_verdict(review, R.clean_verdict(
+        {"status": "corrected", "touches": {"600": {"player": "P1A"}}}, points[5]), 600)
+    by_point, _ = R.attach(review, points)
+    out = R.rotation_servers(points, by_point, [{"after_point": 5, "winner": "A"}])
+    assert 6 not in out
