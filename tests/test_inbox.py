@@ -60,6 +60,9 @@ class FakeRunner:
                 (self.root / "calibrations").mkdir(exist_ok=True)
                 (self.root / "calibrations" / f"{key}.json").write_text('{"source": "auto"}')
             return subprocess.CompletedProcess(cmd, self.court, "", "")
+        if cmd[1:3] == ["-m", "src.publish.gaps"]:
+            (self.root / cmd[3] / "gaps.json").write_text("{}")
+            return ok()
         if cmd[1:3] == ["-m", "src.publish"]:
             return ok("score     A 21 - B 12   points 33\npublished: applied")
         raise AssertionError(f"unexpected command {cmd}")
@@ -109,6 +112,11 @@ def test_calibrated_video_is_run_published_and_archived(tmp_path):
     inbox.run_once()
     names = runner.names()
     assert names.index("make run-match") < names.index("python -m") < names.index("rclone moveto")
+    gaps = next(c for c in runner.calls if c[1:3] == ["-m", "src.publish.gaps"])
+    assert gaps[3:] == ["output/20261004_1805_bogatell_ari_joan", "--video",
+                        "resources/20261004_1805_bogatell_ari_joan.mp4"]
+    assert runner.calls.index(gaps) < next(i for i, c in enumerate(runner.calls)
+                                           if c[:2] == ["rclone", "moveto"])
     move = next(c for c in runner.calls if c[:2] == ["rclone", "moveto"])
     assert move[3] == "gdrive:VolleyArchive/20261004_1805_bogatell_ari_joan.mp4"
     state = json.loads((tmp_path / "data" / "inbox_state.json").read_text())
