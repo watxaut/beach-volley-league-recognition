@@ -160,7 +160,7 @@ class CourtCalibration:
         def _on_click(event, x, y, flags, param):
             if event != cv2.EVENT_LBUTTONDOWN:
                 return
-            if len(points) >= total_steps:
+            if len(points) >= total_steps or not (0 <= y < h_frame):
                 return
             points.append((x, y))
             step = steps[len(points) - 1]
@@ -179,7 +179,6 @@ class CourtCalibration:
             # Net top line
             if len(points) == 8:
                 cv2.line(display, points[6], points[7], (0, 165, 255), 2)
-            cv2.imshow("Court Calibration", display)
 
         window_name = "Court Calibration"
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
@@ -187,23 +186,16 @@ class CourtCalibration:
 
         while len(points) < total_steps:
             step = steps[len(points)]
-            info = display.copy()
-
-            # Top bar: step label
-            cv2.putText(info, step["label"], (10, 45),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
-
-            # Bottom hint area
-            hint_text = step["hint"]
+            # Instructions live in a panel BELOW the picture, never over it: the
+            # near corners sit at the bottom edge of the frame.
             font = cv2.FONT_HERSHEY_SIMPLEX
             font_scale = 1.1
             line_height = 40
             max_chars = max(30, w_frame // 18)
 
-            words = hint_text.split()
             lines = []
             current = ""
-            for word in words:
+            for word in step["hint"].split():
                 test = f"{current} {word}".strip()
                 if len(test) > max_chars:
                     lines.append(current)
@@ -214,16 +206,16 @@ class CourtCalibration:
                 lines.append(current)
 
             display_lines = lines[-4:]
-            hint_area_height = len(display_lines) * line_height + 60
-            hint_y_start = h_frame - hint_area_height + 20
-            cv2.rectangle(info, (0, hint_y_start - 15), (w_frame, h_frame), (0, 0, 0), -1)
-
+            panel_h = (len(display_lines) + 2) * line_height + 30
+            panel = np.zeros((panel_h, w_frame, 3), dtype=np.uint8)
+            cv2.putText(panel, step["label"], (15, line_height),
+                        font, 1.3, (255, 255, 255), 3)
             for i, line in enumerate(display_lines):
-                cv2.putText(info, line, (15, hint_y_start + i * line_height),
+                cv2.putText(panel, line, (15, (i + 2) * line_height),
                             font, font_scale, (200, 200, 200), 2)
-
-            cv2.putText(info, "[R] Reset  [U] Undo last  [Q] Cancel", (15, h_frame - 10),
+            cv2.putText(panel, "[R] Reset  [U] Undo last  [Q] Cancel", (15, panel_h - 12),
                         font, 0.8, (128, 128, 128), 2)
+            info = np.vstack([display, panel])
 
             cv2.imshow(window_name, info)
             key = cv2.waitKey(50) & 0xFF
