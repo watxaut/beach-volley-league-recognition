@@ -1,0 +1,27 @@
+AGENTS.md
+  s_9ed08fada71d0a::t_36304ac3f64a98 442-445
+STATUS.md
+  s_9ed08fada71d0a::t_5a38771ef47ba7 125,512-513
+docs/postrun_reconstruction.md
+  s_9ed08fada71d0a::t_4e431eee413914 636-651
+src/postrun/match.py
+  s_9ed08fada71d0a::t_5e20e69f6ad5b3 186,349-370
+tests/test_postrun_serves.py
+  s_9ed08fada71d0a::t_442e76c51ba0fe 608-630
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "5039ef3027743254bba6ed2acde35ebfb8c74637",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
