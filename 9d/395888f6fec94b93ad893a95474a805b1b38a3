@@ -1,0 +1,21 @@
+src/publish/inbox.py
+  s_9ed08fada71d0a::t_11048586e6f61e 22-25,285-293
+tests/test_inbox.py
+  s_9ed08fada71d0a::t_54f38ec2a4cdd0 63-65,115-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "9d395888f6fec94b93ad893a95474a805b1b38a3",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
