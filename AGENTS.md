@@ -439,7 +439,10 @@ causal and untouched. Owner rules it encodes — keep them when changing it:
   six is read with somebody moving. A serve-shaped launch after the rally's
   ball had to be down, which nobody plays, is the ball going back and never
   that rally's landing. Low samples before a ball has climbed above what sand
-  can bounce are a dig off the sand, not a landing. A rally's last touch
+  can bounce are a dig off the sand, not a landing. The reverse (#117, from the owner's
+  reviews): a rally's last first-touch nobody was at, after an ace / kill, after
+  which the ball never climbs back to the tape, is the ball ON the sand -- dropped,
+  the outcome stands. A rally's last touch
   after which the ball stays under the tape was made on the half it came
   down on. Owner rule (2026-10-11): a spike dug and never set -- the second
   touch does not send the ball back up to net height -- is a kill (a serve:
@@ -469,7 +472,11 @@ causal and untouched. Owner rules it encodes — keep them when changing it:
   TIME: `make review-gaps` (`src/publish/gaps.py`) writes it next to the rally
   copy while the video is on disk (sequential decode, §9); which gaps are
   flagged is a hint for the owner's eyes (seconds and a count), never an
-  input to a decision, and an unwatched gap is no claim that nothing is there.
+  input to a decision, and an unwatched gap is no claim that nothing is there. What the page
+  derives from his corrections (a body he named naming its rally's teammate, the
+  servers the service order moves after a point he added or a winner he changed,
+  #117 -- `postrun.match._serving_order` itself, never a second rotation) is a
+  SUGGESTION drawn on the page and saved only on his key press.
 
 Validation protocol for any change: `score_postrun.py` on the 20260920 match
 (the bar: 33/33 points, 0 false, winners 33/33, score A 21 – B 12, touch

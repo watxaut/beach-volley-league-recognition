@@ -40,6 +40,7 @@ from fastapi.templating import Jinja2Templates
 
 from ..publish.clips import RALLY_PAD_S, RallyCopy, load_rally_copy
 from ..publish.gaps import GAPS_NAME, GapCopy, load_gap_copy
+from ..postrun.match import ROTATION_MIN_AGREEMENT, ROTATION_MIN_VOTES, _serving_order
 
 logger = logging.getLogger(__name__)
 
@@ -538,6 +539,111 @@ def consistency(rows: Sequence[Dict[str, Any]], switch_every: int = 7) -> List[s
     return out
 
 
+#: An owner-named server weighs as this many servers the run saw.
+OWNER_SERVER_VOTES = 3
+
+
+def _seen_server(point: Dict[str, Any]) -> Optional[str]:
+    """The server the identity read saw, before the rotation renamed it
+    (``server_from_rotation:<seen>-><rotation>`` in the point's flags)."""
+    for flag in point.get("flags") or []:
+        if flag.startswith("server_from_rotation:"):
+            seen = flag.split(":", 1)[1].split("->")[0]
+            return seen if seen in PLAYERS else None
+    serve = (point.get("touches") or [{}])[0]
+    return serve.get("player") if serve.get("action") == "serve" else None
+
+
+def _rotation(rows: Sequence[Dict[str, Any]]) -> List[Optional[str]]:
+    """The server of every row by the service order (postrun.match): each
+    squad's teammates alternate every time it wins the serve back; the one
+    free bit per squad -- and any break -- is voted by the servers in
+    ``row["votes"]`` (labels). A squad with too few or too split votes gets
+    no rotation (None)."""
+    turn: Dict[str, int] = {}
+    turns: List[Optional[int]] = []
+    prev = None
+    for row in rows:
+        team = row.get("serve_team")
+        if team not in TEAMS:
+            turns.append(None)
+            prev = None
+            continue
+        if team != prev:
+            turn[team] = turn.get(team, -1) + 1
+        turns.append(turn[team])
+        prev = team
+    out: List[Optional[str]] = [None] * len(rows)
+    for team in TEAMS:
+        seen: Dict[int, List[int]] = {}
+        for row, t in zip(rows, turns):
+            if row.get("serve_team") == team and t is not None:
+                for label in row.get("votes") or []:
+                    if label in PLAYERS and label[2] == team:
+                        seen.setdefault(t, []).append(int(label[1]))
+        n_turns = max((t for row, t in zip(rows, turns)
+                       if row.get("serve_team") == team and t is not None), default=-1) + 1
+        order, _ = _serving_order(seen, n_turns)
+        total = sum(len(v) for v in seen.values())
+        agree = sum(slot == order[t] for t, v in seen.items() for slot in v)
+        if total < ROTATION_MIN_VOTES or agree / total < ROTATION_MIN_AGREEMENT:
+            continue
+        for i, (row, t) in enumerate(zip(rows, turns)):
+            if row.get("serve_team") == team and t is not None:
+                out[i] = f"P{order[t]}{team}"
+    return out
+
+
+def rotation_servers(points: Sequence[Dict[str, Any]], by_point: Dict[int, Dict[str, Any]],
+                     missing: Sequence[Dict[str, Any]]) -> Dict[int, str]:
+    """Servers the owner's corrections move: the service order counted again
+    over the match as reviewed (a point he added, a winner he changed, the
+    labels he swapped, the servers he named) where it now names another
+    server than the run's own rotation does. Only points whose server the
+    owner did not name himself; a SUGGESTION the page shows, never applied
+    without his key press."""
+    def votes(p: Dict[str, Any], verdict: Optional[Dict[str, Any]]) -> List[str]:
+        seen = _seen_server(p)
+        if verdict is None:
+            return [seen] if seen else []
+        serve = p["touches"][0] if p.get("touches") else {}
+        fix = (verdict.get("touches") or {}).get(str(serve.get("frame"))) or {}
+        if serve.get("action") == "serve" and fix.get("player") in PLAYERS:
+            return [fix["player"]] * OWNER_SERVER_VOTES
+        names = {**label_map(p.get("near_team"), verdict.get("labels")),
+                 **(verdict.get("names") or {})}
+        return [names.get(seen, seen)] if seen else []
+
+    base = [{"point": p["point"], "serve_team": p["serve_team"], "votes": votes(p, None)}
+            for p in points]
+    numbers = {p["point"]: p for p in points}
+    reviewed = sequence(points, by_point, missing)
+    for row in reviewed:
+        if row["point"] is not None:
+            row["votes"] = votes(numbers[row["point"]], by_point.get(row["point"]))
+        elif row.get("serve_team") is None and row is not reviewed[0]:
+            # Nobody said who served a point he added: the one before it was won.
+            row["serve_team"] = reviewed[reviewed.index(row) - 1].get("winner")
+    before = {row["point"]: s for row, s in zip(base, _rotation(base))}
+    out: Dict[int, str] = {}
+    for row, server in zip(reviewed, _rotation(reviewed)):
+        n = row["point"]
+        if n is None or server is None or server == before.get(n):
+            continue
+        p, verdict = numbers[n], by_point.get(n) or {}
+        serve = p["touches"][0] if p.get("touches") else {}
+        if serve.get("action") != "serve":
+            continue
+        fix = (verdict.get("touches") or {}).get(str(serve["frame"])) or {}
+        if "player" in fix or fix.get("remove"):
+            continue
+        names = {**label_map(p.get("near_team"), verdict.get("labels")),
+                 **(verdict.get("names") or {})}
+        if names.get(serve.get("player"), serve.get("player")) != server:
+            out[n] = server
+    return out
+
+
 def clean_match_fields(raw: Dict[str, Any], points: Sequence[Dict[str, Any]]
                        ) -> Dict[str, Any]:
     """The match-level part of a review: the owner's final score and the
@@ -663,6 +769,8 @@ def create_router(output_root: Path = Path("output"),
                 "warnings": consistency(sequence(view["points"], by_point,
                                                  review["missing_points"])),
                 "missing_points": review["missing_points"],
+                "servers": rotation_servers(view["points"], by_point,
+                                            review["missing_points"]),
                 "owner_final_score": review["owner_final_score"],
                 "reviewed_score": reviewed_score(view["points"], by_point,
                                                  review["missing_points"])}
