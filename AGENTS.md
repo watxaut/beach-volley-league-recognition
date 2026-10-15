@@ -442,7 +442,10 @@ causal and untouched. Owner rules it encodes — keep them when changing it:
   can bounce are a dig off the sand, not a landing. The reverse (#117, from the owner's
   reviews): a rally's last first-touch nobody was at, after an ace / kill, after
   which the ball never climbs back to the tape, is the ball ON the sand -- dropped,
-  the outcome stands. A rally's last touch
+  the outcome stands. A ball hit above the tape and next seen on the net line
+  UNDER the tape, close to the hit and sooner than a crossing, was stopped by
+  the net or a block: that vertex is never the other half's touch (#117c,
+  `TouchSolver._net_stopped`). A rally's last touch
   after which the ball stays under the tape was made on the half it came
   down on. Owner rule (2026-10-11): a spike dug and never set -- the second
   touch does not send the ball back up to net height -- is a kill (a serve:

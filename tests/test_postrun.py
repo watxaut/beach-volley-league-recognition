@@ -432,6 +432,40 @@ def test_no_block_without_a_player_at_the_net():
     assert all(t["action"] != "block" for t in point["touches"])
 
 
+def _spiked_into_the_net(net_y=8.0, blocker=False):
+    """A attacks at the net; the ball is next seen ON the net line (``net_y``),
+    1.1 m up, and the track ends there (20261010_1100 P31: "spikes into the
+    net"; _1000 P5 / P26 with a blocker: A plays the ball again)."""
+    positions = dict(sim.NEAR_A)
+    positions["P2A"] = (3.0, 9.0)                    # the attacker, at the net
+    if blocker:
+        positions["P1B"] = (3.0, 7.0)
+    b = sim.StreamBuilder(14.0)
+    hits = [sim.Hit(1.15, "P1A", sim.DIG_Z, xy=(4.0, 12.0)),
+            sim.Hit(1.6, "P2A", sim.SET_Z, xy=(4.0, 10.0)),
+            sim.Hit(1.6, "P1A", sim.SPIKE_Z, xy=(3.0, 8.6)),
+            sim.Hit(0.6, None, 1.1, xy=(3.0, net_y))]
+    frames = b.rally(sim.RallyScript(start_s=2.0, serve_xy=(6.0, -0.8), hits=hits,
+                                     landing=(3.2, 8.3), landing_dt=0.5,
+                                     positions=positions))
+    b.hide(frames[-1] + 2, frames[-1] + 40)
+    point = _reconstruct(b)["points"][0]
+    return [(t["side"], t["touch_number"], t["action"]) for t in point["touches"][3:]]
+
+
+def test_a_ball_the_net_stopped_is_not_the_other_halfs_touch():
+    assert _spiked_into_the_net() == [("near", 3, "spike")]
+
+
+def test_a_ball_the_net_stopped_off_a_block_is_the_attackers_again():
+    assert _spiked_into_the_net(blocker=True) == [
+        ("near", 3, "spike"), ("far", 1, "block"), ("near", 1, "dig")]
+
+
+def test_a_ball_seen_past_the_net_after_an_attack_is_still_dug():
+    assert _spiked_into_the_net(net_y=5.5) == [("near", 3, "spike"), ("far", 1, "dig")]
+
+
 def _third_touch(height_m, z, vertex_early=0):
     """dig, set and a third touch at ``z`` by P1B, who stands ``height_m`` tall."""
     b = sim.StreamBuilder(14.0)

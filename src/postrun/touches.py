@@ -150,6 +150,19 @@ BLOCK_NET_ZONE_M = 1.5             # vertex depth read this close to the net
 BLOCKER_NET_M = 1.5                # blocker's stance this close to the net
 BLOCK_RETURN_S = (0.75, 0.35)      # attack -> the hitter's team's next touch
 BLOCK_COST = 1.0
+# The NET STOPPED IT: a ball hit above the tape whose next vertex is read on
+# the net line, close along the court to the hit and sooner than a crossing,
+# went into the net or off a block -- it never reached the other half, so
+# that vertex is not the other half's touch (it is the hitter's team playing
+# the block, or the ball falling off the net). Owner reviews: the 5 such
+# vertices of 20261010_1000 / 1100 / 1200 were all read as the other team's
+# overpass or dig and all corrected (0-0.5 m from the net, 0.3-1.9 m from
+# the hit, 0.43-0.96 s); the closest real touch of the other half after a
+# hit above the tape is 0.70 m from the net at 1.33 s (masnou P25), and a
+# spike dug at the net line had travelled 4.9 m (entreno_2 f327).
+NET_STOP_ZONE_M = 0.6              # vertex depth read this close to the net
+NET_STOP_TRAVEL_M = 3.0            # ... and this close along the court to the hit
+NET_STOP_S = CROSS_INTERVAL_S[0]   # ... sooner than a crossing takes
 
 
 @dataclass
@@ -352,6 +365,14 @@ class TouchSolver:
                                for k in (1, 2, 3) for p in (0, 1)]
         n = len(events)
         emis = [[self._emission(e, st, roster) for st in states] for e in events]
+        # stopped[i] = earlier vertices whose hit the net stopped before i: a
+        # step from one of them stays on its half, and the ball's depth read
+        # on the net line says nothing about the half (``_net_stopped``).
+        stopped = [{j for j in range(i) if self._net_stopped(
+            events[j], e, self.stream.seconds(e.frame - events[j].frame))}
+            for i, e in enumerate(events)]
+        emis_net = [[self._emission(e, st, roster, depth=False) for st in states]
+                    if stopped[i] else None for i, e in enumerate(events)]
         skip = [SKIP_COST_GAP_VERTEX if e.source == SOURCE_GAP else SKIP_COST
                 for e in events]
         skip_prefix = np.concatenate([[0.0], np.cumsum(skip)])
@@ -377,13 +398,15 @@ class TouchSolver:
                     dt = self.stream.seconds(e.frame - events[j].frame)
                     has_gap = gaps[i + 1] - gaps[j + 1] > 0
                     skipped = skip_prefix[i] - skip_prefix[j + 1]
+                    net = j in stopped[i]
+                    emission = emis_net[i][xi] if net else emis[i][xi]
                     for yi, y in enumerate(states):
-                        if best[j][yi] >= INF:
+                        if best[j][yi] >= INF or (net and x[0] != y[0]):
                             continue
                         step = self._transition(y, x, dt, has_gap, y[0] in at_net[j])
                         if step is None:
                             continue
-                        c = best[j][yi] + skipped + step.cost + emis[i][xi]
+                        c = best[j][yi] + skipped + step.cost + emission
                         if c < best[i][xi]:
                             best[i][xi], back[i][xi] = c, (j, yi, step)
 
@@ -468,11 +491,14 @@ class TouchSolver:
 
     # -- costs ------------------------------------------------------------ #
 
-    def _emission(self, e: BallEvent, state: State, roster: RallyRoster) -> float:
+    def _emission(self, e: BallEvent, state: State, roster: RallyRoster,
+                  depth: bool = True) -> float:
+        """``depth`` False: the ball is on the net line (``_net_stopped``),
+        where its depth read cannot tell the halves apart."""
         side, _, p = state
         cost = 0.0
         y = e.court_y()
-        if y is not None:
+        if y is not None and depth:
             z = (y - (NET_Y_M + DEPTH_SPLIT_BIAS_M)) / DEPTH_SIGMA_M
             p_near = 1.0 / (1.0 + math.exp(-z))
             prob = p_near if side == SIDE_NEAR else 1.0 - p_near
@@ -540,6 +566,20 @@ class TouchSolver:
                     sides.append(side)
                     break
         return tuple(sides)
+
+    def _net_stopped(self, hit: BallEvent, e: BallEvent, dt: float) -> bool:
+        """The ball hit above the tape at ``hit`` was next seen at ``e`` on
+        the net line UNDER the tape (so not on its way over), not far from
+        the hit, sooner than a crossing: the net or a block stopped it, and
+        ``e`` is not the other half's touch."""
+        y0, y1 = hit.court_y(), e.court_y()
+        if (y0 is None or y1 is None or dt >= NET_STOP_S
+                or not (np.isfinite(hit.u) and np.isfinite(e.u))
+                or abs(y1 - NET_Y_M) > NET_STOP_ZONE_M
+                or abs(y1 - y0) > NET_STOP_TRAVEL_M):
+            return False
+        return (self.geometry.ball_world(hit.u, hit.v, y0)[2] >= self.attack_min_height_m
+                and self.geometry.ball_world(e.u, e.v, y1)[2] < self.crossing_min_height_m)
 
     def _transition(self, y: State, x: State, dt: float, has_gap: bool,
                     blockable: bool = False) -> Optional[_Step]:
