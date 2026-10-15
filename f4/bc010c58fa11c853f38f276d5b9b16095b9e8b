@@ -1,0 +1,27 @@
+AGENTS.md
+  s_9ed08fada71d0a::t_4f7c96e9c2ec35 472-476
+STATUS.md
+  s_9ed08fada71d0a::t_8f509fd5959d2d 125,508-510
+src/web/review.py
+  s_9ed08fada71d0a::t_59b3be1d892674 43,542-646,772-773
+src/web/static/review.js
+  s_9ed08fada71d0a::t_74d9d3d557ad6c 21,264-268,288,565,588-613,737-739,756-760
+tests/test_review.py
+  s_9ed08fada71d0a::t_76096834f2a091 477-524
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "f4bc010c58fa11c853f38f276d5b9b16095b9e8b",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
