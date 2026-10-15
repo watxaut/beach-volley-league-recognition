@@ -649,6 +649,36 @@ byte-identical (20260920, 1000, masnou, e1–e7 whole files; elsewhere only the
 `positions.kinds` diagnostic, the offset unchanged); 1100 vs the owner's table
 unchanged (35/35, winners 34/35, switches 8 / 15 / 22 / 29).
 
+## The ball the net stopped, from the owner's reviews (2026-10-15, #117c)
+
+Four reviewed points hold a vertex read as the OTHER team's overpass right
+after an attack, on the net line: 1000 P5 / P26 (a block, the attackers dig it
+again), 1000 P10 and 1100 P31 ("spikes into the net"). The depth prior reads a
+ball on the net line as the far half (split at net + 1.3 m), so the solver took
+the crossing. Over every pair of vertices of the 13 runs, the next vertex after
+a hit above the tape that is read within 0.6 m of the net, less than 3 m along
+the court from the hit and sooner than a crossing's mean (1.15 s) is wrong in
+all 5 cases (the four above and 1200 P37) and never a real touch of the other
+half: the closest real one is 0.70 m from the net at 1.33 s (masnou P25); a
+spike dug at the net line had travelled 4.9 m (entreno_2 f327); 20260920 P19
+f13267, a real far dig at the net, follows a low overpass, not a hit above the
+tape. 1200 P37 is a different case: the ball touched the tape at 2.5 m and
+went on to land on the far half; the rule asks for the ball UNDER the tape
+(`crossing_min_height_m`), so P37 is not touched.
+
+`TouchSolver._net_stopped(hit, vertex)`: on such a step the solver may not
+change halves, and the vertex's depth term is dropped on that step only (on
+the net line it cannot tell the halves apart; dropping it for every step let
+the solver skip the attack and keep the net vertex as touch 3 in the sim). The
+block step (#115) or a skip then takes over. A/B over the 13 runs: exactly the
+4 points move, each to the owner's truth -- 1000 P5 spike + block + P1A's dig,
+P26 spike + block + P1B's dig + P2B's kill (was P1B's overpass kill), P10 and
+1100 P31 end on the spike (attack error); 20260920, 1200, 1230, masnou, e1–e7
+byte-identical; 1100 vs the owner's table unchanged; `sweep_postrun.py` no row
+loses a point or a winner. Output side effect: on 1000 the ball-box offset
+(#101) is now read (0.45 px; refused before as "kinds disagree", the
+disagreeing kind was these overpasses), 0 positions clamped to a half (was 4).
+
 ## Known limits
 
 * **Players** are scored against the owner-ratified attribution of the
