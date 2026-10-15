@@ -605,3 +605,26 @@ def test_lob_serve_to_receivers_in_formation_is_a_serve():
     staggered = dict(sim.NEAR_A, P2A=(5.5, 14.0))
     _, found = _lob_serve(staggered)
     assert found == []
+
+
+def test_a_last_dig_nobody_was_at_after_a_kill_is_the_ball_on_the_sand():
+    from types import SimpleNamespace as NS
+    from src.postrun.match import MatchAssembler
+
+    def point(rise_to, player=None, outcome="kill"):
+        flight = NS(n=20, peak_height_m=rise_to)
+        spike = NS(frame=100, side="far", touch_number=3, outcome=outcome, action="spike")
+        dig = NS(frame=130, side="near", touch_number=1, outcome=None, action="dig",
+                 player=player, observed=True, event=NS(flight_out=flight))
+        return NS(touches=[spike, dig], flags=[])
+
+    assembler = MatchAssembler(net_height_m=2.43)
+    pt = point(rise_to=1.7)                          # the ball never climbs back up
+    assembler._drop_ball_on_the_sand(pt)
+    assert [t.frame for t in pt.touches] == [100] and pt.flags == ["ball_on_the_sand:130"]
+    assert pt.touches[0].outcome == "kill"           # the point was decided before
+    for kept in (point(rise_to=4.0),                 # a dig sends the ball up
+                 point(rise_to=1.7, player="P1A"),   # somebody was at it
+                 point(rise_to=1.7, outcome=None)):  # the hit before won nothing
+        assembler._drop_ball_on_the_sand(kept)
+        assert len(kept.touches) == 2 and not kept.flags

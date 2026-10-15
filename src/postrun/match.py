@@ -183,6 +183,7 @@ class MatchAssembler:
             self._finish_labels(pt)
             self._outcomes(pt)
             credit_by_alternation(pt.touches, pt.roster)
+            self._drop_ball_on_the_sand(pt)
         rotation = self._service_order(points)
         checks = self._checks(points, score)
         checks["service_order"] = rotation
@@ -344,6 +345,28 @@ class MatchAssembler:
             before.outcome = OUTCOME_ACE
         elif before.observed and before.action in (ACTION_SPIKE, ACTION_OVERPASS):
             before.outcome = OUTCOME_KILL
+
+    def _drop_ball_on_the_sand(self, pt: Point) -> None:
+        """A rally's last touch that is the ball meeting the sand, not a
+        touch (#117: the owner removed 6 of the 7 the review showed him):
+        a first touch nobody was at, after a hit that already won the point
+        (ace / kill), after which the ball never climbs back to net height
+        -- a dig sends the ball up (the two real ones the reviews and the
+        20260920 GT hold climb to 4.0 and 4.5 m; these stay under 2 m). The
+        outcome is decided before, so it stands; only the touch goes."""
+        if len(pt.touches) < 2:
+            return
+        before, last = pt.touches[-2:]
+        if (last.player is not None or not last.observed or last.touch_number != 1
+                or last.action != ACTION_DIG or before.side == last.side
+                or before.outcome not in (OUTCOME_ACE, OUTCOME_KILL)):
+            return
+        out = last.event.flight_out if last.event is not None else None
+        if (out is None or out.n < MIN_DEPTH_SAMPLES
+                or not out.peak_height_m < self.net_height_m):
+            return
+        pt.touches.pop()
+        pt.flags.append(f"ball_on_the_sand:{last.frame}")
 
     def _dug_never_set(self, pt: Point) -> bool:
         """Owner rule (2026-10-11): "if the spike is dug but there is no set,

@@ -633,6 +633,22 @@ the flight's own depth read starts at 12.4 m, short of `NEAR_SERVE_MIN_Y` (14 m)
 — the toss that fed it reads 15.6; and two more not located (the 56 s gap before
 P27 and one in the first six points).
 
+## The ball on the sand, from the owner's reviews (2026-10-15, #117)
+
+The review files of the four vall_dhebron videos and masnou show 7 points whose
+last touch is an observed first touch nobody was at, after a hit already read
+as an ace or a kill; the owner removed 6. The flight after it separates them:
+after the two real digs (1100 P3, kept; 20260920 P17, owner GT "completely
+occluded, goes wide and ball falls to sand") the ball climbs to 4.0 / 4.5 m;
+after the 6 removed it stays at 1.0–1.9 m. `MatchAssembler._drop_ball_on_the_sand`
+drops such a touch when the ball never climbs back to the tape (the
+`_dug_never_set` test) and flags the point `ball_on_the_sand:<frame>`; the
+outcome was decided before and stands. A/B over all 13 runs: exactly the 6
+touches go (1100 P20 / P21, 1200 P9 / P26, 1230 P3 / P19), everything else
+byte-identical (20260920, 1000, masnou, e1–e7 whole files; elsewhere only the
+`positions.kinds` diagnostic, the offset unchanged); 1100 vs the owner's table
+unchanged (35/35, winners 34/35, switches 8 / 15 / 22 / 29).
+
 ## Known limits
 
 * **Players** are scored against the owner-ratified attribution of the

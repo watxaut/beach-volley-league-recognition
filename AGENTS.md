@@ -439,7 +439,10 @@ causal and untouched. Owner rules it encodes — keep them when changing it:
   six is read with somebody moving. A serve-shaped launch after the rally's
   ball had to be down, which nobody plays, is the ball going back and never
   that rally's landing. Low samples before a ball has climbed above what sand
-  can bounce are a dig off the sand, not a landing. A rally's last touch
+  can bounce are a dig off the sand, not a landing. The reverse (#117, from the owner's
+  reviews): a rally's last first-touch nobody was at, after an ace / kill, after
+  which the ball never climbs back to the tape, is the ball ON the sand -- dropped,
+  the outcome stands. A rally's last touch
   after which the ball stays under the tape was made on the half it came
   down on. Owner rule (2026-10-11): a spike dug and never set -- the second
   touch does not send the ball back up to net height -- is a kill (a serve:
