@@ -1,0 +1,19 @@
+src/detection/court_calibration.py
+  s_9ed08fada71d0a::t_ab6d4d54a20470 163,189-190,198,209-212,214,216,218
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "40b93685665ebbd93f1d682ef55833411e38f218",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
