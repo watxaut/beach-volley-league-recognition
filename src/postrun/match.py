@@ -35,6 +35,7 @@ from .touches import (
     ACTION_SET,
     ACTION_SPIKE,
     RallyRoster,
+    UNDER_TAPE_MIN_COVERAGE,
     Touch,
     credit_by_alternation,
 )
@@ -277,8 +278,10 @@ class MatchAssembler:
         last = pt.touches[-1]
         if last.touch_number == 0 or pt.winner_squad is None:
             return
-        if pt.squad_on(last.side) != pt.winner_squad or last.action not in (
-                ACTION_DIG, ACTION_SET):
+        if last.action not in (ACTION_DIG, ACTION_SET):
+            return
+        if pt.squad_on(last.side) != pt.winner_squad:
+            self._unseen_attack_on_own_half(pt, last)
             return
         if last.touch_number < 3 and self._second_arc(pt, last):
             last.ends_possession = False
@@ -290,6 +293,32 @@ class MatchAssembler:
             pt.flags.append("unseen_final_attack")
         else:
             last.action = ACTION_OVERPASS
+
+    def _unseen_attack_on_own_half(self, pt: Point, last: Touch) -> None:
+        """The LOSING team's second touch after which the ball stayed up for
+        longer than one arc, climbed back to net height and came down on that
+        same half: the setter set it and a third touch nobody saw hit it into
+        the net or out (#119; 4 of the owner's 13 "rally ended early"
+        corrections, each a "set error" the owner moved to the attack). The
+        attack is a hidden touch, credited to nobody, and it decides the
+        point, so the setter is not charged with an error."""
+        out = last.event.flight_out if last.event is not None else None
+        if (last.touch_number != 2 or out is None
+                or not out.peak_height_m >= self.net_height_m
+                or not self._second_arc(pt, last)):
+            return
+        # The ball must have been SEEN on its way down: a flight read from a
+        # few samples (20261010_1100 P16: 11 of 85 frames, a set that crossed
+        # the net) says nothing about which half it came down on.
+        span = pt.rally.end.frame - last.frame
+        if span <= 0 or out.n / span < UNDER_TAPE_MIN_COVERAGE:
+            return
+        last.ends_possession = False
+        pt.touches.append(Touch(
+            frame=int((last.frame + pt.rally.end.frame) // 2), side=last.side,
+            touch_number=3, action=ACTION_SPIKE, observed=False,
+            squad=last.squad, ends_possession=True))
+        pt.flags.append("unseen_final_attack")
 
     @staticmethod
     def _second_arc(pt: Point, last: Touch) -> bool:

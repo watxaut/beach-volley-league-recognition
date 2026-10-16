@@ -737,6 +737,34 @@ def test_an_attack_the_ball_dropped_at_the_net_after_stays_when_its_team_serves_
     assert pt.winner_squad == 1 and pt.touches == touches
     assert "trailing_touch_dropped" not in pt.flags
 
+def _set_then_down_on_its_own_half(attack_unseen):
+    """Far serves, A digs and sets and the ball comes down on A's half: nobody
+    touched it again, or A's third touch left no vertex. B serves again."""
+    b = sim.StreamBuilder(40.0)
+    hits = [sim.Hit(1.15, "P1A", sim.DIG_Z), sim.Hit(1.6, "P2A", sim.SET_Z)]
+    if attack_unseen:
+        hits.append(sim.Hit(1.6, "P1A", sim.SPIKE_Z, seen=False))
+    b.rally(sim.RallyScript(start_s=2.0, serve_xy=(2.0, -0.6), landing=(4.0, 12.5),
+                            hits=hits))
+    b.rally(sim.standard_rally(24.0, "far", sim.NEAR_A))
+    return _reconstruct(b, points_to_win=21)["points"][0]
+
+
+def test_a_set_the_ball_outlived_and_came_down_on_its_half_hid_an_attack():
+    # #119: the setter is not charged with an error the unseen attacker made.
+    point = _set_then_down_on_its_own_half(attack_unseen=True)
+    last = point["touches"][-1]
+    assert point["winner"] == "B"
+    assert (last["action"], last["observed"], last["player"]) == ("spike", False, None)
+    assert [t["outcome"] for t in point["touches"] if t["touch_number"]] == [None] * 3
+    assert "unseen_final_attack" in point["flags"]
+
+
+def test_a_set_that_simply_dropped_hid_nothing():
+    point = _set_then_down_on_its_own_half(attack_unseen=False)
+    assert point["touches"][-1]["action"] == "set"
+    assert "unseen_final_attack" not in point["flags"]
+
 
 def test_touch_credited_after_the_ball_died_is_dropped_by_the_next_serve():
     b = sim.StreamBuilder(40.0)
