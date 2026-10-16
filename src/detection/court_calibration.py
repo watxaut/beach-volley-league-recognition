@@ -63,6 +63,10 @@ class CourtCalibration:
         # ESTABLISHED tracks may roam the wider play area so the server (behind the
         # baseline) and chasers are not dropped. See plan "two-zone policy".
         self.play_area_margin_px: int = 100
+        # Optional ground-plane cap on the same zone, in metres beyond the court
+        # lines (None = px margin only). A px margin is venue-coupled: on a low
+        # camera 100 px past the far baseline spans ~180 m of ground (AGENTS §7).
+        self.play_area_margin_m: Optional[float] = None
         self._play_area_mask: Optional[np.ndarray] = None
 
         # Ground-plane homography (image px -> world m), cached lazily for the
@@ -505,12 +509,45 @@ class CourtCalibration:
             return None
         m = max(1, int(self.play_area_margin_px))
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (m * 2 + 1, m * 2 + 1))
-        self._play_area_mask = cv2.dilate(self.court_mask, kernel)
+        mask = cv2.dilate(self.court_mask, kernel)
+        cap = self._play_area_metre_cap()
+        if cap is not None:
+            mask = cv2.bitwise_and(mask, cap)
+        self._play_area_mask = mask
         return self._play_area_mask
 
-    def set_play_area_margin(self, margin_px: int) -> None:
-        """Override the play-area margin and rebuild the mask."""
+    def _play_area_metre_cap(self) -> Optional[np.ndarray]:
+        """Mask of the pixels whose ground point lies within ``play_area_margin_m``
+        metres of the court lines (None when unset).
+
+        Tested per pixel through the ground homography, not by projecting a
+        rectangle back: near the horizon a projected rectangle wraps around.
+        Pixels on the far side of the horizon (denominator of the opposite
+        sign to the court's) are outside.
+        """
+        if self.play_area_margin_m is None or self.court_mask is None:
+            return None
+        H = self.compute_ground_homography()
+        if H is None:
+            return None
+        m = float(self.play_area_margin_m)
+        L, W = self.BEACH_COURT_LENGTH_M, self.BEACH_COURT_WIDTH_M
+        h, w = self.court_mask.shape
+        uu, vv = np.meshgrid(np.arange(w, dtype=np.float64), np.arange(h, dtype=np.float64))
+        d = H[2, 0] * uu + H[2, 1] * vv + H[2, 2]
+        court_d = H[2, 0] * float(self.court_corners[:, 0].mean()) + H[2, 1] * float(self.court_corners[:, 1].mean()) + H[2, 2]
+        ok = (d * court_d) > 1e-9
+        d = np.where(ok, d, 1.0)
+        x = (H[0, 0] * uu + H[0, 1] * vv + H[0, 2]) / d
+        y = (H[1, 0] * uu + H[1, 1] * vv + H[1, 2]) / d
+        inside = ok & (x >= -m) & (x <= W + m) & (y >= -m) & (y <= L + m)
+        return inside.astype(np.uint8) * 255
+
+    def set_play_area_margin(self, margin_px: int, margin_m: Optional[float] = None) -> None:
+        """Override the play-area margin (px, plus an optional cap in metres)
+        and rebuild the mask."""
         self.play_area_margin_px = max(1, int(margin_px))
+        self.play_area_margin_m = None if margin_m is None else max(0.0, float(margin_m))
         self._play_area_mask = None
         self._ensure_play_area_mask()
 

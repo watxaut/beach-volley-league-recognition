@@ -119,8 +119,11 @@ def main():
         print(f"(warn) ball detector unavailable, bootstrap will use the time fallback: {exc}")
 
     if court.is_calibrated:
-        court.set_play_area_margin(_CFG.get("player_play_area_margin_px", 100))
+        court.set_play_area_margin(_CFG.get("player_play_area_margin_px", 100),
+                                   _CFG.get("player_play_area_margin_m"))
 
+    # Production wiring (FrameProcessor): the detector keeps only the play area
+    detector.set_court_detector(court)
     tracker = PlayerTracker(
         max_players=args.max_players,
         max_disappeared=PROD_MAX_DISAPPEARED,
