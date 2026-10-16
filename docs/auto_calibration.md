@@ -21,6 +21,7 @@ axis, net facing the lens).
 |---|---|---|
 | plate | median of 45 frames of the first 3 min, decoded in order | players and ball vanish, tape and net stay |
 | tape | thin things on the sand whose COLOUR is not the sand's | a shadow only changes brightness; the tape's colour is read off the picture, never assumed |
+| tape, no colour | only when the colour pass finds no court: thin things darker or brighter than the sand, the sand told apart by L, a and b; the tape's colour is then a direction in L, a, b | a black tape has the sand's own hue (masnou: a/b 128/140 on 128/141); a beige promenade has it too, but not its lightness |
 | lines | what adds up along a whole line, twice (any colour, then the tape's own) | half-buried tape is barely above the sand's noise |
 | court | near baseline + the two sidelines that leave its ends and converge: the triple with the most tape | the neighbouring court has less tape in the picture |
 | as it lies | each tape is followed from mid-court outwards; a corner is where two tapes cross | tapes bow (12–40 px off a straight line), and a corner may be outside the frame |
@@ -40,7 +41,9 @@ sideline's tape ends. Reads, each as a depth along the left sideline:
   (≥ 20 % of it, ≥ 0.25 m each).
 - `camera`: where the far baseline must be for the corners to imply the focal
   length this camera is known to have (the median of ≥ 3 other calibrations
-  within 4 %; a video never reads its own file). It confirms a read of the
+  within 4 %; a video never reads its own file). Settings are grouped by the
+  densest window first, never greedily from the smallest focal (#119: masnou's
+  1776 / 1790 px took vall d'Hebron's 1838 and left vall d'Hebron short of 3). It confirms a read of the
   picture (within 0.6 m), it never replaces one.
 
 One read is a proposal. Two that agree (1 m) are a calibration.
@@ -96,6 +99,8 @@ file. Auto minus clicks, px:
 | 20261010_1200 (held out) | yes | −4, +2 | +2, −8 | −10, −3 | +3, +3 | +1.0 % / −0.7 % | 2.35 m |
 | 20261010_1230 (held out, blind) | yes | +7, −6 | +7, −7 | −2, −2 | +5, +7 | 0.0 % / −0.4 % | 2.32 m |
 | e3 = e1–e7 (dev) | yes | −8, +5 | +15, +4 | +8, −5 | **−92, +21** | +3.4 % / +5.2 % | 2.38 m |
+| 20261012_1130 masnou (dev since #119) | yes | 0, 0 | −4, −3 | −2, −1 | +6, 0 | −0.7 % / −0.5 % | 2.30 m |
+| 20261012_1200 masnou (dev since #119) | yes | +3, −2 | −5, −3 | −10, −3 | 0, −4 | −1.4 % / −0.6 % | 2.31 m |
 
 - **e1–e7:** the near-left corner is ~90 px outside the frame. The click sits
   at (7, 910), inside it, so the manual file's near baseline is 5 % short.
@@ -110,6 +115,10 @@ file. Auto minus clicks, px:
 Focal length implied by the corners, the four same-morning videos: automatic
 1870–1943 px (±1.9 %), clicks 1838–1972 px (±3.5 %).
 
+- **masnou (#119):** black tape on pale sand, a 1.6 m tripod. Until #119 both
+  were refused at the first step ("no court"): the tape pass read chroma only.
+  1130's hand file is an agent read (`source: agent-read`), 1200's the owner's.
+
 ### What the match becomes (post-run replay, the existing dumps)
 
 | run | with the clicks | with the automatic file |
@@ -119,8 +128,12 @@ Focal length implied by the corners, the four same-morning videos: automatic
 | 20261010_1100 (owner table) | 35/35, serving team 35/35, winners 34/35 | same; +12 touches, 1 label |
 | 20261010_1200 | 41 points, A 21 – B 20 | same points and winners; −2 touches, 1 label |
 | e1–e7 | serves 5/5, P 52/53, action 52/52 | identical |
+| 20261012_1130 masnou | 33 points, A 19 – B 13 | 34, A 19 – B 14: +f25864 (= the owner's missing point f25934, A ✓); f25250 winner A → B (owner B ✓) |
+| 20261012_1200 masnou | 37 points, A 19 – B 17 | 38, A 21 – B 17: +f8747 (= the owner's missing point f8746 ✓); the last point undecided → A (owner B ✗) |
 
-No point lost or invented, no serving team or winner changed, on any run.
+No point lost or invented, no serving team or winner changed, on any vall d'Hebron,
+20260920 or practice run. On masnou the automatic file moves 2 points per match:
+3 of the 4 changes go to the owner's review, one (a last point) away from it.
 
 ### Full run with the automatic file (C2, causal pass re-run, same session)
 
@@ -140,8 +153,9 @@ knife-edge reads.
 
 ## Known limits
 
-1. **Two venues, two tape colours, 6 views.** White lines, rope, no lines, a
-   third venue: untested. It refuses what it cannot read; it has never been
+1. **Three venues, two tape colours (blue, black), 8 views.** White lines, rope,
+   no lines, a fourth venue: untested. A WHITE tape on pale sand takes the
+   lightness pass (bright) and is pinned by no test. It refuses what it cannot read; it has never been
    shown a court it reads wrongly with confidence, which is not proof.
 2. **Both sidelines buried alike near the far corners** agree with each other
    on a far baseline that is not there. Only the camera read speaks against

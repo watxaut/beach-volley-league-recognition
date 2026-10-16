@@ -51,7 +51,7 @@ from src.utils.video_upscale import ensure_1080, resolve_source_stem
 COURT_LENGTH_M = 16.0
 COURT_WIDTH_M = 8.0
 
-VERSION = 6
+VERSION = 7
 
 # -- plate ------------------------------------------------------------------- #
 PLATE_SPAN_S = 180.0          # where the plate's frames come from (start of the video)
@@ -352,6 +352,12 @@ class TapeMaps:
     tape_threshold: float = 0.0
     dark_tape: bool = False
     any_evidence: Optional[np.ndarray] = None
+    #: The court was found by lightness (``lightness_ridges``): a tape with no
+    #: colour of its own (black, grey, white), read in L, a and b together.
+    by_lightness: bool = False
+    sand_lab: Optional[np.ndarray] = None
+    sand_lab_mad: Optional[np.ndarray] = None
+    tape_lab: Optional[np.ndarray] = None
 
 
 def _kernel(frame_w: int) -> np.ndarray:
@@ -408,11 +414,66 @@ def chroma_ridges(plate: np.ndarray) -> TapeMaps:
                     evidence=evidence, threshold=thr, ridge=ridge, tape=ridge.copy())
 
 
+def lightness_ridges(plate: np.ndarray) -> TapeMaps:
+    """Thin structures on the sand that are darker or brighter than it: the
+    tape when it has no colour of its own (black tape on pale sand differs
+    from it in lightness only, and ``chroma_ridges`` sees none of it). The
+    sand is told apart by L, a and b together, so a wall or a promenade of the
+    sand's own hue is not taken for sand. Only read when the chroma pass finds
+    no court: a shadow changes brightness too, and on a coloured tape the
+    chroma pass is the cleaner one."""
+    h, w = plate.shape[:2]
+    lab = cv2.cvtColor(plate, cv2.COLOR_BGR2LAB).astype(np.float32)
+    rows = lab[int(h * SAND_ROWS_FROM):, :, :].reshape(-1, 3)
+    med = np.median(rows, axis=0)
+    mad = np.maximum(np.median(np.abs(rows - med), axis=0), 0.75)
+    zs = (lab - med) / (1.4826 * mad)
+    z = np.sqrt((zs ** 2).sum(axis=2))
+    core = _sand_region(z)
+    k = max(9, int(round(15 / 1920 * w)) | 1)
+    sand = cv2.dilate(core, np.ones((k, k), np.uint8))
+    light = np.ascontiguousarray(zs[:, :, 0])
+    evidence = np.maximum(cv2.morphologyEx(light, cv2.MORPH_TOPHAT, _kernel(w)),
+                          cv2.morphologyEx(light, cv2.MORPH_BLACKHAT, _kernel(w)))
+    thr = _threshold(evidence, sand)
+    ridge = ((evidence > thr) & (sand > 0)).astype(np.uint8) * 255
+    return TapeMaps(lab=lab, sand_ab=med[1:], sand_mad=mad[1:], sand=sand, sand_core=core,
+                    z=z, evidence=evidence, threshold=thr, ridge=ridge, tape=ridge.copy(),
+                    by_lightness=True, sand_lab=med, sand_lab_mad=mad)
+
+
+def _tape_colour_lab(maps: TapeMaps, px: np.ndarray) -> None:
+    """``tape_colour`` for a court found by lightness: the tape's colour is a
+    direction in L, a and b (each in the sand's robust deviations), so a
+    black tape is "darker than the sand" and a dark-blue one darker and bluer."""
+    scale = 1.4826 * maps.sand_lab_mad
+    zs = (maps.lab[px[:, 1], px[:, 0], :] - maps.sand_lab) / scale
+    strength = np.linalg.norm(zs, axis=1)
+    core = zs[strength >= np.median(strength)]
+    axis = np.median(core, axis=0)
+    norm = float(np.linalg.norm(axis))
+    if norm < 1e-6:
+        return
+    maps.tape_lab = maps.sand_lab + axis * scale
+    maps.tape_ab = maps.tape_lab[1:]
+    along = np.maximum(((maps.lab - maps.sand_lab) / scale) @ (axis / norm), 0.0)
+    w = maps.lab.shape[1]
+    colour = cv2.morphologyEx(along.astype(np.float32), cv2.MORPH_TOPHAT, _kernel(w))
+    evidence = colour / max(_threshold(colour, maps.sand), 1e-6)       # 1.0 = threshold
+    maps.tape_evidence = evidence
+    maps.tape_threshold = 1.0
+    maps.tape = ((evidence > 1.0) & (maps.sand > 0)).astype(np.uint8) * 255
+    maps.any_evidence = np.maximum(evidence, maps.evidence / max(maps.threshold, 1e-6))
+
+
 def tape_colour(maps: TapeMaps, lines: Sequence["Line"]) -> None:
     """Read the tape's colour off the court's own lines and keep, in
     ``maps.tape``, only what departs from the sand TOWARDS that colour."""
     px = np.concatenate([ln.pixels for ln in lines]).astype(int)
     if not len(px):
+        return
+    if maps.by_lightness:
+        _tape_colour_lab(maps, px)
         return
     scale = 1.4826 * maps.sand_mad
     zs = (maps.lab[px[:, 1], px[:, 0], 1:] - maps.sand_ab) / scale
@@ -970,15 +1031,25 @@ def focal_priors(calibrations_dir: Path, frame_w: int, frame_h: int,
         camera = camera_from_corners(corners, frame_w, frame_h)
         if camera is not None and 0.45 * frame_w <= camera["focal_px"] <= 1.8 * frame_w:
             focals.append(camera["focal_px"])
-    focals.sort()
-    out, group = [], []
-    for f in focals + [math.inf]:
-        if group and f > group[0] * (1.0 + FOCAL_CLUSTER):
-            if len(group) >= FOCAL_MIN_VIDEOS:
-                out.append(float(np.median(group)))
-            group = []
-        group.append(f)
-    return out
+    # A setting = the most views within FOCAL_CLUSTER of each other (the
+    # tightest such window on a tie); its views are then taken out and the next
+    # one is looked for. Grouping from the smallest focal instead let a venue's
+    # views take a neighbour's (masnou's 1776 / 1790 px took vall d'Hebron's
+    # 1838 and left vall d'Hebron short of FOCAL_MIN_VIDEOS).
+    left, out = sorted(focals), []
+    while len(left) >= FOCAL_MIN_VIDEOS:
+        windows = []
+        for i, f in enumerate(left):
+            j = i
+            while j + 1 < len(left) and left[j + 1] <= f * (1.0 + FOCAL_CLUSTER):
+                j += 1
+            windows.append((-(j - i + 1), left[j] / f, i, j))
+        size, _, i, j = min(windows)
+        if -size < FOCAL_MIN_VIDEOS:
+            break
+        out.append(float(np.median(left[i:j + 1])))
+        left = left[:i] + left[j + 1:]
+    return sorted(out)
 
 
 def q_for_focal(court: "Court", across: np.ndarray, focal: float, frame_w: int,
@@ -1063,8 +1134,12 @@ def detect(plate: np.ndarray, focals: Sequence[float] = ()) -> AutoCalibration:
 
     maps = chroma_ridges(plate)
     lines = strong_lines(maps.ridge)
-    debug.update(maps=maps, lines=lines)
     found = find_court(lines, w, h)
+    if found is None:                    # a tape with no colour of its own (black, white)?
+        maps = lightness_ridges(plate)
+        lines = strong_lines(maps.ridge)
+        found = find_court(lines, w, h)
+    debug.update(maps=maps, lines=lines)
     if found is None:
         return AutoCalibration(None, False, checks,
                                ["no court: near baseline + two sidelines not found"], debug)
@@ -1081,6 +1156,10 @@ def detect(plate: np.ndarray, focals: Sequence[float] = ()) -> AutoCalibration:
     checks["sand_colour_lab_ab"] = [round(float(v), 1) for v in maps.sand_ab]
     checks["tape_colour_lab_ab"] = [round(float(v), 1) for v in maps.tape_ab]
     checks["tape_read_by_darkness_too"] = bool(maps.dark_tape)
+    if maps.by_lightness:
+        checks["court_found_by"] = "lightness"
+        checks["sand_colour_lab"] = [round(float(v), 1) for v in maps.sand_lab]
+        checks["tape_colour_lab"] = [round(float(v), 1) for v in maps.tape_lab]
     near_line = court.near.base
     f_lo, f_hi = near_line.in_frame(w)
     checks["near_baseline"] = {

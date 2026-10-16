@@ -63,6 +63,15 @@ VIEWS: Dict[str, Dict[str, Any]] = {
     "20261010_1230_vall_dhebron_jesus_sara_joan_loida": {
         "video": "resources/full_videos/20261010_1230_vall_dhebron_jesus_sara_joan_loida.mp4",
         "dev": False, "runs": []},
+    # masnou (beach, BLACK tape, low tripod): the court is found by lightness
+    "20261012_1130_masnou_loida_joan_pere_aitana": {
+        "video": "resources/full_videos/20261012_1130_masnou_loida_joan_pere_aitana.mp4",
+        "dev": True,
+        "runs": [("output/20261012_1130_masnou_loida_joan_pere_aitana", None)]},
+    "20261012_1200_masnou_loida_joan_pere_aitana": {
+        "video": "resources/full_videos/20261012_1200_masnou_loida_joan_pere_aitana.mp4",
+        "dev": True,
+        "runs": [("output/20261012_1200_masnou_loida_joan_pere_aitana", None)]},
     "video_entreno_3": {
         "video": "resources/video_entreno_3.mp4", "dev": True,
         "runs": [(f"output/postrun/entreno_{i}", f"clip:{i}") for i in range(1, 8)]},
