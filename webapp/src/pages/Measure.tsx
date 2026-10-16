@@ -50,7 +50,7 @@ const ROWS: Row[] = [
 ]
 
 const NOT_MEASURED = [
-  'Blocks', 'Ball-handling faults (a double or a lift)', 'Pass quality (we look at what the reception became, never grade the pass itself)',
+  'Block kills (only in a match reviewed by hand)', 'Ball-handling faults (a double or a lift)', 'Pass quality (we look at what the reception became, never grade the pass itself)',
   'Ball speed in km/h', 'Distance run',
 ]
 
@@ -94,7 +94,7 @@ export function Measure() {
           {NOT_MEASURED.map((n) => <li key={n}>{n}</li>)}
         </ul>
         <p className="muted small" style={{ marginBottom: 0, marginTop: 8 }}>
-          These read “not measured”, never 0. The fantasy Block rule can never fire until blocks are measured.
+          These read “not measured”, never 0. The fantasy Block rule fires only on a block that won the point, which the owner's review adds.
         </p>
       </Card>
 

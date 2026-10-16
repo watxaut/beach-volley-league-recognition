@@ -111,7 +111,8 @@ def reconstruct(stream: MatchStream, geometry: CourtGeometry,
 
 
 #: Owner-ratified fantasy values (STATUS north-star G1). A block is a
-#: post-run label (#115) but a hidden, uncredited one. Errors = service fault + attack error + ball handling
+#: post-run label (#115), credited to the defender at the net, and scores the
+#: kill value only when it wins the point. Errors = service fault + attack error + ball handling
 #: (a set or dig the layer marks ``error``, e.g. P6 f3229 -- open point 32f).
 #: The web platform scores from its own rule table (supabase/migrations,
 #: ``fantasy_rules``); ``src/publish/fantasy.py`` mirrors this G1 set.
@@ -145,6 +146,16 @@ def player_stats(points: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
             r["serve_errors"] += serve["outcome"] == "error"
         body = [t for t in pt["touches"] if t["touch_number"] > 0]
         for i, t in enumerate(body):
+            if t["action"] == "block":
+                # A block is hidden (the ball's vertex at the net is the
+                # attack's), named by who stood at the net: credited without
+                # being observed. Only one that wins the point scores.
+                if t["player"]:
+                    r = row(t["player"])
+                    r["blocks"] = r.get("blocks", 0) + 1
+                    if t["outcome"] == "kill":
+                        r["block_kills"] = r.get("block_kills", 0) + 1
+                continue
             if not t["observed"]:
                 continue
             if not t["player"]:
@@ -166,7 +177,8 @@ def player_stats(points: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
                 r["assists"] += 1
     for r in stats.values():
         r["fantasy"] = round(
-            FANTASY["kill"] * r["kills"] + FANTASY["ace"] * r["aces"]
+            FANTASY["kill"] * (r["kills"] + r.get("block_kills", 0))
+            + FANTASY["ace"] * r["aces"]
             + FANTASY["dig"] * r["digs"] + FANTASY["assist"] * r["assists"]
             + FANTASY["error"] * (r["attack_errors"] + r["serve_errors"]
                                   + r["handling_errors"]), 1)

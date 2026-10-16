@@ -48,6 +48,7 @@ ACTION_BLOCK = "block"
 # Touch.player_source: how a touch got its player.
 SOURCE_REACH = "reach"              # the player's body was at the ball
 SOURCE_ALTERNATION = "alternation"  # the rules: two players alternate in a possession
+SOURCE_AT_NET = "at_the_net"        # a block: the one defender standing at the net
 
 # -- timing priors (seconds between two consecutive touches) ----------------- #
 # Measured on the owner's 211-contact match GT: same-half 0.9-2.7 s (median
@@ -150,6 +151,11 @@ BLOCK_NET_ZONE_M = 1.5             # vertex depth read this close to the net
 BLOCKER_NET_M = 1.5                # blocker's stance this close to the net
 BLOCK_RETURN_S = (0.75, 0.35)      # attack -> the hitter's team's next touch
 BLOCK_COST = 1.0
+# The block is credited (owner, 2026-10-15) to the defender standing at the
+# net when the ball was hit -- only when ONE of the half's two players is
+# there (a double block names nobody: precision first). The gate reads the
+# ball's height at the net, never what the hit was labelled, so a free ball
+# or an overpass that is blocked is credited the same way.
 # The NET STOPPED IT: a ball hit above the tape whose next vertex is read on
 # the net line, close along the court to the hit and sooner than a crossing,
 # went into the net or off a block -- it never reached the other half, so
@@ -436,20 +442,25 @@ class TouchSolver:
         chain.reverse()
 
         prev_frame = rally.serve.frame
+        prev_event: Optional[BallEvent] = None
         for i, (side, k, p), step in chain:
             e = events[i]
             for h, (hs, hk) in enumerate(step.hidden):
                 frac = (h + 1) / (len(step.hidden) + 1)
                 frame = int(round(prev_frame + frac * (e.frame - prev_frame)))
                 block = step.block and h == 0
+                blocker = None
                 if block:               # right after the attack it stopped
                     frame = prev_frame + max(1, int(round(0.1 * self.stream.fps)))
+                    if prev_event is not None:
+                        blocker = self._blocker(prev_event, hs, roster)
                 touches.append(Touch(
                     frame=frame, side=hs, touch_number=hk,
                     action=ACTION_BLOCK if block else "", observed=False,
-                    squad=roster.squad_on(hs)))
+                    squad=roster.squad_on(hs), player=blocker,
+                    player_source=SOURCE_AT_NET if blocker else None))
             touches.append(self._observed_touch(e, side, k, p, roster))
-            prev_frame = e.frame
+            prev_frame, prev_event = e.frame, e
         self._label(touches)
         return touches, roster
 
@@ -558,14 +569,22 @@ class TouchSolver:
             return ()
         if self.geometry.ball_world(e.u, e.v, y)[2] < self.attack_min_height_m:
             return ()
-        sides = []
-        for side in (SIDE_NEAR, SIDE_FAR):
-            for key in roster.by_side.get(other_side(side), []):
-                stance = roster.stance_depth(key, e.frame, self.geometry)
-                if stance is not None and abs(stance - NET_Y_M) <= BLOCKER_NET_M:
-                    sides.append(side)
-                    break
-        return tuple(sides)
+        return tuple(side for side in (SIDE_NEAR, SIDE_FAR)
+                     if self._at_the_net(e, other_side(side), roster))
+
+    def _at_the_net(self, e: BallEvent, side: str, roster: RallyRoster) -> List[str]:
+        """Players of ``side`` standing at the net when the ball was hit."""
+        out = []
+        for key in roster.by_side.get(side, []):
+            stance = roster.stance_depth(key, e.frame, self.geometry)
+            if stance is not None and abs(stance - NET_Y_M) <= BLOCKER_NET_M:
+                out.append(key)
+        return out
+
+    def _blocker(self, hit: BallEvent, side: str, roster: RallyRoster) -> Optional[str]:
+        """The block's player: the one defender at the net, nobody otherwise."""
+        at_net = self._at_the_net(hit, side, roster)
+        return at_net[0] if len(at_net) == 1 else None
 
     def _net_stopped(self, hit: BallEvent, e: BallEvent, dt: float) -> bool:
         """The ball hit above the tape at ``hit`` was next seen at ``e`` on

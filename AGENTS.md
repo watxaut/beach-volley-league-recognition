@@ -579,8 +579,12 @@ Pages). Rules that keep it correct:
   about the PIPELINE, never the reviewed match. The review files are in git:
   merge them before publishing from the prod worktree.
 * **A block scores only when it wins the point (owner, 2026-10-14).** A block
-  is credited only through a review (the post-run layer reads blocks since #115
-  but as hidden, uncredited touches the bundle does not send); it is published
+  is credited to the defender standing alone at the net when the ball was hit
+  (#123, `TouchSolver._blocker`: two at the net = nobody; the post-run layer
+  reads it from the ball coming back, so it is always a soft block, outcome
+  none, +0); a block that ends the point exists only through the owner's review
+  (the ball dies, nothing comes back: no read of that landing half is
+  trustworthy, #115), and is published
   with outcome `kill` when it ends the point for the blocker's team, and the
   fantasy rule `block` asks for that outcome (migration
   `20261014100000_block_kill_only`, mirrored in `src/publish/fantasy.py` and
