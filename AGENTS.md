@@ -732,7 +732,9 @@ touches nothing in it. Rules to keep when changing it:
   manual reconstruction, and the owner's GT scores held; a difference on
   `auto_points.jpg` is a place to look, never a number to minimise.
 * **Nothing is assumed about a venue.** The tape's colour is read off the
-  court's own lines; tolerances are metres along the court, shares of the
+  court's own lines, and a colour includes lightness: a tape may have no hue
+  of its own (masnou's black tape, #119) -- chroma first, lightness only when
+  chroma finds no court, never a hue assumed; tolerances are metres along the court, shares of the
   frame or robust deviations of the sand's colour. The pixel bands in there
   are tape widths at 1080p, the size every frame is processed at
   (`ensure_1080`); never add a colour constant or a threshold fitted to one
@@ -746,8 +748,8 @@ touches nothing in it. Rules to keep when changing it:
   a single read into a calibration; the points always come from the picture.
 * **Plate frames are decoded in order** (§9), on the frames the pipeline will
   process.
-* **Held-out discipline.** Developed on e3, 20261010_1000 and 20260920; 1100,
-  1200 and 1230 were scored frozen and are spent. The next NEW video is the
+* **Held-out discipline.** Developed on e3, 20261010_1000, 20260920 and (#119)
+  masnou 1130 + 1200; 1100, 1200 and 1230 were scored frozen and are spent. The next NEW video is the
   held-out one: run it before reading or making its manual file, then compare.
   A change needs `tests/test_court_autocalibration.py` (drawn courts, known
   camera) green and the scorer on every view; a full causal re-run (e1–e7 +

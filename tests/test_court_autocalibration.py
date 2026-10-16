@@ -70,7 +70,8 @@ def _ground_strip(cam: Camera, a: Sequence[float], b: Sequence[float], width: fl
 
 
 def draw_court(cam: Camera, far_tape: bool = True, buried: Sequence[Tuple[str, float, float]] = (),
-               tape: bool = True, seed: int = 3) -> np.ndarray:
+               tape: bool = True, seed: int = 3, tape_bgr: Tuple[int, int, int] = TAPE
+               ) -> np.ndarray:
     """The scene. ``buried``: (line, from_m, to_m) stretches of tape under the sand;
     lines are ``left`` / ``right`` (metres from the near corner) and ``near``."""
     rng = np.random.default_rng(seed)
@@ -104,7 +105,7 @@ def draw_court(cam: Camera, far_tape: bool = True, buried: Sequence[Tuple[str, f
                 if lo > start:
                     p = np.asarray(a) + (np.asarray(b) - a) * start / length
                     q = np.asarray(a) + (np.asarray(b) - a) * lo / length
-                    cv2.fillPoly(img, [_ground_strip(cam, p, q)], TAPE, lineType=cv2.LINE_AA)
+                    cv2.fillPoly(img, [_ground_strip(cam, p, q)], tape_bgr, lineType=cv2.LINE_AA)
                 start = max(start, hi)
     # the net: posts, tape, bottom band
     for x in (-0.9, 8.9):
@@ -171,6 +172,23 @@ def test_tape_colour_is_read_off_the_picture_not_assumed(cam):
     assert result.accepted, result.reasons
     assert result.checks["tape_colour_lab_ab"][1] > result.checks["sand_colour_lab_ab"][1]
     assert corner_errors(result.points, cam).max() <= 6.0
+
+
+def test_a_black_tape_with_no_colour_of_its_own_is_found_by_lightness():
+    """Masnou (20261012): black tape on pale sand, a low tripod. The chroma pass
+    sees no tape at all; the court is found by lightness, read in L, a and b."""
+    low = Camera(focal=1780.0, height=1.6, behind=8.7, across=4.1, aim=(4.0, 4.0))
+    # dark, of the sand's own hue (masnou reads Lab a/b 128/140 on a sand of 128/141)
+    result = ac.detect(draw_court(low, tape_bgr=(32, 71, 90)))
+    assert result.accepted, result.reasons
+    assert result.checks["court_found_by"] == "lightness"
+    sand_l, tape_l = result.checks["sand_colour_lab"][0], result.checks["tape_colour_lab"][0]
+    assert tape_l < sand_l - 40
+    assert corner_errors(result.points, low).max() <= 6.0
+
+
+def test_a_coloured_tape_never_takes_the_lightness_path(full):
+    assert "court_found_by" not in full.checks
 
 
 def test_buried_far_baseline_two_sideline_ends_agree(cam):
@@ -272,6 +290,17 @@ def test_focal_priors_need_three_views_that_agree(tmp_path):
     assert len(priors) == 1 and abs(priors[0] - 1900) <= 30
     # a video never reads its own file, and two views are not enough
     assert ac.focal_priors(tmp_path, W, H, exclude_stem="day_0") == []
+
+
+def test_a_venues_settings_do_not_swallow_a_neighbours(tmp_path):
+    """Grouping from the smallest focal let two views of a second venue take
+    the first venue's lowest view and leave it short of three."""
+    for i, focal in enumerate([1838, 1888, 1893]):
+        _write(tmp_path / f"vall_{i}.json", Camera(focal=focal))
+    for i, focal in enumerate([1776, 1790]):
+        _write(tmp_path / f"beach_{i}.json", Camera(focal=focal))
+    priors = ac.focal_priors(tmp_path, W, H)
+    assert len(priors) == 1 and abs(priors[0] - 1888) <= 15
 
 
 def test_focal_priors_ignore_copies_and_other_frame_sizes(tmp_path):

@@ -7503,6 +7503,22 @@ Deployed by the owner the same day (migration pushed, web redeployed, `make repu
 
 **Not done / owed.** Keys and wording are still a first guess. A rally the run cut short cannot have its lost touches reviewed (the tail is only in the dead-time copy). The gap copy is not yet written by `make inbox` / `make publish`: a match whose video is archived before `make review-gaps` has no dead time to watch. The corrections are feedback, not yet applied to what is published (`action_overrides`, design doc Phase 3) and not yet scored (a scorer over `truth` — winners, serving team, who — is the next step once a file exists). The crop is the clip's: a near player at the side line can be half out of the picture. Dead time is not in the copy: a missed point has no picture, only "missing after point N". 20260920 has no rally copy on disk (already ratified).
 
+### 2026-10-14 (hundred-and-fifteenth session) — #115: blocks in the post-run touch solver
+
+**Asked (owner):** start with blocks; "if there is a block and the ball ends up in the spiker's field then it was a block".
+
+**Diagnosis.** The owner reviews carry 8 block labels (1000 ×2, 1100 ×2 = a joust, 1200 ×4). The block is 2–6 frames after the attack (one tracker vertex; twice the attack itself is not even labelled) and the ball's depth read at the net is ±1.5 m, so no reversal is readable off the ball. 6 of 8 are "the attacker's team plays the ball again"; none is a clean kill block. The solver already allowed "over and back" but priced it as two whole crossings (~2.3 s); a block returns in 0.4–1.1 s.
+
+**Built (`src/postrun/touches.py`).** A block step in `TouchSolver._transition`: from a vertex read within 1.5 m of the net and above the attack height, when a player of the OTHER half stands within 1.5 m of the net (`_blockable`), the hitter's half may start a new possession after `BLOCK_RETURN_S` (0.75 ± 0.35 s), cost `BLOCK_COST` 1.0; the block is a hidden touch (action `block`, never credited, not published: the bundle sends observed touches only). The defender guard removed the one clear false block (masnou P24: nearest defender 4.5 m; reviewed blockers 0.7–1.3 m). Two sim tests.
+
+**Measured (all runs, `python -m src.postrun` both arms).** 1200: blocks at P6 / P21 / P24 = the owner's three; touches matching his truth 6/8 → 7/10, 8/9 → 10/12, 12/15 → 14/16. 1230 P18: a block read where the owner noted "net violation by A" (A at the net 1.1 m) plus an overpass after it he does not list — the one invented touch. Unread: 1000 P4 / P25, 1100 P4 (the touch after the block reads at the net on the blocker's half), 1200 P6's last block (it lost the point). Points, winners, scores unchanged everywhere; 20260920, 1000, 1100, masnou, e1–e7 byte-identical, so the §11 bars hold as recorded; `sweep_postrun.py` not re-run (20260920 identical). 1406 tests pass.
+
+**Owner answers (same day).** 1230 P18 WAS a block (the net violation is the blocker's) → 4 of 6 reviewed situations read, 0 false. Credit only kill blocks we are sure of. Tried: a stuff read at the rally's end (last hit above the tape at the net, ball down ≥ 1 m back on its own half within 1.5 s, one defender at the net → credited kill block) — REFUTED and reverted: its 3 reads (1200 P37, masnou P24 / P30) are all attacks that landed on the OTHER half per the reviews (the end side follows a wrong touch side); two would have credited an invented kill. No block is credited until the landing half is read independently of the touch sides. Not published (no re-publish needed: blocks are not sent yet).
+
 ### Session index lines moved out of STATUS.md (2026-10-15, #117), verbatim
 
 - 2026-09-27 **#20** — e3 v3 drift FIXED without GT edits: bridge defers only when a fireable normal vertex exists; 7/7 neutrality; match 31/33 unchanged (Log below).
+
+### Session index lines moved out of STATUS.md (2026-10-16, #119), verbatim
+
+- 2026-09-27 **#21** — pi repo default model → zai/glm-5.3-flash (SUPERSEDED by #29: default now lives in `~/.pi/agent/settings.json` as zai/glm-5.3).
