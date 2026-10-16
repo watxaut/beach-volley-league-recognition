@@ -1,0 +1,21 @@
+src/postrun/match.py
+  s_9ed08fada71d0a::t_bd7b48103823fb 52-55,57,135
+tests/test_postrun.py
+  s_9ed08fada71d0a::t_d286da2d16a4b6 721-740
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "420ad5685cde7b004a8a42a6ee30d1ee483fd67e",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
