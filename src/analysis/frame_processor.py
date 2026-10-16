@@ -121,7 +121,8 @@ class FrameProcessor:
             # may roam). Set once here from config; the mask builds lazily on use.
             if self.court_calibration.is_calibrated:
                 self.court_calibration.set_play_area_margin(
-                    self.config.get("player_play_area_margin_px", 100)
+                    self.config.get("player_play_area_margin_px", 100),
+                    self.config.get("player_play_area_margin_m"),
                 )
 
             # Ball detection (YOLO-based)

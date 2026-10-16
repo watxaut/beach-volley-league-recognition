@@ -97,6 +97,7 @@ class Config:
         # and the enriched appearance+biometric signature.
         "player_appearance_weight": 0.4,        # surface of PlayerTracker ctor default
         "player_init_frames": 60,               # surface of ctor default; = bootstrap_max_wait fallback
+        "player_play_area_margin_m": 20.0,      # ground-plane cap (metres beyond the lines) on that zone: the px band alone spans ~180 m behind a low camera (#118); 20 m leaves higher-camera venues untouched. None = px only
         "player_play_area_margin_px": 100,      # how far beyond the court polygon ESTABLISHED tracks may roam
         "player_gallery_enabled": True,         # match-long dormant gallery (never delete a player)
         "player_gallery_reacquire_distance_px": 120.0,  # motion/position gate to re-acquire a dormant id

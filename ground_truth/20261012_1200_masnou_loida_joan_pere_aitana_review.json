@@ -1,0 +1,3067 @@
+{
+ "format": "match-review-v1",
+ "match_key": "20261012_1200_masnou_loida_joan_pere_aitana",
+ "owner_final_score": null,
+ "points": [
+  {
+   "start_frame": 725,
+   "end_frame": 833,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 1,
+    "winner": "A",
+    "serve_team": "A",
+    "near_team": "A",
+    "touches": [
+     [
+      725,
+      "serve",
+      "P1A"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "A",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 725,
+      "action": "serve",
+      "player": "P1A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 1547,
+   "end_frame": 1685,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 2,
+    "winner": "A",
+    "serve_team": "A",
+    "near_team": "A",
+    "touches": [
+     [
+      1547,
+      "serve",
+      "P1A"
+     ],
+     [
+      1577,
+      "dig",
+      "P1B"
+     ],
+     [
+      1616,
+      "set",
+      "P2B"
+     ],
+     [
+      1656,
+      "spike",
+      "P1B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "A",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 1547,
+      "action": "serve",
+      "player": "P1A"
+     },
+     {
+      "frame": 1577,
+      "action": "dig",
+      "player": "P1B"
+     },
+     {
+      "frame": 1616,
+      "action": "set",
+      "player": "P2B"
+     },
+     {
+      "frame": 1656,
+      "action": "spike",
+      "player": "P1B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 2294,
+   "end_frame": 2438,
+   "status": "corrected",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {
+    "2330": {
+     "player": "P1A"
+    },
+    "2384": {
+     "player": "P1A"
+    },
+    "2411": {
+     "remove": true
+    }
+   },
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 3,
+    "winner": "B",
+    "serve_team": "A",
+    "near_team": "A",
+    "touches": [
+     [
+      2294,
+      "serve",
+      "P1A"
+     ],
+     [
+      2330,
+      "dig",
+      null
+     ],
+     [
+      2384,
+      "set",
+      null
+     ],
+     [
+      2411,
+      "spike",
+      null
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "A",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 2294,
+      "action": "serve",
+      "player": "P1A"
+     },
+     {
+      "frame": 2330,
+      "action": "dig",
+      "player": "P1A"
+     },
+     {
+      "frame": 2384,
+      "action": "set",
+      "player": "P1A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 2972,
+   "end_frame": 3009,
+   "status": "corrected",
+   "labels": {
+    "far_swapped": true
+   },
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {
+    "2972": {
+     "player": "P1B"
+    }
+   },
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 4,
+    "winner": "B",
+    "serve_team": "B",
+    "near_team": "A",
+    "touches": [
+     [
+      2972,
+      "serve",
+      "P2B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "A",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 2972,
+      "action": "serve",
+      "player": "P1B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 3598,
+   "end_frame": 3822,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 5,
+    "winner": "A",
+    "serve_team": "B",
+    "near_team": "A",
+    "touches": [
+     [
+      3598,
+      "serve",
+      "P2B"
+     ],
+     [
+      3620,
+      "dig",
+      "P2A"
+     ],
+     [
+      3662,
+      "set",
+      "P1A"
+     ],
+     [
+      3708,
+      "spike",
+      "P2A"
+     ],
+     [
+      3731,
+      "dig",
+      "P2B"
+     ],
+     [
+      3765,
+      "set",
+      "P1B"
+     ],
+     [
+      3801,
+      "spike",
+      "P2B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "A",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 3598,
+      "action": "serve",
+      "player": "P2B"
+     },
+     {
+      "frame": 3620,
+      "action": "dig",
+      "player": "P2A"
+     },
+     {
+      "frame": 3662,
+      "action": "set",
+      "player": "P1A"
+     },
+     {
+      "frame": 3708,
+      "action": "spike",
+      "player": "P2A"
+     },
+     {
+      "frame": 3731,
+      "action": "dig",
+      "player": "P2B"
+     },
+     {
+      "frame": 3765,
+      "action": "set",
+      "player": "P1B"
+     },
+     {
+      "frame": 3801,
+      "action": "spike",
+      "player": "P2B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 4513,
+   "end_frame": 4549,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 6,
+    "winner": "A",
+    "serve_team": "A",
+    "near_team": "A",
+    "touches": [
+     [
+      4513,
+      "serve",
+      "P2A"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "A",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 4513,
+      "action": "serve",
+      "player": "P2A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 5506,
+   "end_frame": 5648,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 7,
+    "winner": "B",
+    "serve_team": "A",
+    "near_team": "A",
+    "touches": [
+     [
+      5506,
+      "serve",
+      "P2A"
+     ],
+     [
+      5536,
+      "dig",
+      "P2B"
+     ],
+     [
+      5580,
+      "set",
+      "P1B"
+     ],
+     [
+      5626,
+      "spike",
+      "P2B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "A",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 5506,
+      "action": "serve",
+      "player": "P2A"
+     },
+     {
+      "frame": 5536,
+      "action": "dig",
+      "player": "P2B"
+     },
+     {
+      "frame": 5580,
+      "action": "set",
+      "player": "P1B"
+     },
+     {
+      "frame": 5626,
+      "action": "spike",
+      "player": "P2B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 6500,
+   "end_frame": 6803,
+   "status": "corrected",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {
+    "6775": {
+     "player": "P2A"
+    }
+   },
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 8,
+    "winner": "A",
+    "serve_team": "B",
+    "near_team": "B",
+    "touches": [
+     [
+      6500,
+      "serve",
+      "P1B"
+     ],
+     [
+      6535,
+      "dig",
+      "P1A"
+     ],
+     [
+      6578,
+      "set",
+      "P2A"
+     ],
+     [
+      6616,
+      "spike",
+      "P1A"
+     ],
+     [
+      6638,
+      "dig",
+      "P1B"
+     ],
+     [
+      6683,
+      "set",
+      "P2B"
+     ],
+     [
+      6720,
+      "spike",
+      "P1B"
+     ],
+     [
+      6748,
+      "dig",
+      "P1A"
+     ],
+     [
+      6775,
+      "spike",
+      null
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "B",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 6500,
+      "action": "serve",
+      "player": "P1B"
+     },
+     {
+      "frame": 6535,
+      "action": "dig",
+      "player": "P1A"
+     },
+     {
+      "frame": 6578,
+      "action": "set",
+      "player": "P2A"
+     },
+     {
+      "frame": 6616,
+      "action": "spike",
+      "player": "P1A"
+     },
+     {
+      "frame": 6638,
+      "action": "dig",
+      "player": "P1B"
+     },
+     {
+      "frame": 6683,
+      "action": "set",
+      "player": "P2B"
+     },
+     {
+      "frame": 6720,
+      "action": "spike",
+      "player": "P1B"
+     },
+     {
+      "frame": 6748,
+      "action": "dig",
+      "player": "P1A"
+     },
+     {
+      "frame": 6775,
+      "action": "spike",
+      "player": "P2A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 7315,
+   "end_frame": 7733,
+   "status": "corrected",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {
+    "7464": {
+     "player": "P1A"
+    }
+   },
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 9,
+    "winner": "A",
+    "serve_team": "A",
+    "near_team": "B",
+    "touches": [
+     [
+      7315,
+      "serve",
+      "P1A"
+     ],
+     [
+      7353,
+      "dig",
+      "P1B"
+     ],
+     [
+      7395,
+      "set",
+      "P2B"
+     ],
+     [
+      7438,
+      "spike",
+      "P1B"
+     ],
+     [
+      7464,
+      "dig",
+      null
+     ],
+     [
+      7489,
+      "set",
+      "P2A"
+     ],
+     [
+      7534,
+      "spike",
+      "P1A"
+     ],
+     [
+      7550,
+      "dig",
+      "P2B"
+     ],
+     [
+      7588,
+      "set",
+      "P1B"
+     ],
+     [
+      7633,
+      "spike",
+      "P2B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "B",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 7315,
+      "action": "serve",
+      "player": "P1A"
+     },
+     {
+      "frame": 7353,
+      "action": "dig",
+      "player": "P1B"
+     },
+     {
+      "frame": 7395,
+      "action": "set",
+      "player": "P2B"
+     },
+     {
+      "frame": 7438,
+      "action": "spike",
+      "player": "P1B"
+     },
+     {
+      "frame": 7464,
+      "action": "dig",
+      "player": "P1A"
+     },
+     {
+      "frame": 7489,
+      "action": "set",
+      "player": "P2A"
+     },
+     {
+      "frame": 7534,
+      "action": "spike",
+      "player": "P1A"
+     },
+     {
+      "frame": 7550,
+      "action": "dig",
+      "player": "P2B"
+     },
+     {
+      "frame": 7588,
+      "action": "set",
+      "player": "P1B"
+     },
+     {
+      "frame": 7633,
+      "action": "spike",
+      "player": "P2B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 8312,
+   "end_frame": 8383,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 10,
+    "winner": "A",
+    "serve_team": "A",
+    "near_team": "B",
+    "touches": [
+     [
+      8312,
+      "serve",
+      "P1A"
+     ],
+     [
+      8347,
+      "dig",
+      "P2B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "B",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 8312,
+      "action": "serve",
+      "player": "P1A"
+     },
+     {
+      "frame": 8347,
+      "action": "dig",
+      "player": "P2B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 10072,
+   "end_frame": 10294,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 11,
+    "winner": "B",
+    "serve_team": "A",
+    "near_team": "B",
+    "touches": [
+     [
+      10072,
+      "serve",
+      "P1A"
+     ],
+     [
+      10104,
+      "dig",
+      "P1B"
+     ],
+     [
+      10152,
+      "set",
+      "P2B"
+     ],
+     [
+      10188,
+      "spike",
+      "P1B"
+     ],
+     [
+      10207,
+      "dig",
+      "P1A"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "B",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 10072,
+      "action": "serve",
+      "player": "P1A"
+     },
+     {
+      "frame": 10104,
+      "action": "dig",
+      "player": "P1B"
+     },
+     {
+      "frame": 10152,
+      "action": "set",
+      "player": "P2B"
+     },
+     {
+      "frame": 10188,
+      "action": "spike",
+      "player": "P1B"
+     },
+     {
+      "frame": 10207,
+      "action": "dig",
+      "player": "P1A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 11226,
+   "end_frame": 11369,
+   "status": "corrected",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {
+    "11332": {
+     "player": "P2A"
+    }
+   },
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 12,
+    "winner": "A",
+    "serve_team": "B",
+    "near_team": "B",
+    "touches": [
+     [
+      11226,
+      "serve",
+      "P2B"
+     ],
+     [
+      11258,
+      "dig",
+      "P2A"
+     ],
+     [
+      11295,
+      "set",
+      "P1A"
+     ],
+     [
+      11332,
+      "spike",
+      null
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "B",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 11226,
+      "action": "serve",
+      "player": "P2B"
+     },
+     {
+      "frame": 11258,
+      "action": "dig",
+      "player": "P2A"
+     },
+     {
+      "frame": 11295,
+      "action": "set",
+      "player": "P1A"
+     },
+     {
+      "frame": 11332,
+      "action": "spike",
+      "player": "P2A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 11972,
+   "end_frame": 12023,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 13,
+    "winner": "B",
+    "serve_team": "A",
+    "near_team": "B",
+    "touches": [
+     [
+      11972,
+      "serve",
+      "P2A"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "B",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 11972,
+      "action": "serve",
+      "player": "P2A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 12574,
+   "end_frame": 12600,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 14,
+    "winner": "A",
+    "serve_team": "B",
+    "near_team": "A",
+    "touches": [
+     [
+      12574,
+      "serve",
+      "P1B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "A",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 12574,
+      "action": "serve",
+      "player": "P1B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 13117,
+   "end_frame": 13258,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 15,
+    "winner": "B",
+    "serve_team": "A",
+    "near_team": "A",
+    "touches": [
+     [
+      13117,
+      "serve",
+      "P1A"
+     ],
+     [
+      13146,
+      "dig",
+      "P1B"
+     ],
+     [
+      13182,
+      "set",
+      "P2B"
+     ],
+     [
+      13226,
+      "spike",
+      "P1B"
+     ],
+     [
+      13244,
+      "dig",
+      "P1A"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "A",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 13117,
+      "action": "serve",
+      "player": "P1A"
+     },
+     {
+      "frame": 13146,
+      "action": "dig",
+      "player": "P1B"
+     },
+     {
+      "frame": 13182,
+      "action": "set",
+      "player": "P2B"
+     },
+     {
+      "frame": 13226,
+      "action": "spike",
+      "player": "P1B"
+     },
+     {
+      "frame": 13244,
+      "action": "dig",
+      "player": "P1A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 13929,
+   "end_frame": 13980,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 16,
+    "winner": "A",
+    "serve_team": "B",
+    "near_team": "A",
+    "touches": [
+     [
+      13929,
+      "serve",
+      "P2B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "A",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 13929,
+      "action": "serve",
+      "player": "P2B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 14509,
+   "end_frame": 14792,
+   "status": "corrected",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {
+    "14509": {
+     "player": "P2A"
+    },
+    "14557": {
+     "player": "P2B"
+    },
+    "14605": {
+     "player": "P1B"
+    },
+    "14652": {
+     "player": "P2B"
+    }
+   },
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 17,
+    "winner": "A",
+    "serve_team": "A",
+    "near_team": "A",
+    "touches": [
+     [
+      14509,
+      "serve",
+      "P1A"
+     ],
+     [
+      14557,
+      "dig",
+      null
+     ],
+     [
+      14605,
+      "set",
+      null
+     ],
+     [
+      14652,
+      "overpass",
+      null
+     ],
+     [
+      14682,
+      "dig",
+      "P1A"
+     ],
+     [
+      14722,
+      "set",
+      "P2A"
+     ],
+     [
+      14770,
+      "spike",
+      "P1A"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "A",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 14509,
+      "action": "serve",
+      "player": "P2A"
+     },
+     {
+      "frame": 14557,
+      "action": "dig",
+      "player": "P2B"
+     },
+     {
+      "frame": 14605,
+      "action": "set",
+      "player": "P1B"
+     },
+     {
+      "frame": 14652,
+      "action": "overpass",
+      "player": "P2B"
+     },
+     {
+      "frame": 14682,
+      "action": "dig",
+      "player": "P1A"
+     },
+     {
+      "frame": 14722,
+      "action": "set",
+      "player": "P2A"
+     },
+     {
+      "frame": 14770,
+      "action": "spike",
+      "player": "P1A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 15503,
+   "end_frame": 15579,
+   "status": "corrected",
+   "labels": {},
+   "names": {},
+   "winner": "A",
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 18,
+    "winner": "B",
+    "serve_team": "A",
+    "near_team": "A",
+    "touches": [
+     [
+      15503,
+      "serve",
+      "P1A"
+     ],
+     [
+      15530,
+      "overpass",
+      "P2B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "A",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 15503,
+      "action": "serve",
+      "player": "P1A"
+     },
+     {
+      "frame": 15530,
+      "action": "overpass",
+      "player": "P2B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 17264,
+   "end_frame": 17873,
+   "status": "corrected",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {
+    "17502": {
+     "action": "dig"
+    },
+    "17530": {
+     "action": "spike",
+     "player": "P1A"
+    },
+    "17564": {
+     "action": "dig"
+    },
+    "17602": {
+     "action": "set"
+    },
+    "17694": {
+     "player": "P1A"
+    }
+   },
+   "added": [
+    {
+     "frame": 17642,
+     "action": "spike",
+     "player": "P1B"
+    }
+   ],
+   "note": "",
+   "run": {
+    "point": 19,
+    "winner": "A",
+    "serve_team": "B",
+    "near_team": "A",
+    "touches": [
+     [
+      17264,
+      "serve",
+      "P1B"
+     ],
+     [
+      17291,
+      "dig",
+      "P1A"
+     ],
+     [
+      17320,
+      "set",
+      "P2A"
+     ],
+     [
+      17365,
+      "overpass",
+      "P1A"
+     ],
+     [
+      17398,
+      "dig",
+      "P2B"
+     ],
+     [
+      17440,
+      "set",
+      "P1B"
+     ],
+     [
+      17481,
+      "spike",
+      "P2B"
+     ],
+     [
+      17502,
+      "overpass",
+      "P2A"
+     ],
+     [
+      17530,
+      "dig",
+      "P2B"
+     ],
+     [
+      17564,
+      "set",
+      "P1B"
+     ],
+     [
+      17602,
+      "overpass",
+      "P2B"
+     ],
+     [
+      17655,
+      "dig",
+      "P2A"
+     ],
+     [
+      17694,
+      "set",
+      null
+     ],
+     [
+      17733,
+      "spike",
+      "P2A"
+     ],
+     [
+      17758,
+      "dig",
+      "P2B"
+     ],
+     [
+      17796,
+      "set",
+      "P1B"
+     ],
+     [
+      17829,
+      "spike",
+      "P2B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "A",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 17264,
+      "action": "serve",
+      "player": "P1B"
+     },
+     {
+      "frame": 17291,
+      "action": "dig",
+      "player": "P1A"
+     },
+     {
+      "frame": 17320,
+      "action": "set",
+      "player": "P2A"
+     },
+     {
+      "frame": 17365,
+      "action": "overpass",
+      "player": "P1A"
+     },
+     {
+      "frame": 17398,
+      "action": "dig",
+      "player": "P2B"
+     },
+     {
+      "frame": 17440,
+      "action": "set",
+      "player": "P1B"
+     },
+     {
+      "frame": 17481,
+      "action": "spike",
+      "player": "P2B"
+     },
+     {
+      "frame": 17502,
+      "action": "dig",
+      "player": "P2A"
+     },
+     {
+      "frame": 17530,
+      "action": "spike",
+      "player": "P1A"
+     },
+     {
+      "frame": 17564,
+      "action": "dig",
+      "player": "P1B"
+     },
+     {
+      "frame": 17602,
+      "action": "set",
+      "player": "P2B"
+     },
+     {
+      "frame": 17642,
+      "action": "spike",
+      "player": "P1B"
+     },
+     {
+      "frame": 17655,
+      "action": "dig",
+      "player": "P2A"
+     },
+     {
+      "frame": 17694,
+      "action": "set",
+      "player": "P1A"
+     },
+     {
+      "frame": 17733,
+      "action": "spike",
+      "player": "P2A"
+     },
+     {
+      "frame": 17758,
+      "action": "dig",
+      "player": "P2B"
+     },
+     {
+      "frame": 17796,
+      "action": "set",
+      "player": "P1B"
+     },
+     {
+      "frame": 17829,
+      "action": "spike",
+      "player": "P2B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 18484,
+   "end_frame": 18619,
+   "status": "corrected",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {
+    "18484": {
+     "player": "P1A"
+    }
+   },
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 20,
+    "winner": "A",
+    "serve_team": "A",
+    "near_team": "A",
+    "touches": [
+     [
+      18484,
+      "serve",
+      "P2A"
+     ],
+     [
+      18513,
+      "dig",
+      "P1B"
+     ],
+     [
+      18555,
+      "set",
+      "P2B"
+     ],
+     [
+      18595,
+      "spike",
+      "P1B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "A",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 18484,
+      "action": "serve",
+      "player": "P1A"
+     },
+     {
+      "frame": 18513,
+      "action": "dig",
+      "player": "P1B"
+     },
+     {
+      "frame": 18555,
+      "action": "set",
+      "player": "P2B"
+     },
+     {
+      "frame": 18595,
+      "action": "spike",
+      "player": "P1B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 19422,
+   "end_frame": 19612,
+   "status": "corrected",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {
+    "19422": {
+     "player": "P1A"
+    },
+    "19479": {
+     "player": "P2B"
+    }
+   },
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 21,
+    "winner": "A",
+    "serve_team": "A",
+    "near_team": "A",
+    "touches": [
+     [
+      19422,
+      "serve",
+      "P2A"
+     ],
+     [
+      19452,
+      "dig",
+      "P1B"
+     ],
+     [
+      19479,
+      "overpass",
+      null
+     ],
+     [
+      19506,
+      "dig",
+      "P1A"
+     ],
+     [
+      19543,
+      "set",
+      "P2A"
+     ],
+     [
+      19582,
+      "spike",
+      "P1A"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "A",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 19422,
+      "action": "serve",
+      "player": "P1A"
+     },
+     {
+      "frame": 19452,
+      "action": "dig",
+      "player": "P1B"
+     },
+     {
+      "frame": 19479,
+      "action": "overpass",
+      "player": "P2B"
+     },
+     {
+      "frame": 19506,
+      "action": "dig",
+      "player": "P1A"
+     },
+     {
+      "frame": 19543,
+      "action": "set",
+      "player": "P2A"
+     },
+     {
+      "frame": 19582,
+      "action": "spike",
+      "player": "P1A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 20378,
+   "end_frame": 20633,
+   "status": "corrected",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {
+    "20378": {
+     "player": "P1A"
+    }
+   },
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 22,
+    "winner": "B",
+    "serve_team": "A",
+    "near_team": "B",
+    "touches": [
+     [
+      20378,
+      "serve",
+      "P2A"
+     ],
+     [
+      20414,
+      "dig",
+      "P1B"
+     ],
+     [
+      20452,
+      "set",
+      "P2B"
+     ],
+     [
+      20492,
+      "spike",
+      "P1B"
+     ],
+     [
+      20506,
+      "dig",
+      "P2A"
+     ],
+     [
+      20546,
+      "set",
+      "P1A"
+     ],
+     [
+      20580,
+      "spike",
+      "P2A"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "B",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 20378,
+      "action": "serve",
+      "player": "P1A"
+     },
+     {
+      "frame": 20414,
+      "action": "dig",
+      "player": "P1B"
+     },
+     {
+      "frame": 20452,
+      "action": "set",
+      "player": "P2B"
+     },
+     {
+      "frame": 20492,
+      "action": "spike",
+      "player": "P1B"
+     },
+     {
+      "frame": 20506,
+      "action": "dig",
+      "player": "P2A"
+     },
+     {
+      "frame": 20546,
+      "action": "set",
+      "player": "P1A"
+     },
+     {
+      "frame": 20580,
+      "action": "spike",
+      "player": "P2A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 21272,
+   "end_frame": 21309,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 23,
+    "winner": "A",
+    "serve_team": "B",
+    "near_team": "B",
+    "touches": [
+     [
+      21272,
+      "serve",
+      "P2B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "B",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 21272,
+      "action": "serve",
+      "player": "P2B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 21761,
+   "end_frame": 21951,
+   "status": "corrected",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {
+    "21761": {
+     "player": "P2A"
+    }
+   },
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 24,
+    "winner": "B",
+    "serve_team": "A",
+    "near_team": "B",
+    "touches": [
+     [
+      21761,
+      "serve",
+      "P1A"
+     ],
+     [
+      21788,
+      "dig",
+      "P1B"
+     ],
+     [
+      21824,
+      "set",
+      "P2B"
+     ],
+     [
+      21861,
+      "spike",
+      "P1B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "B",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 21761,
+      "action": "serve",
+      "player": "P2A"
+     },
+     {
+      "frame": 21788,
+      "action": "dig",
+      "player": "P1B"
+     },
+     {
+      "frame": 21824,
+      "action": "set",
+      "player": "P2B"
+     },
+     {
+      "frame": 21861,
+      "action": "spike",
+      "player": "P1B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 22371,
+   "end_frame": 22604,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 25,
+    "winner": "B",
+    "serve_team": "B",
+    "near_team": "B",
+    "touches": [
+     [
+      22371,
+      "serve",
+      "P1B"
+     ],
+     [
+      22403,
+      "dig",
+      "P1A"
+     ],
+     [
+      22448,
+      "set",
+      "P2A"
+     ],
+     [
+      22481,
+      "spike",
+      "P1A"
+     ],
+     [
+      22508,
+      "dig",
+      "P1B"
+     ],
+     [
+      22534,
+      "set",
+      "P2B"
+     ],
+     [
+      22575,
+      "spike",
+      "P1B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "B",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 22371,
+      "action": "serve",
+      "player": "P1B"
+     },
+     {
+      "frame": 22403,
+      "action": "dig",
+      "player": "P1A"
+     },
+     {
+      "frame": 22448,
+      "action": "set",
+      "player": "P2A"
+     },
+     {
+      "frame": 22481,
+      "action": "spike",
+      "player": "P1A"
+     },
+     {
+      "frame": 22508,
+      "action": "dig",
+      "player": "P1B"
+     },
+     {
+      "frame": 22534,
+      "action": "set",
+      "player": "P2B"
+     },
+     {
+      "frame": 22575,
+      "action": "spike",
+      "player": "P1B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 25343,
+   "end_frame": 25525,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 26,
+    "winner": "A",
+    "serve_team": "B",
+    "near_team": "A",
+    "touches": [
+     [
+      25343,
+      "serve",
+      "P1B"
+     ],
+     [
+      25373,
+      "dig",
+      "P2A"
+     ],
+     [
+      25410,
+      "set",
+      "P1A"
+     ],
+     [
+      25454,
+      "overpass",
+      "P2A"
+     ],
+     [
+      25498,
+      "dig",
+      "P2B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "A",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 25343,
+      "action": "serve",
+      "player": "P1B"
+     },
+     {
+      "frame": 25373,
+      "action": "dig",
+      "player": "P2A"
+     },
+     {
+      "frame": 25410,
+      "action": "set",
+      "player": "P1A"
+     },
+     {
+      "frame": 25454,
+      "action": "overpass",
+      "player": "P2A"
+     },
+     {
+      "frame": 25498,
+      "action": "dig",
+      "player": "P2B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 26104,
+   "end_frame": 26245,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 27,
+    "winner": "B",
+    "serve_team": "A",
+    "near_team": "A",
+    "touches": [
+     [
+      26104,
+      "serve",
+      "P2A"
+     ],
+     [
+      26127,
+      "dig",
+      "P1B"
+     ],
+     [
+      26177,
+      "set",
+      "P2B"
+     ],
+     [
+      26215,
+      "spike",
+      "P1B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "A",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 26104,
+      "action": "serve",
+      "player": "P2A"
+     },
+     {
+      "frame": 26127,
+      "action": "dig",
+      "player": "P1B"
+     },
+     {
+      "frame": 26177,
+      "action": "set",
+      "player": "P2B"
+     },
+     {
+      "frame": 26215,
+      "action": "spike",
+      "player": "P1B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 27007,
+   "end_frame": 27294,
+   "status": "corrected",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {
+    "27149": {
+     "player": "P1B"
+    },
+    "27186": {
+     "player": "P2B"
+    },
+    "27222": {
+     "player": "P1B"
+    }
+   },
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 28,
+    "winner": "B",
+    "serve_team": "B",
+    "near_team": "A",
+    "touches": [
+     [
+      27007,
+      "serve",
+      "P1B"
+     ],
+     [
+      27036,
+      "dig",
+      "P1A"
+     ],
+     [
+      27073,
+      "set",
+      "P2A"
+     ],
+     [
+      27115,
+      "overpass",
+      "P1A"
+     ],
+     [
+      27149,
+      "dig",
+      null
+     ],
+     [
+      27186,
+      "set",
+      null
+     ],
+     [
+      27222,
+      "spike",
+      null
+     ],
+     [
+      27240,
+      "dig",
+      "P2A"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "A",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 27007,
+      "action": "serve",
+      "player": "P1B"
+     },
+     {
+      "frame": 27036,
+      "action": "dig",
+      "player": "P1A"
+     },
+     {
+      "frame": 27073,
+      "action": "set",
+      "player": "P2A"
+     },
+     {
+      "frame": 27115,
+      "action": "overpass",
+      "player": "P1A"
+     },
+     {
+      "frame": 27149,
+      "action": "dig",
+      "player": "P1B"
+     },
+     {
+      "frame": 27186,
+      "action": "set",
+      "player": "P2B"
+     },
+     {
+      "frame": 27222,
+      "action": "spike",
+      "player": "P1B"
+     },
+     {
+      "frame": 27240,
+      "action": "dig",
+      "player": "P2A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 27714,
+   "end_frame": 27852,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 29,
+    "winner": "B",
+    "serve_team": "B",
+    "near_team": "A",
+    "touches": [
+     [
+      27714,
+      "serve",
+      "P1B"
+     ],
+     [
+      27753,
+      "dig",
+      "P1A"
+     ],
+     [
+      27790,
+      "set",
+      "P2A"
+     ],
+     [
+      27835,
+      "spike",
+      "P1A"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "A",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 27714,
+      "action": "serve",
+      "player": "P1B"
+     },
+     {
+      "frame": 27753,
+      "action": "dig",
+      "player": "P1A"
+     },
+     {
+      "frame": 27790,
+      "action": "set",
+      "player": "P2A"
+     },
+     {
+      "frame": 27835,
+      "action": "spike",
+      "player": "P1A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 28292,
+   "end_frame": 28518,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 30,
+    "winner": "B",
+    "serve_team": "B",
+    "near_team": "A",
+    "touches": [
+     [
+      28292,
+      "serve",
+      "P1B"
+     ],
+     [
+      28320,
+      "dig",
+      "P1A"
+     ],
+     [
+      28351,
+      "set",
+      "P2A"
+     ],
+     [
+      28393,
+      "spike",
+      "P1A"
+     ],
+     [
+      28413,
+      "dig",
+      "P2B"
+     ],
+     [
+      28453,
+      "set",
+      "P1B"
+     ],
+     [
+      28495,
+      "spike",
+      "P2B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "A",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 28292,
+      "action": "serve",
+      "player": "P1B"
+     },
+     {
+      "frame": 28320,
+      "action": "dig",
+      "player": "P1A"
+     },
+     {
+      "frame": 28351,
+      "action": "set",
+      "player": "P2A"
+     },
+     {
+      "frame": 28393,
+      "action": "spike",
+      "player": "P1A"
+     },
+     {
+      "frame": 28413,
+      "action": "dig",
+      "player": "P2B"
+     },
+     {
+      "frame": 28453,
+      "action": "set",
+      "player": "P1B"
+     },
+     {
+      "frame": 28495,
+      "action": "spike",
+      "player": "P2B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 29374,
+   "end_frame": 29434,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 31,
+    "winner": "B",
+    "serve_team": "B",
+    "near_team": "A",
+    "touches": [
+     [
+      29374,
+      "serve",
+      "P1B"
+     ],
+     [
+      29398,
+      "dig",
+      "P1A"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "A",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 29374,
+      "action": "serve",
+      "player": "P1B"
+     },
+     {
+      "frame": 29398,
+      "action": "dig",
+      "player": "P1A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 29932,
+   "end_frame": 29994,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 32,
+    "winner": "B",
+    "serve_team": "B",
+    "near_team": "A",
+    "touches": [
+     [
+      29932,
+      "serve",
+      "P1B"
+     ],
+     [
+      29965,
+      "dig",
+      "P1A"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "A",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 29932,
+      "action": "serve",
+      "player": "P1B"
+     },
+     {
+      "frame": 29965,
+      "action": "dig",
+      "player": "P1A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 30379,
+   "end_frame": 30573,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 33,
+    "winner": "A",
+    "serve_team": "B",
+    "near_team": "A",
+    "touches": [
+     [
+      30379,
+      "serve",
+      "P1B"
+     ],
+     [
+      30408,
+      "dig",
+      "P1A"
+     ],
+     [
+      30448,
+      "spike",
+      "P2A"
+     ],
+     [
+      30468,
+      "dig",
+      "P2B"
+     ],
+     [
+      30509,
+      "set",
+      "P1B"
+     ],
+     [
+      30550,
+      "spike",
+      "P2B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "A",
+    "near_team": "A",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 30379,
+      "action": "serve",
+      "player": "P1B"
+     },
+     {
+      "frame": 30408,
+      "action": "dig",
+      "player": "P1A"
+     },
+     {
+      "frame": 30448,
+      "action": "spike",
+      "player": "P2A"
+     },
+     {
+      "frame": 30468,
+      "action": "dig",
+      "player": "P2B"
+     },
+     {
+      "frame": 30509,
+      "action": "set",
+      "player": "P1B"
+     },
+     {
+      "frame": 30550,
+      "action": "spike",
+      "player": "P2B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 31504,
+   "end_frame": 31659,
+   "status": "ok",
+   "labels": {},
+   "names": {},
+   "winner": null,
+   "not_a_point": false,
+   "touches": {},
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 34,
+    "winner": "B",
+    "serve_team": "A",
+    "near_team": "B",
+    "touches": [
+     [
+      31504,
+      "serve",
+      "P1A"
+     ],
+     [
+      31539,
+      "dig",
+      "P2B"
+     ],
+     [
+      31586,
+      "set",
+      "P1B"
+     ],
+     [
+      31626,
+      "spike",
+      "P2B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "B",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 31504,
+      "action": "serve",
+      "player": "P1A"
+     },
+     {
+      "frame": 31539,
+      "action": "dig",
+      "player": "P2B"
+     },
+     {
+      "frame": 31586,
+      "action": "set",
+      "player": "P1B"
+     },
+     {
+      "frame": 31626,
+      "action": "spike",
+      "player": "P2B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 32264,
+   "end_frame": 32391,
+   "status": "corrected",
+   "labels": {},
+   "names": {},
+   "winner": "B",
+   "not_a_point": false,
+   "touches": {
+    "32338": {
+     "action": "set"
+    }
+   },
+   "added": [
+    {
+     "frame": 32374,
+     "action": "spike",
+     "player": "P2B"
+    }
+   ],
+   "note": "spike error into the net",
+   "run": {
+    "point": 35,
+    "winner": "A",
+    "serve_team": "B",
+    "near_team": "B",
+    "touches": [
+     [
+      32264,
+      "serve",
+      "P2B"
+     ],
+     [
+      32296,
+      "dig",
+      "P2A"
+     ],
+     [
+      32338,
+      "overpass",
+      "P1A"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "B",
+    "serve_team": "B",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 32264,
+      "action": "serve",
+      "player": "P2B"
+     },
+     {
+      "frame": 32296,
+      "action": "dig",
+      "player": "P2A"
+     },
+     {
+      "frame": 32338,
+      "action": "set",
+      "player": "P1A"
+     },
+     {
+      "frame": 32374,
+      "action": "spike",
+      "player": "P2B"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 33001,
+   "end_frame": 33451,
+   "status": "corrected",
+   "labels": {},
+   "names": {},
+   "winner": "B",
+   "not_a_point": false,
+   "touches": {
+    "33001": {
+     "action": "spike",
+     "player": "P1A"
+    },
+    "33417": {
+     "player": "P1A"
+    }
+   },
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 36,
+    "winner": "A",
+    "serve_team": "A",
+    "near_team": "B",
+    "touches": [
+     [
+      33001,
+      "serve",
+      "P2A"
+     ],
+     [
+      33026,
+      "dig",
+      "P2B"
+     ],
+     [
+      33072,
+      "set",
+      "P1B"
+     ],
+     [
+      33114,
+      "spike",
+      "P2B"
+     ],
+     [
+      33125,
+      "dig",
+      "P2A"
+     ],
+     [
+      33172,
+      "set",
+      "P1A"
+     ],
+     [
+      33220,
+      "spike",
+      "P2A"
+     ],
+     [
+      33240,
+      "dig",
+      "P1B"
+     ],
+     [
+      33282,
+      "set",
+      "P2B"
+     ],
+     [
+      33323,
+      "spike",
+      "P1B"
+     ],
+     [
+      33349,
+      "dig",
+      "P1A"
+     ],
+     [
+      33383,
+      "set",
+      "P2A"
+     ],
+     [
+      33417,
+      "spike",
+      null
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "B",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 33001,
+      "action": "spike",
+      "player": "P1A"
+     },
+     {
+      "frame": 33026,
+      "action": "dig",
+      "player": "P2B"
+     },
+     {
+      "frame": 33072,
+      "action": "set",
+      "player": "P1B"
+     },
+     {
+      "frame": 33114,
+      "action": "spike",
+      "player": "P2B"
+     },
+     {
+      "frame": 33125,
+      "action": "dig",
+      "player": "P2A"
+     },
+     {
+      "frame": 33172,
+      "action": "set",
+      "player": "P1A"
+     },
+     {
+      "frame": 33220,
+      "action": "spike",
+      "player": "P2A"
+     },
+     {
+      "frame": 33240,
+      "action": "dig",
+      "player": "P1B"
+     },
+     {
+      "frame": 33282,
+      "action": "set",
+      "player": "P2B"
+     },
+     {
+      "frame": 33323,
+      "action": "spike",
+      "player": "P1B"
+     },
+     {
+      "frame": 33349,
+      "action": "dig",
+      "player": "P1A"
+     },
+     {
+      "frame": 33383,
+      "action": "set",
+      "player": "P2A"
+     },
+     {
+      "frame": 33417,
+      "action": "spike",
+      "player": "P1A"
+     }
+    ]
+   }
+  },
+  {
+   "start_frame": 34245,
+   "end_frame": 34333,
+   "status": "corrected",
+   "labels": {},
+   "names": {},
+   "winner": "B",
+   "not_a_point": false,
+   "touches": {
+    "34245": {
+     "action": "spike"
+    }
+   },
+   "added": [],
+   "note": "",
+   "run": {
+    "point": 37,
+    "winner": null,
+    "serve_team": "A",
+    "near_team": "B",
+    "touches": [
+     [
+      34245,
+      "serve",
+      "P2A"
+     ],
+     [
+      34269,
+      "dig",
+      "P2B"
+     ],
+     [
+      34300,
+      "spike",
+      "P1B"
+     ]
+    ]
+   },
+   "truth": {
+    "is_point": true,
+    "winner": "B",
+    "near_team": "B",
+    "serve_team": "A",
+    "labels_unclear": false,
+    "touches": [
+     {
+      "frame": 34245,
+      "action": "spike",
+      "player": "P2A"
+     },
+     {
+      "frame": 34269,
+      "action": "dig",
+      "player": "P2B"
+     },
+     {
+      "frame": 34300,
+      "action": "spike",
+      "player": "P1B"
+     }
+    ]
+   }
+  }
+ ],
+ "missing_points": [
+  {
+   "after_point": 10,
+   "after_frame": 8312,
+   "winner": null,
+   "note": "",
+   "at_frame": 8746
+  },
+  {
+   "after_point": 18,
+   "after_frame": 15503,
+   "winner": "B",
+   "note": "",
+   "at_frame": 16464,
+   "serve_team": "A"
+  },
+  {
+   "after_point": 25,
+   "after_frame": 22371,
+   "winner": "A",
+   "note": "",
+   "at_frame": 23183,
+   "serve_team": "B"
+  },
+  {
+   "after_point": 25,
+   "after_frame": 22371,
+   "winner": "B",
+   "note": "",
+   "at_frame": 24131,
+   "serve_team": "A"
+  },
+  {
+   "after_point": 35,
+   "after_frame": 32264,
+   "winner": null,
+   "note": "The serve for P36 is in this dead time on this frame",
+   "at_frame": 32919,
+   "serve_team": "B"
+  },
+  {
+   "after_point": 36,
+   "after_frame": 33001,
+   "winner": "A",
+   "note": "full point missing",
+   "at_frame": 33934,
+   "serve_team": "A"
+  }
+ ],
+ "gaps": [
+  {
+   "first": 3873,
+   "last": 4487,
+   "status": "checked"
+  },
+  {
+   "first": 4600,
+   "last": 5480,
+   "status": "checked"
+  },
+  {
+   "first": 8434,
+   "last": 10046,
+   "status": "checked"
+  },
+  {
+   "first": 10345,
+   "last": 11200,
+   "status": "checked"
+  },
+  {
+   "first": 15630,
+   "last": 17238,
+   "status": "checked"
+  },
+  {
+   "first": 17924,
+   "last": 18458,
+   "status": "checked"
+  },
+  {
+   "first": 22655,
+   "last": 25317,
+   "status": "checked"
+  },
+  {
+   "first": 29485,
+   "last": 29906,
+   "status": "checked"
+  },
+  {
+   "first": 31710,
+   "last": 32238,
+   "status": "checked"
+  },
+  {
+   "first": 32442,
+   "last": 32975,
+   "status": "checked"
+  },
+  {
+   "first": 33502,
+   "last": 34219,
+   "status": "checked"
+  }
+ ],
+ "updated_at": "2026-10-16T07:50:10Z"
+}
