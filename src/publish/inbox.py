@@ -48,6 +48,7 @@ from typing import Any, Callable, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 from .client import DEFAULT_ENV_FILE, load_env_file
+from .gaps import load_gap_copy
 from .naming import MatchKeyError, match_key_for, parse_match_key
 
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".mkv", ".avi"}
@@ -283,7 +284,7 @@ class Inbox:
             rec["summary"] = summary
 
         # 4b. the review page's dead time (gaps.mp4): only buildable from the video
-        if not (run_dir / "gaps.json").exists():
+        if load_gap_copy(run_dir) is None:
             res = self.run([cfg.python, "-m", "src.publish.gaps", str(run_dir.relative_to(cfg.root)),
                             "--video", str(video.relative_to(cfg.root))],
                            cwd=cfg.root, capture_output=True, text=True)

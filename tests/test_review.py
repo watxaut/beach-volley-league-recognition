@@ -423,6 +423,19 @@ def test_runs_are_found_with_what_they_lack(tmp_path):
         ("20990102_1000_no_copy", False), (run.name, True)]
 
 
+def test_runs_without_a_dead_time_copy_are_named_at_start(tmp_path):
+    run = _run_dir(tmp_path)
+    videos = tmp_path / "videos"
+    videos.mkdir()
+    runs = R.find_runs(tmp_path / "output")
+    assert runs[0]["has_gaps"] is False
+    report = R.missing_gaps_report(runs, videos)
+    assert len(report) == 2 and "cannot be built" in report[1]
+    (videos / f"{run.name}.mp4").write_bytes(b"")
+    assert f"make review-gaps RUN=output/{run.name}" in R.missing_gaps_report(runs, videos)[1]
+    assert R.missing_gaps_report([dict(runs[0], has_gaps=True)], videos) == []
+
+
 def test_saving_a_point_writes_the_owner_file_and_undo_removes_it(tmp_path):
     run = _run_dir(tmp_path)
     gt = tmp_path / "ground_truth"

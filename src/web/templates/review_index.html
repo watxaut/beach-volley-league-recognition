@@ -23,6 +23,8 @@
               {% else %}{{ r.key }}
               <span class="rv-muted">— no {{ "rally copy" if not r.has_copy else "diag dump" }}</span>
               {% endif %}
+              {% if r.reviewable and not r.has_gaps %}<span class="warn">no dead time between points
+                (<code>make review-gaps RUN=output/{{ r.key }}</code>)</span>{% endif %}
               {% if r.error %}<span class="warn">{{ r.error }}</span>{% endif %}</td>
           <td class="num">{{ r.points if r.points is defined else "—" }}</td>
           <td class="num">{% if r.points is defined %}{{ r.reviewed }} / {{ r.points }}{% endif %}</td>
@@ -34,7 +36,9 @@
       </tbody>
     </table>
     <p class="rv-muted">A match needs its rally copy (<code>rallies.mp4</code>, written by
-      <code>make publish</code> while the video is on disk) and its diag dump.</p>
+      <code>make publish</code> while the video is on disk) and its diag dump. What plays
+      between the points (G) is the dead-time copy (<code>gaps.mp4</code>,
+      <code>make review-gaps</code>, also while the video is on disk).</p>
     {% else %}
     <p>No run with a <code>match_reconstruction.json</code> under the output folder.</p>
     {% endif %}

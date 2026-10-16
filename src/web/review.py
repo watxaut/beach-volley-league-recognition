@@ -39,7 +39,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from ..publish.clips import RALLY_PAD_S, RallyCopy, load_rally_copy
-from ..publish.gaps import GAPS_NAME, GapCopy, load_gap_copy
+from ..publish.gaps import GAPS_NAME, VIDEO_DIR, GapCopy, find_video, load_gap_copy
 from ..postrun.match import ROTATION_MIN_AGREEMENT, ROTATION_MIN_VOTES, _serving_order
 
 logger = logging.getLogger(__name__)
@@ -89,8 +89,27 @@ def find_runs(output_root: Path) -> List[Dict[str, Any]]:
         copy = (path / "rallies.mp4").is_file() and (path / "rallies.json").is_file()
         diag = (path / DIAG_NAME).is_file()
         runs.append({"key": path.name, "path": path, "has_copy": copy, "has_diag": diag,
+                     "has_gaps": load_gap_copy(path) is not None,
                      "reviewable": copy and diag})
     return runs
+
+
+def missing_gaps_report(runs: Sequence[Dict[str, Any]],
+                        video_dir: Path = VIDEO_DIR) -> List[str]:
+    """One line per reviewable run without a dead-time copy (nothing plays
+    between its points, G does nothing), saying whether the video is still on
+    disk to build it."""
+    lines = []
+    for run in runs:
+        if not run["reviewable"] or run["has_gaps"]:
+            continue
+        if find_video(run["path"], video_dir):
+            lines.append(f"  {run['key']}: make review-gaps RUN=output/{run['key']}")
+        else:
+            lines.append(f"  {run['key']}: video not in {video_dir}/, cannot be built")
+    if lines:
+        lines.insert(0, "No dead time between points (G does nothing) for:")
+    return lines
 
 
 def review_path(gt_root: Path, key: str) -> Path:
@@ -780,7 +799,8 @@ def create_router(output_root: Path = Path("output"),
         rows = []
         for run in find_runs(output_root):
             row = {"key": run["key"], "reviewable": run["reviewable"],
-                   "has_copy": run["has_copy"], "has_diag": run["has_diag"]}
+                   "has_copy": run["has_copy"], "has_diag": run["has_diag"],
+                   "has_gaps": run["has_gaps"]}
             try:
                 view = view_of(run)
                 state = state_of(run, view)
@@ -898,6 +918,9 @@ def main() -> int:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8001)
     args = parser.parse_args()
+
+    for line in missing_gaps_report(find_runs(Path(args.output_root))):
+        print(line, flush=True)
 
     import uvicorn
     from fastapi import FastAPI
