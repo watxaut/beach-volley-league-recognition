@@ -1,0 +1,37 @@
+AGENTS.md
+  s_9ed08fada71d0a::t_da67f4856e1b3c 582-587
+STATUS.md
+  s_9ed08fada71d0a::t_25043afbcc0fb9 21,36,106,126,400,502-508
+docs/history/status_log_archive.md
+  s_9ed08fada71d0a::t_040f18db179b35 7577-7591
+src/postrun/reconstruct.py
+  s_9ed08fada71d0a::t_f7ce835c80050c 114-115,149-158,180-181
+src/postrun/touches.py
+  s_9ed08fada71d0a::t_fa51eae6f128d0 51,154-158,445,452,455-456,460-461,463,572-587
+src/publish/bundle.py
+  s_9ed08fada71d0a::t_893b9bc4294d51 13-14,108
+src/publish/reviewed.py
+  s_9ed08fada71d0a::t_dc95f6a5bb4601 277-280
+tests/test_postrun.py
+  s_9ed08fada71d0a::t_c4e723f922e777 63,402,409-410,429-454
+webapp/src/lib/glossary.ts
+  s_9ed08fada71d0a::t_7577da3cd3c58e 29
+webapp/src/pages/Measure.tsx
+  s_9ed08fada71d0a::t_5af2e63ed06343 53,97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "c15d6885e5aed9e5ffe0126e589897170ea15387",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
