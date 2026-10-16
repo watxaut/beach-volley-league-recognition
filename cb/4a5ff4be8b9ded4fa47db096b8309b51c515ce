@@ -1,0 +1,37 @@
+STATUS.md
+  s_9ed08fada71d0a::t_78dd30094b3b1b 284,401,514-522
+calibrations/20261012_1200_masnou_loida_joan_pere_aitana.json
+  s_9ed08fada71d0a::t_38adcdd230d49b 1-44
+docs/history/status_log_archive.md
+  s_9ed08fada71d0a::t_c31d7974528b20 7525-7549
+docs/history/status_where_we_are_archive.md
+  s_9ed08fada71d0a::t_eafff61b25b217 3079-3080
+ground_truth/20261012_1200_masnou_loida_joan_pere_aitana_review.json
+  s_9ed08fada71d0a::t_c1a6ec55d08736 1-3067
+scripts/dump_player_tracks.py
+  s_9ed08fada71d0a::t_a7736a78f0c699 122-123,125-126
+src/analysis/frame_processor.py
+  s_9ed08fada71d0a::t_e6f6988d1d3d72 124-125
+src/detection/court_calibration.py
+  s_9ed08fada71d0a::t_7e1429bc42ce08 66-69,512-516,519-548,550
+src/utils/config.py
+  s_9ed08fada71d0a::t_207b7241766053 100
+tests/test_play_area_metre_cap.py
+  s_9ed08fada71d0a::t_cf5db6144968f0 1-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "cb4a5ff4be8b9ded4fa47db096b8309b51c515ce",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
