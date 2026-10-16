@@ -7565,3 +7565,12 @@ Deployed by the owner the same day (migration pushed, web redeployed, `make repu
 ## Session index entries retired 2026-10-17 (verbatim)
 
 - 2026-09-27 **#22** — far-side serves scoped: retracted mispaired-anchor measurement; P2 specimen (ball tracked; loss = episode starvation + serve-action gate); `derive_match_serve_windows.py`.
+
+### 2026-10-16 (hundred-and-eighteenth session) — #118: metric play-area margin; why the far-side players are lost on masnou
+
+**Asked (owner):** masnou 1200 has the worst tracking (low camera, bystanders behind the far baseline, players occluded); what can be done.
+**Measured (diag + calibration, rally frames).** Tracks >1.5 m off court: vall 3-7 %, masnou 1130 7 %, **1200 23 %** (a body 30+ px behind the far baseline, labelled with a squad and slot). Cause: `player_play_area_margin_px = 100` is a PIXEL band; behind a low camera 25 px past the far baseline is ~7 m of ground and 100 px ~180 m, at vall 100 px is ~16 m.
+**Built (`CourtCalibration.play_area_margin_m`, config `player_play_area_margin_m = 20`).** The zone is also capped in metres, tested per pixel through the ground homography (a projected rectangle wraps at the horizon). It removes 0 px on all four vall calibrations, the 7 practice clips and avp: e1-e7 byte-identical to the golden runs (diag identical to the px-only baseline). Beach calibrations lose ~37-48k px.
+**Result.** 1200: bystander-side tracks 22.6 -> 2.0 % of rally frames; owner-named touches with the right player 151 -> 150 / 176 (flat); 1130 173 -> 176 / 196 (its off-court bodies are not removed); 20260920 bar held (33/33, 0 false, winners 33/33, A 21 - B 12, precision 0.976, 0 rule breaks).
+**Far-side "recovery" is NOT a tracker gap (probed).** Of 263 samples of a coasting far track on 1200: 72 % the nearby detection is another track's body (a teammate in front, normal aspect), 21 % the detector has nothing (conf 0.15 adds 2 %), 8 % a free box and those are bystanders 80+ px behind the baseline. Nothing to re-associate; the post-run layer already ignores `predicted` boxes. More height/angle is the only real lever.
+- 2026-09-27 **#23** — pose gating shipped in the shared classifier (staleness + near-ball trail), byte-identical everywhere, match ×1.24 (Log below).
