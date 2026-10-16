@@ -19,7 +19,10 @@ For every video in the shared Drive folder (rclone remote ``gdrive:VolleyInbox``
    used and the run goes on, anything else waits; ``off`` -- always wait. A
    notification says what to do, once;
 3. ``make run-match`` (only on AC power, under ``caffeinate``);
-4. ``python -m src.publish output/<key>`` (lands as a DRAFT);
+4. ``python -m src.publish output/<key>`` (lands as a DRAFT), then the
+   dead-time copy for the review page (``src.publish.gaps``: ``gaps.mp4``,
+   what plays between the points and on G) while the video is still on disk;
+   a failure there is reported and never blocks the archive;
 5. move the Drive file to ``VolleyArchive/<key>.<ext>`` (a server-side move
    keeps the file id, so the stored link stays valid).
 
@@ -45,6 +48,7 @@ from typing import Any, Callable, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 from .client import DEFAULT_ENV_FILE, load_env_file
+from .gaps import load_gap_copy
 from .naming import MatchKeyError, match_key_for, parse_match_key
 
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".mkv", ".avi"}
@@ -278,6 +282,15 @@ class Inbox:
             rec["status"] = "published"
             summary = next((ln for ln in res.stdout.splitlines() if ln.startswith("score")), "")
             rec["summary"] = summary
+
+        # 4b. the review page's dead time (gaps.mp4): only buildable from the video
+        if load_gap_copy(run_dir) is None:
+            res = self.run([cfg.python, "-m", "src.publish.gaps", str(run_dir.relative_to(cfg.root)),
+                            "--video", str(video.relative_to(cfg.root))],
+                           cwd=cfg.root, capture_output=True, text=True)
+            if res.returncode != 0:
+                self.say(f"{key}: no dead-time copy for the review page "
+                         f"(make review-gaps RUN=output/{key}): {res.stderr.strip()[-200:]}")
 
         # 5. archive on Drive under the match key
         self._check(self.run(["rclone", "moveto", self._remote(cfg.inbox, entry["Path"]),
