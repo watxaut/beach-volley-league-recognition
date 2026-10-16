@@ -1,0 +1,31 @@
+AGENTS.md
+  s_9ed08fada71d0a::t_297268a1ae26cb 735-737,751-752
+STATUS.md
+  s_9ed08fada71d0a::t_cc107f1e2fc308 21-22,79,238,296,299,400,502-513
+docs/auto_calibration.md
+  s_9ed08fada71d0a::t_b91e7703691a24 24,44-46,102-103,118-121,131-132,134-136,156-158
+docs/history/status_log_archive.md
+  s_9ed08fada71d0a::t_94e3497bade27c 7506-7517,7521-7524
+scripts/score_autocalibration.py
+  s_9ed08fada71d0a::t_f189aca186bb03 66-74
+src/detection/court_autocalibration.py
+  s_9ed08fada71d0a::t_cfd0d184e5fc14 54,355-360,417-468,475-477,1034-1052,1138-1142,1159-1162
+tests/test_court_autocalibration.py
+  s_9ed08fada71d0a::t_a39d234bfd280e 73-74,108,177-193,295-305
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "14f5732ee2e67abcf748918cdf849779c8eb2aa8",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
