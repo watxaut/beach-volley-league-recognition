@@ -1,0 +1,25 @@
+src/publish/inbox.py
+  s_9ed08fada71d0a::t_8e7c08e15fdd39 51,287
+src/web/review.py
+  s_9ed08fada71d0a::t_89739ce6fdc2e0 42,92,97-114,802-803,922-924
+src/web/templates/review_index.html
+  s_9ed08fada71d0a::t_1a08f654ab2ae0 26-27,39-41
+tests/test_review.py
+  s_9ed08fada71d0a::t_a424a40487e808 426-438
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "8e7783223b8aa6c66e1ac6356c71aad0502cc46d",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
