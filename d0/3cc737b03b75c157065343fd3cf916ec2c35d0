@@ -1,0 +1,21 @@
+STATUS.md
+  s_9ed08fada71d0a::t_524b18116ffcea 125,400,502-515
+docs/history/status_log_archive.md
+  s_9ed08fada71d0a::t_2519a70c0d63c4 7568-7576
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "d03cc737b03b75c157065343fd3cf916ec2c35d0",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
