@@ -49,8 +49,12 @@ WINNER_SCORE = "score_closes"       # last point: the only winner that ends the 
 LINE_CALL_REASONS = ("ace", "serve_out", "landed_in", "landed_out")
 #: A ball that comes down AT the net after an attack: which side of it?
 REASON_FELL_AT_NET = "fell_at_net"
+#: A ball dropping at the net (the rally's end is the net, not the sand): a
+#: hit that went over and fell just past the tape reads the same as one that
+#: stopped in it (#122: 1000 P21, a kill dropped as a "trailing touch").
+REASON_INTO_NET = "into_net"
 #: Reads the next serve overrules without anything being dropped.
-WEAK_REASONS = LINE_CALL_REASONS + (REASON_FELL_AT_NET,)
+WEAK_REASONS = LINE_CALL_REASONS + (REASON_FELL_AT_NET, REASON_INTO_NET)
 # "Tracked all the way down": this share of the frames after the last touch.
 FELL_MIN_COVERAGE = 0.7
 
@@ -128,7 +132,7 @@ def death_winner(rally: Rally, touches: List[Touch],
             return rival, "serve_short"
         return None, None
     if end.kind == END_NET:
-        return rival, "into_net"
+        return rival, REASON_INTO_NET
     if end.side == hitter:
         return rival, "died_on_own_half"
     if end.side == rival and end.kind == END_GROUND:

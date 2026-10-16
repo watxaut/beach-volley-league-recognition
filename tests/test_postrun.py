@@ -718,6 +718,26 @@ def test_a_set_and_a_third_contact_is_not_an_ace():
     assert lost["touches"][-1]["outcome"] == "error"
 
 
+def test_an_attack_the_ball_dropped_at_the_net_after_stays_when_its_team_serves_next():
+    # #122: "dropping at the net" cannot say which side of the tape; the next
+    # serve decides and the observed attack is not a trailing pick-up.
+    from src.postrun.match import MatchAssembler, Point
+    from src.postrun.rallies import END_NET
+    rally = type("R", (), {"serve": type("S", (), {"side": "far", "into_net": False})(),
+                           "end": RallyEnd(kind=END_NET, frame=9, side=None)})()
+    touches = [Touch(frame=0, side="far", touch_number=0, action="serve", observed=False),
+               Touch(frame=3, side="near", touch_number=1, action="dig", observed=True),
+               Touch(frame=6, side="near", touch_number=2, action="set", observed=True),
+               Touch(frame=8, side="near", touch_number=3, action="spike", observed=True)]
+    pt = Point(rally=rally, touches=list(touches), roster=None, near_squad=1)
+    served = type("R", (), {"serve": type("S", (), {"side": "near", "into_net": False})(),
+                            "end": None})()
+    nxt = Point(rally=served, touches=[], roster=None, near_squad=1)   # the attackers serve next
+    MatchAssembler()._decide(pt, nxt)
+    assert pt.winner_squad == 1 and pt.touches == touches
+    assert "trailing_touch_dropped" not in pt.flags
+
+
 def test_touch_credited_after_the_ball_died_is_dropped_by_the_next_serve():
     b = sim.StreamBuilder(40.0)
     # Point 1: A serves, B's attack goes into the net and drops on B's half;
