@@ -1,0 +1,23 @@
+STATUS.md
+  s_9ed08fada71d0a::t_0d3642731509b9 214-216,402,504-509
+docs/camera_upgrade_review.md
+  s_9ed08fada71d0a::t_f560b832e74dde 1-177
+docs/history/status_log_archive.md
+  s_9ed08fada71d0a::t_0374f4892ff4e1 7592-7601
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "e627ca6f4b2ee96539cc5bb3b504ff366101066a",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
