@@ -1,0 +1,19 @@
+webapp/src/lib/glossary.ts
+  s_9ed08fada71d0a::t_7ceb8a15bf22ff 29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "2303b3da52d2e0d0d9043e7093821c7570c4f6f1",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
