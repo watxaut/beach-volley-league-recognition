@@ -10,7 +10,8 @@ talks to the network: thumbnail and clip paths are handed in. Point / action key
 Credit rule (the one that keeps the web equal to the owner-ratified
 ``postrun.player_stats``): an action carries a ``slot`` exactly when
 player_stats credits it -- a named server always (service-order servers
-included), a rally touch only when it was observed. Every stat in SQL counts
+included), a block named by who stood at the net, a rally touch only
+when it was observed. Every stat in SQL counts
 ``slot IS NOT NULL`` rows only.
 """
 
@@ -104,7 +105,7 @@ def _credited_slot(t: Dict[str, Any]) -> Optional[str]:
     player = t.get("player")
     if player not in SLOTS:
         return None
-    if t["touch_number"] == 0 or t["action"] == "serve":
+    if t["touch_number"] == 0 or t["action"] in ("serve", "block"):
         return player
     return player if t["observed"] else None
 

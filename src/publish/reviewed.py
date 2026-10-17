@@ -274,25 +274,10 @@ def missing_point(m: Dict[str, Any], before: Optional[Dict[str, Any]],
 # --------------------------------------------------------------------------- #
 
 def _player_stats(points: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """The post-run stats over the reviewed points, plus what only a review
-    can say: blocks, and the ones that won the point (+1 each, owner rule)."""
-    from ..postrun.reconstruct import FANTASY, player_stats
-    stats = player_stats(points)
-    for pt in points:
-        for t in pt["touches"]:
-            if t["action"] != "block" or not t["observed"] or t["player"] not in SLOTS:
-                continue
-            row = stats.setdefault(t["player"], {k: 0 for k in (
-                "serves", "aces", "serve_errors", "digs", "sets", "assists", "spikes",
-                "overpasses", "kills", "attack_errors", "handling_errors", "fantasy")})
-            row["blocks"] = row.get("blocks", 0) + 1
-            if t["outcome"] == "kill":
-                row["block_kills"] = row.get("block_kills", 0) + 1
-                row["fantasy"] = round(row["fantasy"] + FANTASY["kill"], 1)
-    extra = stats.pop("_uncredited_observed_touches")
-    stats = dict(sorted(stats.items()))
-    stats["_uncredited_observed_touches"] = extra
-    return stats
+    """The post-run stats over the reviewed points (blocks included: a block
+    scores only when it wins the point, owner rule)."""
+    from ..postrun.reconstruct import player_stats
+    return player_stats(points)
 
 
 def _checks(checks: Dict[str, Any], points: List[Dict[str, Any]],

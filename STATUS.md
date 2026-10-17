@@ -18,7 +18,7 @@ update at the end of every session that changes anything and commit with the wor
 - New durable protocol rules go in `AGENTS.md`; new cross-session technical
   facts go one-line-each into *Learnings* below.
 
-Last updated: **2026-10-16 (118th session, worktree `fix/autocal-beach-masnou`) — #119 automatic calibration finds a BLACK tape: the chroma-only first pass saw nothing at masnou; a lightness pass (only when chroma finds no court) accepts 1130 and 1200, corners ≤ 10 px from the clicks; focal priors no longer let one venue swallow another.**
+Last updated: **2026-10-17 (121st session) — #123 a block is credited to the one defender standing at the net when the hit came back (soft block, +0; a block that wins the point is still the owner's review): 5 of 5 owner-named blocks right, everything else byte-identical.**
 #116 (web simpler, match details), #115 (blocks as a hidden post-run label), #113 (web player page v3; merged, pushed and deployed by the owner), #112 (masnou: a new beach video, calibrated by hand), #111 (1230: two lost rallies), #110 (automatic court calibration), #109 (1100 vs the owner's table), #108 (two more videos run), #107 (attack clips), #106 (20261010 = the owner's sequence), #105 (who is who post-run), #104 (second match, diagnosis), #102 (Feedback button), #101 (net-anchored court positions), #99 (reception vs defense), #98 / #97 (hard / touch), #96 (player page v2), #95 (unknown-player slots) and #90 (platform) lie underneath.
 
 ## North-star goals (set session 24)
@@ -33,7 +33,7 @@ Last updated: **2026-10-16 (118th session, worktree `fix/autocal-beach-masnou`) 
   `class_accuracy`; contact F1 is label-blind; label-only oracle is trivially 1.000.
 - Stat coverage: kill/dig/attack-error, ace + serve-error, assist and
   point winner are all derived by the post-run layer (#87) per credited
-  touch; block = hidden, uncredited label (#115); ball-handling error not perceptible →
+  touch; block = hidden label credited to the defender at the net (#123, +0; kill = review); ball-handling error not perceptible →
   manual override in the review UI.
 - Critical path: owner player gate (32a) → ingest `match_reconstruction.json`
   into the DB → points-table UI (14e) + fantasy. Rollout gate = fast human
@@ -103,7 +103,7 @@ colours/labels. Pass-2 scripts (`relabel_serves`, `resolve_side_switches`,
 `resolve_point_winners` 18/33, `consume_serve_evidence`) are SUPERSEDED by
 `src/postrun` for points/serves/winners; kept as provenance. Entreno action
 gate (causal): e1 0.706, e2 0.571, e3 1.0, e4 0.933, e5 0.923, e6 0.933,
-e7 0.75 (same-session A/B only). Test suite **1409** (1404 pass, 5 skipped: the schema checks, which pass with a Postgres).
+e7 0.75 (same-session A/B only). Test suite **1431** (1426 pass, 5 skipped: the schema checks, which pass with a Postgres).
 
 **Player detector input (#94, default ON):** `player_bgr_input: true` passes BGR as-is (`false` = the old path; how to compare: Learnings). 4-track frames up on all 7 clips, stream F1 0.824→0.839, post-run identical; match stream labels 81/145→74/146; e3 contact sheet owed. Full text: `docs/history/status_where_we_are_archive.md` (#97).
 **Speed (#89, results-neutral — AGENTS §12):** `prefetch_depth: 8` + `detector_fast_inference`: match 1955 → 783–836 s, clips 291 → 131 s, byte-identical to the pre-#94 goldens (= `player_bgr_input: false`). Bound: MediaPipe pose (open point 33). Full text: same archive (#94, #97).
@@ -123,7 +123,7 @@ GT `20260920_match_ari_joan_contacts_p1_p8.txt` P31 serve f24543 is 128 f before
 ## Active next (ranked)
 
 0. **Cut the owner's review time (#117; measured: 175 edits on 71 of 180 points over 5 reviewed matches, ~20 min a match; `scripts/review_corrections.py`).** One mechanism per session, each judged by the edits it saves on the 5 review files with the §11 bars held: (a) DONE (#117): naming a `T#` body on one touch names it (and the half's other unnamed body, the teammate) for the rally; the servers the owner's corrections move are suggested, kept on Enter; (b) DONE (#117): a last dig nobody was at after an ace / kill, the ball never back up to the tape = the ball on the sand, dropped (exactly the 6 the owner removed; `make republish-all` after merge); (c) DONE (#117): a hit above the tape next seen on the net line under the tape, close and sooner than a crossing = net / block, never the other half's touch (the 4 reviewed points now read as the owner's truth, ~7 edits; `make republish-all` after merge); (d) DONE as far as it generalises (#120, #122): the LOSING team's set the ball outlived and that came down on its own half = a hidden uncredited attack, no setter error (4 points); a net drop that contradicts the next serve no longer trims the attack before it (`into_net` is a weak death read, 1000 P21); the other 9 of the 13 are one-offs, not rules: a net fault / block the run cannot read (1200 P6, masnou 1200 P35 trimmed by `died_on_own_half`), a serve frame 2.8 s before its reception (1200 P7; all 174 owner serves are <= 2.1 s), the ball lost or a serve-side read (1230 P7, 1100 P12 / P13, masnou 1130 P32); crediting the unseen attack to the setter's partner stays the owner's call; (e) diagnosed #120: mostly missed touches (see (d) / blocks), 11 of 29 relabels are the 1.23 ratio — not re-tunable on these matches; (f) DIAGNOSED #121, NOT BUILT: 1230 B's two players score alike against every anchor (a B body reads P1B 0.77 / P2B 0.81, the other 0.78 / 0.80), so no read of `id_sims` can tell them apart: the margin does not predict a swap (3 of 6 half-rallies at 0.03-0.06 swapped, 87-98 % right at every other level over 6 matches), track ids do not persist across rallies, court side does not separate them; the 22 per-touch names shrink to ~7 with (a); what is left is 5 one-key swaps. Needs a NEW appearance signal (embeddings in the dump = a full re-run, owner gate).
-1. **Blocks (owner, 2026-10-15):** a block MAY be credited (to the defender at the net); it scores +1 only as a kill block (§13 rule unchanged). Owed: the credit rule in §11 + `player_stats` + publisher together, and a landing half read independently of the touch sides (the #115 stuff read was refuted).
+1. **Blocks (owner, 2026-10-15):** DONE for the soft block (#123: credited to the one defender at the net, +0, `player_stats` + bundle slot + reviewed together). Open: a block KILL read by the run (nothing comes back after it): needs a landing half read independent of the touch sides (#115 refuted the stuff read); until then it is the owner's review only.
 2. **Web, design §8 "Next":** action_overrides UI, in-app invites, `own_x_m` heatmaps; a match-type filter on the League table / tabs ("for the future", #116).
 3. **Landing line calls** (20260920: 3 of 10 wrong, not the #106 bug; 20261010:
    5 of 5): needed only for the last point and for kill-vs-out detail; a read
@@ -397,6 +397,7 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Owner labels vs run labels (#109, 1100): the owner named team B the other way round (owner P1B = run P2B) through the whole video — check a serve frame with the dump's labels drawn before calling an identity bug. The owner's `mm.ss` is the SERVE time; `ffprobe` packet pts ≥ 0, sorted, are the decoder's frames exactly (4 videos: one per frame).
 
 ## Session index (one line each)
+- #123 **Blocks credited: the one defender at the net when the hit came back is the block's player (+0; a block kill = owner review); 5 of 5 owner-named blocks right**
 - #122 **Review time: (f) look-alike squads diagnosed, not built (B bodies read alike against every anchor); (d) rest: a net drop no longer trims the attack before it (1000 P21)**
 - #120 **Review time (d): a losing team's set the ball outlived, tracked down on its own half = a hidden unseen attack, no setter error (4 reviewed points; rest byte-identical)**
 - #119 **Auto calibration finds a black tape (masnou 1130 + 1200 accepted, ≤ 10 px): lightness pass when the chroma pass finds no court; focal priors by densest window; 6 old views identical**
@@ -496,8 +497,14 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-09-28 **#27** — architecture ratified: pass-2 interpretation layer over the stream (map → serve re-label → winner → fantasy); full-video two-pass REJECTED (live parity + no perception gain) — …(log archive 2026-10-06)
 - 2026-09-27 **#26** — open point 22 mechanism 1 SHIPPED: anchor-free episode→GT-point order map (DP + BURST class, physics constraints) + far/near serve census on TRUE windows — …(log archive 2026-10-06)
 - 2026-09-27 **#25** — open point 23 SHIPPED: live-debug producer/consumer decoupling; logs + rendered frames byte-identical; 8.0 → ~12 fps; +14 tests (Log below).
-- 2026-09-27 **#24** — product north-star goals set (G1 Fantasy scoring / G2 individual stats); stat-coverage audit + critical paths (archived).
 ## Log (newest first)
+
+### 2026-10-17 (hundred-and-twenty-first session) — #123: a block is credited to the defender at the net
+
+**Asked (owner):** "check status and credit block kills", then "do 1" (credit the soft blocks only; a block can also happen when nobody is spiking at the net, rarely).
+**Built.** `TouchSolver._blocker` (`touches.py`): the hidden block takes the ONE player of the blocking half standing within `BLOCKER_NET_M` of the net at the hit frame (`player_source: at_the_net`; two at the net = nobody). The gate is the ball's height at the net, not the hit's label, so a blocked free ball / overpass counts the same. `player_stats` credits `blocks` (+ `block_kills`, +kill value) for a named block without it being observed; `bundle._credited_slot` sends its `slot`; `reviewed._player_stats` now just calls `player_stats` (an owner-listed block replaces the run's, no double count). Web hint text updated (glossary, `/measure`).
+**Measured.** 14 runs (7 clips, 20260920, 6 vall d'Hebron / masnou), same-session A/B: only the 3 matches that read blocks change, and only the block's player + `player_stats.blocks`; 6 of 6 run blocks named vs the owner's review for 5 of them (1000 P5 / P26, 1200 P6 / P21 / P24 all right), 1230 P18 has no owner verdict. Block kills stay the owner's review only: they have no touch after them, and the landing-half read was refuted (#115).
+**Owed.** `make republish-all` after merge (blocks now carry a slot on 1000 / 1200 / 1230; reviewed points unchanged).
 
 ### 2026-10-17 (hundred-and-twentieth session) — #121 / #122: review time (f) diagnosed, (d) rest
 
@@ -512,15 +519,3 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 **Built (`MatchAssembler._unseen_attack_on_own_half`, match.py).** Mirror of the winner-side `_finish_labels` rule: touch 2 (dig/set), flight out reached net height, `_second_arc`, ball tracked >= `UNDER_TAPE_MIN_COVERAGE` of the frames to the landing -> hidden uncredited spike (`unseen_final_attack`), no error. Coverage is what separates the false positive (1100 P16: 11 of 85 frames, a set that crossed the net, seen on frames).
 **Result.** Exactly those 4 points change on the 6 reviewed matches (touches + the setter's `error` outcome), scores / winners / every other point identical; 20260920 + e1-e7 byte-identical; 2 tests; suite green. `make republish-all` after merge.
 **Not done.** (d) other causes (an invented hidden touch after a slow serve: 1200 P7; spike vertex at the landing frame: 1200 P35; far attack lost: 1230 P7; the rally's dead-time tail) and (f); each its own mechanism.
-
-### 2026-10-16 (hundred-and-eighteenth session) — #119: the automatic calibration finds a black tape (masnou)
-
-**Asked (owner):** why does the auto calibration not work on 20261012_1130 / _1200 masnou; is it biased to vall d'Hebron / Castelldefels? Work on a worktree (another session on `feat/118`).
-
-**Diagnosis.** Both refused at the first step ("no court"). Two chroma-only assumptions, true of vall d'Hebron's BLUE tape: (1) `chroma_ridges` + `_sand_region` read Lab a/b only — masnou's black tape has the sand's own a/b (128/140 vs 128/141), 0 ridge pixels on the court lines, and the sand mask leaked into the beige promenade (its dark clutter then filled the 60-line Hough budget); (2) `tape_colour` reads the tape as a chroma direction — 1200: "no colour of its own", 1130 (with (1) patched alone): a noise axis that re-picked near corners 49 px off and was still ACCEPTED. Also latent: `focal_priors` grouped greedily from the smallest focal, so masnou's two files (1776 / 1790 px) took vall d'Hebron's 1838 and left 1230 without its camera read (refused) — already true on the main checkout, where both masnou files are on disk.
-
-**Built (`src/detection/court_autocalibration.py`, VERSION 7).** `lightness_ridges`: thin darker / brighter structures, sand told apart by L+a+b; run only when the chroma pass finds no court. `_tape_colour_lab`: the tape's colour as a direction in L, a, b for such a court (`checks.court_found_by: lightness`, `tape_colour_lab`). `focal_priors`: the densest window first (tightest on a tie), its views removed, repeat. Tests: a drawn sand-hued dark tape on a low tripod (refused without the fix), a coloured tape never takes the lightness path, two views of a venue cannot swallow a neighbour's. `score_autocalibration.py` scores both masnou views.
-
-**Measured.** 1130 accepted: corners (0,0) / (−4,−3) / (−2,−1) / (6,0) px vs the hand file, widths −0.7 / −0.5 %, net 2.30 m, camera 1.57 m up; 1200 accepted: (3,−2) / (−5,−3) / (−10,−3) / (0,−4), widths −1.4 / −0.6 %, net 2.31 m. The 6 old views: points, checks and acceptance identical to main's `score.json`, focal priors unchanged (1879 / 1879 / 1869 / 1889 / 1889 / 1879). Replays: see open point 36 (h) — 3 of 4 differences go to the owner's review, the 1200 last point goes from undecided to the wrong winner. 1403 tests pass; `test_serve_scorer` fails in the worktree only (reads `output/serve_*.json`, not there).
-
-**Not done / owed.** No causal re-run with the automatic files (§14 asks for one when an accepted view's corners move — here no accepted view moved; masnou has hand files, which stay). The 1200 hand calibration stays untracked in the main checkout (not committed here). The last-point winner of 1200 is a post-run question.

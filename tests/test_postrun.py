@@ -60,7 +60,7 @@ from src.postrun.rallies import (  # noqa: E402
     RallySegmenter,
     classify_landing,
 )
-from src.postrun.reconstruct import reconstruct  # noqa: E402
+from src.postrun.reconstruct import player_stats, reconstruct  # noqa: E402
 from src.postrun.stream import load_stream  # noqa: E402
 from src.postrun.touches import (  # noqa: E402
     SOURCE_ALTERNATION,
@@ -399,13 +399,15 @@ def test_low_third_touch_over_the_net_is_an_overpass_not_a_spike():
     assert actions == ["serve", "dig", "set", "overpass", "dig"]
 
 
-def _blocked_rally(blocker_at_net):
+def _blocked_rally(blocker_at_net, double=False):
     """B attacks at the net, the ball comes straight back to B's half and B
     plays a new possession (dig, set, attack)."""
     positions = dict(sim.NEAR_A)
     positions["P1B"] = (2.5, 7.0)                    # the attacker, at the net
     if blocker_at_net:
         positions["P1A"] = (2.5, 8.8)                # her blocker, across it
+    if double:
+        positions["P2A"] = (4.0, 8.8)                # a double block
     b = sim.StreamBuilder(16.0)
     hits = [sim.Hit(1.15, "P2B", sim.DIG_Z, xy=(5.5, 5.0)),
             sim.Hit(1.6, "P1B", sim.SET_Z, xy=(3.0, 6.0)),
@@ -424,7 +426,32 @@ def test_attack_that_comes_straight_back_was_blocked():
         ("far", 3, "spike"), ("near", 1, "block"), ("far", 1, "dig"),
         ("far", 2, "set"), ("far", 3, "spike")]
     block = point["touches"][4]
-    assert block["player"] is None and not block["observed"]   # never credited
+    assert block["player"] == "P1A" and not block["observed"]   # the one at the net
+    assert block["player_source"] == "at_the_net"
+
+
+def test_a_double_block_names_nobody():
+    point = _blocked_rally(blocker_at_net=True, double=True)
+    block = [t for t in point["touches"] if t["action"] == "block"]
+    assert len(block) == 1 and block[0]["player"] is None
+
+
+def _block_point(outcome):
+    return {"serve": {"player": None, "outcome": None}, "touches": [
+        {"touch_number": 3, "observed": True, "player": "P1B", "action": "spike",
+         "side": "far", "outcome": None},
+        {"touch_number": 1, "observed": False, "player": "P1A", "action": "block",
+         "side": "near", "outcome": outcome}]}
+
+
+def test_a_soft_block_is_counted_and_scores_nothing():
+    row = player_stats([_block_point(None)])["P1A"]
+    assert row["blocks"] == 1 and row.get("block_kills", 0) == 0 and row["fantasy"] == 0.0
+
+
+def test_a_block_kill_scores_the_kill_value():
+    row = player_stats([_block_point("kill")])["P1A"]
+    assert row["blocks"] == 1 and row["block_kills"] == 1 and row["fantasy"] == 1.0
 
 
 def test_no_block_without_a_player_at_the_net():
