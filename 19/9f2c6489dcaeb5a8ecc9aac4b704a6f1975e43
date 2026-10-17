@@ -1,0 +1,21 @@
+STATUS.md
+  s_9ed08fada71d0a::t_b38f9a3a8c1d70 125
+scripts/probe_identity_embedding.py
+  s_9ed08fada71d0a::t_4c49d079cf92db 1-193
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "199f2c6489dcaeb5a8ecc9aac4b704a6f1975e43",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
