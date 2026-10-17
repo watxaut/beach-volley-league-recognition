@@ -7589,3 +7589,13 @@ Deployed by the owner the same day (migration pushed, web redeployed, `make repu
 
 ### Session index lines moved out of STATUS.md (2026-10-17, #123; verbatim)
 - 2026-09-27 **#24** — product north-star goals set (G1 Fantasy scoring / G2 individual stats); stat-coverage audit + critical paths (archived).
+
+### 2026-10-17 (hundred-and-nineteenth session) — #120: review time (d), the set nobody followed up
+
+**Asked (owner):** "do d, e, f" (Active next 0). **Diagnosis first (`scripts/review_corrections.py` + probes over the 6 review files).** (e) is mostly NOT a dig-vs-overpass rule: of 29 overpass relabels 15 follow a touch the run missed beside it (11 a missing attack / set = (d), 4 a missing block = backlog 1), 3 an invented touch, 11 pure labels (attack vs pass ratio 1.23, §11: not re-tunable on these). (d) has 4 sub-causes over its 13 points; the one that repeats (4 points: 1100 P10, 1200 P2, 1130 P18 + P29) is the LOSING team's second touch (a set) after which the ball stayed up longer than one arc, was tracked down on the same half and the run charged the setter with a handling error the unseen attacker made.
+**Built (`MatchAssembler._unseen_attack_on_own_half`, match.py).** Mirror of the winner-side `_finish_labels` rule: touch 2 (dig/set), flight out reached net height, `_second_arc`, ball tracked >= `UNDER_TAPE_MIN_COVERAGE` of the frames to the landing -> hidden uncredited spike (`unseen_final_attack`), no error. Coverage is what separates the false positive (1100 P16: 11 of 85 frames, a set that crossed the net, seen on frames).
+**Result.** Exactly those 4 points change on the 6 reviewed matches (touches + the setter's `error` outcome), scores / winners / every other point identical; 20260920 + e1-e7 byte-identical; 2 tests; suite green. `make republish-all` after merge.
+**Not done.** (d) other causes (an invented hidden touch after a slow serve: 1200 P7; spike vertex at the landing frame: 1200 P35; far attack lost: 1230 P7; the rally's dead-time tail) and (f); each its own mechanism.
+
+### Session index lines moved out of STATUS.md (2026-10-17, #126; verbatim)
+- 2026-09-27 **#25** — open point 23 SHIPPED: live-debug producer/consumer decoupling; logs + rendered frames byte-identical; 8.0 → ~12 fps; +14 tests (Log below).

@@ -211,7 +211,9 @@ archived under their session date in `docs/history/status_log_archive.md`.)*
 29. **Stale recording guide.** `docs/video_recording_guide.md` contradicts
     the validated long-axis geometry. Next (docs-only): rewrite to the
     long-axis spec + `scripts/probe_capture_spec.py` pre-flight (ffprobe:
-    CFR/VFR, effective fps, resolution).
+    CFR/VFR, effective fps, resolution). Input since #126:
+    `docs/camera_upgrade_review.md` (camera / stand spec, the owed new-camera
+    steps — its "auto-scales" 4K claim is false, `ensure_1080` only upscales).
 31. **Point-end REST / landing line calls.** The tracker drops the final
     descent by design (static suppression), so the post-run ball-death read
     exists on only 16/33 points and its in/out half is weak (3 of 10 wrong;
@@ -397,6 +399,7 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - Owner labels vs run labels (#109, 1100): the owner named team B the other way round (owner P1B = run P2B) through the whole video — check a serve frame with the dump's labels drawn before calling an identity bug. The owner's `mm.ss` is the SERVE time; `ffprobe` packet pts ≥ 0, sorted, are the decoder's frames exactly (4 videos: one per frame).
 
 ## Session index (one line each)
+- #126 **Camera review (docs only, `docs/camera_upgrade_review.md`): height is the lever (far sand 3.7 px/m at 1.2 m vs 11 at 3.3 m); 1080p30 CFR, ~55-60° rectilinear; no net-post fisheye; <€100 = used HERO8**
 - #123 **Blocks credited: the one defender at the net when the hit came back is the block's player (+0; a block kill = owner review); 5 of 5 owner-named blocks right**
 - #122 **Review time: (f) look-alike squads diagnosed, not built (B bodies read alike against every anchor); (d) rest: a net drop no longer trims the attack before it (1000 P21)**
 - #120 **Review time (d): a losing team's set the ball outlived, tracked down on its own half = a hidden unseen attack, no setter error (4 reviewed points; rest byte-identical)**
@@ -496,8 +499,13 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 - 2026-09-28 **#28** — point 22 mechanism 3 SHIPPED: pass-2 serve re-labeling (`scripts/relabel_serves.py`, +29 tests) — …(log archive 2026-10-06)
 - 2026-09-28 **#27** — architecture ratified: pass-2 interpretation layer over the stream (map → serve re-label → winner → fantasy); full-video two-pass REJECTED (live parity + no perception gain) — …(log archive 2026-10-06)
 - 2026-09-27 **#26** — open point 22 mechanism 1 SHIPPED: anchor-free episode→GT-point order map (DP + BURST class, physics constraints) + far/near serve census on TRUE windows — …(log archive 2026-10-06)
-- 2026-09-27 **#25** — open point 23 SHIPPED: live-debug producer/consumer decoupling; logs + rendered frames byte-identical; 8.0 → ~12 fps; +14 tests (Log below).
 ## Log (newest first)
+
+### 2026-10-17 (hundred-and-twenty-third session) — #126: what camera to record with (docs only)
+
+**Asked (owner):** camera specs to buy instead of the phone (shops shipping to Spain), a fisheye clamped to the net post, then anything under €100 ("we need only 1080 and 30 fps"); "save the review to a file".
+**Measured (from `calibrations/`, `camera_from_corners`).** Far-baseline sand detail 3.7 px/m beach (lens 1.21 m) / 4.5 masnou (1.55 m) / 10.8-11.2 vall d'Hebron (3.3 m); every validated video has focal 1640-2120 px at 1080p (~50-60° H); an unzoomed action cam (92° H) would halve the far ball (~8 px vs 15-17). Phone files: HEVC 1080p ~16 Mbps, VFR on most (avg 25.2-26.6 fps).
+**Written.** `docs/camera_upgrade_review.md`: stand first (3-3.5 m, sandbags, guy lines), spec (1080p30 CFR, rectilinear ~55-60°, ≥ 2 h untouched, app preview), picks (DJI Osmo Action 5 Pro / GoPro HERO13; < €100 used HERO8 Black), net-post fisheye refused (new geometry, net play on one image line, post shake), owed pipeline steps (> 1080p passes `ensure_1080` untouched, chapter join, detector check, focal prior relearns). No code.
 
 ### 2026-10-17 (hundred-and-twenty-first session) — #123: a block is credited to the defender at the net
 
@@ -512,10 +520,3 @@ Recording domain + GT conventions live in `AGENTS.md` §7 and
 **(f), not built (#121).** 1230 B's two players read alike against every anchor (a body: P1B 0.77 / P2B 0.81, the other 0.78 / 0.80), so `id_sims` cannot tell them apart. Over the 6 reviewed matches the slot margin does not predict a swap (half-rallies at 0.03-0.06: 3 of 6 swapped on 1230; every other level 87-98 % right), track ids do not persist across rallies, court side does not separate the two. The 22 per-touch names are ~7 with #117a; 5 far swaps remain, one key each. A real fix needs a new appearance signal (embeddings in the dump: a full re-run, owner gate).
 **(d) rest (#122).** `into_net` is a weak death read (like `fell_at_net`): when it contradicts the next serve the serve wins and the observed attack stays, instead of being trimmed as a pick-up (`match.py`). Same-code A/B over 6 matches + 20260920 + e1-e7: only 1000 P21 changes (3 -> 4 touches, the kill returns). The other 9 points of the 13 are one-offs: a net fault / block unread (1200 P6, masnou 1200 P35), a serve frame 2.8 s before its reception (1200 P7), the ball lost / serve-side reads (1230 P7, 1100 P12 / P13, masnou 1130 P32).
 **Owed.** `make republish-all` after merge (#120 moved 4 points, #122 one).
-
-### 2026-10-17 (hundred-and-nineteenth session) — #120: review time (d), the set nobody followed up
-
-**Asked (owner):** "do d, e, f" (Active next 0). **Diagnosis first (`scripts/review_corrections.py` + probes over the 6 review files).** (e) is mostly NOT a dig-vs-overpass rule: of 29 overpass relabels 15 follow a touch the run missed beside it (11 a missing attack / set = (d), 4 a missing block = backlog 1), 3 an invented touch, 11 pure labels (attack vs pass ratio 1.23, §11: not re-tunable on these). (d) has 4 sub-causes over its 13 points; the one that repeats (4 points: 1100 P10, 1200 P2, 1130 P18 + P29) is the LOSING team's second touch (a set) after which the ball stayed up longer than one arc, was tracked down on the same half and the run charged the setter with a handling error the unseen attacker made.
-**Built (`MatchAssembler._unseen_attack_on_own_half`, match.py).** Mirror of the winner-side `_finish_labels` rule: touch 2 (dig/set), flight out reached net height, `_second_arc`, ball tracked >= `UNDER_TAPE_MIN_COVERAGE` of the frames to the landing -> hidden uncredited spike (`unseen_final_attack`), no error. Coverage is what separates the false positive (1100 P16: 11 of 85 frames, a set that crossed the net, seen on frames).
-**Result.** Exactly those 4 points change on the 6 reviewed matches (touches + the setter's `error` outcome), scores / winners / every other point identical; 20260920 + e1-e7 byte-identical; 2 tests; suite green. `make republish-all` after merge.
-**Not done.** (d) other causes (an invented hidden touch after a slow serve: 1200 P7; spike vertex at the landing frame: 1200 P35; far attack lost: 1230 P7; the rally's dead-time tail) and (f); each its own mechanism.
