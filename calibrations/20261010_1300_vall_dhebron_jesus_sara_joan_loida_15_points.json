@@ -1,0 +1,150 @@
+{
+  "court_corners": [
+    [
+      564,
+      351
+    ],
+    [
+      1185,
+      354
+    ],
+    [
+      1820,
+      834
+    ],
+    [
+      80,
+      843
+    ]
+  ],
+  "midcourt_points": [
+    [
+      438,
+      479
+    ],
+    [
+      1353,
+      481
+    ]
+  ],
+  "net_top_points": [
+    [
+      438,
+      203
+    ],
+    [
+      1353,
+      211
+    ]
+  ],
+  "frame_dimensions": [
+    1080,
+    1920
+  ],
+  "source": "auto",
+  "auto": {
+    "version": 7,
+    "accepted": true,
+    "accepted_by": "checks",
+    "reasons": [],
+    "checks": {
+      "sand_colour_lab_ab": [
+        132.0,
+        142.0
+      ],
+      "tape_colour_lab_ab": [
+        121.0,
+        104.0
+      ],
+      "tape_read_by_darkness_too": false,
+      "near_baseline": {
+        "residual_px": 0.88,
+        "bow_px": 1.2,
+        "coverage": 0.63
+      },
+      "left_sideline": {
+        "residual_px": 0.44,
+        "bow_px": 27.6,
+        "tape_ends": [
+          [
+            569.0,
+            346.8
+          ]
+        ],
+        "coverage": 0.95
+      },
+      "right_sideline": {
+        "residual_px": 0.78,
+        "bow_px": 13.5,
+        "tape_ends": [
+          [
+            1178.5,
+            349.7
+          ],
+          [
+            1011.3,
+            238.0
+          ]
+        ],
+        "coverage": 0.98
+      },
+      "net_tape": {
+        "search_rows": [
+          147.8,
+          256.7
+        ],
+        "colour_spread": 7.0,
+        "contrast": 12.4,
+        "band_rows": 21,
+        "row_at_centre": 207.4,
+        "slope": 0.0082,
+        "other_bands_m_below": []
+      },
+      "far_tape": {
+        "coverage": 0.25,
+        "typical": 0.0
+      },
+      "far_baseline": {
+        "reads": [
+          {
+            "from": "camera",
+            "row_on_left_sideline": 351.7
+          },
+          {
+            "from": "far_tape",
+            "row_on_left_sideline": 350.6
+          },
+          {
+            "from": "left_end",
+            "row_on_left_sideline": 346.8
+          },
+          {
+            "from": "right_end",
+            "row_on_left_sideline": 346.5
+          },
+          {
+            "from": "right_end",
+            "row_on_left_sideline": 235.7
+          }
+        ],
+        "agreeing": [
+          "camera",
+          "far_tape",
+          "left_end",
+          "right_end"
+        ],
+        "row_on_left_sideline": 350.6,
+        "known_focals_px": [
+          1879
+        ]
+      },
+      "net_top_height_m": 2.39,
+      "camera": {
+        "focal_px": 1865.56,
+        "height_m": 3.36,
+        "behind_near_baseline_m": 8.05,
+        "across_m": 3.75
+      }
+    }
+  }
+}
