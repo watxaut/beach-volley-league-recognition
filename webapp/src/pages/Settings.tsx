@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useApp, useLoad } from '../app/state'
 import { ReportHead, Shots } from '../components/FeedbackList'
 import { Card, ErrorBox } from '../components/ui'
+import { ManagerName } from './Fantasy'
 import { explainError } from '../lib/api'
 
 export function Settings() {
@@ -30,10 +31,11 @@ export function Settings() {
         <p>Logged in as <strong>{session?.email}</strong>{profile?.role === 'admin' && <span className="badge" style={{ marginLeft: 8 }}>admin</span>}</p>
         <p>
           {me ? <>Linked to player <Link to={`/players/${me.id}`}>{me.display_name}</Link>.</>
-            : 'Not linked to a player yet — an admin links your account after your first recorded match.'}
+            : 'Not linked to a player: fine for fantasy. If you play in the league, an admin links your account after your first recorded match.'}
         </p>
         <button onClick={() => api.signOut()}>Log out</button>
       </Card>
+      <ManagerName current={profile?.display_name} onSaved={() => {}} />
       {me && (
         <Card title="Privacy">
           <p className="muted">

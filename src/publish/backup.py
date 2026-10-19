@@ -34,6 +34,12 @@ ADMIN_TABLES = {
     "fantasy_rules": "*",
     # members' bug reports / suggestions (the screenshots stay in Storage)
     "feedback": "*",
+    # the fantasy game (20261019100000): admin-built days, members' lineups
+    "fantasy_match_days": "*",
+    "fantasy_fixtures": "*",
+    "fantasy_fixture_players": "*",
+    "fantasy_prices": "*",
+    "fantasy_lineups": "*",
 }
 
 

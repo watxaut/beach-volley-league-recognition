@@ -19,6 +19,7 @@ export function Layout() {
           <nav className="nav" aria-label="Main">
             {me && <NavLink to={`/players/${me.id}`} className={link}>My stats</NavLink>}
             <NavLink to="/league" className={link}>League</NavLink>
+            <NavLink to="/fantasy" className={link}>Fantasy</NavLink>
             <NavLink to="/matches" className={link}>Matches</NavLink>
             <NavLink to="/measure" className={link}>How we measure</NavLink>
             {isAdmin && (

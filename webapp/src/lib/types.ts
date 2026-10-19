@@ -487,3 +487,119 @@ export interface NewFeedback {
   /** Already downscaled (lib/feedback.ts). */
   images: Blob[]
 }
+
+// The fantasy game (supabase/migrations/20261019100000_fantasy_game.sql):
+// match days of scheduled fixtures, a lineup per member, a captain.
+export type FantasyDayStatus = 'draft' | 'open'
+
+/** A match day as the admin edits it (table row). */
+export interface FantasyDay {
+  id: number
+  season: string
+  name: string
+  status: FantasyDayStatus
+  squad_size: number
+  budget: number
+  captain_multiplier: number
+  opened_at: string | null
+}
+export type FantasyDayPatch = Partial<Pick<FantasyDay, 'season' | 'name' | 'squad_size' | 'budget' | 'captain_multiplier'>>
+
+/** A scheduled match of a day; `match_id` is the published video once linked. */
+export interface FantasyFixture {
+  id: number
+  match_day_id: number
+  scheduled_at: string
+  venue: string | null
+  match_id: number | null
+  fantasy_published: boolean
+  cancelled: boolean
+}
+export type FantasyFixturePatch = Partial<Pick<FantasyFixture, 'scheduled_at' | 'venue' | 'cancelled'>>
+
+export interface FantasyFixturePlayer {
+  fixture_id: number
+  player_id: number
+  team: Team
+}
+
+/** Who differs between a fixture and its match's assigned slots. */
+export interface FixtureMismatch {
+  missing: string[]
+  extra: string[]
+}
+
+/** `fantasy_match_day()`: everything one match-day page needs. */
+export interface FantasyDayPage {
+  day: {
+    id: number
+    season: string
+    name: string
+    status: FantasyDayStatus
+    squad_size: number
+    budget: number
+    captain_multiplier: number
+    locks_at: string | null
+    locked: boolean
+    final: boolean
+  }
+  me: { manager: string | null }
+  fixtures: {
+    id: number
+    scheduled_at: string
+    venue: string | null
+    cancelled: boolean
+    fantasy_published: boolean
+    match_key: string | null
+    score_a: number | null
+    score_b: number | null
+    players: { player_id: number; team: Team }[]
+  }[]
+  players: {
+    player_id: number
+    display_name: string
+    price: number
+    is_override: boolean
+    per21: number | null
+    /** The last 5 fantasy scores, oldest first. */
+    form: number[]
+    /** The day's points, once a fixture of theirs is published to fantasy. */
+    points: number | null
+  }[]
+  my_lineup: FantasyLineup & { points: number | null; updated_at: string } | null
+  /** Every lineup, only once the day is locked. */
+  lineups: (FantasyLineup & { manager: string; is_me: boolean; points: number; rank: number })[] | null
+  n_lineups: number
+}
+
+export interface FantasyLineup {
+  player_ids: number[]
+  captain: number
+}
+
+/** `fantasy_days()`: one row per visible match day. */
+export interface FantasyDaySummary {
+  id: number
+  season: string
+  name: string
+  status: FantasyDayStatus
+  locks_at: string | null
+  locked: boolean
+  final: boolean
+  n_fixtures: number
+  has_lineup: boolean
+  my_points: number | null
+  leader: string | null
+  leader_points: number | null
+}
+
+/** `fantasy_standings()`: the season table. */
+export interface FantasyStanding {
+  manager: string
+  is_me: boolean
+  total: number
+  days_played: number
+  day_wins: number
+  last_points: number | null
+  rank: number
+}

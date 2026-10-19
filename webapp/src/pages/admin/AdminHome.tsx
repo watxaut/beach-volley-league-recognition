@@ -14,6 +14,7 @@ export function AdminLayout() {
       <nav className="nav" style={{ marginBottom: 16 }} aria-label="Admin">
         <NavLink to="/admin" end className={link}>Review queue</NavLink>
         <NavLink to="/admin/players" className={link}>Players & accounts</NavLink>
+        <NavLink to="/admin/fantasy" className={link}>Fantasy game</NavLink>
         <NavLink to="/admin/scoring" className={link}>Fantasy scoring</NavLink>
         <NavLink to="/admin/feedback" className={link}>Feedback{open.data ? ` (${open.data})` : ''}</NavLink>
       </nav>

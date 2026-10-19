@@ -4,6 +4,7 @@ import { useApp, useLoad } from '../../app/state'
 import { PlayByPlay } from '../../components/PlayByPlay'
 import { Card, ErrorBox, Loading, StatusBadge } from '../../components/ui'
 import { explainError } from '../../lib/api'
+import { FantasyLink } from './AdminFantasy'
 import {
   formatDate, MATCH_TYPE_LABEL, MATCH_TYPES, matchLabel, slotNames, teamName, TOURNAMENT_LEVEL_LABEL, TOURNAMENT_LEVELS,
 } from '../../lib/format'
@@ -156,6 +157,10 @@ export function AdminMatch() {
             {m.status === 'hidden' && <button onClick={() => setStatus('draft')}>Unhide (draft)</button>}
           </div>
         </div>
+      </Card>
+
+      <Card title="5 · Fantasy" action={<span className="muted small">Which fixture of the game this video is</span>}>
+        <FantasyLink match={m} participants={participants} />
       </Card>
 
       <Card title="Publication log" action={<span className="muted small">Every <code>make publish</code> of this video</span>}>

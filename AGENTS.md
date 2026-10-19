@@ -598,6 +598,25 @@ Pages). Rules that keep it correct:
 * **Fantasy values live in the database** (`fantasy_rulesets` +
   `fantasy_rules`, edited on the admin page). `src/publish/fantasy.py`
   `G1_RULES` mirrors the migration seed (pinned) for previews only.
+* **The fantasy game (owner, 2026-10-19, #127; `20261019100000_fantasy_game`,
+  `/fantasy`).** Members pick, per MATCH DAY, `squad_size` players of its
+  scheduled fixtures under a budget, one captain (x `captain_multiplier`); the
+  day locks at its first scheduled match. Rules to keep: (1) points follow LIVE
+  (owner decision): the game reads `player_match_fantasy`, so a review, a rule
+  change or `make republish-all` re-scores past days -- never snapshot points;
+  (2) a fixture counts only when an admin links it to its published match and
+  publishes it TO FANTASY; a player scores by `player_id` over those matches
+  (never by slot: an unknown slot is nobody's), a pick who did not play scores 0;
+  (3) prices are a SNAPSHOT taken when the day opens (percentile of fantasy per
+  21, admin override only while draft) and never move while people pick; the
+  rules of an open day are fixed; (4) lineups are written only through
+  `save_lineup()` and are private until the lock (others' only through the
+  definer functions after it); the tables show the member's fantasy name
+  (`set_my_display_name`), never an email; (5) an account needs no player: a
+  fantasy-only member is a normal invited member and lands on `/fantasy`; the
+  login stays invite-only (no open sign-up). The publisher never writes the
+  game's tables (admin- and member-owned); `make backup` exports them; demo mode
+  mirrors the rules (`webapp/src/lib/fantasy.ts`).
 * **Access rules live in the database** (RLS + security-definer functions);
   the web app never decides visibility. A schema change is a NEW file in
   `supabase/migrations/` (never edit an applied one) plus checks in

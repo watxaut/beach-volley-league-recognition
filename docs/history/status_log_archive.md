@@ -7599,3 +7599,15 @@ Deployed by the owner the same day (migration pushed, web redeployed, `make repu
 
 ### Session index lines moved out of STATUS.md (2026-10-17, #126; verbatim)
 - 2026-09-27 **#25** — open point 23 SHIPPED: live-debug producer/consumer decoupling; logs + rendered frames byte-identical; 8.0 → ~12 fps; +14 tests (Log below).
+
+## Archived 2026-10-19 (#127): the oldest Log session and the oldest Session index line moved out of STATUS.md verbatim (Log ≤3 sessions; index budget)
+
+### 2026-10-17 (hundred-and-twentieth session) — #121 / #122: review time (f) diagnosed, (d) rest
+
+**Asked (owner):** "do f", then "look at remaining d".
+**(f), not built (#121).** 1230 B's two players read alike against every anchor (a body: P1B 0.77 / P2B 0.81, the other 0.78 / 0.80), so `id_sims` cannot tell them apart. Over the 6 reviewed matches the slot margin does not predict a swap (half-rallies at 0.03-0.06: 3 of 6 swapped on 1230; every other level 87-98 % right), track ids do not persist across rallies, court side does not separate the two. The 22 per-touch names are ~7 with #117a; 5 far swaps remain, one key each. A real fix needs a new appearance signal (embeddings in the dump: a full re-run, owner gate).
+**(d) rest (#122).** `into_net` is a weak death read (like `fell_at_net`): when it contradicts the next serve the serve wins and the observed attack stays, instead of being trimmed as a pick-up (`match.py`). Same-code A/B over 6 matches + 20260920 + e1-e7: only 1000 P21 changes (3 -> 4 touches, the kill returns). The other 9 points of the 13 are one-offs: a net fault / block unread (1200 P6, masnou 1200 P35), a serve frame 2.8 s before its reception (1200 P7), the ball lost / serve-side reads (1230 P7, 1100 P12 / P13, masnou 1130 P32).
+**Owed.** `make republish-all` after merge (#120 moved 4 points, #122 one).
+
+### Session index line moved out of STATUS.md (2026-10-19, #127; verbatim)
+- 2026-09-27 **#26** — open point 22 mechanism 1 SHIPPED: anchor-free episode→GT-point order map (DP + BURST class, physics constraints) + far/near serve census on TRUE windows — …(log archive 2026-10-06)
