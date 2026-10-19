@@ -415,6 +415,34 @@ subtraction.
 8. **Publication log:** revisions per match with result, hash, pipeline
    version, bundle download and video link.
 
+### The fantasy game (#127, migration `20261019100000_fantasy_game.sql`)
+
+Until #127 "fantasy" was a stat: points per player per match. The game sits on
+top of it, on the same web (`/fantasy`, Admin → Fantasy game), with no new
+infrastructure. It follows the VNL / FPL pattern (owner decisions 2026-10-19):
+
+* **Match day** = fixtures scheduled ahead (start time, venue, the league
+  players of each pair; a guest is simply not listed) in a season. An admin
+  builds it as a draft, then opens it.
+* **Lineup:** `squad_size` (3) players of the day under a `budget` (22.5), one
+  captain scoring x `captain_multiplier` (2), a fresh lineup each day. Prices
+  are a snapshot taken at opening: 5.0 + 5.0 x the player's percentile of
+  fantasy per 21 over their last 10 published matches (7.5 without history),
+  overridable by an admin while the day is a draft.
+* **Lock:** the day's first scheduled match. A fixture cancelled after its time
+  still counts, so a lock never comes undone. Before it, a member sees only
+  their own lineup and a count; after it, every lineup.
+* **Points follow live:** a pick scores the player's `player_match_fantasy` in
+  the day's fixtures that an admin linked to their published match (the admin
+  match page's "5 · Fantasy" card) and published to fantasy. A review, a rule
+  change or `republish-all` re-scores past days, like every other stat.
+* **Tables:** the day ranking (live until every fixture is published or
+  cancelled, then final) and the season table (sum over locked days; a final
+  day's top score is a win, ties for each; wins break ties). Managers show
+  under their fantasy name (`set_my_display_name`), never an email.
+* **Accounts:** a fantasy-only member is a normal invited member with no player:
+  they land on `/fantasy` instead of a player page.
+
 ### Keeping the free tier healthy
 
 * **Pausing:** free projects pause after **7 days of inactivity**. A
@@ -485,6 +513,8 @@ Your three tables are the right core. Four refinements:
 | `match_publications` | publish call (**the log**) | pipeline (append-only) | `match_id`, `revision`, `result` (applied/unchanged), `content_sha256`, `pipeline_version`, `bundle_path`, `video_url`, counts, `score`, `published_by/at`, `notes` |
 | `fantasy_rulesets` | rule set | admin | `name`, `description`, `is_active` (unique when true) |
 | `fantasy_rules` | rule × set | admin | PK (`ruleset_id`, `rule_key`), `label`, `actions[]`, `outcome` (NULL = any), `assist_only`, `points`, `sort_order`; G1 seeded |
+| `fantasy_match_days`, `fantasy_fixtures`, `fantasy_fixture_players`, `fantasy_prices` | the game (#127) | admin (prices: snapshot RPC) | day: `season`, `name`, `status` (draft/open), `squad_size`, `budget`, `captain_multiplier`; fixture: `scheduled_at`, `venue`, `match_id` (the video), `fantasy_published`, `cancelled` |
+| `fantasy_lineups` | member × match day | the member, only via `save_lineup()` | `player_ids[]`, `captain_player_id` |
 | `action_overrides` (Phase 3) | manual correction | admin | `match_id`, `point_no`, `frame`, `field`, `value`, `orphaned`, `author`, `reason` |
 
 ### Modeling notes that matter

@@ -5,8 +5,12 @@
 import type { Api } from './api'
 import { blobDataUrl } from './feedback'
 import { hitSplit, longestRally, playerAnalytics, pointFantasy, serveRows, serveTargets, teamRally, type Seat, type Touch } from './analytics'
+import {
+  competitionRank, dayState, lineupPoints, lineupProblem, NO_HISTORY_PRICE, standings, suggestedPrices, type PriceSample,
+} from './fantasy'
 import type {
-  ActionName, ActionRow, BoxRow, FantasyRule, Feedback, LeaderRow, Match, MatchType, PointRow, Participant,
+  ActionName, ActionRow, BoxRow, FantasyDay, FantasyDayPage, FantasyDaySummary, FantasyFixture, FantasyFixturePlayer,
+  FantasyLineup, FantasyRule, Feedback, FixtureMismatch, LeaderRow, Match, MatchType, PointRow, Participant,
   Pass, Player, PlayerProfile, Profile, Publication, ReportPlayer, Ruleset, Serve, Session, Slot, Team, WindowParams,
 } from './types'
 
@@ -145,6 +149,9 @@ export function demoApi(): Api {
   const profiles: Profile[] = [
     { user_id: ME, email: 'ari@example.com', role: 'admin', display_name: 'Ari' },
     { user_id: '00000000-0000-0000-0000-0000000000b2', email: 'laia@example.com', role: 'viewer', display_name: null },
+    // fantasy-only members: accounts that play no match
+    { user_id: '00000000-0000-0000-0000-0000000000c1', email: 'sergi@example.com', role: 'viewer', display_name: 'Sergi' },
+    { user_id: '00000000-0000-0000-0000-0000000000c2', email: 'marta@example.com', role: 'viewer', display_name: 'Marta' },
   ]
   const rulesets: Ruleset[] = [{ id: 1, name: 'G1', description: 'Owner-ratified 2026-09-27', is_active: true }]
   let rules: FantasyRule[] = G1.map((r) => ({ ...r, ruleset_id: 1 }))
@@ -221,6 +228,88 @@ export function demoApi(): Api {
     return w.lastN ? kept.slice(0, w.lastN) : kept
   }
   const delay = <T,>(v: T) => new Promise<T>((res) => setTimeout(() => res(structuredClone(v)), 60))
+
+  // ── the fantasy game: the SQL of 20261019100000, over the demo league ──
+  const at = (days: number, hour: number, minute = 0) => {
+    const d = new Date()
+    d.setDate(d.getDate() + days)
+    d.setHours(hour, minute, 0, 0)
+    return d.toISOString()
+  }
+  const fDays: FantasyDay[] = [
+    { id: 1, season: '2026 Autumn', name: 'Match day 1', status: 'open', squad_size: 3, budget: 25, captain_multiplier: 2, opened_at: '2026-09-15T09:00:00Z' },
+    { id: 2, season: '2026 Autumn', name: 'Match day 2', status: 'open', squad_size: 3, budget: 25, captain_multiplier: 2, opened_at: at(-1, 9) },
+    { id: 3, season: '2026 Autumn', name: 'Match day 3', status: 'draft', squad_size: 3, budget: 25, captain_multiplier: 2, opened_at: null },
+  ]
+  const fixtures: FantasyFixture[] = [
+    { id: 1, match_day_id: 1, scheduled_at: '2026-09-20T16:30:00Z', venue: 'Bogatell', match_id: 1, fantasy_published: true, cancelled: false },
+    { id: 2, match_day_id: 1, scheduled_at: '2026-09-27T17:00:00Z', venue: 'Bogatell', match_id: 2, fantasy_published: true, cancelled: false },
+    { id: 3, match_day_id: 2, scheduled_at: at(2, 10), venue: 'Bogatell', match_id: null, fantasy_published: false, cancelled: false },
+    { id: 4, match_day_id: 2, scheduled_at: at(2, 11, 30), venue: 'Bogatell', match_id: null, fantasy_published: false, cancelled: false },
+    { id: 5, match_day_id: 3, scheduled_at: at(9, 10), venue: "Vall d'Hebron", match_id: null, fantasy_published: false, cancelled: false },
+  ]
+  const fxPlayers: FantasyFixturePlayer[] = ([
+    [1, 1, 'A'], [1, 2, 'A'], [1, 3, 'B'], [1, 4, 'B'],
+    [2, 5, 'A'], [2, 6, 'A'], [2, 1, 'B'], [2, 2, 'B'],
+    [3, 1, 'A'], [3, 3, 'A'], [3, 4, 'B'], [3, 5, 'B'],
+    [4, 2, 'A'], [4, 6, 'A'],                    // their opponents are guests nobody can pick
+    [5, 1, 'A'], [5, 2, 'A'], [5, 5, 'B'], [5, 6, 'B'],
+  ] as [number, number, Team][]).map(([fixture_id, player_id, team]) => ({ fixture_id, player_id, team }))
+  const prices = new Map<string, { price: number; is_override: boolean }>()
+  const lineups: (FantasyLineup & { day: number; user: string; updated_at: string })[] = [
+    { day: 1, user: ME, player_ids: [1, 3, 5], captain: 1, updated_at: '2026-09-19T20:00:00Z' },
+    { day: 1, user: '00000000-0000-0000-0000-0000000000c1', player_ids: [2, 4, 6], captain: 2, updated_at: '2026-09-19T21:00:00Z' },
+    { day: 1, user: '00000000-0000-0000-0000-0000000000c2', player_ids: [1, 2, 6], captain: 6, updated_at: '2026-09-20T08:00:00Z' },
+    { day: 2, user: '00000000-0000-0000-0000-0000000000c1', player_ids: [3, 4, 2], captain: 3, updated_at: at(0, 8) },
+  ]
+  const nameOf = (uid: string) => profiles.find((p) => p.user_id === uid)?.display_name ?? '?'
+  const dayFixtures = (day: number) => fixtures.filter((f) => f.match_day_id === day)
+  const dayPlayerIds = (day: number) => [...new Set(fxPlayers
+    .filter((fp) => dayFixtures(day).some((f) => f.id === fp.fixture_id)).map((fp) => fp.player_id))]
+  /** Published matches, newest first, per player (the price's history). */
+  const priceHistory = () => {
+    const h = new Map<number, PriceSample[]>()
+    const published = windowed(matches.filter((m) => m.match.status === 'published'), { season: null, from: null, to: null, lastN: null })
+    for (const m of published) for (const b of box(m)) {
+      if (b.player_id) h.set(b.player_id, [...(h.get(b.player_id) ?? []), { fantasy: b.fantasy, n_points: m.match.n_points ?? 0 }])
+    }
+    return h
+  }
+  const priceOf = (day: number, player: number) =>
+    prices.get(`${day}:${player}`)?.price ?? suggestedPrices(priceHistory()).get(player) ?? NO_HISTORY_PRICE
+  for (const d of fDays.filter((x) => x.status === 'open')) for (const p of dayPlayerIds(d.id)) prices.set(`${d.id}:${p}`, { price: priceOf(d.id, p), is_override: false })
+  /** SQL `fantasy_player_points`: fixtures published to fantasy, by player. */
+  const dayPoints = (day: number) => {
+    const out = new Map<number, number>()
+    for (const f of dayFixtures(day).filter((x) => x.fantasy_published && !x.cancelled && x.match_id !== null)) {
+      const m = byId(f.match_id!)
+      if (!m || m.match.status !== 'published') continue
+      for (const b of box(m)) if (b.player_id) out.set(b.player_id, Math.round(((out.get(b.player_id) ?? 0) + b.fantasy) * 10) / 10)
+    }
+    return out
+  }
+  const stateOf = (d: FantasyDay) => dayState(d.status, dayFixtures(d.id), new Date())
+  const dayScores = (day: FantasyDay) => {
+    const pts = dayPoints(day.id)
+    return lineups.filter((l) => l.day === day.id)
+      .map((l) => ({ user: l.user, points: lineupPoints(l, day.captain_multiplier, (p) => pts.get(p)) }))
+  }
+  const seeDay = (d: FantasyDay | undefined) => !!d && (d.status === 'open' || isAdmin())
+  const mismatch = (f: FantasyFixture): FixtureMismatch => {
+    const m = f.match_id === null ? undefined : byId(f.match_id)
+    const inMatch = m ? SLOTS.map((s) => m.slots[s]).filter((x): x is number => x !== null) : []
+    const inFixture = fxPlayers.filter((fp) => fp.fixture_id === f.id).map((fp) => fp.player_id)
+    const name = (id: number) => players.find((p) => p.id === id)!.display_name
+    return { missing: inFixture.filter((p) => !inMatch.includes(p)).map(name).sort(),
+             extra: inMatch.filter((p) => !inFixture.includes(p)).map(name).sort() }
+  }
+  const lockedNow = (day: number) => {
+    const d = fDays.find((x) => x.id === day)!
+    return stateOf(d).locked
+  }
+  const adminOnly = () => {
+    if (!isAdmin()) throw new Error('admins only')
+  }
 
   return {
     getSession: () => delay(session),
@@ -508,6 +597,185 @@ export function demoApi(): Api {
     clipUrl: async (path) => (path === DEMO_CLIP ? '/demo-clip.mp4' : null),
     async feedbackUrls(paths) {
       return Object.fromEntries(paths.filter((p) => shots[p]).map((p) => [p, shots[p]]))
+    },
+
+    fantasyDays(season = null) {
+      const rows: FantasyDaySummary[] = fDays.filter((d) => seeDay(d) && (!season || d.season === season)).map((d) => {
+        const st = stateOf(d)
+        const scores = dayScores(d)
+        const top = scores.length ? Math.max(...scores.map((x) => x.points)) : null
+        return {
+          id: d.id, season: d.season, name: d.name, status: d.status, ...st,
+          n_fixtures: dayFixtures(d.id).filter((f) => !f.cancelled).length,
+          has_lineup: lineups.some((l) => l.day === d.id && l.user === session?.userId),
+          my_points: scores.find((x) => x.user === session?.userId)?.points ?? null,
+          leader: st.locked && top !== null ? scores.filter((x) => x.points === top).map((x) => nameOf(x.user)).sort().join(', ') : null,
+          leader_points: st.locked ? top : null,
+        }
+      })
+      return delay(rows.sort((a, b) => (b.locks_at ?? '9').localeCompare(a.locks_at ?? '9') || b.id - a.id))
+    },
+    fantasyDay(id) {
+      const d = fDays.find((x) => x.id === id)
+      if (!seeDay(d)) return delay(null)
+      const st = stateOf(d!)
+      const pts = dayPoints(id)
+      const history = priceHistory()
+      const suggested = suggestedPrices(history)
+      const scores = dayScores(d!)
+      const ranks = competitionRank(scores.map((x) => x.points))
+      const mine = lineups.find((l) => l.day === id && l.user === session?.userId)
+      const page: FantasyDayPage = {
+        day: { id: d!.id, season: d!.season, name: d!.name, status: d!.status, squad_size: d!.squad_size, budget: d!.budget,
+               captain_multiplier: d!.captain_multiplier, ...st },
+        me: { manager: nameOf(session?.userId ?? '') === '?' ? null : nameOf(session!.userId) },
+        fixtures: dayFixtures(id).sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at)).map((f) => {
+          const m = f.match_id === null ? undefined : byId(f.match_id)
+          const shown = m && (m.match.status === 'published' || isAdmin())
+          return { id: f.id, scheduled_at: f.scheduled_at, venue: f.venue, cancelled: f.cancelled, fantasy_published: f.fantasy_published,
+                   match_key: shown ? m!.match.match_key : null, score_a: shown ? m!.match.score_a : null, score_b: shown ? m!.match.score_b : null,
+                   players: fxPlayers.filter((fp) => fp.fixture_id === f.id).map((fp) => ({ player_id: fp.player_id, team: fp.team })) }
+        }),
+        players: dayPlayerIds(id).map((pid) => {
+          const p = prices.get(`${id}:${pid}`)
+          const samples = history.get(pid) ?? []
+          const points = samples.slice(0, 10).reduce((t, x) => t + x.n_points, 0)
+          return {
+            player_id: pid, display_name: players.find((x) => x.id === pid)!.display_name,
+            price: p?.price ?? suggested.get(pid) ?? NO_HISTORY_PRICE, is_override: p?.is_override ?? false,
+            per21: points ? Math.round((samples.slice(0, 10).reduce((t, x) => t + x.fantasy, 0) / points) * 210) / 10 : null,
+            form: samples.slice(0, 5).map((x) => x.fantasy).reverse(), points: pts.get(pid) ?? null,
+          }
+        }).sort((a, b) => b.price - a.price || a.display_name.localeCompare(b.display_name)),
+        my_lineup: mine ? { player_ids: mine.player_ids, captain: mine.captain, updated_at: mine.updated_at,
+                            points: scores.find((x) => x.user === mine.user)?.points ?? null } : null,
+        lineups: !st.locked ? null : scores.map((x, i) => {
+          const l = lineups.find((y) => y.day === id && y.user === x.user)!
+          return { manager: nameOf(x.user), is_me: x.user === session?.userId, player_ids: l.player_ids, captain: l.captain,
+                   points: x.points, rank: ranks[i] }
+        }).sort((a, b) => a.rank - b.rank || a.manager.localeCompare(b.manager)),
+        n_lineups: lineups.filter((l) => l.day === id).length,
+      }
+      return delay(page)
+    },
+    fantasyStandings(season = null) {
+      const days = fDays.filter((d) => d.status === 'open' && (!season || d.season === season))
+        .map((d) => ({ d, st: stateOf(d) })).filter((x) => x.st.locked)
+        .map(({ d, st }) => ({ locks_at: st.locks_at!, final: st.final,
+                               scores: dayScores(d).map((x) => ({ manager: nameOf(x.user), points: x.points })) }))
+      const me = nameOf(session?.userId ?? '')
+      return delay(standings(days).map((r) => ({ ...r, is_me: r.manager === me })))
+    },
+    async saveLineup(id, playerIds, captain) {
+      const d = fDays.find((x) => x.id === id)
+      if (!d || d.status !== 'open') throw new Error('this match day is not open')
+      if (lockedNow(id)) throw new Error('this match day is locked')
+      if (nameOf(session!.userId) === '?') throw new Error('choose your manager name first')
+      const playing = dayFixtures(id).filter((f) => !f.cancelled).map((f) => f.id)
+      const inDay = fxPlayers.filter((fp) => playing.includes(fp.fixture_id)).map((fp) => fp.player_id)
+      const problem = lineupProblem(d, playerIds, captain, (p) => (inDay.includes(p) ? prices.get(`${id}:${p}`)?.price : undefined))
+      if (problem) throw new Error(problem)
+      const row = { day: id, user: session!.userId, player_ids: playerIds, captain, updated_at: new Date().toISOString() }
+      const i = lineups.findIndex((l) => l.day === id && l.user === row.user)
+      if (i >= 0) lineups[i] = row
+      else lineups.push(row)
+    },
+    async setMyName(name) {
+      const v = name.trim()
+      if (v.length < 2 || v.length > 30) throw new Error('a name has 2 to 30 characters')
+      if (profiles.some((p) => p.user_id !== session?.userId && p.display_name?.toLowerCase() === v.toLowerCase()))
+        throw new Error('that name is taken')
+      profiles.find((p) => p.user_id === session?.userId)!.display_name = v
+      return v
+    },
+    fantasyDayRows: () => delay(isAdmin() ? [...fDays].sort((a, b) => b.id - a.id) : fDays.filter((d) => d.status === 'open')),
+    async createFantasyDay(day) {
+      adminOnly()
+      if (fDays.some((d) => d.season === day.season && d.name === day.name)) throw new Error('fantasy_match_days_season_name_key')
+      const row: FantasyDay = { ...day, id: Math.max(0, ...fDays.map((d) => d.id)) + 1, status: 'draft', opened_at: null }
+      fDays.push(row)
+      return structuredClone(row)
+    },
+    async updateFantasyDay(id, patch) {
+      adminOnly()
+      const d = fDays.find((x) => x.id === id)!
+      if (d.status === 'open' && (['squad_size', 'budget', 'captain_multiplier'] as const).some((k) => k in patch && patch[k] !== d[k]))
+        throw new Error('the rules of an open match day are fixed')
+      Object.assign(d, patch)
+    },
+    async deleteFantasyDay(id) {
+      adminOnly()
+      if (fDays.find((d) => d.id === id)?.status !== 'draft') throw new Error('only a draft match day can be deleted')
+      fDays.splice(fDays.findIndex((d) => d.id === id), 1)
+      for (const f of dayFixtures(id)) fixtures.splice(fixtures.indexOf(f), 1)
+    },
+    fantasyFixtures: (dayId) => delay(fixtures.filter((f) => (dayId === undefined || f.match_day_id === dayId) && seeDay(fDays.find((d) => d.id === f.match_day_id)))
+      .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at))),
+    fixturePlayers: (ids) => delay(fxPlayers.filter((fp) => ids.includes(fp.fixture_id))),
+    async addFixture(dayId, scheduledAt, venue, list) {
+      adminOnly()
+      if (lockedNow(dayId)) throw new Error('the match day is locked')
+      for (const team of ['A', 'B'] as Team[]) if (list.filter((p) => p.team === team).length > 2) throw new Error('a side has two players')
+      if (new Set(list.map((p) => p.player_id)).size !== list.length) throw new Error('fantasy_fixture_players_pkey')
+      const id = Math.max(0, ...fixtures.map((f) => f.id)) + 1
+      fixtures.push({ id, match_day_id: dayId, scheduled_at: scheduledAt, venue, match_id: null, fantasy_published: false, cancelled: false })
+      fxPlayers.push(...list.map((p) => ({ ...p, fixture_id: id })))
+      if (fDays.find((d) => d.id === dayId)!.status === 'open')
+        for (const p of list) if (!prices.has(`${dayId}:${p.player_id}`)) prices.set(`${dayId}:${p.player_id}`, { price: priceOf(dayId, p.player_id), is_override: false })
+    },
+    async updateFixture(id, patch) {
+      adminOnly()
+      const f = fixtures.find((x) => x.id === id)!
+      if (patch.scheduled_at && patch.scheduled_at !== f.scheduled_at && lockedNow(f.match_day_id)) throw new Error('the match day is locked')
+      if (patch.cancelled && f.fantasy_published) throw new Error('fantasy_fixtures_published_needs_match')
+      Object.assign(f, patch)
+    },
+    async deleteFixture(id) {
+      adminOnly()
+      const f = fixtures.find((x) => x.id === id)!
+      if (fDays.find((d) => d.id === f.match_day_id)!.status === 'open') throw new Error('the match day is open: cancel the fixture instead')
+      fixtures.splice(fixtures.indexOf(f), 1)
+    },
+    async setFantasyPrice(dayId, playerId, price) {
+      adminOnly()
+      if (fDays.find((d) => d.id === dayId)?.status !== 'draft') throw new Error('prices are fixed once the match day is open')
+      if (price === null) prices.delete(`${dayId}:${playerId}`)
+      else prices.set(`${dayId}:${playerId}`, { price: Math.round(price * 2) / 2, is_override: true })
+    },
+    async openFantasyDay(dayId) {
+      adminOnly()
+      const d = fDays.find((x) => x.id === dayId)!
+      if (d.status !== 'draft') throw new Error('the match day is already open')
+      if (!dayPlayerIds(dayId).length) throw new Error('add the fixtures and their players first')
+      if (dayState('open', dayFixtures(dayId), new Date()).locked) throw new Error('its first match has already started')
+      for (const p of dayPlayerIds(dayId)) if (!prices.has(`${dayId}:${p}`)) prices.set(`${dayId}:${p}`, { price: priceOf(dayId, p), is_override: false })
+      d.status = 'open'
+      d.opened_at = new Date().toISOString()
+    },
+    async linkFixtureMatch(id, matchId) {
+      adminOnly()
+      const f = fixtures.find((x) => x.id === id)!
+      if (matchId === null) {
+        Object.assign(f, { match_id: null, fantasy_published: false })
+        return mismatch(f)
+      }
+      if (f.cancelled) throw new Error('the fixture was cancelled')
+      if (fixtures.some((x) => x.id !== id && x.match_id === matchId)) throw new Error('fantasy_fixtures_match_id_key')
+      Object.assign(f, { fantasy_published: f.fantasy_published && f.match_id === matchId, match_id: matchId })
+      return mismatch(f)
+    },
+    async fixtureMismatch(id) {
+      return mismatch(fixtures.find((x) => x.id === id)!)
+    },
+    async publishFixtureToFantasy(id, on) {
+      adminOnly()
+      const f = fixtures.find((x) => x.id === id)!
+      if (on) {
+        if (f.cancelled) throw new Error('the fixture was cancelled')
+        if (f.match_id === null) throw new Error('link the fixture to its match first')
+        if (byId(f.match_id)?.match.status !== 'published') throw new Error('publish the match first')
+      }
+      f.fantasy_published = on
     },
   }
 }

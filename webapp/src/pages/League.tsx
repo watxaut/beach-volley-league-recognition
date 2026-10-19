@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useApp, useLoad } from '../app/state'
 import { useWindowKey } from '../app/window'
 import { Card, ErrorBox, Loading } from '../components/ui'
@@ -55,8 +55,8 @@ export function League() {
       </div>
       {!me && (
         <div className="notice">
-          Your account isn't linked to a player yet. A league admin links accounts to players after your
-          first recorded match. Meanwhile you can browse the league.
+          You are browsing as a fan: <Link to="/fantasy">pick your fantasy lineup</Link>. If you play in the league, an
+          admin links your account to your player after your first recorded match.
         </div>
       )}
       <Card>

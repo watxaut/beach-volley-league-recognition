@@ -1029,6 +1029,298 @@ begin
 end $$;
 reset role;
 
+-- ── fantasy game (20261019100000): days, lineups, captain, tables ─────────
+-- The published check match is the day's only fixture. Its fantasy now:
+-- Ari 2.0, Joan 0.5, Opp1 1.0, Opp2 -1.0. Per 21 over each player's
+-- published matches (Ari also has 0 in the 20-point second match): Ari 1.9,
+-- Joan 5.25, Opp1 10.5, Opp2 -10.5 -> percentile prices 6.5, 8.5, 10.0, 5.0.
+do $$
+begin
+  assert not has_function_privilege('anon', 'public.fantasy_match_day(bigint)', 'execute')
+     and has_function_privilege('authenticated', 'public.fantasy_match_day(bigint)', 'execute')
+     and has_function_privilege('authenticated', 'public.save_lineup(bigint,bigint[],bigint)', 'execute')
+     and has_function_privilege('authenticated', 'public.fantasy_standings(text)', 'execute'),
+    'members (never anon) read the game and save lineups';
+  assert not has_function_privilege('authenticated', 'public.fantasy_player_points(bigint)', 'execute')
+     and not has_function_privilege('authenticated', 'public.fantasy_lineup_scores(bigint)', 'execute')
+     and not has_function_privilege('authenticated', 'public.fantasy_suggested_prices()', 'execute'),
+    'the scoring helpers are internal';
+  assert not has_table_privilege('authenticated', 'public.fantasy_lineups', 'insert, update, delete')
+     and not has_table_privilege('authenticated', 'public.fantasy_prices', 'insert, update, delete'),
+    'lineups and prices are written only through the RPCs';
+  assert not has_column_privilege('authenticated', 'public.fantasy_match_days', 'status', 'update')
+     and not has_column_privilege('authenticated', 'public.fantasy_fixtures', 'match_id', 'update')
+     and not has_column_privilege('authenticated', 'public.fantasy_fixtures', 'fantasy_published', 'update')
+     and has_column_privilege('authenticated', 'public.fantasy_fixtures', 'cancelled', 'update'),
+    'opening, linking and publishing to fantasy go through the admin RPCs';
+  assert has_table_privilege('service_role', 'public.fantasy_lineups', 'select'),
+    'make backup exports the lineups';
+end $$;
+
+insert into public.players (display_name) values ('Check Five');
+
+-- the admin builds a draft day: one fixture tomorrow, 2 + 2 players
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', true);
+do $$
+declare
+  v_day bigint;
+  v_fx  bigint;
+begin
+  insert into public.fantasy_match_days (season, name, budget) values ('S1', 'MD1', 25)
+  returning id into v_day;
+  insert into public.fantasy_fixtures (match_day_id, scheduled_at)
+  values (v_day, now() + interval '1 day') returning id into v_fx;
+  insert into public.fantasy_fixture_players (fixture_id, player_id, team)
+  select v_fx, p.id, case when p.display_name in ('Check Ari', 'Check Joan') then 'A' else 'B' end
+  from public.players p where p.display_name in ('Check Ari', 'Check Joan', 'Check Opp1', 'Check Opp2');
+  begin
+    insert into public.fantasy_fixture_players (fixture_id, player_id, team)
+    values (v_fx, (select id from public.players where display_name = 'Check Five'), 'A');
+    assert false, 'a side has two players';
+  exception when raise_exception then null;
+  end;
+  begin
+    update public.fantasy_fixtures set fantasy_published = true where id = v_fx;
+    assert false, 'publishing to fantasy goes through the RPC';
+  exception when insufficient_privilege then null;
+  end;
+  perform public.set_fantasy_price(v_day, (select id from public.players where display_name = 'Check Opp2'), 9.2);
+  perform set_config('check.fantasy_day', v_day::text, true);
+  perform set_config('check.fantasy_fixture', v_fx::text, true);
+end $$;
+reset role;
+
+-- a member sees no draft
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b0', true);
+do $$
+begin
+  assert (select count(*) from public.fantasy_match_days) = 0
+     and (select count(*) from public.fantasy_fixtures) = 0, 'a draft day is the admins''';
+  assert public.fantasy_match_day(current_setting('check.fantasy_day')::bigint) is null,
+    'the page of a draft day is empty for a member';
+  begin
+    insert into public.fantasy_match_days (season, name) values ('S1', 'mine');
+    assert false, 'a member cannot create a match day';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+
+-- the admin opens it: prices are snapshot, the override kept
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', true);
+do $$
+declare v_day bigint := current_setting('check.fantasy_day')::bigint;
+begin
+  perform public.open_fantasy_match_day(v_day);
+  assert (select jsonb_object_agg(p.display_name, pr.price) from public.fantasy_prices pr
+          join public.players p on p.id = pr.player_id where pr.match_day_id = v_day)
+         = '{"Check Ari": 6.5, "Check Joan": 8.5, "Check Opp1": 10.0, "Check Opp2": 9.0}'::jsonb,
+    'percentile prices, the override rounded to 0.5: '
+      || (select jsonb_object_agg(p.display_name, pr.price)::text from public.fantasy_prices pr
+          join public.players p on p.id = pr.player_id where pr.match_day_id = v_day);
+  begin
+    perform public.set_fantasy_price(v_day, (select id from public.players where display_name = 'Check Ari'), 5);
+    assert false, 'prices never move while people pick';
+  exception when raise_exception then null;
+  end;
+  begin
+    update public.fantasy_match_days set budget = 99 where id = v_day;
+    assert false, 'the rules of an open day are fixed';
+  exception when raise_exception then null;
+  end;
+  begin
+    delete from public.fantasy_fixtures where match_day_id = v_day;
+    assert false, 'an open day''s fixture is cancelled, never deleted';
+  exception when raise_exception then null;
+  end;
+end $$;
+reset role;
+
+-- Ari (a player account, no manager name yet) picks
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+do $$
+declare
+  v_day  bigint := current_setting('check.fantasy_day')::bigint;
+  v_ari  bigint := (select id from public.players where display_name = 'Check Ari');
+  v_joan bigint := (select id from public.players where display_name = 'Check Joan');
+  v_opp1 bigint := (select id from public.players where display_name = 'Check Opp1');
+  v_opp2 bigint := (select id from public.players where display_name = 'Check Opp2');
+  v_five bigint := (select id from public.players where display_name = 'Check Five');
+begin
+  begin
+    perform public.save_lineup(v_day, array[v_joan, v_opp1, v_opp2], v_opp1);
+    assert false, 'a manager name comes first';
+  exception when raise_exception then null;
+  end;
+  begin
+    perform public.set_my_display_name('bob');
+    assert false, 'manager names are unique, case-insensitively';
+  exception when raise_exception then null;
+  end;
+  assert public.set_my_display_name('  Ari  ') = 'Ari', 'the name is trimmed';
+  begin
+    perform public.save_lineup(v_day, array[v_ari, v_opp1, v_opp2], v_ari);
+    assert false, 'over budget (25.5 of 25)';
+  exception when raise_exception then null;
+  end;
+  begin
+    perform public.save_lineup(v_day, array[v_joan, v_opp1], v_joan);
+    assert false, 'exactly squad_size players';
+  exception when raise_exception then null;
+  end;
+  begin
+    perform public.save_lineup(v_day, array[v_joan, v_joan, v_opp1], v_joan);
+    assert false, 'a player only once';
+  exception when raise_exception then null;
+  end;
+  begin
+    perform public.save_lineup(v_day, array[v_joan, v_opp1, v_five], v_joan);
+    assert false, 'only players of the day';
+  exception when raise_exception then null;
+  end;
+  begin
+    perform public.save_lineup(v_day, array[v_joan, v_opp1, v_opp2], v_ari);
+    assert false, 'the captain is one of the picks';
+  exception when raise_exception then null;
+  end;
+  begin
+    insert into public.fantasy_lineups (match_day_id, user_id, player_ids, captain_player_id)
+    values (v_day, auth.uid(), array[v_ari], v_ari);
+    assert false, 'no lineup bypasses save_lineup';
+  exception when insufficient_privilege then null;
+  end;
+  -- Ari 2.0 + Joan 0.5 x2 + Opp2 -1.0 = 2.0 once published to fantasy
+  assert (public.save_lineup(v_day, array[v_ari, v_joan, v_opp2], v_joan) ->> 'cost')::numeric = 24.0,
+    'a lineup at 24.0 of 25';
+end $$;
+reset role;
+
+-- Bob picks; before the lock nobody sees another lineup
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b0', true);
+do $$
+declare
+  v_day bigint := current_setting('check.fantasy_day')::bigint;
+  v_ari bigint := (select id from public.players where display_name = 'Check Ari');
+  d     jsonb;
+begin
+  -- Ari 2.0 x2 + Joan 0.5 + Opp1 1.0 = 5.5 once published to fantasy (25.0 of 25)
+  perform public.save_lineup(v_day,
+    array[v_ari, (select id from public.players where display_name = 'Check Joan'),
+          (select id from public.players where display_name = 'Check Opp1')], v_ari);
+  assert (select count(*) from public.fantasy_lineups) = 1, 'a member reads only their own lineup';
+  d := public.fantasy_match_day(v_day);
+  assert d -> 'lineups' = 'null'::jsonb and (d ->> 'n_lineups')::int = 2
+     and (d -> 'my_lineup' ->> 'captain')::bigint = v_ari
+     and not (d -> 'day' ->> 'locked')::boolean,
+    'before the lock: my lineup and a count, nobody else''s: ' || d::text;
+  assert jsonb_array_length(d -> 'players') = 4 and jsonb_array_length(d -> 'fixtures') = 1,
+    'the day page lists its fixture and its four players';
+  assert (select count(*) from public.fantasy_standings('S1')) = 0, 'an unlocked day is in no table';
+end $$;
+reset role;
+
+-- the first match starts (the clock is fixed inside the transaction: move it)
+update public.fantasy_fixtures set scheduled_at = now() - interval '1 hour'
+where id = current_setting('check.fantasy_fixture')::bigint;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b0', true);
+do $$
+declare
+  v_day bigint := current_setting('check.fantasy_day')::bigint;
+  d     jsonb;
+begin
+  begin
+    perform public.save_lineup(v_day, array[1, 2, 3]::bigint[], 1);
+    assert false, 'a locked day takes no lineup';
+  exception when raise_exception then null;
+  end;
+  d := public.fantasy_match_day(v_day);
+  assert (d -> 'day' ->> 'locked')::boolean and not (d -> 'day' ->> 'final')::boolean
+     and jsonb_array_length(d -> 'lineups') = 2,
+    'after the lock every lineup is visible: ' || d::text;
+  assert (select sum(total) from public.fantasy_standings('S1')) = 0,
+    'nothing counts before a fixture is published to fantasy';
+end $$;
+reset role;
+
+-- the admin links the fixture to the published match and publishes it to fantasy
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', true);
+do $$
+declare
+  v_fx bigint := current_setting('check.fantasy_fixture')::bigint;
+  r    jsonb;
+begin
+  begin
+    insert into public.fantasy_fixtures (match_day_id, scheduled_at)
+    values (current_setting('check.fantasy_day')::bigint, now() + interval '2 hours');
+    assert false, 'a locked day takes no new fixture';
+  exception when raise_exception then null;
+  end;
+  begin
+    perform public.publish_fixture_to_fantasy(v_fx, true);
+    assert false, 'a fixture without its match cannot be published to fantasy';
+  exception when raise_exception then null;
+  end;
+  r := public.link_fixture_match(v_fx, current_setting('check.match_id')::bigint);
+  assert r = '{"missing": [], "extra": []}'::jsonb, 'the match has the fixture''s four players: ' || r::text;
+  perform public.publish_fixture_to_fantasy(v_fx, true);
+end $$;
+reset role;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b0', true);
+do $$
+declare
+  v_day bigint := current_setting('check.fantasy_day')::bigint;
+  d     jsonb;
+  s     record;
+begin
+  d := public.fantasy_match_day(v_day);
+  assert (d -> 'day' ->> 'final')::boolean, 'every fixture published: the day is final';
+  assert (d -> 'lineups' -> 0 ->> 'manager') = 'Bob' and (d -> 'lineups' -> 0 ->> 'points')::numeric = 5.5
+     and (d -> 'lineups' -> 0 ->> 'is_me')::boolean
+     and (d -> 'lineups' -> 1 ->> 'points')::numeric = 2.0 and (d -> 'lineups' -> 1 ->> 'rank')::int = 2,
+    'the captain counts x2: ' || (d -> 'lineups')::text;
+  select * into s from public.fantasy_standings('S1') where manager = 'Bob';
+  assert s.total = 5.5 and s.day_wins = 1 and s.days_played = 1 and s.rank = 1 and s.is_me,
+    'Bob leads the season';
+  assert (select day_wins from public.fantasy_standings('S1') where manager = 'Ari') = 0, 'Ari won no day';
+  assert (select leader = 'Bob' and leader_points = 5.5 and my_points = 5.5
+          from public.fantasy_days('S1') where id = v_day), 'the day list names the leader';
+  assert (select count(*) from public.fantasy_standings('other season')) = 0, 'a season filters';
+end $$;
+reset role;
+
+-- points follow live: a rule edit rescores the game (dig 1 -> 2: Ari 3, Opp1 2)
+update public.fantasy_rules set points = 2.0
+where rule_key = 'dig' and ruleset_id = (select id from public.fantasy_rulesets where is_active);
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b0', true);
+do $$
+begin
+  assert (select total from public.fantasy_standings('S1') where manager = 'Bob') = 8.5,
+    'a rule edit rescores past days (3 x2 + 0.5 + 2)';
+end $$;
+reset role;
+update public.fantasy_rules set points = 1.0
+where rule_key = 'dig' and ruleset_id = (select id from public.fantasy_rulesets where is_active);
+
+-- a hidden match scores nothing in the game
+do $$
+begin
+  update public.matches set status = 'hidden' where id = current_setting('check.match_id')::bigint;
+  assert (select sum(points) from public.fantasy_player_points(current_setting('check.fantasy_day')::bigint))
+         is null, 'a hidden match counts for nobody';
+  update public.matches set status = 'published' where id = current_setting('check.match_id')::bigint;
+end $$;
+
 -- a match with history cannot be hard-deleted (hide it instead)
 do $$
 begin

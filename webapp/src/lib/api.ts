@@ -8,9 +8,10 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { linkCache } from './clips'
 import type {
-  ActionRow, BoxRow, FantasyRule, Feedback, FeedbackStatus, LeaderRow, Match, MatchPatch, MatchReport, MatchSource, MatchType,
-  NewFeedback, Participant, Player, PlayerPatch, PlayerProfile, PointRow, Profile, Publication, Role, Ruleset,
-  Session, Slot, WindowParams,
+  ActionRow, BoxRow, FantasyDay, FantasyDayPage, FantasyDayPatch, FantasyDaySummary, FantasyFixture, FantasyFixturePatch,
+  FantasyFixturePlayer, FantasyRule, FantasyStanding, Feedback, FeedbackStatus, FixtureMismatch, LeaderRow, Match,
+  MatchPatch, MatchReport, MatchSource, MatchType, NewFeedback, Participant, Player, PlayerPatch, PlayerProfile, PointRow,
+  Profile, Publication, Role, Ruleset, Session, Slot, Team, WindowParams,
 } from './types'
 
 export interface Api {
@@ -66,6 +67,33 @@ export interface Api {
   setFeedbackStatus(id: number, status: FeedbackStatus, note: string | null): Promise<void>
   /** Short-lived links to screenshots (the author's own, or any for an admin). */
   feedbackUrls(paths: string[]): Promise<Record<string, string>>
+  // the fantasy game: members
+  fantasyDays(season?: string | null): Promise<FantasyDaySummary[]>
+  /** Null for a day the caller cannot see (a draft, for a member). */
+  fantasyDay(dayId: number): Promise<FantasyDayPage | null>
+  fantasyStandings(season?: string | null): Promise<FantasyStanding[]>
+  saveLineup(dayId: number, playerIds: number[], captain: number): Promise<void>
+  /** The name a member plays under; returns it as saved (trimmed). */
+  setMyName(name: string): Promise<string>
+  // the fantasy game: admins
+  fantasyDayRows(): Promise<FantasyDay[]>
+  createFantasyDay(day: Required<FantasyDayPatch>): Promise<FantasyDay>
+  updateFantasyDay(dayId: number, patch: FantasyDayPatch): Promise<void>
+  deleteFantasyDay(dayId: number): Promise<void>
+  /** Every fixture an admin can see (all days), or one day's. */
+  fantasyFixtures(dayId?: number): Promise<FantasyFixture[]>
+  fixturePlayers(fixtureIds: number[]): Promise<FantasyFixturePlayer[]>
+  addFixture(dayId: number, scheduledAt: string, venue: string | null,
+             players: { player_id: number; team: Team }[]): Promise<void>
+  updateFixture(fixtureId: number, patch: FantasyFixturePatch): Promise<void>
+  deleteFixture(fixtureId: number): Promise<void>
+  /** A price override while the day is a draft; null removes it. */
+  setFantasyPrice(dayId: number, playerId: number, price: number | null): Promise<void>
+  openFantasyDay(dayId: number): Promise<void>
+  /** Link a fixture to its match (the video), or unlink with null. */
+  linkFixtureMatch(fixtureId: number, matchId: number | null): Promise<FixtureMismatch>
+  fixtureMismatch(fixtureId: number): Promise<FixtureMismatch>
+  publishFixtureToFantasy(fixtureId: number, on: boolean): Promise<void>
 }
 
 // Rows are typed by the `Api` signatures (lib/types.ts mirrors the schema);
@@ -95,6 +123,11 @@ export function explainError(err: unknown): string {
     return 'You have sent a lot of reports today. Try again tomorrow.'
   if (/row-level security|exceeded the maximum allowed size|mime type/i.test(msg))
     return 'A screenshot could not be uploaded. Remove it and send the text, or try again tomorrow.'
+  if (/fantasy_match_days_season_name_key/i.test(msg)) return 'That season already has a match day with this name.'
+  if (/fantasy_fixture_players_pkey/i.test(msg)) return 'That player is already in this fixture.'
+  if (/fantasy_fixtures_match_id_key/i.test(msg)) return 'That match is linked to another fixture.'
+  if (/fantasy_fixtures_published_needs_match/i.test(msg))
+    return 'Remove the fixture from fantasy before cancelling it.'
   if (/captcha/i.test(msg))
     return 'Login is unavailable right now: the login function did not answer. Tell a league admin.'
   return msg
@@ -316,6 +349,80 @@ export function supabaseApi(url: string, publishableKey: string): Api {
       const out: Record<string, string> = {}
       for (const d of data ?? []) if (d.path && d.signedUrl) out[d.path] = d.signedUrl
       return out
+    },
+
+    async fantasyDays(season = null) {
+      return must(await sb.rpc('fantasy_days', { p_season: season }))
+    },
+    async fantasyDay(dayId) {
+      return must(await sb.rpc('fantasy_match_day', { p_day: dayId }))
+    },
+    async fantasyStandings(season = null) {
+      return must(await sb.rpc('fantasy_standings', { p_season: season }))
+    },
+    async saveLineup(dayId, playerIds, captain) {
+      must(await sb.rpc('save_lineup', { p_day: dayId, p_players: playerIds, p_captain: captain }))
+    },
+    async setMyName(name) {
+      return must(await sb.rpc('set_my_display_name', { p_name: name }))
+    },
+    async fantasyDayRows() {
+      return must(await sb.from('fantasy_match_days')
+        .select('id,season,name,status,squad_size,budget,captain_multiplier,opened_at')
+        .order('created_at', { ascending: false }))
+    },
+    async createFantasyDay(day) {
+      return must(await sb.from('fantasy_match_days').insert(day)
+        .select('id,season,name,status,squad_size,budget,captain_multiplier,opened_at').single())
+    },
+    async updateFantasyDay(dayId, patch) {
+      must(await sb.from('fantasy_match_days').update(patch).eq('id', dayId))
+    },
+    async deleteFantasyDay(dayId) {
+      must(await sb.from('fantasy_match_days').delete().eq('id', dayId))
+    },
+    async fantasyFixtures(dayId) {
+      let q = sb.from('fantasy_fixtures')
+        .select('id,match_day_id,scheduled_at,venue,match_id,fantasy_published,cancelled')
+      if (dayId !== undefined) q = q.eq('match_day_id', dayId)
+      return must(await q.order('scheduled_at'))
+    },
+    async fixturePlayers(fixtureIds) {
+      if (!fixtureIds.length) return []
+      return must(await sb.from('fantasy_fixture_players').select('fixture_id,player_id,team')
+        .in('fixture_id', fixtureIds))
+    },
+    async addFixture(dayId, scheduledAt, venue, players) {
+      const fx: { id: number } = must(await sb.from('fantasy_fixtures')
+        .insert({ match_day_id: dayId, scheduled_at: scheduledAt, venue }).select('id').single())
+      if (!players.length) return
+      const { error } = await sb.from('fantasy_fixture_players').insert(players.map((p) => ({ ...p, fixture_id: fx.id })))
+      if (error) {
+        // no half-made fixture: drop it again (refused once the day is open)
+        await sb.from('fantasy_fixtures').delete().eq('id', fx.id)
+        throw new Error(error.message)
+      }
+    },
+    async updateFixture(fixtureId, patch) {
+      must(await sb.from('fantasy_fixtures').update(patch).eq('id', fixtureId))
+    },
+    async deleteFixture(fixtureId) {
+      must(await sb.from('fantasy_fixtures').delete().eq('id', fixtureId))
+    },
+    async setFantasyPrice(dayId, playerId, price) {
+      must(await sb.rpc('set_fantasy_price', { p_day: dayId, p_player: playerId, p_price: price }))
+    },
+    async openFantasyDay(dayId) {
+      must(await sb.rpc('open_fantasy_match_day', { p_day: dayId }))
+    },
+    async linkFixtureMatch(fixtureId, matchId) {
+      return must(await sb.rpc('link_fixture_match', { p_fixture: fixtureId, p_match: matchId }))
+    },
+    async fixtureMismatch(fixtureId) {
+      return must(await sb.rpc('fixture_match_mismatch', { p_fixture: fixtureId }))
+    },
+    async publishFixtureToFantasy(fixtureId, on) {
+      must(await sb.rpc('publish_fixture_to_fantasy', { p_fixture: fixtureId, p_on: on }))
     },
   }
 }
