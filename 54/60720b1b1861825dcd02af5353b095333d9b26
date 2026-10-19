@@ -1,0 +1,59 @@
+AGENTS.md
+  s_9ed08fada71d0a::t_ba98ff1d98c73b 601-619
+STATUS.md
+  s_9ed08fada71d0a::t_939fcceb1f219c 85,127-129,132-134,139,142,403,505-511
+docs/history/status_log_archive.md
+  s_9ed08fada71d0a::t_59f0f85b9b7a19 7602-7613
+docs/web_platform_design.md
+  s_9ed08fada71d0a::t_773a30d23087f4 418-445,516-517
+src/publish/backup.py
+  s_9ed08fada71d0a::t_73e5ef64d342c9 37-42
+supabase/checks/rls_smoke.sql
+  s_9ed08fada71d0a::t_d6305c6a8a256a 1032-1323
+supabase/migrations/20261019100000_fantasy_game.sql
+  s_9ed08fada71d0a::t_6782a2c984983a 1-624
+webapp/src/App.tsx
+  s_9ed08fada71d0a::t_f11bdf0061086d 5,11,20-21,24,37-39,50-51
+webapp/src/components/Layout.tsx
+  s_9ed08fada71d0a::t_e7b2aafb0d7726 22
+webapp/src/lib/api.ts
+  s_9ed08fada71d0a::t_35de82fc7b92bb 11-14,70-96,126-130,353-426
+webapp/src/lib/demo.ts
+  s_9ed08fada71d0a::t_bb2cdaadc79958 8-10,12-13,152-154,232-313,601-779
+webapp/src/lib/fantasy.test.ts
+  s_9ed08fada71d0a::t_fafa6abe90b273 1-110
+webapp/src/lib/fantasy.ts
+  s_9ed08fada71d0a::t_51b31a27921695 1-152
+webapp/src/lib/types.ts
+  s_9ed08fada71d0a::t_44df43a1732842 490-605
+webapp/src/pages/Fantasy.tsx
+  s_9ed08fada71d0a::t_cb01cfc256b482 1-395
+webapp/src/pages/League.tsx
+  s_9ed08fada71d0a::t_0466d2393201c0 2,58-59
+webapp/src/pages/Settings.tsx
+  s_9ed08fada71d0a::t_c1caa9b760a1b0 6,34,38
+webapp/src/pages/admin/AdminFantasy.tsx
+  s_9ed08fada71d0a::t_98304561312fc3 1-414
+webapp/src/pages/admin/AdminHome.tsx
+  s_9ed08fada71d0a::t_5ff64011116f33 17
+webapp/src/pages/admin/AdminMatch.tsx
+  s_9ed08fada71d0a::t_6dccd9df6037f9 7,162-165
+webapp/src/styles.css
+  s_9ed08fada71d0a::t_7daa7292d89945 396-424
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "5460720b1b1861825dcd02af5353b095333d9b26",
+  "prompts": {},
+  "sessions": {
+    "s_9ed08fada71d0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f626634-3925-437d-ab6c-1860574a470c",
+        "model": "unknown"
+      },
+      "human_author": "Joan <watxaut@gmail.com>"
+    }
+  }
+}
